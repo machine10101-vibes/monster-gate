@@ -25,6 +25,7 @@ const NPC_DEFS = [
       'Slay five creatures and the guild board will pay you in gold. Use Space to roll away from danger.',
       'Hold Shift to raise your shield. Blocking a charging boar is very satisfying.',
       'Monster parts can be forged into gear. Bram the blacksmith keeps the forge by the south road.',
+      'Lira the alchemist sells healing draughts and spirit philters from her stall on the south road.',
     ],
   },
   {
@@ -39,6 +40,19 @@ const NPC_DEFS = [
       'Steel and leather, friend. That greatsword on your back has seen better days.',
       'Wraiths cannot take a hit from the hammer. Heavy swings, heavy knockback.',
       'Bring me monster parts and the forge will turn them into weapons and armor. Step up and have a look.',
+    ],
+  },
+  {
+    id: 'alchemist',
+    name: 'Lira',
+    title: 'Alchemist',
+    spot: 'alchemist',
+    service: 'alchemy',
+    yaw: -1.48,
+    look: { skin: 0xe8b892, hair: 0x2a1838, hairStyle: 'short', hairLen: 6, tunic: 0x3a2460, sleeve: 0x4c3278, apron: 0x1d3a32, pants: 0x241c30, boots: 0x1a141c, hat: 'hood', hatColor: 0x3a2460, belt: true, seed: 21, eye: 0x3ecf7a },
+    lines: [
+      'Bubbles, brews and things that glow. Mind the fumes.',
+      'A healing draught mends the cuts. A spirit philter fills the bolt.',
     ],
   },
   {
@@ -106,6 +120,10 @@ export class NPC {
     const look = d < 6 ? clamp(angDiff(this.yaw, Math.atan2(dx, dz)), -0.6, 0.6) : 0;
     m.head.rotation.y = look * 0.5;
     if (this.id === 'npc-smith') m.armR.rotation.x = -0.9 + Math.sin(t * 4) * 0.35 * (d > 6 ? 1 : 0.15);
+    if (this.id === 'npc-alchemist') {
+      m.armR.rotation.x = -1.15 + Math.sin(t * 3.2) * 0.28;
+      m.armL.rotation.x = -0.55 + Math.sin(t * 2.1) * 0.08;
+    }
     if (this.id === 'npc-guild' && d < 6) m.armR.rotation.z = -0.5 + Math.sin(t * 5) * 0.25;
     else m.armR.rotation.z *= 0.9;
     this.near = d < 2.6;

@@ -269,6 +269,21 @@ export function buildHumanoid(o = {}) {
         }
       for (let x = 5; x < 15; x++) for (let z = 15; z < 18; z++) H.set(x, rowY(11), z, J(shade(c.hatColor || 0x2f6f4f, 0.85), x, 11, z, seed, 0.05));
     }
+    if (c.hat === 'hood') {
+      const col = c.hatColor || 0x3a2458;
+      for (let z = 2; z < 18; z++)
+        for (let x = 2; x < 18; x++) {
+          const dx = (x + 0.5 - 10) / 7.4;
+          const dz = (z + 0.5 - 9.2) / 7.6;
+          const r = dx * dx + dz * dz;
+          if (r > 1) continue;
+          const h = Math.round((1 - Math.sqrt(r)) * 7);
+          for (let k = 0; k < h; k++) H.set(x, rowY(11) + k, z, J(col, x, k, z, seed, 0.06));
+        }
+      for (let y = rowY(5); y < rowY(12); y++)
+        for (let x = 4; x < 16; x++)
+          for (let z = 2; z < 6; z++) H.set(x, y, z, J(shade(col, 0.9), x, y, z, seed, 0.05));
+    }
     if (c.armor?.helm) (c.armor.helm === 'darksyceset' ? dark.paintHelm : paintHelm)(H, rowY);
     head = meshFrom(H, HC, rowY(0), HC, mat);
   }
@@ -501,8 +516,9 @@ export function buildHeld(kind) {
     for (let z = 22; z < 26; z++) for (let x = -2; x <= 1; x++) for (let y = -2; y <= 1; y++) set(x, y, z, 0x3e4046);
     for (let z = 26; z < 31; z++) for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, z, z < 29 ? 0xff7a1a : 0xffcf4a, true);
     set(0, 0, 31, 0xfff1b0, true);
-  } else if (kind === 'potion') {
-    for (let z = 4; z < 10; z++) for (let x = -3; x <= 2; x++) for (let y = -3; y <= 2; y++) set(x, y, z, (z >= 8) ? 0xffffff : 0xff4a6a, z < 8);
+  } else if (kind === 'potion' || kind === 'manapotion') {
+    const brew = kind === 'manapotion' ? 0x4ec8ff : 0xff4a6a;
+    for (let z = 4; z < 10; z++) for (let x = -3; x <= 2; x++) for (let y = -3; y <= 2; y++) set(x, y, z, (z >= 8) ? 0xffffff : brew, z < 8);
     for (let z = 10; z < 14; z++) for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, z, 0xdde8f0);
     for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, 14, 0x8a5a30);
   } else if (kind === 'stone') {

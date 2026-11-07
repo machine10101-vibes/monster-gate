@@ -14,7 +14,7 @@ import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
-import { HUD, ITEMS } from './ui/hud.js';
+import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
 import { Catalog } from './ui/catalog.js';
 import { MONSTERS, MATERIALS } from './data/catalog.js';
@@ -72,6 +72,8 @@ class Game {
     this.quest = { text: 'Slay 5 Gate monsters', n: 0, total: 5 };
     this.items = ITEMS.map((i) => ({ ...i }));
     this.progress = new Progress();
+    this.gold = this.progress.gold;
+    for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.catalog = new Catalog(this);
     this.discoverT = 0;
     this.sel = 0;
@@ -656,7 +658,7 @@ class Game {
 
   completeQuest() {
     const reward = 20 + this.rank * 15;
-    this.gold += reward;
+    this.addGold(reward);
     this.rank = Math.min(RANKS.length - 1, this.rank + 1);
     const p = this.player;
     p.maxHp = Math.min(40, 20 + this.rank * 2) + this.progress.bonusHp;
@@ -664,7 +666,6 @@ class Game {
     p.maxMana = 50 + this.rank * 5 + this.progress.bonusMana;
     this.quest = { text: `Slay ${5 + this.rank * 3} Gate monsters`, n: 0, total: 5 + this.rank * 3 };
     this.hud.setQuest(this.quest.text, 0, this.quest.total);
-    this.hud.setGold(this.gold);
     this.hud.setRank(RANKS[this.rank]);
     this.hud.banner('Hunt complete', `Rank ${RANKS[this.rank]}  +${reward}g`, 3800);
     this.audio.quest();
@@ -726,8 +727,7 @@ class Game {
           this.audio.potion();
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), '+2', 'heal');
         } else {
-          this.gold += k.value;
-          this.hud.setGold(this.gold);
+          this.addGold(k.value);
           this.audio.coin();
         }
         this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
@@ -937,6 +937,10 @@ class Game {
     const wd = w ? Math.hypot(p.x - w.x, p.z - w.z) : 99;
     const npcNear = this.ambient.npcs.find((n) => n.near);
     const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
+    if (!this.talkNpc && this.alchemyNear && !npcNear) {
+      this.openAlchemy();
+      return;
+    }
     if (!this.talkNpc && this.forgeNear && !npcNear) {
       this.openForge();
       return;
@@ -962,10 +966,71 @@ class Game {
     }
     const near = this.ambient.npcs.find((n) => n.near);
     if (!near) return;
+    if (near.def.service === 'alchemy') {
+      this.openAlchemy();
+      return;
+    }
     this.talkNpc = near;
-    near.dialogLeft = Math.min(2, near.def.lines.length - 1);
+    near.dialogLeft = near.def.lines.length - 1;
     this.hud.showDialog(near.name, near.nextLine());
     this.audio.select();
+  }
+
+  addGold(n) {
+    this.gold = Math.max(0, this.gold + n);
+    this.hud.setGold(this.gold);
+    this.progress.setGold(this.gold);
+  }
+
+  buyPotion(id) {
+    const offer = POTION_SHOP[id];
+    const it = this.items.find((i) => i.id === id);
+    if (!offer || !it) return false;
+    if (it.count >= offer.max) {
+      this.hud.toast('Your belt is full of those', 1400);
+      return false;
+    }
+    if (this.gold < offer.price) {
+      this.hud.toast('Not enough gold', 1400);
+      return false;
+    }
+    this.addGold(-offer.price);
+    it.count++;
+    this.progress.setStock(id, it.count);
+    this.itemsChanged();
+    this.audio.coin();
+    this.hud.toast(`Bought ${it.name}`, 1200);
+    const a = this.world.alchemy;
+    if (a) this.fx.burst(a.x, a.y + 0.7, a.z, id === 'manapotion' ? [0x4ec8ff, 0xffffff] : [0xff6a8a, 0xffffff], 10, 2, 0.07, 0.6, -1, 1);
+    return true;
+  }
+
+  openAlchemy() {
+    this.hud.openPanel('alchemy', this);
+    this.hud.panelId = 'alchemy';
+    this.audio.select();
+    const a = this.world.alchemy;
+    if (a) this.fx.burst(a.x, a.y + 0.8, a.z, [0x5dffb0, 0xb8ffe0, 0xffffff], 12, 1.6, 0.07, 0.8, -1.2, 1.4);
+  }
+
+  updateAlchemy(dt) {
+    const a = this.world.alchemy;
+    if (!a) return;
+    const P = this.player.pos;
+    const d = Math.hypot(P.x - a.x, P.z - a.z);
+    this.alchemyNear = d < 3.4 && this.started;
+    if (d < 20 && Math.random() < dt * 8) {
+      this.fx.burst(a.x + (Math.random() - 0.5) * 0.3, a.y + 0.55, a.z + (Math.random() - 0.5) * 0.3, [0x5dffb0, 0xc8ffe4, 0x4ec8ff], 1, 0.35, 0.07, 1.1, -1.6, 1.3);
+    }
+    if (this.alchemyNear && !this.alchemyHinted) {
+      this.alchemyHinted = true;
+      this.hud.toast("Lira's Alchemy - press F to buy potions", 2600);
+    }
+    if (this.alchemyNear) {
+      const [sx, sy, vis] = this.screenOf(a.x, a.y + 1.5, a.z, true);
+      this.hud.plate('alchemy', "Lira's Alchemy<small>F · buy potions</small>");
+      this.hud.placePlate('alchemy', sx, sy, vis);
+    } else this.hud.removePlate('alchemy');
   }
 
   openForge() {
@@ -1217,7 +1282,8 @@ class Game {
       this.hud.placePlate('waygate', sx, sy, vis);
     } else this.hud.removePlate('waygate');
     this.updateForge(dt);
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear;
+    this.updateAlchemy(dt);
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear || this.alchemyNear;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }

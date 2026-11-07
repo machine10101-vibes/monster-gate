@@ -204,15 +204,23 @@ export class Player {
       return false;
     }
     if (item.kind === 'use') {
+      const heal = item.heal || 0;
+      const mana = item.mana || 0;
       if (item.count <= 0) {
         this.game.hud.toast('Out of potions', 1200);
         return false;
       }
-      if (this.hp >= this.maxHp) {
+      if (heal && !mana && this.hp >= this.maxHp) {
         this.game.hud.toast('Already at full health', 1200);
         return false;
       }
+      if (mana && !heal && this.mana >= this.maxMana) {
+        this.game.hud.toast('Spirit already full', 1200);
+        return false;
+      }
       item.count--;
+      this.useFx = { heal, mana };
+      this.game.progress.setStock(item.id, item.count);
       this.setState('use', 0.6);
       this.game.itemsChanged();
       return true;
@@ -305,10 +313,20 @@ export class Player {
         moveDir.copy(want);
         if (!this.potionDone && this.stateT > 0.3) {
           this.potionDone = true;
-          this.heal(8);
+          const fx = this.useFx || { heal: 8, mana: 0 };
           g.audio.potion();
-          g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff6a8a, 0xffc0cc, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
-          g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2, this.pos.z), '+8', 'heal');
+          if (fx.heal) {
+            this.heal(fx.heal);
+            g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff6a8a, 0xffc0cc, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
+            g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2, this.pos.z), '+' + fx.heal, 'heal');
+          }
+          if (fx.mana) {
+            const before = this.mana;
+            this.mana = Math.min(this.maxMana, this.mana + fx.mana);
+            const got = Math.round(this.mana - before);
+            g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0x4ec8ff, 0xb8f0ff, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
+            g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.3, this.pos.z), '+' + got, 'mana');
+          }
         }
         if (this.stateT >= this.stateDur) {
           this.potionDone = false;
@@ -678,7 +696,7 @@ export class Player {
       case 'use': {
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
         const sw = Math.sin(tt * Math.PI);
-        armR = this.heldKind === 'potion' ? lerp(-0.3, -2.4, sw) : -1.6 + sw * -0.6;
+        armR = this.heldKind === 'potion' || this.heldKind === 'manapotion' ? lerp(-0.3, -2.4, sw) : -1.6 + sw * -0.6;
         if (this.heldKind !== 'potion') armL = -1.2;
         headPitch = -0.14 * sw;
         lean = -0.06 * sw;

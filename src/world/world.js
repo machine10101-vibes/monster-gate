@@ -294,6 +294,7 @@ export class World {
       chest: M.buildChest(1),
       forge: M.buildForge(3),
       anvil: M.buildAnvil(4),
+      cauldron: M.buildCauldron(6),
       hay: M.buildHay(1),
       fence: [1, 2, 3].map((s) => M.buildFencePiece(s)),
       sign: M.buildSignpost(1),
@@ -402,6 +403,16 @@ export class World {
     this.box(67, 85.5, 2.1, 0.9);
     this.putAt(stallB, 77, 86, 0, 1);
     this.box(77, 85.5, 2.1, 0.9);
+    const stallC = M.buildStall(3, [0x5b3d86, 0xe4d4f6], 'potion');
+    this.putAt(stallC, 72, 86, 0, 1);
+    this.box(72, 85.5, 2.1, 0.9);
+    const ax = 71.2;
+    const az = 83.8;
+    const ay = this.heightAt(ax, az);
+    this.putAt(m.cauldron, ax, az, 0.3, 1.15);
+    this.circle(ax, az, 0.42);
+    this.lightSpots.push({ x: ax, y: ay + 0.7, z: az, color: 0x5dffb0 });
+    this.alchemy = { x: ax, y: ay, z: az };
 
     const tentA = M.buildTent(1, 0x2f9a8e);
     const tentB = M.buildTent(2, 0x3c6fb5);
@@ -476,6 +487,7 @@ export class World {
     this.npcSpots = {
       guild: { x: GUILD.x - 1.4, z: GUILD.z + 3.5 },
       smith: { x: 64.3, z: 85.2 },
+      alchemist: { x: 73.4, z: 83.6 },
       farmer: { x: 90, z: 82 },
       child: { x: 72, z: 80.5 },
     };
@@ -882,6 +894,8 @@ export class World {
       ctx.fillStyle = '#7ef6ff';
       ctx.fillRect(Math.floor(this.waygate.x) - 2, Math.floor(this.waygate.z) - 2, 4, 4);
     }
+    ctx.fillStyle = '#6a3d86';
+    ctx.fillRect(70, 84, 4, 3);
     ctx.fillStyle = '#6b4a2b';
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
       ctx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);

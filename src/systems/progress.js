@@ -9,6 +9,8 @@ const blank = () => ({
   crafted: {},
   armor: {},
   weapon: null,
+  gold: 0,
+  stock: {},
 });
 
 /** Discoveries, harvested parts, crafted gear and what is worn. Persisted in localStorage. */
@@ -29,6 +31,29 @@ export class Progress {
     } catch {
       /* storage unavailable */
     }
+  }
+
+  get gold() {
+    return this.data.gold | 0;
+  }
+
+  setGold(n) {
+    this.data.gold = Math.max(0, n | 0);
+    this.save();
+  }
+
+  hasStock(id) {
+    return !!this.data.stock && Object.prototype.hasOwnProperty.call(this.data.stock, id);
+  }
+
+  stock(id) {
+    return this.data.stock[id] | 0;
+  }
+
+  setStock(id, n) {
+    if (!this.data.stock) this.data.stock = {};
+    this.data.stock[id] = Math.max(0, n | 0);
+    this.save();
   }
 
   seen(id) {
