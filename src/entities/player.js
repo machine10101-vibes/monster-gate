@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
+import { WeaponTrail } from '../engine/trail.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -67,6 +68,16 @@ export class Player {
     this.torchLight = new THREE.PointLight(0xffa850, 0, 10, 1.6);
     this.torchLight.position.set(0, 1.6, 0.4);
     this.obj.add(this.torchLight);
+    this.mv = new THREE.Vector3();
+    this.accSm = 0;
+    this.yawRate = 0;
+    this.footIdx = 0;
+    this.rollPuff = 0;
+    this.deadFx = false;
+    this.bank = 0;
+    this.trail = new WeaponTrail(game.scene);
+    this.tA = new THREE.Vector3();
+    this.tB = new THREE.Vector3();
     this.setHeld('blade');
     this.syncObj();
   }
@@ -128,7 +139,8 @@ export class Player {
       this.stamina = Math.max(0, this.stamina - 14 - dmg * 3);
       this.stamDelay = 0.9;
       this.knock.set((dx / d) * knock * 0.5, 0, (dz / d) * knock * 0.5);
-      g.fx.burst(this.pos.x + f.x * 0.6, this.pos.y + 1, this.pos.z + f.z * 0.6, [0xffffff, 0xffe27a, 0x9fd8ff], 9, 3.5, 0.08, 0.35);
+      g.fx.impact(this.pos.x + f.x * 0.6, this.pos.y + 1, this.pos.z + f.z * 0.6, -dx / d, -dz / d, [0xffffff, 0xffe27a, 0x9fd8ff], 0.9);
+      g.punch(0.12);
       g.audio.block();
       g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), 'Blocked', 'gold');
       g.shake(0.08);
@@ -144,7 +156,9 @@ export class Player {
     this.invuln = 0.9;
     this.hurtT = 0.4;
     this.knock.set((dx / d) * knock, 0, (dz / d) * knock);
-    g.fx.burst(this.pos.x, this.pos.y + 1.1, this.pos.z, [0xff4d5a, 0xffa0a8, 0xffffff], 12, 3.5, 0.09, 0.5);
+    g.fx.impact(this.pos.x, this.pos.y + 1.1, this.pos.z, dx / d, dz / d, [0xff4d5a, 0xffa0a8, 0xffffff], 1.1);
+    g.fx.burst(this.pos.x, this.pos.y + 1.1, this.pos.z, [0xff4d5a, 0xffa0a8, 0xffffff], 8, 3.5, 0.09, 0.5);
+    g.punch(0.28);
     g.audio.hurt();
     g.hud.hurtFlash();
     g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), '-' + dmg, 'hurt');
@@ -162,6 +176,8 @@ export class Player {
   die() {
     this.dead = true;
     this.setState('dead', 9);
+    this.deadFx = false;
+    this.game.slowmo(0.7, 0.35);
     this.game.onPlayerDeath();
   }
 
@@ -221,8 +237,9 @@ export class Player {
     this.yaw = Math.atan2(this.rollDir.x, this.rollDir.z);
     this.setState('roll', 0.42);
     this.invuln = 0.38;
+    this.rollPuff = 0;
     this.game.audio.evade();
-    this.game.fx.burst(this.pos.x, this.pos.y + 0.1, this.pos.z, [0xd9c9a0, 0xb8a888], 6, 1.6, 0.1, 0.4, 3, 0.4);
+    this.game.fx.dust(this.pos.x, this.pos.y, this.pos.z, 7, 1.8);
     return true;
   }
 
@@ -272,7 +289,7 @@ export class Player {
           this.attackHit = true;
           this.doAttackHit(it);
         }
-        const lunge = it.kind === 'melee' && t > hitT - 0.15 && t < hitT + 0.1 ? 3.2 : 0;
+        const lunge = it.kind === 'melee' && t > hitT - 0.15 && t < hitT + 0.1 ? (this.combo === 2 ? 5.2 : 4.4) : 0;
         speed = lunge + inputMag * 1.3;
         moveDir.copy(this.facing);
         if (lunge === 0 && inputMag > 0.1) moveDir.copy(want).normalize();
@@ -314,10 +331,19 @@ export class Player {
 
     if (this.wading && this.state !== 'roll') speed *= 0.65;
 
-    this.vel.copy(moveDir).multiplyScalar(speed).add(this.knock);
+    const prevAlong = this.vel.x * Math.sin(this.yaw) + this.vel.z * Math.cos(this.yaw);
+    const rate = this.state === 'roll' ? 45 : this.state === 'attack' ? 26 : speed > 0 ? 15 : 12;
+    this.mv.x += (moveDir.x * speed - this.mv.x) * Math.min(1, dt * rate);
+    this.mv.z += (moveDir.z * speed - this.mv.z) * Math.min(1, dt * rate);
+    this.vel.copy(this.mv).add(this.knock);
     this.knock.multiplyScalar(Math.max(0, 1 - dt * 9));
     this.moveBy(this.vel.x * dt, this.vel.z * dt);
     this.speed = Math.hypot(this.vel.x, this.vel.z);
+    if (dt > 1e-4) {
+      const along = this.vel.x * Math.sin(this.yaw) + this.vel.z * Math.cos(this.yaw);
+      this.accSm += ((along - prevAlong) / dt - this.accSm) * Math.min(1, dt * 9);
+    }
+    const yawBefore = this.yaw;
 
     if (!this.dead && this.state !== 'roll' && this.state !== 'attack') {
       let target = this.yaw;
@@ -326,16 +352,35 @@ export class Player {
       } else if (inputMag > 0.1) target = Math.atan2(moveDir.x, moveDir.z);
       this.yaw += angDiff(this.yaw, target) * Math.min(1, dt * 16);
     }
+    if (dt > 1e-4) this.yawRate += (clamp(angDiff(yawBefore, this.yaw) / dt, -14, 14) - this.yawRate) * Math.min(1, dt * 8);
 
     this.updateGround(dt);
 
     const moving = this.speed > 0.4 && this.state !== 'dead';
     this.moveAmt = lerp(this.moveAmt, moving ? clamp(this.speed / 4.7, 0.3, 1.4) : 0, Math.min(1, dt * 12));
-    this.cycle += dt * (this.speed * 1.85 + 0.01);
-    if (moving && this.state === 'idle' && Math.sin(this.cycle * 1.0) < -0.96) g.audio.step();
+    this.cycle += dt * (this.speed * 2.2 + 0.01);
+    const foot = Math.floor(this.cycle / Math.PI);
+    if (foot !== this.footIdx) {
+      this.footIdx = foot;
+      if (moving && (this.state === 'idle' || this.state === 'use') && this.speed > 1.2 && !this.wading) {
+        g.audio.step();
+        if (this.speed > 3) g.fx.dust(this.pos.x - Math.sin(this.yaw) * 0.1, this.pos.y, this.pos.z - Math.cos(this.yaw) * 0.1, 2, 0.7);
+      }
+    }
+    if (this.state === 'idle' && this.accSm < -22 && this.speed > 2.4 && !this.wading && Math.random() < dt * 40) {
+      g.fx.dust(this.pos.x, this.pos.y, this.pos.z, 2, 1.2);
+    }
+    if (this.state === 'roll') {
+      this.rollPuff -= dt;
+      if (this.rollPuff <= 0) {
+        this.rollPuff = 0.06;
+        g.fx.dust(this.pos.x, this.pos.y, this.pos.z, 2, 0.8);
+      }
+    }
 
     this.pose(dt);
     this.syncObj();
+    this.updateTrail(dt);
 
     this.model.mat.emissive.setRGB(this.hurtT > 0.2 ? 0.6 : 0, 0, 0);
     if (this.invuln > 0 && this.hurtT <= 0 && this.state !== 'roll') {
@@ -415,9 +460,17 @@ export class Player {
         g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25)), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
         hits++;
       }
+      if (this.combo === 2) {
+        const sx = this.pos.x + f.x * reach * 0.75;
+        const sz = this.pos.z + f.z * reach * 0.75;
+        g.fx.shockwave(sx, this.pos.y, sz, 0xd9c9a0, 1.6);
+        g.shake(0.2);
+        g.punch(0.2);
+      }
       if (hits) {
-        g.hitstop(0.05 + Math.min(0.06, hits * 0.02));
-        g.shake(0.18);
+        g.hitstop(0.05 + Math.min(0.06, hits * 0.02) + (this.combo === 2 ? 0.04 : 0));
+        g.shake(this.combo === 2 ? 0.3 : 0.18);
+        g.punch(this.combo === 2 ? 0.34 : 0.16);
         this.fury = Math.min(100, this.fury + 7 * hits);
         g.audio.hit();
       }
@@ -472,13 +525,34 @@ export class Player {
     }
   }
 
+  updateTrail(dt) {
+    const tr = this.trail;
+    const it = this.attackItem;
+    if (this.state === 'attack' && it && it.kind === 'melee' && !this.dead) {
+      const tt = this.stateT / this.stateDur;
+      const hitT = it.hit / it.dur;
+      if (tt > hitT - 0.12 && tt < hitT + (1 - hitT) * 0.55) {
+        const spec = TRAIL_SPEC[this.heldKind] || TRAIL_SPEC.blade;
+        tr.setStyle(this.combo === 2 ? spec.hot : spec.col, 0.22);
+        this.obj.updateMatrixWorld(true);
+        this.tA.set(spec.b[0], spec.b[1], spec.b[2]);
+        this.tB.set(spec.t[0], spec.t[1], spec.t[2]);
+        this.model.heldSlot.localToWorld(this.tA);
+        this.model.heldSlot.localToWorld(this.tB);
+        tr.add(this.tA, this.tB);
+      }
+    }
+    tr.update(dt);
+  }
+
   pose(dt) {
     const m = this.model;
     const t = this.game.time;
     const walk = Math.sin(this.cycle);
+    const cs = Math.cos(this.cycle);
     const mv = this.moveAmt;
-    const heldBlade = this.heldKind === 'blade' || this.heldKind === 'axe' || this.heldKind === 'pick' || this.heldKind === 'hammer' || this.heldKind === 'budgeblade' || this.heldKind === 'budgemaul' || this.heldKind === 'darkscythe';
-    const k = Math.min(1, dt * 18);
+    const run = Math.min(1.1, mv);
+    const heldBlade = BLADES.has(this.heldKind);
     let armR = heldBlade ? -0.85 : -0.25;
     let armL = 0;
     let armRz = 0;
@@ -487,21 +561,47 @@ export class Player {
     let lean = 0;
     let crouch = 0;
     let pivotX = 0;
+    let pivotY = 0.55;
     let headPitch = 0;
+    let headYaw = 0;
+    let tilt = 0;
+    let hipX = 0;
+    let legExtraL = 0;
+    let legExtraR = 0;
+    let liftL = 0;
+    let liftR = 0;
+    let rate = 22;
 
-    armR += -walk * 0.45 * mv * (heldBlade ? 0.5 : 1);
-    armL = walk * 0.7 * mv;
+    const idle = 1 - Math.min(1, mv * 2);
+    armR += walk * 0.55 * mv * (heldBlade ? 0.4 : 1);
+    armL = -walk * 1.0 * mv;
+    armLz = 0.05 + run * 0.1;
+    armRz = -0.05 - run * 0.08;
     let legL = walk * 0.8 * mv;
     let legR = -walk * 0.8 * mv;
-    const breathe = Math.sin(t * 2.2) * 0.012;
-    let bob = Math.abs(Math.sin(this.cycle)) * 0.035 * mv + breathe;
-    if (mv < 0.1) armR += Math.sin(t * 2.2) * 0.03;
+    liftL = Math.max(0, -cs) * 0.11 * run;
+    liftR = Math.max(0, cs) * 0.11 * run;
+    legExtraL = -Math.max(0, -cs) * 0.3 * run;
+    legExtraR = -Math.max(0, cs) * 0.3 * run;
+    torsoYaw = walk * 0.2 * run;
+    lean = run * 0.1 + clamp(this.accSm * 0.0055, -0.14, 0.2);
+    tilt = clamp(-this.yawRate * 0.012, -0.16, 0.16) * Math.min(1, run + 0.2);
+    hipX = -walk * 0.02 * run + Math.sin(t * 0.8) * 0.012 * idle;
+    tilt += hipX * -1.5;
+    armR += Math.sin(t * 2.2) * 0.03 * idle;
+    armL += Math.sin(t * 2.2 + 1) * 0.04 * idle;
+    armLz += Math.sin(t * 1.6) * 0.02 * idle;
+    headYaw = Math.sin(t * 0.55) * 0.18 * idle + Math.sin(t * 1.3) * 0.05 * idle;
+    headPitch = -lean * 0.6;
+    let bobExtra = Math.sin(t * 2.2) * 0.012 * idle;
 
+    const flinch = this.hurtT > 0 ? Math.min(1, this.hurtT / 0.4) : 0;
     if (this.shielding && this.state !== 'attack') {
       armL = -1.42;
       armLz = 0.12;
       armR = heldBlade ? -1.05 : armR;
       torsoYaw = -0.2;
+      crouch += 0.025;
     }
 
     switch (this.state) {
@@ -510,85 +610,196 @@ export class Player {
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
         const hitT = it.hit / it.dur;
         const dir = this.combo === 1 ? -1 : 1;
+        rate = 30;
         if (it.kind === 'melee') {
+          const over = this.combo === 2;
           if (tt < hitT) {
-            const p = ease(tt / hitT);
-            armR = lerp(armR, this.combo === 2 ? -3.0 : -2.55, p);
-            torsoYaw = lerp(0, 0.6 * dir, p);
-            lean = lerp(0, -0.12, p);
-            crouch = lerp(0, 0.03, p);
+            const q = tt / hitT;
+            const p = ease(q);
+            const hold = Math.pow(q, 2.2);
+            armR = lerp(armR, over ? -3.05 : -2.55, p);
+            armRz = lerp(armRz, over ? 0.25 : 0.55 * dir, p);
+            torsoYaw = lerp(0, over ? 0 : 0.7 * dir, p);
+            lean = lerp(lean, over ? -0.3 : -0.16, p);
+            crouch = lerp(0, over ? 0.02 : 0.05, hold);
+            legL = lerp(legL, 0.5, p);
+            legR = lerp(legR, -0.1, p);
+            armL = lerp(armL, over ? -2.4 : 0.5, p);
+            headPitch = over ? -0.15 * p : 0;
+            tilt = lerp(tilt, -0.06 * dir, p);
           } else {
-            const p = ease(clamp((tt - hitT) / (1 - hitT), 0, 1));
-            const fast = Math.min(1, (tt - hitT) / 0.2);
-            armR = lerp(-2.55, -0.25, ease(fast)) + (p > 0.5 ? (p - 0.5) * 0.9 : 0);
-            torsoYaw = lerp(0.6 * dir, -0.75 * dir, ease(fast)) * (1 - p * 0.7);
-            lean = lerp(-0.12, 0.28, ease(fast)) * (1 - p * 0.8);
-            crouch = 0.04 * (1 - p);
+            const q = clamp((tt - hitT) / (1 - hitT), 0, 1);
+            const fast = ease(Math.min(1, (tt - hitT) / 0.16));
+            const settle = ease(clamp((q - 0.45) / 0.55, 0, 1));
+            if (over) {
+              armR = lerp(-3.05, 0.35, fast) * (1 - settle) + settle * -0.5;
+              armL = lerp(-2.4, -0.2, fast) * (1 - settle);
+              torsoYaw = 0;
+              lean = lerp(-0.3, 0.55, fast) * (1 - settle * 0.9);
+              crouch = lerp(0.02, 0.14, fast) * (1 - settle);
+              legL = lerp(0.5, 0.9, fast) * (1 - settle);
+              legR = lerp(-0.1, -0.85, fast) * (1 - settle);
+              headPitch = 0.2 * fast * (1 - settle);
+            } else {
+              armR = lerp(-2.55, -0.35, fast) * (1 - settle) + settle * -0.6;
+              armRz = lerp(0.55 * dir, -0.3 * dir, fast) * (1 - settle);
+              torsoYaw = lerp(0.7 * dir, -0.85 * dir, fast) * (1 - settle * 0.8);
+              lean = lerp(-0.16, 0.34, fast) * (1 - settle * 0.9);
+              crouch = lerp(0.05, 0.1, fast) * (1 - settle);
+              legL = lerp(0.5, 0.75, fast) * (1 - settle);
+              legR = lerp(-0.1, -0.75, fast) * (1 - settle);
+              armL = lerp(0.5, -0.5, fast) * (1 - settle);
+              tilt = lerp(-0.06 * dir, 0.1 * dir, fast) * (1 - settle);
+            }
           }
-          if (this.combo === 2 && tt >= hitT) pivotX = 0;
+          legExtraL = 0;
+          legExtraR = 0;
+          liftL = 0;
+          liftR = 0;
         } else if (it.kind === 'ranged') {
           const p = tt < 0.6 ? ease(tt / 0.6) : 1 - ease((tt - 0.6) / 0.4);
+          const rel = tt > 0.6 ? Math.max(0, 1 - (tt - 0.6) / 0.12) : 0;
           armR = lerp(-0.4, -1.5, p);
           armL = lerp(0, -1.5, p);
           torsoYaw = -0.4 * p;
+          lean = lerp(0, -0.06, p) - rel * 0.1;
+          crouch = 0.03 * p;
+          legL = lerp(legL, 0.35, p);
+          legR = lerp(legR, -0.35, p);
+          headPitch = -0.05 * p;
         } else {
           const p = tt < hitT / it.dur ? ease(tt / (hitT / it.dur)) : 1;
           armR = tt < 0.5 ? lerp(-0.6, -2.4, p) : lerp(-2.4, -0.4, ease((tt - 0.5) / 0.5));
           torsoYaw = tt < 0.5 ? 0.4 * p : -0.3;
+          lean = tt < 0.5 ? -0.1 * p : 0.2 * (1 - ease((tt - 0.5) / 0.5));
         }
         break;
       }
       case 'use': {
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
-        armR = this.heldKind === 'potion' ? lerp(-0.3, -2.4, Math.sin(tt * Math.PI)) : -1.6 + Math.sin(tt * Math.PI) * -0.6;
+        const sw = Math.sin(tt * Math.PI);
+        armR = this.heldKind === 'potion' ? lerp(-0.3, -2.4, sw) : -1.6 + sw * -0.6;
         if (this.heldKind !== 'potion') armL = -1.2;
-        headPitch = -0.12 * Math.sin(tt * Math.PI);
+        headPitch = -0.14 * sw;
+        lean = -0.06 * sw;
         break;
       }
       case 'roll': {
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
         pivotX = ease(tt) * TAU;
-        armR = -1.7;
-        armL = -1.7;
-        legL = 1.2;
-        legR = 1.2;
-        crouch = 0.22 * Math.sin(tt * Math.PI);
+        armR = -1.8;
+        armL = -1.8;
+        armLz = 0.3;
+        armRz = -0.3;
+        legL = 1.35;
+        legR = 1.35;
+        legExtraL = 0;
+        legExtraR = 0;
+        liftL = 0;
+        liftR = 0;
+        crouch = 0.24 * Math.sin(tt * Math.PI);
+        lean = 0;
+        tilt = 0;
+        torsoYaw = 0;
+        pivotY = 0.55 - 0.1 * Math.sin(tt * Math.PI);
+        rate = 40;
         break;
       }
-      case 'stagger':
-        armR = -0.2;
-        armL = 0.2;
-        lean = -0.3;
+      case 'stagger': {
+        const wob = Math.sin(this.stateT * 22) * 0.08;
+        armR = -0.1 + wob;
+        armL = 0.3 - wob;
+        armRz = -0.5;
+        armLz = 0.5;
+        lean = -0.4;
+        headPitch = -0.3;
+        crouch = 0.06;
+        legL = 0.4;
+        legR = -0.35;
+        torsoYaw = wob;
         break;
+      }
       case 'dead': {
-        const tt = clamp(this.stateT / 0.7, 0, 1);
-        pivotX = -ease(tt) * 1.5;
-        armR = 0.5;
-        armL = 0.5;
+        const u = this.stateT;
+        const kneel = ease(clamp(u / 0.35, 0, 1));
+        const fall = clamp((u - 0.3) / 0.75, 0, 1);
+        const bounce = fall > 0 ? 1 - Math.exp(-5.5 * fall) * Math.cos(9 * fall) : 0;
+        crouch = 0.16 * kneel;
+        legL = 0.9 * kneel;
+        legR = -0.5 * kneel;
+        legExtraL = 0;
+        legExtraR = 0;
+        liftL = 0;
+        liftR = 0;
+        lean = -0.2 * kneel;
+        pivotX = -bounce * 1.52;
+        pivotY = 0.55 - 0.27 * ease(fall);
+        armR = 0.5 - kneel * 0.6;
+        armL = 0.4 - kneel * 0.5;
+        armRz = -0.9 * ease(fall);
+        armLz = 0.9 * ease(fall);
+        headPitch = -0.3 * kneel;
+        tilt = 0;
+        torsoYaw = 0;
+        rate = 16;
+        if (!this.deadFx && fall > 0.5) {
+          this.deadFx = true;
+          this.game.fx.shockwave(this.pos.x, this.pos.y, this.pos.z, 0xd9c9a0, 1.2);
+          this.game.shake(0.25);
+        }
         break;
       }
       default:
     }
 
-    const s = Math.min(1, dt * 22);
+    if (flinch > 0 && this.state !== 'dead' && this.state !== 'roll') {
+      const f2 = flinch * flinch;
+      lean = lerp(lean, -0.42, f2);
+      headPitch = lerp(headPitch, -0.4, f2);
+      armRz = lerp(armRz, -0.7, f2);
+      armLz = lerp(armLz, 0.7, f2);
+      armL = lerp(armL, 0.3, f2);
+      torsoYaw += Math.sin(this.hurtT * 50) * 0.08 * flinch;
+      crouch += 0.05 * f2;
+    }
+
+    const s = Math.min(1, dt * rate);
     const lerpRot = (obj, axis, v, kk = s) => (obj.rotation[axis] += (v - obj.rotation[axis]) * kk);
     lerpRot(m.armR, 'x', armR);
     lerpRot(m.armR, 'z', armRz);
     lerpRot(m.armL, 'x', armL);
     lerpRot(m.armL, 'z', armLz);
-    lerpRot(m.legL, 'x', legL);
-    lerpRot(m.legR, 'x', legR);
+    const legSpeed = Math.min(1, dt * (this.state === 'attack' ? 30 : 26));
+    lerpRot(m.legL, 'x', legL + legExtraL, legSpeed);
+    lerpRot(m.legR, 'x', legR + legExtraR, legSpeed);
     lerpRot(m.upper, 'y', torsoYaw);
     lerpRot(m.upper, 'x', lean);
+    lerpRot(m.upper, 'z', tilt * 0.6, Math.min(1, dt * 12));
     lerpRot(m.head, 'x', headPitch);
-    m.head.rotation.y = -m.upper.rotation.y * 0.5;
-    m.hip.position.y = 24 * S - crouch + bob;
+    m.head.rotation.y = -m.upper.rotation.y * 0.55 + headYaw;
+    const cl = Math.cos(m.legL.rotation.x);
+    const cr = Math.cos(m.legR.rotation.x);
+    const planted = 0.72 - 0.72 * 0.55 * (1 - Math.max(cl, cr));
+    m.hip.position.y = this.state === 'roll' || this.state === 'dead' ? 24 * S - crouch + bobExtra : planted - crouch + bobExtra;
+    m.hip.position.x += (hipX - m.hip.position.x) * Math.min(1, dt * 14);
     this.pivot.rotation.x = pivotX;
-    if (this.state === 'roll') this.pivot.position.y = 0.55 - crouch * 0.3;
-    else this.pivot.position.y = 0.55;
+    this.pivot.rotation.z += (tilt * 0.4 - this.pivot.rotation.z) * Math.min(1, dt * 10);
+    this.pivot.position.y = pivotY;
     m.legL.rotation.z = 0;
     m.legR.rotation.z = 0;
-    m.legL.position.y = 0;
-    m.legR.position.y = 0;
+    m.legL.position.y = liftL;
+    m.legR.position.y = liftR;
   }
 }
+
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe']);
+
+const TRAIL_SPEC = {
+  blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
+  axe: { b: [0, 0, 0.5], t: [0, 0, 1.1], col: 0xfff2c0, hot: 0xffd27a },
+  pick: { b: [0, 0, 0.5], t: [0, 0, 1.1], col: 0xe6e0d0, hot: 0xffd27a },
+  hammer: { b: [0, 0, 0.6], t: [0, 0, 1.2], col: 0xe6e0d0, hot: 0xffd27a },
+  budgeblade: { b: [0, 0, 0.35], t: [0, 0, 1.4], col: 0xb8ff8a, hot: 0xfff09a },
+  budgemaul: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0xb8ff8a, hot: 0xfff09a },
+  darkscythe: { b: [-0.05, 0, 0.8], t: [-0.4, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
+};

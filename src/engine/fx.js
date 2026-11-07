@@ -29,6 +29,116 @@ export class FX {
     this.makeMotes();
     this.makeSlash();
     this.makeGateMotes();
+    this.makeTelegraphs();
+  }
+
+  emit(x, y, z, vx, vy, vz, c, size, life, g = 9) {
+    if (this.particles.length >= MAX_P) this.particles.shift();
+    this.particles.push({ x, y, z, vx, vy, vz, life, max: life, size, c, g, rx: Math.random() * 6, rv: (Math.random() - 0.5) * 14 });
+  }
+
+  /** Directional hit sparks plus a short white flash at the contact point. */
+  impact(x, y, z, dx, dz, color, power = 1) {
+    const l = Math.hypot(dx, dz) || 1;
+    const ux = dx / l;
+    const uz = dz / l;
+    const n = Math.round(6 + power * 7);
+    for (let i = 0; i < n; i++) {
+      const a = (Math.random() - 0.5) * 1.5;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      const dxr = ux * ca - uz * sa;
+      const dzr = ux * sa + uz * ca;
+      const sp = (4 + Math.random() * 6) * (0.7 + power * 0.4);
+      const c = Array.isArray(color) ? color[Math.floor(Math.random() * color.length)] : color;
+      this.emit(x, y, z, dxr * sp, Math.random() * 3 + 0.5, dzr * sp, c, 0.05 + Math.random() * 0.05, 0.22 + Math.random() * 0.18, 7);
+    }
+    this.emit(x, y, z, 0, 0, 0, 0xffffff, 0.2 + power * 0.1, 0.08, 0);
+    this.emit(x, y, z, 0, 0, 0, 0xfff2c0, 0.32 + power * 0.14, 0.04, 0);
+  }
+
+  dust(x, y, z, count = 3, spread = 1, color = 0xd9c9a0) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = (0.4 + Math.random() * 0.8) * spread;
+      this.emit(x + Math.cos(a) * 0.12, y + 0.06, z + Math.sin(a) * 0.12, Math.cos(a) * sp, 0.5 + Math.random() * 0.9, Math.sin(a) * sp, color, 0.1 + Math.random() * 0.1, 0.35 + Math.random() * 0.25, -0.5);
+    }
+  }
+
+  shockwave(x, y, z, color = 0xd9c9a0, radius = 2.2) {
+    this.ring(x, y + 0.08, z, color, 18, radius * 2.2, 0.12, 0.42);
+    this.dust(x, y, z, 8, radius * 1.4, color);
+  }
+
+  makeTelegraphs() {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    this.tele = [];
+    for (let i = 0; i < 6; i++) {
+      const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
+        uniforms: { uProg: { value: 0 }, uA: { value: 0 }, uCol: { value: new THREE.Color(0xff4a3a) }, uShape: { value: 0 } },
+        vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `
+          uniform float uProg; uniform float uA; uniform vec3 uCol; uniform float uShape; varying vec2 vUv;
+          void main(){
+            float a;
+            if (uShape < 0.5) {
+              float r = length(vUv - 0.5) * 2.0;
+              float edge = smoothstep(0.86, 0.94, r) * smoothstep(1.0, 0.95, r);
+              float fill = step(r, uProg) * 0.32 * step(r, 0.94);
+              a = max(edge * 0.95, fill);
+            } else {
+              float along = 1.0 - vUv.y;
+              float side = abs(vUv.x - 0.5) * 2.0;
+              float edge = smoothstep(0.84, 0.92, side) * step(along, 1.0);
+              float tip = smoothstep(0.94, 0.98, along);
+              float fill = step(along, uProg) * 0.3 * step(side, 0.92);
+              a = max(max(edge * 0.9, tip * 0.9 * step(side, 0.95)), fill);
+            }
+            gl_FragColor = vec4(uCol, a * uA);
+          }`,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 5;
+      this.scene.add(mesh);
+      this.tele.push({ mesh, t: 0, dur: 1, active: false });
+    }
+  }
+
+  /** Ground warning decal. shape 'circle' (radius w) or 'line' (width w, length l, starts at x,z along yaw). */
+  telegraph(x, y, z, yaw, shape, w, l, color, dur) {
+    let slot = this.tele.find((s) => !s.active);
+    if (!slot) slot = this.tele[0];
+    const m = slot.mesh;
+    slot.active = true;
+    slot.t = 0;
+    slot.dur = dur;
+    m.visible = true;
+    m.material.uniforms.uCol.value.set(color);
+    m.material.uniforms.uShape.value = shape === 'line' ? 1 : 0;
+    m.material.uniforms.uProg.value = 0;
+    m.material.uniforms.uA.value = 0;
+    if (shape === 'line') {
+      m.scale.set(w, 1, l);
+      m.position.set(x + Math.sin(yaw) * l * 0.5, y + 0.1, z + Math.cos(yaw) * l * 0.5);
+      m.rotation.set(0, yaw, 0);
+    } else {
+      m.scale.set(w * 2, 1, w * 2);
+      m.position.set(x, y + 0.1, z);
+      m.rotation.set(0, 0, 0);
+    }
+    return slot;
+  }
+
+  cancelTelegraph(slot) {
+    if (slot && slot.active) {
+      slot.t = Math.max(slot.t, slot.dur);
+    }
   }
 
   burst(x, y, z, color, count = 10, speed = 3, size = 0.1, life = 0.6, gravity = 9, up = 1.5) {
@@ -221,6 +331,21 @@ export class FX {
       this.slash.material.uniforms.uA.value = k;
       this.slash.scale.x *= 1 + dt * 1.2;
       if (this.slashT <= 0) this.slash.visible = false;
+    }
+
+    for (const s of this.tele) {
+      if (!s.active) continue;
+      s.t += dt;
+      const u = s.mesh.material.uniforms;
+      if (s.t >= s.dur + 0.12) {
+        s.active = false;
+        s.mesh.visible = false;
+        continue;
+      }
+      const p = Math.min(1, s.t / s.dur);
+      u.uProg.value = p * p * (3 - 2 * p);
+      const pulse = 0.75 + Math.sin(s.t * 26) * 0.25 * p;
+      u.uA.value = s.t > s.dur ? Math.max(0, 1 - (s.t - s.dur) / 0.12) : Math.min(1, s.t * 8) * pulse;
     }
 
     let n = 0;
