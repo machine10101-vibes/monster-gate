@@ -118,9 +118,52 @@ export class Monster {
     this.z = p.z;
   }
 
+  /** Hosts chase whichever hunter is closest, including friends in the world. */
+  hunter() {
+    const g = this.game;
+    const local = g.player;
+    if (g.net?.role !== 'host' || !g.remotes?.size) return local;
+    let best = null;
+    let bestD = Math.hypot(local.pos.x - this.x, local.pos.z - this.z);
+    for (const rp of g.remotes.values()) {
+      if (rp.dead || !rp.ready) continue;
+      const d = Math.hypot(rp.x - this.x, rp.z - this.z);
+      if (d < bestD) {
+        bestD = d;
+        best = rp;
+      }
+    }
+    if (!best) return local;
+    return {
+      pos: best,
+      dead: false,
+      invuln: 0,
+      hurt: (dmg, x, z, knock) => {
+        g.net.sendHurt(best.id, dmg, x, z, knock || 6);
+        return true;
+      },
+    };
+  }
+
+  snap(s) {
+    this.x = s.x;
+    this.y = s.y;
+    this.z = s.z;
+    this.yaw = s.yaw;
+    if (s.state) this.state = s.state;
+    if (s.hp < this.hp) {
+      const dealt = this.hp - s.hp;
+      this.flash = 0.12;
+      const g = this.game;
+      g.hud.floatText(...g.screenOf(this.x, this.y + 1.6, this.z), String(dealt));
+      g.audio.hit();
+    }
+    this.hp = s.hp;
+    if (this.hp <= 0 && !this.dead) this.die();
+  }
+
   update(dt) {
     const g = this.game;
-    const P = g.player;
     if (this.dead) {
       this.deadT += dt;
       const s = Math.max(0, 1 - this.deadT * 3.2) * this.baseScale;
@@ -128,6 +171,13 @@ export class Monster {
       if (this.deadT > 0.4) this.remove = true;
       return;
     }
+    if (this.puppet) {
+      this.t += dt;
+      this.flash = Math.max(0, this.flash - dt);
+      this.animate(dt, 99);
+      return;
+    }
+    const P = this.hunter();
     this.t += dt;
     this.cd -= dt;
     this.stun = Math.max(0, this.stun - dt);
@@ -440,6 +490,7 @@ export class Spawner {
   }
 
   update(dt) {
+    if (this.game.net?.role === 'guest') return;
     const g = this.game;
     this.timer -= dt;
     if (this.timer > 0) return;

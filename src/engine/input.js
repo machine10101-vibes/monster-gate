@@ -42,6 +42,8 @@ export class Input {
     const k = this.keys;
     window.addEventListener('keydown', (e) => {
       if (!this.enabled) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.repeat) {
         if (['Tab', 'Space'].includes(e.code)) e.preventDefault();
         return;

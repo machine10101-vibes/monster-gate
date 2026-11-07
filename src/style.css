@@ -902,6 +902,65 @@ body.touch #top-right {
   font-family: var(--font-px);
   font-size: 10px;
 }
+.wg-label {
+  display: block;
+  margin: 12px 0 4px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  color: #ffd23f;
+  letter-spacing: 1px;
+}
+.wg-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  font-size: 18px;
+  color: #fff;
+  background: #0e1014;
+  border: 2px solid #3b3d44;
+  border-radius: 4px;
+  padding: 8px 10px;
+  touch-action: auto;
+}
+.wg-input:focus {
+  outline: 2px solid #7ef6ff;
+}
+.wg-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.wg-row .wg-input {
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+.wg-btn {
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  color: #071014;
+  background: linear-gradient(#d8fbff, #3ec8d4);
+  border: 2px solid #e9fbff;
+  border-radius: 4px;
+  touch-action: auto;
+}
+.wg-row .wg-btn {
+  margin-top: 0;
+}
+.wg-code {
+  display: block;
+  font-family: var(--font-px);
+  font-size: 22px;
+  letter-spacing: 6px;
+  color: #7ef6ff;
+  margin: 4px 0 8px;
+}
+#wg-players {
+  margin-top: 8px;
+}
 .panel-row {
   display: flex;
   align-items: center;

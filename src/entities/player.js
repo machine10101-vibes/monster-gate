@@ -390,7 +390,7 @@ export class Player {
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
         const crit = Math.random() < 0.12;
-        m.takeHit(Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25)), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
+        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25)), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
         hits++;
       }
       if (hits) {
@@ -440,7 +440,7 @@ export class Player {
       const dx = m.x - this.pos.x;
       const dz = m.z - this.pos.z;
       const d = Math.hypot(dx, dz);
-      if (d < 5.5) m.takeHit(22, dx / (d || 1), dz / (d || 1), 11, true);
+      if (d < 5.5) g.strikeMonster(m, 22, dx / (d || 1), dz / (d || 1), 11, true);
     }
   }
 
