@@ -2,6 +2,7 @@ import { VoxelModel, hash3, jitter } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
 import { meshFrom } from './humanoid.js';
 import { BUDGE } from '../data/budge.js';
+import { DARK } from '../data/darksycle.js';
 
 const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
 const SZ = 0.06;
@@ -109,7 +110,104 @@ function hideModel(mat) {
 
 const shadeHide = (x, y) => ((x + y) % 5 === 0 ? BUDGE.scaleHi : BUDGE.scale);
 
-const BUILDERS = { budgescale: scaleModel, budgefang: fangModel, budgeclaw: clawModel, budgehorn: hornModel, budgehide: hideModel };
+function duskScaleModel(mat) {
+  const M = new VoxelModel(18, 20, 6);
+  for (let y = 0; y < 18; y++) {
+    const t = y / 17;
+    const half = t < 0.5 ? 2.6 + t * 9 : 7.1 * (1 - (t - 0.5) / 0.55);
+    for (let x = 0; x < 18; x++) {
+      const dx = Math.abs(x + 0.5 - 9);
+      if (dx > half) continue;
+      const edge = dx > half - 1.4 || y < 1;
+      const d = 1 + (edge ? 0 : 1) + (dx < 1.2 && !edge ? 1 : 0);
+      const base = edge ? DARK.scaleLo : t > 0.6 ? DARK.scaleHi : DARK.scale;
+      for (let z = 0; z < d + 1; z++) M.set(x, y + 1, z, J(z === d ? base : DARK.scaleLo, x, y, z, 11));
+    }
+  }
+  for (let y = 3; y < 13; y++) M.set(9, y + 1, 4, y % 3 === 0 ? DARK.glowHi : DARK.glow, true);
+  return meshFrom(M, 9, 10, 3, mat, SZ);
+}
+
+function duskClawModel(mat) {
+  const M = new VoxelModel(24, 22, 8);
+  for (let i = 0; i < 26; i++) {
+    const t = i / 25;
+    const a = t * 1.5;
+    const x = Math.round(5 + Math.sin(a) * 15);
+    const y = Math.round(2 + (1 - Math.cos(a)) * 15);
+    const w = Math.max(0.6, 3.4 * (1 - t) + 0.5);
+    for (let dx = -3; dx <= 3; dx++)
+      for (let dy = -3; dy <= 3; dy++)
+        for (let z = 0; z < 6; z++) {
+          const d = Math.hypot(dx, dy, (z - 2.5) * 1.1);
+          if (d > w * 0.9) continue;
+          const col = t < 0.14 ? DARK.scaleLo : t > 0.55 ? DARK.claw : z < 2 ? DARK.bladeDark : DARK.blade;
+          M.set(x + dx, y + dy, z + 1, J(col, x + dx, y + dy, z, 12, 0.03));
+        }
+  }
+  return meshFrom(M, 12, 11, 4, mat, SZ);
+}
+
+function scytheHornModel(mat) {
+  const M = new VoxelModel(26, 30, 12);
+  for (let i = 0; i < 40; i++) {
+    const t = i / 39;
+    const a = t * 1.35;
+    const x = Math.round(3 + Math.sin(a) * 18);
+    const y = Math.round(2 + (1 - Math.cos(a)) * 22);
+    const r = 3.6 * (1 - t) ** 0.8 + 0.5;
+    for (let dx = -4; dx <= 4; dx++)
+      for (let dy = -4; dy <= 4; dy++)
+        for (let dz = -2; dz <= 2; dz++) {
+          const d = Math.hypot(dx, dy, dz * 1.6);
+          if (d > r) continue;
+          const lower = dy < -r * 0.35 && t > 0.15;
+          const col = t < 0.1 ? DARK.scaleLo : lower ? DARK.edge : i % 6 === 0 ? DARK.bladeDark : DARK.blade;
+          M.set(x + dx, y + dy, 6 + dz, J(col, x + dx, y + dy, dz, 13, 0.03));
+        }
+    if (i > 8 && i % 9 === 0) M.set(x, y, 6, DARK.glow, true);
+  }
+  return meshFrom(M, 12, 14, 6, mat, SZ);
+}
+
+function membraneModel(mat) {
+  const M = new VoxelModel(26, 22, 6);
+  for (let y = 0; y < 18; y++)
+    for (let x = 0; x < 24; x++) {
+      const ex = Math.abs(x + 0.5 - 12) / 11;
+      const ey = (y + 0.5) / 18;
+      const scallop = 0.08 * Math.abs(Math.sin(x * 0.7));
+      if (ex ** 2.4 + (ey - 0.5 + scallop * 0.5) ** 2 * 3.4 > 1) continue;
+      M.set(x, y + 1, 0, J(ex > 0.8 ? DARK.membraneHi : DARK.membrane, x, y, 0, 14, 0.05));
+      M.set(x, y + 1, 1, J(DARK.membrane, x, y, 1, 15, 0.05));
+    }
+  for (const sx of [4, 9, 12, 15, 20]) for (let y = 1; y < 17; y++) {
+    const vein = (y + sx) % 4 === 0;
+    M.set(sx, y + 1, 2, vein ? DARK.glow : DARK.membraneHi, vein);
+  }
+  for (let x = 2; x < 22; x++) M.set(x, 1, 2, J(DARK.scaleHi, x, 0, 2, 16, 0.04));
+  return meshFrom(M, 12, 10, 2, mat, SZ);
+}
+
+function gloomCoreModel(mat) {
+  const M = new VoxelModel(18, 22, 18);
+  for (let y = 0; y < 20; y++)
+    for (let x = 0; x < 18; x++)
+      for (let z = 0; z < 18; z++) {
+        const dx = (x + 0.5 - 9) / 6.6;
+        const dz = (z + 0.5 - 9) / 6.6;
+        const dy = (y - 10) / (9.8 - Math.abs(y - 10) * 0.2);
+        const d = Math.abs(dx) + Math.abs(dz) + Math.abs(dy) * 0.7;
+        if (d > 1.15) continue;
+        const rim = d > 0.82;
+        M.set(x, y + 1, z, J(rim ? DARK.glow : DARK.glowHi, x, y, z, 17, 0.04), !rim);
+      }
+  for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]) M.set(9 + dx, 11 + dy, 9 + dz, 0xffffff, true);
+  for (let y = 0; y < 3; y++) for (let x = 5; x < 13; x++) for (let z = 5; z < 13; z++) if ((x + z + y) % 3 !== 0 && Math.hypot(x - 8.5, z - 8.5) < 4.3 - y) M.set(x, y, z, J(DARK.scaleLo, x, y, z, 18, 0.04));
+  return meshFrom(M, 9, 11, 9, mat, SZ);
+}
+
+const BUILDERS = { budgescale: scaleModel, budgefang: fangModel, budgeclaw: clawModel, budgehorn: hornModel, budgehide: hideModel, duskscale: duskScaleModel, duskclaw: duskClawModel, scythehorn: scytheHornModel, gloommembrane: membraneModel, gloomcore: gloomCoreModel };
 const cache = {};
 
 export function buildMaterialModel(id) {

@@ -43,6 +43,14 @@ Press C (or Menu > Hunter Catalog on touch) for the catalog. It lists monsters y
 - Progress (discoveries, parts, crafted gear, what is worn) is saved in localStorage.
 - The dragon's palette and proportions live in `src/data/budge.js` and `buildBudgeDragon()` in `src/entities/creatures.js`. Catalog data (drops, recipes, stats) is in `src/data/catalog.js`.
 
+## Darksycle Dragon
+
+The second monster is the Darksycle Dragon (Lv 7, one roams the open fields). It hovers out of melee range and fights mostly at range: a fan of spinning crescents (five when it is below half health), a slow homing gloom orb, and a tail slash with a back-step if you get close. A heavy hit during a wind-up staggers it. Parts: dusk scales, membrane, talons, scythe horns and a rare gloom core.
+
+- Weapons: Darksycle Scythe (long reach), Crescent Wingbow (piercing crescents) and Gloomcore Staff (homing orbs). All go to hotbar slot 8 when equipped.
+- Armor: the Duskscale set (helm, cuirass, gauntlets, greaves, boots). The full set gives +2 max health and +20 max mana. Pieces from different sets can be mixed, and each set's bonus needs all five of its pieces.
+- The reference image for this dragon was not available when it was built, so the look comes from the name and brief. Its palette is in `src/data/darksycle.js` and its proportions in `buildDarksycleDragon()` in `src/entities/creatures.js`.
+
 ## Rendering
 
 - Voxel models are meshed with per-vertex ambient occlusion and baked vertex colors.

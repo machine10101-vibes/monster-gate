@@ -412,6 +412,11 @@ class Game {
       p.maxHp = max;
       p.hp = Math.min(max, p.hp + gain);
     }
+    const maxMana = 50 + this.rank * 5 + pr.bonusMana;
+    if (p.maxMana !== maxMana) {
+      p.maxMana = maxMana;
+      p.mana = Math.min(maxMana, p.mana);
+    }
     const w = pr.weaponItem;
     this.items[7] = w ? { ...w } : { ...ITEMS[7] };
     if (!initial) {
@@ -463,6 +468,27 @@ class Game {
       mesh = new THREE.Group();
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xd9ffff })));
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0x4ad0ff, transparent: true, opacity: 0.45, depthWrite: false })));
+    } else if (kind === 'crescent') {
+      mesh = new THREE.Group();
+      const blade = new THREE.MeshBasicMaterial({ color: 0xe9e4ff });
+      const glow = new THREE.MeshBasicMaterial({ color: 0xb25cff, transparent: true, opacity: 0.5, depthWrite: false });
+      for (let i = 0; i < 7; i++) {
+        const a = -1.05 + i * 0.35;
+        const w = 0.26 - Math.abs(i - 3) * 0.045;
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(w, 0.09, 0.2), blade);
+        seg.position.set(Math.sin(a) * 0.5, 0, Math.cos(a) * 0.5 - 0.35);
+        seg.rotation.y = a;
+        mesh.add(seg);
+        const halo = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.2, 0.34), glow);
+        halo.position.copy(seg.position);
+        halo.rotation.y = a;
+        mesh.add(halo);
+      }
+    } else if (kind === 'gloom') {
+      mesh = new THREE.Group();
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshBasicMaterial({ color: 0xf0c8ff })));
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), new THREE.MeshBasicMaterial({ color: 0x6a2cc8, transparent: true, opacity: 0.55, depthWrite: false })));
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.86), new THREE.MeshBasicMaterial({ color: 0x1a1530, transparent: true, opacity: 0.35, depthWrite: false })));
     } else if (kind === 'ember') {
       mesh = new THREE.Group();
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), new THREE.MeshBasicMaterial({ color: 0xfff0b0 })));
@@ -488,9 +514,47 @@ class Game {
       }
     });
     if (fx) {
-      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : p.kind === 'ember' ? [0xff7a1a, 0xffd25a, 0x6fd45a] : [0xffffff, 0xd9c9a0];
+      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : p.kind === 'ember' ? [0xff7a1a, 0xffd25a, 0x6fd45a] : p.kind === 'crescent' || p.kind === 'gloom' ? [0xb25cff, 0xf0c8ff, 0x2b2450] : [0xffffff, 0xd9c9a0];
       this.fx.burst(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, c, 7, 2.6, 0.08, 0.35);
     }
+  }
+
+  steerProjectile(p, dt) {
+    const m = p.mesh;
+    let tx;
+    let ty;
+    let tz;
+    if (p.owner === 'player') {
+      let best = null;
+      let bd = 12;
+      for (const mon of this.monsters) {
+        if (mon.dead) continue;
+        const d = Math.hypot(mon.x - m.position.x, mon.z - m.position.z);
+        if (d < bd) {
+          bd = d;
+          best = mon;
+        }
+      }
+      if (!best) return;
+      tx = best.x;
+      ty = best.y + best.hover + 0.9;
+      tz = best.z;
+    } else {
+      tx = this.player.pos.x;
+      ty = this.player.pos.y + 1;
+      tz = this.player.pos.z;
+    }
+    const sp = Math.hypot(p.vx, p.vz) || 1;
+    const dx = tx - m.position.x;
+    const dz = tz - m.position.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const k = Math.min(1, dt * p.homing);
+    const nx = p.vx / sp + (dx / d - p.vx / sp) * k;
+    const nz = p.vz / sp + (dz / d - p.vz / sp) * k;
+    const nl = Math.hypot(nx, nz) || 1;
+    p.vx = (nx / nl) * sp;
+    p.vz = (nz / nl) * sp;
+    p.vy += ((ty - m.position.y) / Math.max(0.6, d / sp) - p.vy) * k;
   }
 
   updateProjectiles(dt) {
@@ -504,6 +568,10 @@ class Game {
       m.position.y += p.vy * dt;
       m.position.z += p.vz * dt;
       if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember') m.rotation.x += dt * 8;
+      if (p.kind === 'crescent') m.rotation.y += dt * 16;
+      if (p.kind === 'gloom') m.rotation.y += dt * 5;
+      if (p.homing && p.age > 0.25) this.steerProjectile(p, dt);
+      if ((p.kind === 'crescent' || p.kind === 'gloom') && Math.random() < dt * 24) this.fx.burst(m.position.x, m.position.y, m.position.z, [0xb25cff, 0x2b2450], 1, 0.5, 0.08, 0.4, 0, 0.2);
       if (p.kind === 'ember' && Math.random() < dt * 30) this.fx.burst(m.position.x, m.position.y, m.position.z, [0xff7a1a, 0x555555], 1, 0.6, 0.07, 0.35);
       if (p.age > p.life) {
         this.killProjectile(p, p.kind !== 'arrow');
@@ -519,7 +587,7 @@ class Game {
           if (mon.dead || p.hit.has(mon)) continue;
           const dx = mon.x - m.position.x;
           const dz = mon.z - m.position.z;
-          if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + 0.8)) < 1.6) {
+          if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + (mon.hover || 0) + 0.8)) < 1.6) {
             p.hit.add(mon);
             const d = Math.hypot(p.vx, p.vz) || 1;
             this.strikeMonster(mon, Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.vx / d, p.vz / d, p.kind === 'bolt' ? 3 : 2);
@@ -581,7 +649,7 @@ class Game {
     const p = this.player;
     p.maxHp = Math.min(40, 20 + this.rank * 2) + this.progress.bonusHp;
     p.hp = p.maxHp;
-    p.maxMana = 50 + this.rank * 5;
+    p.maxMana = 50 + this.rank * 5 + this.progress.bonusMana;
     this.quest = { text: `Slay ${5 + this.rank * 3} Gate monsters`, n: 0, total: 5 + this.rank * 3 };
     this.hud.setQuest(this.quest.text, 0, this.quest.total);
     this.hud.setGold(this.gold);

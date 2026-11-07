@@ -3,6 +3,11 @@ import { VoxelModel, hash3, jitter, shade, mix, clamp, RNG } from '../engine/vox
 import { toonMaterial } from '../engine/materials.js';
 import { BUDGE } from '../data/budge.js';
 import { paintHelm, paintChest, paintArm, paintLeg } from './armor.js';
+import * as dark from './armorDark.js';
+import { DARK } from '../data/darksycle.js';
+
+const isSet = (v, id) => v === id;
+const legFlags = (armor, id) => ({ legs: isSet(armor?.legs, id), boots: isSet(armor?.boots, id) });
 
 export const S = 0.03;
 
@@ -122,7 +127,7 @@ export function buildHumanoid(o = {}) {
     T.box(slantX(30) - 1, ty(30), 1, slantX(30) + 1, ty(32), 4, 0x6b6c72);
     T.box(12, ty(2), 2, 20, ty(5), 4, (x, y, z) => J(0x3a2a1f, x, y, z, seed, 0.08));
   }
-  if (c.armor?.chest) paintChest(T, ty);
+  if (c.armor?.chest) (c.armor.chest === 'darksyceset' ? dark.paintChest : paintChest)(T, ty);
   const torso = meshFrom(T, 13, OY, 9, mat);
 
   /* ---------------------------- head --------------------------- */
@@ -256,14 +261,14 @@ export function buildHumanoid(o = {}) {
       }
     for (let x = 5; x < 15; x++) for (let z = 15; z < 18; z++) H.set(x, rowY(11), z, J(shade(c.hatColor || 0x2f6f4f, 0.85), x, 11, z, seed, 0.05));
   }
-  if (c.armor?.helm) paintHelm(H, rowY);
+  if (c.armor?.helm) (c.armor.helm === 'darksyceset' ? dark.paintHelm : paintHelm)(H, rowY);
   const head = meshFrom(H, HC, rowY(0), HC, mat);
 
   /* ---------------------------- arms --------------------------- */
   const makeArm = (side) => {
     const A = new VoxelModel(14, 30, 14);
     const mx = (x) => (side > 0 ? x : 13 - x);
-    const set = (x, y, z, col) => A.set(mx(x), y, z, col);
+    const set = (x, y, z, col, g) => A.set(mx(x), y, z, col, g);
     const fillBox = (x0, y0, z0, x1, y1, z1, fn) => {
       for (let z = z0; z < z1; z++)
         for (let y = y0; y < y1; y++)
@@ -304,7 +309,7 @@ export function buildHumanoid(o = {}) {
     } else {
       fillBox(3, 20, 3, 10, 24, 11, (x, y, z) => J(shade(sleeve, 1.05), x, y, z, seed, 0.07));
     }
-    if (c.armor?.arms) paintArm(A, set);
+    if (c.armor?.arms) (c.armor.arms === 'darksyceset' ? dark.paintArm : paintArm)(A, set);
     const grp = meshFrom(A, 6.5, 22, 7, mat);
     return grp;
   };
@@ -313,7 +318,7 @@ export function buildHumanoid(o = {}) {
   const makeLeg = (side) => {
     const L = new VoxelModel(14, 30, 16);
     const mx = (x) => (side > 0 ? x : 13 - x);
-    const set = (x, y, z, col) => L.set(mx(x), y, z, col);
+    const set = (x, y, z, col, g) => L.set(mx(x), y, z, col, g);
     const fillBox = (x0, y0, z0, x1, y1, z1, fn) => {
       for (let z = z0; z < z1; z++)
         for (let y = y0; y < y1; y++)
@@ -343,7 +348,10 @@ export function buildHumanoid(o = {}) {
       set(6, 20, 11, c.metal);
       for (let y = 18; y < 23; y++) for (let z = 3; z < 10; z++) if (z % 2 === 0 && y % 2 === 0) set(10, y, z, J(c.metal, y, z, 5, seed, 0.06));
     }
-    if (c.armor?.legs || c.armor?.boots) paintLeg(set, c.armor);
+    if (c.armor?.legs || c.armor?.boots) {
+      paintLeg(set, legFlags(c.armor, 'budgeset'));
+      dark.paintLeg(set, legFlags(c.armor, 'darksyceset'));
+    }
     return meshFrom(L, 6.5, 24, 6.5, mat);
   };
 
@@ -428,8 +436,8 @@ const heldCache = {};
 export function buildHeld(kind) {
   if (heldCache[kind]) return heldCache[kind].clone();
   const mat = toonMaterial({ vertexColors: true });
-  const tall = kind === 'budgebow';
-  const wide = kind === 'budgemaul';
+  const tall = kind === 'budgebow' || kind === 'darkbow';
+  const wide = kind === 'budgemaul' || kind === 'darkscythe';
   const M = new VoxelModel(wide ? 26 : 16, tall ? 56 : 16, 56);
   const cx = wide ? 13 : 8;
   const cy = tall ? 28 : 8;
@@ -545,6 +553,60 @@ export function buildHeld(kind) {
       for (let k = 0; k < 4; k++) set(0, dir * (21 + k), 16 + (k < 2 ? 0 : -1), J(BUDGE.claw, k, dir, 0, 34, 0.03));
     }
     for (let z = 20; z < 30; z += 2) set(-1, 0, z, BUDGE.vein, true);
+  } else if (kind === 'darkscythe') {
+    const ds = (x, y, z, s) => J(((z >> 1) % 2 ? DARK.scaleLo : DARK.scale), x, y, z, s, 0.05);
+    for (let z = 0; z < 38; z++) for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++) set(x - 1, y - 1, z, z % 9 === 8 ? J(DARK.trim, x, y, z, 40, 0.04) : ds(x, y, z, 41));
+    for (let x = -2; x <= 1; x++) for (let y = -2; y <= 1; y++) set(x, y, 0, J(DARK.blade, x, y, 0, 42, 0.03));
+    for (let x = -2; x <= 1; x++) for (let y = -2; y <= 1; y++) for (let z = 36; z <= 39; z++) set(x, y, z, J(z === 38 ? DARK.glowHi : DARK.trim, x, y, z, 43, 0.04), z === 38 && x >= -1 && x <= 0 && y >= -1 && y <= 0);
+    for (let z = 40; z <= 44; z++) for (let y = -1; y <= 0; y++) set(0, y, z, J(DARK.blade, 0, y, z, 44, 0.03));
+    for (let k = 0; k <= 17; k++) {
+      const t = k / 17;
+      const x = -1 - Math.round(k * 0.7);
+      const zc = 38 + Math.round(t * t * 11);
+      const wd = Math.max(1, Math.round(4.2 * (1 - t) + 0.8));
+      for (let q = 0; q < wd; q++) {
+        const edge = q === wd - 1;
+        for (let y = -1; y <= 0; y++) set(x, y, zc + q, edge ? J(DARK.edge, x, y, q, 45, 0.02) : q === 0 ? J(DARK.bladeDark, x, y, q, 46, 0.03) : J(DARK.blade, x, y, q, 47, 0.03));
+      }
+      if (k > 3 && k < 15 && k % 3 === 0) set(x, 0, zc + 1, DARK.glow, true);
+    }
+  } else if (kind === 'darkbow') {
+    for (let y = -22; y <= 22; y++) {
+      const bend = Math.round((1 - (y / 22) ** 2) * 11);
+      const ring = Math.abs(y) % 6 === 0;
+      const thick = Math.abs(y) < 6 ? 3 : 2;
+      for (let k = 0; k < thick; k++) {
+        const col = Math.abs(y) <= 3 ? J(k === 1 ? DARK.scaleLo : DARK.scale, y, k, 0, 50, 0.05) : ring ? DARK.trim : J(Math.abs(y) > 14 ? DARK.blade : DARK.scaleHi, y, k, 0, 51, 0.04);
+        set(0, y, 16 + bend + k, col);
+        if (thick === 3) set(-1, y, 16 + bend + k, col);
+      }
+      set(0, y, 16, Math.abs(y) % 3 === 0 ? DARK.glowHi : DARK.glow, true);
+    }
+    for (const dir of [-1, 1]) {
+      for (let k = 0; k < 7; k++) {
+        const yy = dir * (23 + k);
+        const zz = 16 - Math.round(k * k * 0.18);
+        for (let q = 0; q < 2; q++) set(0, yy, zz + q, k === 6 ? DARK.edge : J(DARK.blade, k, dir, q, 52, 0.03));
+      }
+    }
+  } else if (kind === 'darkstaff') {
+    for (let z = 0; z < 40; z++) for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++) set(x - 1, y - 1, z, z % 10 === 9 ? J(DARK.trim, x, y, z, 60, 0.04) : J((z >> 1) % 2 ? DARK.scaleLo : DARK.scale, x, y, z, 61, 0.05));
+    for (let x = -2; x <= 1; x++) for (let y = -2; y <= 1; y++) set(x, y, 0, J(DARK.blade, x, y, 0, 62, 0.03));
+    for (let x = -2; x <= 1; x++) for (let y = -2; y <= 1; y++) for (let z = 38; z <= 40; z++) set(x, y, z, J(DARK.trim, x, y, z, 63, 0.04));
+    for (let z = 41; z <= 49; z++)
+      for (let y = -4; y <= 3; y++)
+        for (let x = -4; x <= 3; x++) {
+          const d = Math.hypot(x + 0.5, y + 0.5, z - 45);
+          if (d <= 4.1) set(x, y, z, d < 2.4 ? DARK.glowHi : DARK.glow, true);
+        }
+    for (const dir of [-1, 1]) {
+      for (let k = 0; k < 14; k++) {
+        const t = k / 13;
+        const x = dir * Math.round(3 + Math.sin(t * 1.5) * 4);
+        const z = 38 + Math.round((1 - Math.cos(t * 1.7)) * 14 + t * 6);
+        for (let y = -1; y <= 0; y++) set(x - (dir < 0 ? 0 : 0), y, z, k > 11 ? DARK.edge : J(k % 3 === 2 ? DARK.bladeDark : DARK.blade, k, y, dir, 64, 0.03));
+      }
+    }
   }
   const g = meshFrom(M, cx, cy, 0, mat);
   heldCache[kind] = g;

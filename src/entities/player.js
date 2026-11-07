@@ -422,8 +422,14 @@ export class Player {
         g.audio.hit();
       }
     } else if (it.kind === 'ranged') {
-      g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * 20, vz: f.z * 20, dmg: it.dmg, life: 1.3, r: 0.35 });
-      g.audio.tone(900, 0.08, 'triangle', 0.1, -500);
+      if (it.proj) {
+        const sp = it.proj === 'gloom' ? 12 : 18;
+        g.spawnProjectile({ owner: 'player', kind: it.proj, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg: it.dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce: it.proj === 'crescent', homing: it.proj === 'gloom' ? 3.2 : 0 });
+        g.audio.tone(it.proj === 'gloom' ? 260 : 620, 0.14, 'sawtooth', 0.08, -200);
+      } else {
+        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * 20, vz: f.z * 20, dmg: it.dmg, life: 1.3, r: 0.35 });
+        g.audio.tone(900, 0.08, 'triangle', 0.1, -500);
+      }
     } else if (it.kind === 'throw') {
       if (it.count <= 0) return;
       it.count--;
@@ -471,7 +477,7 @@ export class Player {
     const t = this.game.time;
     const walk = Math.sin(this.cycle);
     const mv = this.moveAmt;
-    const heldBlade = this.heldKind === 'blade' || this.heldKind === 'axe' || this.heldKind === 'pick' || this.heldKind === 'hammer' || this.heldKind === 'budgeblade' || this.heldKind === 'budgemaul';
+    const heldBlade = this.heldKind === 'blade' || this.heldKind === 'axe' || this.heldKind === 'pick' || this.heldKind === 'hammer' || this.heldKind === 'budgeblade' || this.heldKind === 'budgemaul' || this.heldKind === 'darkscythe';
     const k = Math.min(1, dt * 18);
     let armR = heldBlade ? -0.85 : -0.25;
     let armL = 0;
