@@ -1,4 +1,4 @@
-import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SET, armorPieces, gearById } from '../data/catalog.js';
+import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, armorPieces, gearById } from '../data/catalog.js';
 
 const KEY = 'monster-gate-hunter-v1';
 
@@ -102,10 +102,13 @@ export class Progress {
     this.save();
   }
 
-  /** {helm:true,...} describing which pieces are on the hero. */
+  /** {helm:'budgeset',...} describing which pieces are on the hero and which set styles them. */
   armorLook() {
     const look = {};
-    for (const s of ARMOR_SLOTS) if (this.data.armor[s]) look[s] = true;
+    for (const s of ARMOR_SLOTS) {
+      const g = gearById(this.data.armor[s]);
+      if (g) look[s] = g.set;
+    }
     return look;
   }
 
@@ -122,12 +125,20 @@ export class Progress {
     return Math.min(0.5, this.defense * DEF_PER_POINT);
   }
 
-  get setComplete() {
-    return armorPieces().every((g) => this.worn(g.id));
+  setComplete(setId) {
+    return armorPieces(setId).every((g) => this.worn(g.id));
+  }
+
+  get activeSets() {
+    return SETS.filter((s) => this.setComplete(s.id));
   }
 
   get bonusHp() {
-    return this.setComplete ? SET.hp : 0;
+    return this.activeSets.reduce((n, s) => n + s.hp, 0);
+  }
+
+  get bonusMana() {
+    return this.activeSets.reduce((n, s) => n + s.mana, 0);
   }
 
   get weaponItem() {

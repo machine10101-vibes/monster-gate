@@ -1231,8 +1231,21 @@ body.touch .how {
 }
 .cat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
   gap: 10px;
+}
+.cat-sub {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #3b3f4a;
+  font-family: var(--font-px);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #ffe27a;
+}
+.cat-sub:first-child {
+  margin-top: 0;
 }
 .cat-card {
   position: relative;

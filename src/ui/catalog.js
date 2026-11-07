@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ARMOR_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SET, SLOT_LABEL, armorPieces, gearById, monsterById, weapons } from '../data/catalog.js';
+import { ARMOR_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SETS, SLOT_LABEL, armorPieces, gearById, monsterById, setById, weapons } from '../data/catalog.js';
 import { MONSTER_BUILDERS, MONSTER_STATS } from '../entities/monsters.js';
 import { buildHeld, buildHumanoid } from '../entities/humanoid.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
@@ -26,13 +26,13 @@ function buildSubject(spec, silhouette) {
   } else if (spec.kind === 'material') {
     const m = buildMaterialModel(spec.id);
     tilt.add(m);
-    tilt.rotation.z = spec.id === 'budgefang' ? -0.35 : 0;
+    tilt.rotation.z = spec.id === 'budgefang' ? -0.35 : spec.id === 'duskclaw' ? -0.2 : 0;
     yaw = 0.55;
     pitch = 0.18;
   } else if (spec.kind === 'weapon') {
     const g = gearById(spec.id);
     const held = buildHeld(g.held);
-    if (g.held === 'budgebow') {
+    if (g.held === 'budgebow' || g.held === 'darkbow') {
       yaw = -0.85;
     } else {
       held.rotation.x = -Math.PI / 2;
@@ -43,7 +43,6 @@ function buildSubject(spec, silhouette) {
     tilt.add(held);
   } else if (spec.kind === 'armor') {
     const g = gearById(spec.id);
-    const h = buildHumanoid({ armor: { [g.slot]: true }, ...(g.slot === 'helm' ? {} : { hero: false }) });
     const keep = {
       helm: ['head'],
       chest: ['torso'],
@@ -51,16 +50,17 @@ function buildSubject(spec, silhouette) {
       legs: ['legL', 'legR'],
       boots: ['legL', 'legR'],
     }[g.slot];
+    const h = buildHumanoid({ armor: { [g.slot]: g.set }, parts: keep, ...(g.slot === 'helm' ? {} : { hero: false }) });
     for (const part of ['head', 'torso', 'armL', 'armR', 'legL', 'legR']) if (!keep.includes(part)) removePart(h[part]);
     h.shieldG?.parent?.remove(h.shieldG);
     tilt.add(h.root);
     yaw = g.slot === 'arms' ? 0.5 : 0.55;
     pitch = g.slot === 'legs' || g.slot === 'boots' ? 0.12 : 0.2;
   } else if (spec.kind === 'set') {
-    const h = buildHumanoid({ armor: Object.fromEntries(ARMOR_SLOTS.map((s) => [s, true])) });
+    const h = buildHumanoid({ armor: Object.fromEntries(ARMOR_SLOTS.map((s) => [s, spec.id])) });
     h.armR.rotation.x = -0.9;
     h.shieldG?.parent?.remove(h.shieldG);
-    h.heldSlot.add(buildHeld('budgeblade'));
+    h.heldSlot.add(buildHeld(spec.id === 'darksyceset' ? 'darkscythe' : 'budgeblade'));
     tilt.add(h.root);
     yaw = 0.5;
     pitch = 0.14;
@@ -84,7 +84,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? 0.82 : spec.kind === 'set' ? 0.92 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : 0.82) : spec.kind === 'set' ? 0.92 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 
@@ -142,33 +142,58 @@ class Stage {
     const done = this.cache.get(key);
     if (done) ctx.drawImage(done, 0, 0, px, px);
     else this.queue.push({ key, spec, silhouette, ctx, px });
-    this.pump();
     return cv;
   }
 
-  pump() {
-    if (this.pumping || !this.queue.length) return;
-    this.pumping = true;
-    requestAnimationFrame(() => {
-      this.pumping = false;
-      const job = this.queue.shift();
-      if (job) {
-        let src = this.cache.get(job.key);
-        if (!src) {
-          const subject = buildSubject(job.spec, job.silhouette);
-          const tmp = document.createElement('canvas');
-          tmp.width = 192;
-          tmp.height = 192;
-          this.draw(subject, subject.yaw, tmp.getContext('2d'), 192, 192);
-          disposeSubject(subject);
-          this.cache.set(job.key, tmp);
-          src = tmp;
-        }
+  /** Drop thumbs for a catalog view that has been replaced. */
+  cancel() {
+    this.queue.length = 0;
+  }
+
+  pending() {
+    return this.queue.length > 0;
+  }
+
+  run(job) {
+    try {
+      let src = this.cache.get(job.key);
+      if (!src) {
+        const subject = buildSubject(job.spec, job.silhouette);
+        const tmp = document.createElement('canvas');
+        tmp.width = 192;
+        tmp.height = 192;
+        this.draw(subject, subject.yaw, tmp.getContext('2d'), 192, 192);
+        disposeSubject(subject);
+        this.cache.set(job.key, tmp);
+        src = tmp;
+      }
+      if (job.ctx) {
         job.ctx.clearRect(0, 0, job.px, job.px);
         job.ctx.drawImage(src, 0, 0, job.px, job.px);
       }
-      this.pump();
-    });
+    } catch (err) {
+      console.warn('catalog thumb failed', job.key, err);
+    }
+  }
+
+  /**
+   * Paint queued thumbnails. The open tab is flushed immediately so its
+   * pictures are on screen before the browser paints the empty cards.
+   */
+  flush(budget = 14) {
+    const t0 = performance.now();
+    let n = 0;
+    while (this.queue.length && (n < 1 || performance.now() - t0 < budget)) {
+      this.run(this.queue.shift());
+      n++;
+    }
+    if (this.queue.length && !this.pumping) {
+      this.pumping = true;
+      requestAnimationFrame(() => {
+        this.pumping = false;
+        this.flush();
+      });
+    }
   }
 }
 
@@ -193,6 +218,11 @@ function el(tag, cls, html) {
   if (html !== undefined) n.innerHTML = html;
   return n;
 }
+
+const SET_BLURB = {
+  budgeset: 'Five pieces of dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots.',
+  darksyceset: 'Five pieces of indigo scale lit from within by gloom: a sickle-horned helm, a core-burning cuirass, scythe-pauldron gauntlets, rune greaves and silent talon boots.',
+};
 
 export class Catalog {
   constructor(game) {
@@ -248,10 +278,12 @@ export class Catalog {
   render() {
     if (!this.body) return;
     this.stopViewer();
+    getStage().cancel();
     this.body.innerHTML = '';
     this.game.hud.el.panelTitle.textContent = 'Hunter Catalog';
     if (this.view) this.renderDetail(this.view);
     else this.renderGrid();
+    getStage().flush(120);
   }
 
   /* ----------------------------- grid ------------------------------ */
@@ -287,18 +319,32 @@ export class Catalog {
         grid.appendChild(card);
       }
     } else if (this.tab === 'weapons') {
-      for (const g of weapons()) grid.appendChild(this.gearCard(g));
+      for (const m of MONSTERS) {
+        const list = weapons(m.id);
+        if (!list.length) continue;
+        grid.appendChild(this.heading(pr.seen(m.id) ? m.name : '???'));
+        for (const g of list) grid.appendChild(this.gearCard(g));
+      }
     } else {
-      const done = armorPieces().filter((g) => pr.crafted(g.id)).length;
-      const known = pr.seen(SET.monster);
-      const card = this.card(s.thumb({ kind: 'set' }, !known), known ? SET.name : '???', known ? `${done}/5 pieces${pr.setComplete ? '  -  Complete' : ''}` : 'Undiscovered', (known ? 'set' : 'locked') + (pr.setComplete ? ' worn' : ''));
-      card.onclick = () => this.goto({ type: 'set' });
-      grid.appendChild(card);
-      for (const g of armorPieces()) grid.appendChild(this.gearCard(g));
+      for (const set of SETS) {
+        const pieces = armorPieces(set.id);
+        const done = pieces.filter((g) => pr.crafted(g.id)).length;
+        const known = pr.seen(set.monster);
+        const complete = pr.setComplete(set.id);
+        grid.appendChild(this.heading(known ? monsterById(set.monster).name : '???'));
+        const card = this.card(s.thumb({ kind: 'set', id: set.id }, !known), known ? set.name : '???', known ? `${done}/${pieces.length} pieces${complete ? '  -  Complete' : ''}` : 'Undiscovered', (known ? 'set' : 'locked') + (complete ? ' worn' : ''));
+        card.onclick = () => this.goto({ type: 'set', id: set.id });
+        grid.appendChild(card);
+        for (const g of pieces) grid.appendChild(this.gearCard(g));
+      }
     }
     root.appendChild(grid);
     root.appendChild(el('p', 'cat-foot', 'Defeat monsters to discover them and collect parts. Parts craft into weapons and armor that you can wear into the field.'));
     this.body.appendChild(root);
+  }
+
+  heading(text) {
+    return el('h4', 'cat-sub', esc(text));
   }
 
   card(canvas, name, sub, cls = '', badge = '') {
@@ -362,9 +408,10 @@ export class Catalog {
       spec = { kind: 'monster', id: m.id };
       this.fillMonster(info, m, known);
     } else if (view.type === 'set') {
-      known = pr.seen(SET.monster);
-      spec = { kind: 'set' };
-      this.fillSet(info, known);
+      const set = setById(view.id);
+      known = pr.seen(set.monster);
+      spec = { kind: 'set', id: set.id };
+      this.fillSet(info, set, known);
     } else {
       const g = gearById(view.id);
       known = pr.gearSeen(g);
@@ -382,7 +429,7 @@ export class Catalog {
     }
     const st = MONSTER_STATS[m.id];
     info.innerHTML = `<h3>${esc(m.name)}</h3>
-      <div class="cat-tags"><span>Lv ${m.level}</span><span>${esc(m.temper)}</span><span>${pr.kills(m.id)} slain</span></div>
+      <div class="cat-tags"><span>Lv ${m.level}</span><span>${esc(m.temper)}</span><span>${esc(m.style)}</span><span>${pr.kills(m.id)} slain</span></div>
       <p>${esc(m.desc)}</p>
       <div class="cat-stats"><div><small>Health</small><b>${st.hp}</b></div><div><small>Attack</small><b>${st.dmg}</b></div><div><small>Speed</small><b>${st.speed}</b></div></div>
       <p class="cat-muted">Habitat: ${esc(m.habitat)}</p>`;
@@ -477,21 +524,23 @@ export class Catalog {
       actions.appendChild(b);
     }
     info.appendChild(actions);
-    if (g.type === 'armor') info.appendChild(el('p', 'cat-muted', esc(SET.bonus)));
+    if (g.type === 'armor') info.appendChild(el('p', 'cat-muted', `${esc(setById(g.set).name)}. ${esc(setById(g.set).bonus)}`));
   }
 
-  fillSet(info, known) {
+  fillSet(info, set, known) {
     const pr = this.progress;
+    const m = monsterById(set.monster);
     if (!known) {
-      info.innerHTML = `<h3>???</h3><p class="cat-muted">Discover the Green Budge Dragon to reveal this armor set.</p>`;
+      info.innerHTML = `<h3>???</h3><p class="cat-muted">Discover the ${esc(m.name)} to reveal this armor set.</p>`;
       return;
     }
-    info.innerHTML = `<h3>${esc(SET.name)}</h3>
-      <div class="cat-tags"><span>Armor set</span><span>${pr.defense} defense worn</span></div>
-      <p>Five pieces of dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots.</p>
-      <p class="${pr.setComplete ? 'cat-ok' : 'cat-muted'}">${esc(SET.bonus)}${pr.setComplete ? ' (active)' : ''}</p>`;
+    const complete = pr.setComplete(set.id);
+    info.innerHTML = `<h3>${esc(set.name)}</h3>
+      <div class="cat-tags"><span>Armor set</span><span>From ${esc(m.name)}</span><span>${pr.defense} defense worn</span></div>
+      <p>${esc(SET_BLURB[set.id])}</p>
+      <p class="${complete ? 'cat-ok' : 'cat-muted'}">${esc(set.bonus)}${complete ? ' (active)' : ''}</p>`;
     const list = el('div', 'cat-made');
-    for (const g of armorPieces()) {
+    for (const g of armorPieces(set.id)) {
       const c = el('button', 'cat-mini' + (pr.crafted(g.id) ? ' done' : ''));
       c.type = 'button';
       c.appendChild(getStage().thumb({ kind: 'armor', id: g.id }, false, 96));
@@ -537,6 +586,10 @@ export class Catalog {
         cv.height = h;
       }
       if (!state.drag) state.yaw += dt * 0.7;
+      if (stage.pending()) {
+        state.raf = requestAnimationFrame(tick);
+        return;
+      }
       stage.draw(subject, state.yaw, ctx, w, h);
       state.raf = requestAnimationFrame(tick);
     };

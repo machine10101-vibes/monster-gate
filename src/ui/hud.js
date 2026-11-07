@@ -373,7 +373,7 @@ export class HUD {
            <div class="panel-row"><span>Fury</span><b>${Math.round(p.fury)} / 100</b></div>
            <div class="panel-row"><span>Weapon</span><b>${game.items[game.sel].name}</b></div>
            <div class="panel-row"><span>Defense</span><b>${game.progress.defense} (-${Math.round(game.progress.reduction * 100)}% damage)</b></div>
-           <p style="color:#aab;font-size:13px">${game.progress.defense ? (game.progress.setComplete ? 'Full Budgescale set: +4 max health.' : 'Wearing dragon-scale armor. Craft the full set for a health bonus.') : "Dark leather hunter's garb, steel bracers and a greatsword on your back."} Press C for the Hunter Catalog.</p>`);
+           <p style="color:#aab;font-size:13px">${game.progress.defense ? (game.progress.activeSets.length ? game.progress.activeSets.map((x) => `${x.name}: ${x.bonus.replace('Full set: ', '')}`).join(' ') : 'Wearing dragon armor. Complete a set for a bonus.') : "Dark leather hunter's garb, steel bracers and a greatsword on your back."} Press C for the Hunter Catalog.</p>`);
     } else if (name === 'catalog') {
       title.textContent = 'Hunter Catalog';
       this.cleanup = game.catalog.mount(body);
