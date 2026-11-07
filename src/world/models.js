@@ -914,6 +914,65 @@ export function buildGate(seed = 3) {
   return bundle([[M, 0.125, 30, 0, 10]]);
 }
 
+/** Man-made hunter waygate: ashlar, brass bands, and a side console. Opening faces +Z. */
+export function buildWaygate(seed = 11) {
+  const M = new VoxelModel(56, 58, 24);
+  const stone = (x, y, z) => {
+    const row = Math.floor(y / 4);
+    const col = Math.floor((x + (row % 2) * 3) / 5);
+    const base = [0x6e675e, 0x7d756b, 0x5c564e, 0x8b8276][Math.abs(col + row * 3) % 4];
+    let c = J(base, x, y, z, seed, 0.055);
+    if (y % 4 === 0) c = shade(c, 0.8);
+    if (hash3(x >> 2, 0, z >> 2, seed) > 0.86) c = shade(c, 0.72);
+    return c;
+  };
+  const brass = (x, y, z) => J((x + y) % 3 === 0 ? 0xd7a24a : 0xa87432, x, y, z, seed, 0.05);
+  const copper = (x, y, z) => J(y % 2 ? 0xc46a3a : 0x8d4e2c, x, y, z, seed, 0.06);
+  M.box(1, 0, 1, 54, 3, 22, stone);
+  for (let a = 0; a < 28; a++) {
+    const t = (a / 28) * Math.PI * 2;
+    const ix = Math.round(28 + Math.cos(t) * 16);
+    const iz = Math.round(12 + Math.sin(t) * 7);
+    M.set(ix, 3, iz, brass(ix, 3, iz));
+    M.set(ix, 3, iz + 1, brass(ix, 3, iz));
+  }
+  const pillar = (x0) => {
+    M.box(x0, 3, 5, x0 + 11, 7, 18, stone);
+    M.box(x0 + 1, 7, 6, x0 + 10, 38, 17, stone);
+    M.box(x0, 38, 5, x0 + 11, 42, 18, stone);
+    for (const gy of [12, 20, 28, 36]) M.box(x0, gy, 5, x0 + 11, gy + 2, 18, brass);
+    M.box(x0 + 4, 16, 17, x0 + 7, 18, 20, brass);
+    M.box(x0 + 4, 22, 17, x0 + 7, 27, 20, brass);
+    M.set(x0 + 5, 24, 19, 0x7ef6ff, true);
+    M.set(x0 + 5, 24, 20, 0xe9fbff, true);
+    M.box(x0 + 3, 30, 17, x0 + 8, 33, 20, copper);
+  };
+  pillar(3);
+  pillar(42);
+  const cx = 28;
+  const cy = 40;
+  for (let y = 36; y < 56; y++) {
+    for (let x = 2; x < 54; x++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (d > 20 || d < 15) continue;
+      const band = d > 18.6 || d < 16.2;
+      for (let z = 6; z < 17; z++) M.set(x, y, z, band ? brass(x, y, z) : stone(x, y, z));
+    }
+  }
+  M.box(24, 52, 5, 32, 57, 18, brass);
+  M.box(26, 53, 17, 30, 56, 20, 0xd8fbff, true);
+  cyl(M, 8, 8, 7, 18, 2.1, copper);
+  cyl(M, 48, 8, 7, 18, 2.1, copper);
+  cyl(M, 8, 8, 16, 18, 2.4, brass);
+  cyl(M, 48, 8, 16, 18, 2.4, brass);
+  M.box(44, 3, 16, 54, 15, 23, stone);
+  M.box(45, 15, 16, 53, 17, 23, brass);
+  M.box(46, 16, 20, 52, 18, 23, 0x39e7ff, true);
+  M.box(47, 8, 22, 51, 12, 23, 0x1a2428);
+  for (let i = 0; i < 4; i++) M.set(47 + i, 10, 22, i === 1 ? 0x7ef6ff : 0xc9a15a, true);
+  return M.build(0.068, 28, 0, 12);
+}
+
 export function buildWindmill(seed = 2) {
   const M = new VoxelModel(40, 80, 40);
   const c = 20;

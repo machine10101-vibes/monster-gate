@@ -229,7 +229,7 @@ export class HUD {
     p.style.top = y.toFixed(0) + 'px';
   }
 
-  drawMinimap(world, px, pz, yaw, monsters, npcs, time) {
+  drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null) {
     const ctx = this.mctx;
     const cv = this.el.minimap;
     const N = 44;
@@ -256,8 +256,22 @@ export class HUD {
       ctx.fillStyle = '#1b0e3a';
       ctx.fillRect(toX(GATE.x) - 2, toZ(GATE.z) - 2, 4, 4);
     }
+    if (world.waygate && inView(world.waygate.x, world.waygate.z)) {
+      const pulse = 3 + Math.sin(time * 5) * 1;
+      ctx.fillStyle = '#7ef6ff';
+      ctx.fillRect(toX(world.waygate.x) - pulse, toZ(world.waygate.z) - pulse, pulse * 2, pulse * 2);
+      ctx.fillStyle = '#14343a';
+      ctx.fillRect(toX(world.waygate.x) - 1, toZ(world.waygate.z) - 1, 3, 3);
+    }
     ctx.fillStyle = '#5ad0ff';
     for (const n of npcs) if (inView(n.x, n.z)) ctx.fillRect(toX(n.x) - 2, toZ(n.z) - 2, 4, 4);
+    if (remotes) {
+      ctx.fillStyle = '#9ad7ff';
+      for (const r of remotes) {
+        if (!r.ready || !inView(r.x, r.z)) continue;
+        ctx.fillRect(toX(r.x) - 2, toZ(r.z) - 2, 4, 4);
+      }
+    }
     ctx.fillStyle = '#ff4d4d';
     for (const m of monsters) {
       if (m.dead || !inView(m.x, m.z)) continue;
@@ -298,6 +312,7 @@ export class HUD {
   }
 
   openPanel(name, game) {
+    this.panelId = name;
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -326,7 +341,11 @@ export class HUD {
       ctx.fillStyle = '#000';
       ctx.fillRect(p.pos.x - 1, p.pos.z - 1, 2, 2);
       body.appendChild(c);
-      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. White: you.</p>');
+      if (game.world.waygate) {
+        ctx.fillStyle = '#7ef6ff';
+        ctx.fillRect(game.world.waygate.x - 2, game.world.waygate.z - 2, 5, 5);
+      }
+      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. White: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
@@ -352,6 +371,45 @@ export class HUD {
            <div class="panel-row"><span>Fury</span><b>${Math.round(p.fury)} / 100</b></div>
            <div class="panel-row"><span>Weapon</span><b>${game.items[game.sel].name}</b></div>
            <p style="color:#aab;font-size:13px">Dark leather hunter's garb, steel bracers and a greatsword on your back.</p>`);
+    } else if (name === 'waygate') {
+      title.textContent = 'Waygate';
+      const saved = (localStorage.getItem('mg-name') || 'Hunter').replace(/[<>"&]/g, '').slice(0, 16);
+      add(`<p id="wg-status" style="color:#cfe"></p>
+        <div id="wg-lobby">
+          <label class="wg-label">Your name</label>
+          <input id="wg-name" class="wg-input" maxlength="16" value="${saved.replace(/"/g, '')}" />
+          <button id="wg-host" class="wg-btn" type="button">Host a world</button>
+          <label class="wg-label">Friend's code</label>
+          <div class="wg-row">
+            <input id="wg-join-code" class="wg-input" maxlength="4" placeholder="CODE" />
+            <button id="wg-join" class="wg-btn" type="button">Join</button>
+          </div>
+          <p style="color:#99a;font-size:13px">The host's browser runs the world. Up to 6 hunters. Share the code with friends at their own waygate.</p>
+        </div>
+        <div id="wg-session" class="hidden">
+          <div class="wg-label">World code</div>
+          <b id="wg-code" class="wg-code"></b>
+          <div class="wg-row">
+            <button id="wg-copy" class="wg-btn" type="button">Copy code</button>
+            <button id="wg-leave" class="wg-btn" type="button">Close waygate</button>
+          </div>
+          <div class="wg-label" id="wg-count"></div>
+          <ul id="wg-players"></ul>
+        </div>`);
+      const nameInput = document.getElementById('wg-name');
+      nameInput?.addEventListener('change', () => localStorage.setItem('mg-name', nameInput.value.slice(0, 16)));
+      document.getElementById('wg-host').onclick = () => game.net.host(document.getElementById('wg-name').value);
+      document.getElementById('wg-join').onclick = () => game.net.join(document.getElementById('wg-name').value, document.getElementById('wg-join-code').value);
+      document.getElementById('wg-copy').onclick = () => {
+        const code = game.net.code;
+        if (!code) return;
+        navigator.clipboard?.writeText(code).then(
+          () => game.hud.toast('Code copied', 1200),
+          () => game.hud.toast(code, 2000)
+        );
+      };
+      document.getElementById('wg-leave').onclick = () => game.net.leave();
+      game.refreshWaygate();
     } else if (name === 'settings' || name === 'menu') {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
       const q = game.quality;
@@ -377,6 +435,7 @@ export class HUD {
     this.el.panel.classList.remove('hidden');
   }
   closePanel() {
+    this.panelId = null;
     this.el.panel.classList.add('hidden');
   }
   get panelOpen() {

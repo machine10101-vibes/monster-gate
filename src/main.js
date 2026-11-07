@@ -11,6 +11,8 @@ import { Input } from './engine/input.js';
 import { hideUniforms } from './engine/materials.js';
 import { Player } from './entities/player.js';
 import { Spawner } from './entities/monsters.js';
+import { RemoteHunter } from './entities/remote.js';
+import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS } from './ui/hud.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
@@ -72,6 +74,12 @@ class Game {
     this.frameAcc = 0;
     this.frameCnt = 0;
     this.talkNpc = null;
+    this.remotes = new Map();
+    this.net = new Session(this);
+    this.net.onChange = () => this.refreshWaygate();
+    this.waygateNear = false;
+    this.waygateHinted = false;
+    this.guestBound = false;
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
     this.uiBlocking = false;
 
@@ -465,7 +473,7 @@ class Game {
           if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + 0.8)) < 1.6) {
             p.hit.add(mon);
             const d = Math.hypot(p.vx, p.vz) || 1;
-            mon.takeHit(Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.vx / d, p.vz / d, p.kind === 'bolt' ? 3 : 2);
+            this.strikeMonster(mon, Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.vx / d, p.vz / d, p.kind === 'bolt' ? 3 : 2);
             this.audio.hit();
             P.fury = Math.min(100, P.fury + 3);
             if (!p.pierce) {
@@ -474,9 +482,22 @@ class Game {
             }
           }
         }
-      } else if (Math.hypot(P.pos.x - m.position.x, P.pos.z - m.position.z) < 0.55 + p.r && Math.abs(m.position.y - (P.pos.y + 1)) < 1.2) {
-        if (P.hurt(p.dmg, m.position.x - p.vx * 0.1, m.position.z - p.vz * 0.1, 3)) this.audio.hurt();
-        this.killProjectile(p);
+      } else {
+        let struck = false;
+        if (Math.hypot(P.pos.x - m.position.x, P.pos.z - m.position.z) < 0.55 + p.r && Math.abs(m.position.y - (P.pos.y + 1)) < 1.2) {
+          if (P.hurt(p.dmg, m.position.x - p.vx * 0.1, m.position.z - p.vz * 0.1, 3)) this.audio.hurt();
+          struck = true;
+        }
+        if (this.net?.role === 'host') {
+          for (const rp of this.remotes.values()) {
+            if (!rp.ready || rp.dead) continue;
+            if (Math.hypot(rp.x - m.position.x, rp.z - m.position.z) < 0.7 + p.r && Math.abs(m.position.y - (rp.y + 1)) < 1.3) {
+              this.net.sendHurt(rp.id, p.dmg, m.position.x, m.position.z, 3);
+              struck = true;
+            }
+          }
+        }
+        if (struck) this.killProjectile(p);
       }
     }
     this.projectiles = this.projectiles.filter((p) => !p.dead);
@@ -672,7 +693,118 @@ class Game {
     P.tryRoll(dir);
   }
 
+  strikeMonster(m, dmg, dx, dz, knock, crit = false) {
+    if (!m || m.dead) return;
+    if (this.net?.role === 'guest') this.net.relayHit(m, dmg, dx, dz, knock, crit);
+    else m.takeHit(dmg, dx, dz, knock, crit);
+  }
+
+  ensureRemote(id, name) {
+    let r = this.remotes.get(id);
+    if (!r) {
+      r = new RemoteHunter(this, id, name);
+      this.remotes.set(id, r);
+    } else if (name) r.name = name;
+    return r;
+  }
+
+  removeRemote(id) {
+    const r = this.remotes.get(id);
+    if (!r) return;
+    r.dispose();
+    this.remotes.delete(id);
+  }
+
+  clearRemotes() {
+    for (const r of this.remotes.values()) r.dispose();
+    this.remotes.clear();
+  }
+
+  suspendLocalHunt() {
+    this.guestBound = false;
+    for (const m of this.monsters) m.dispose();
+    this.monsters = [];
+  }
+
+  onSessionEnd(wasGuest) {
+    this.clearRemotes();
+    this.guestBound = false;
+    if (!wasGuest) return;
+    for (const m of this.monsters) m.dispose();
+    this.monsters = [];
+    this.spawner?.populate();
+  }
+
+  applyWorld(data) {
+    if (!data?.m || this.net.role !== 'guest') return;
+    if (!this.guestBound) {
+      this.guestBound = true;
+      for (const m of this.monsters) m.dispose();
+      this.monsters = [];
+    }
+    const seen = new Set();
+    for (const row of data.m) {
+      const [id, type, x, y, z, yaw, hp, state] = row;
+      seen.add(id);
+      let mon = this.monsters.find((m) => m.id === id);
+      if (!mon) {
+        mon = this.spawner.spawn(type, x, z, false);
+        mon.id = id;
+        mon.puppet = true;
+      }
+      if (!mon.dead) mon.snap({ x, y, z, yaw, hp, state });
+    }
+    for (const mon of this.monsters) {
+      if (mon.puppet && !mon.dead && !seen.has(mon.id)) {
+        mon.hp = 0;
+        mon.die();
+      }
+    }
+  }
+
+  refreshWaygate() {
+    const status = document.getElementById('wg-status');
+    if (!status || this.hud.panelId !== 'waygate') return;
+    const net = this.net;
+    const lobby = document.getElementById('wg-lobby');
+    const session = document.getElementById('wg-session');
+    status.textContent = net.status;
+    if (!net.role) {
+      lobby?.classList.remove('hidden');
+      session?.classList.add('hidden');
+      return;
+    }
+    lobby?.classList.add('hidden');
+    session?.classList.remove('hidden');
+    const code = document.getElementById('wg-code');
+    if (code) code.textContent = net.code;
+    const count = document.getElementById('wg-count');
+    if (count) count.textContent = `${net.count} / 6 hunters`;
+    const list = document.getElementById('wg-players');
+    if (list) {
+      list.innerHTML = '';
+      const add = (label) => {
+        const li = document.createElement('li');
+        li.textContent = label;
+        list.appendChild(li);
+      };
+      add(net.name + ' (you)');
+      for (const peer of net.peers.values()) add(peer.name);
+    }
+  }
+
   tryTalk() {
+    const w = this.world.waygate;
+    const p = this.player.pos;
+    const wd = w ? Math.hypot(p.x - w.x, p.z - w.z) : 99;
+    const npcNear = this.ambient.npcs.find((n) => n.near);
+    const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
+    if (!this.talkNpc && w && wd < 3.6 && wd <= nd) {
+      this.hud.openPanel('waygate', this);
+      this.hud.panelId = 'waygate';
+      this.audio.portal();
+      return;
+    }
     if (this.talkNpc) {
       const npc = this.talkNpc;
       if (npc.dialogLeft > 0) {
@@ -856,6 +988,8 @@ class Game {
     if (this.started) this.sky.setHour(this.sky.hour + rawDt / 50);
 
     this.player.update(dt);
+    this.net.update(dt);
+    for (const r of this.remotes.values()) r.update(dt);
     for (const m of this.monsters) m.update(dt);
     if (this.monsters.some((m) => m.remove)) {
       for (const m of this.monsters) if (m.remove) m.dispose();
@@ -884,9 +1018,21 @@ class Game {
 
     this.hud.setClock(this.sky.hour);
     this.refreshHud();
-    const near = this.ambient.npcs.some((n) => n.near);
+    const wgate = this.world.waygate;
+    this.waygateNear = !!(wgate && Math.hypot(P.pos.x - wgate.x, P.pos.z - wgate.z) < 3.6);
+    if (this.waygateNear && !this.waygateHinted && this.started) {
+      this.waygateHinted = true;
+      this.hud.toast('Waygate — press F to host or join', 2400);
+    }
+    if (this.waygateNear && wgate) {
+      const [sx, sy, vis] = this.screenOf(wgate.x, wgate.y + 3.5, wgate.z, true);
+      const label = this.net.role ? `Waygate<small>${this.net.code} · ${this.net.count}/6</small>` : 'Waygate<small>F · host or join</small>';
+      this.hud.plate('waygate', label);
+      this.hud.placePlate('waygate', sx, sy, vis);
+    } else this.hud.removePlate('waygate');
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear;
     this.hud.setTalkVisible(near && this.input.touch);
-    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t);
+    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }
 }
 

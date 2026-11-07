@@ -6,6 +6,7 @@ import {
   generateWorld, buildTerrainMeshes,
 } from './terrain.js';
 import * as M from './models.js';
+import { placeWaygate as buildWaygateSite } from './waygate.js';
 
 const CH = 16;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -244,6 +245,7 @@ export class World {
     this.scatterTrees();
     await nextFrame();
     this.scatterCover();
+    this.placeWaygate();
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
@@ -864,6 +866,10 @@ export class World {
     ctx.putImageData(img, 0, 0);
     ctx.fillStyle = 'rgba(20,70,30,0.9)';
     for (const t of this.treeDots) ctx.fillRect(Math.floor(t.x), Math.floor(t.z), 1, 1);
+    if (this.waygate) {
+      ctx.fillStyle = '#7ef6ff';
+      ctx.fillRect(Math.floor(this.waygate.x) - 2, Math.floor(this.waygate.z) - 2, 4, 4);
+    }
     ctx.fillStyle = '#6b4a2b';
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
       ctx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);
@@ -876,6 +882,11 @@ export class World {
     this.waterMat.uniforms.uTime.value = t;
     this.portalMat.uniforms.uTime.value = t;
     this.haloMat.uniforms.uTime.value = t;
+    this.waygate?.tick(t);
+  }
+
+  placeWaygate() {
+    buildWaygateSite(this);
   }
 }
 

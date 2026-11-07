@@ -24,9 +24,13 @@ npm run preview  # serve the production build
 | Spirit Bolt | Z | Bolt button |
 | Fury burst | V | Fury button |
 | Select item | 1-9 / click hotbar | Tap hotbar |
-| Talk | F | Talk button |
+| Talk / Waygate | F | Talk button |
 | Rotate / zoom camera | R, [ ], wheel, middle-drag | Drag right side |
 | Panels | M map, E hunter, B satchel, Q hunt log, T settings | Menu buttons |
+
+## Waygate
+
+South of Oakhollow, just off the road, is a stone-and-brass waygate. Press F there to host a world or join one with a 4-character code. The host's browser runs the hunt. A world holds 6 hunters.
 
 ## Rendering
 
