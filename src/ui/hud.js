@@ -9,10 +9,16 @@ export const ITEMS = [
   { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', dmg: 15, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'Slow, bone-shaking blows.' },
   { id: 'bow', icon: 'bow', name: 'Hunter Bow', kind: 'ranged', dmg: 7, dur: 0.5, stam: 7, held: 'bow', desc: 'Loose arrows at range.' },
   { id: 'stone', icon: 'stone', name: 'Throwing Stone', kind: 'throw', dmg: 4, dur: 0.38, stam: 4, count: 12, held: 'stone', desc: 'Pocket-sized pain.' },
-  { id: 'potion', icon: 'potion', name: 'Healing Potion', kind: 'use', count: 10, held: 'potion', desc: 'Restores 8 health.' },
+  { id: 'potion', icon: 'potion', name: 'Healing Potion', kind: 'use', count: 10, held: 'potion', heal: 8, desc: 'Restores 8 health.' },
   { id: 'empty', icon: 'empty', name: 'Empty', kind: 'none' },
   { id: 'torch', icon: 'torch', name: 'Torch', kind: 'light', count: 18, held: 'torch', desc: 'Lights the way at night.' },
+  { id: 'manapotion', icon: 'manapotion', name: 'Spirit Philter', kind: 'use', count: 2, held: 'manapotion', mana: 20, desc: 'Restores 20 spirit.' },
 ];
+
+export const POTION_SHOP = {
+  potion: { price: 6, max: 20 },
+  manapotion: { price: 8, max: 20 },
+};
 
 export class HUD {
   constructor() {
@@ -64,7 +70,7 @@ export class HUD {
       b.appendChild(cv);
       const key = document.createElement('span');
       key.className = 'key';
-      key.textContent = i + 1;
+      key.textContent = i === 9 ? '0' : String(i + 1);
       b.appendChild(key);
       const cnt = document.createElement('span');
       cnt.className = 'cnt';
@@ -380,6 +386,47 @@ export class HUD {
     } else if (name === 'forge') {
       title.textContent = 'The Forge';
       this.cleanup = game.catalog.mount(body, { forge: true });
+    } else if (name === 'alchemy') {
+      title.textContent = "Lira's Alchemy";
+      const paint = () => {
+        body.innerHTML = '';
+        const intro = document.createElement('p');
+        intro.className = 'alc-intro';
+        intro.innerHTML = '<b>Lira the Alchemist</b>Healing draughts for the cuts, spirit philters for the bolt. Gold on the counter.';
+        body.appendChild(intro);
+        const gold = document.createElement('p');
+        gold.className = 'alc-gold';
+        gold.textContent = `Your gold: ${game.gold}`;
+        body.appendChild(gold);
+        for (const it of game.items) {
+          const offer = POTION_SHOP[it.id];
+          if (!offer) continue;
+          const row = document.createElement('div');
+          row.className = 'alc-row';
+          const cv = document.createElement('canvas');
+          cv.width = 16;
+          cv.height = 16;
+          cv.getContext('2d').drawImage(iconCanvas(it.icon), 0, 0);
+          row.appendChild(cv);
+          const info = document.createElement('div');
+          info.className = 'alc-info';
+          const have = it.count | 0;
+          const full = have >= offer.max;
+          info.innerHTML = `<b>${it.name}</b><span>${it.desc}</span><small>Carried ${have}/${offer.max}</small>`;
+          row.appendChild(info);
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'alc-buy';
+          b.textContent = full ? 'Full' : `Buy  ${offer.price}g`;
+          b.disabled = full || game.gold < offer.price;
+          b.onclick = () => {
+            if (game.buyPotion(it.id)) paint();
+          };
+          row.appendChild(b);
+          body.appendChild(row);
+        }
+      };
+      paint();
     } else if (name === 'waygate') {
       title.textContent = 'Waygate';
       const saved = (localStorage.getItem('mg-name') || 'Hunter').replace(/[<>"&]/g, '').slice(0, 16);
@@ -430,7 +477,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z Spirit Bolt - V Fury - 1-9 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z Spirit Bolt - V Fury - 1-9 and 0 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
       const catBtn = document.getElementById('set-cat');
       if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
       document.getElementById('set-q').onclick = () => {

@@ -100,6 +100,7 @@ export class Input {
           break;
         default:
           if (/^Digit[1-9]$/.test(e.code)) this.slotSelect = Number(e.code.slice(5)) - 1;
+          else if (e.code === 'Digit0') this.slotSelect = 9;
       }
     });
     window.addEventListener('keyup', (e) => k.delete(e.code));

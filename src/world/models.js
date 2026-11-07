@@ -846,10 +846,18 @@ export function buildStall(seed, awning = [0xc8402f, 0xf2ead3], goods = 'apple')
   for (let x = 6; x < 34; x++) {
     for (let z = 19; z < 24; z++) {
       const k = Math.floor((x - 6) / 4);
-      if (goods === 'apple') M.set(x, 12, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 12, z, seed, 0.1));
+      if (goods === 'potion') {
+        if (x % 4 === 1) {
+          const col = [0xff4d6a, 0x4ec8ff, 0x7d5cff, 0x5dffa0][k % 4];
+          M.set(x, 12, z, 0xdde8f0);
+          M.set(x, 13, z, col, true);
+          M.set(x, 14, z, col, true);
+          if (z === 21) M.set(x, 15, z, 0xc8b48a);
+        }
+      } else if (goods === 'apple') M.set(x, 12, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 12, z, seed, 0.1));
       else if (goods === 'pumpkin') M.set(x, 12, z, J(k % 2 ? 0xe8821e : 0x6aa84a, x, 12, z, seed, 0.1));
       else M.set(x, 12, z, J(k % 2 ? 0x8aa8c0 : 0xd0d8e0, x, 12, z, seed, 0.1));
-      if ((x + z) % 3 === 0) M.set(x, 13, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 13, z, seed, 0.1));
+      if (goods !== 'potion' && (x + z) % 3 === 0) M.set(x, 13, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 13, z, seed, 0.1));
     }
   }
   for (let z = 0; z < 28; z++) {
@@ -866,6 +874,19 @@ export function buildStall(seed, awning = [0xc8402f, 0xf2ead3], goods = 'apple')
     M.set(x, 25 + (x % 4 === 1 || x % 4 === 2 ? -1 : 0), 27, shade(stripe, 0.9));
   }
   return bundle([[M, 0.0625 * 1.6, 20, 0, 14]]);
+}
+
+export function buildCauldron(seed = 6) {
+  const M = new VoxelModel(18, 16, 18);
+  const iron = (x, y, z) => J(0x3e424a, x, y, z, seed, 0.07);
+  const rad = [3.4, 4.6, 5.6, 6.1, 6.0, 5.2];
+  lathe(M, 9, 9, 1, rad, iron);
+  cyl(M, 9, 9, 6, 7, 4.3, 0x2dff9a, true);
+  cyl(M, 9, 9, 7, 8, 3.1, 0xc8ffe4, true);
+  for (const [x, z] of [[4, 4], [12, 4], [4, 12], [12, 12]]) M.box(x, 0, z, x + 2, 2, z + 2, iron);
+  M.box(1, 4, 8, 3, 6, 11, iron);
+  M.box(15, 4, 8, 17, 6, 11, iron);
+  return bundle([[M, 0.07, 9, 0, 9]]);
 }
 
 export function buildGate(seed = 3) {

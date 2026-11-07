@@ -751,6 +751,9 @@ body.touch #top-right {
 .dmg.heal {
   color: #7dff9a;
 }
+.dmg.mana {
+  color: #7ee7ff;
+}
 .dmg.gold {
   color: #ffe27a;
   font-size: 10px;
@@ -1525,3 +1528,16 @@ body.touch .how {
 
 .cat-forge{margin:0 0 12px;padding:10px 12px;border:2px solid #7a3b14;border-radius:6px;background:linear-gradient(90deg,rgba(255,122,34,.22),rgba(60,30,20,.4));color:#ffe3bf;font-size:13px;line-height:1.4}
 .cat-forge b{display:block;color:#ffb347;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.alc-intro{margin:0 0 10px;padding:10px 12px;border:2px solid #2f6b4a;border-radius:6px;background:linear-gradient(90deg,rgba(80,220,140,.16),rgba(20,40,36,.45));color:#d7ffe8;font-size:13px;line-height:1.4}
+.alc-intro b{display:block;color:#7dffb2;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.alc-gold{margin:0 0 10px;color:#ffe27a;font-family:var(--font-px);font-size:11px}
+.alc-row{display:flex;align-items:center;gap:12px;padding:10px;margin-bottom:8px;border:2px solid #24523a;border-radius:6px;background:#141816}
+.alc-row canvas{width:48px;height:48px;image-rendering:pixelated;background:#0c100e;border-radius:4px;flex:none}
+.alc-info{flex:1;min-width:0}
+.alc-info b{display:block;font-size:15px}
+.alc-info span,.alc-info small{display:block;color:#9ab;font-size:13px}
+.alc-buy{padding:8px 12px;font-family:var(--font-px);font-size:9px;color:#07140c;background:linear-gradient(#d8ffd0,#3ecf6a);border:2px solid #e9ffe4;border-radius:4px;touch-action:auto;white-space:nowrap}
+.alc-buy:disabled{opacity:.55;background:#2a2e2c;color:#889;border-color:#3a3e3c}
+@media (max-width: 720px) {
+  .slot { width: 32px; height: 32px; }
+}
