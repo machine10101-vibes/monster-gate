@@ -43,7 +43,6 @@ function buildSubject(spec, silhouette) {
     tilt.add(held);
   } else if (spec.kind === 'armor') {
     const g = gearById(spec.id);
-    const h = buildHumanoid({ armor: { [g.slot]: g.set }, ...(g.slot === 'helm' ? {} : { hero: false }) });
     const keep = {
       helm: ['head'],
       chest: ['torso'],
@@ -51,6 +50,7 @@ function buildSubject(spec, silhouette) {
       legs: ['legL', 'legR'],
       boots: ['legL', 'legR'],
     }[g.slot];
+    const h = buildHumanoid({ armor: { [g.slot]: g.set }, parts: keep, ...(g.slot === 'helm' ? {} : { hero: false }) });
     for (const part of ['head', 'torso', 'armL', 'armR', 'legL', 'legR']) if (!keep.includes(part)) removePart(h[part]);
     h.shieldG?.parent?.remove(h.shieldG);
     tilt.add(h.root);
@@ -142,33 +142,58 @@ class Stage {
     const done = this.cache.get(key);
     if (done) ctx.drawImage(done, 0, 0, px, px);
     else this.queue.push({ key, spec, silhouette, ctx, px });
-    this.pump();
     return cv;
   }
 
-  pump() {
-    if (this.pumping || !this.queue.length) return;
-    this.pumping = true;
-    requestAnimationFrame(() => {
-      this.pumping = false;
-      const job = this.queue.shift();
-      if (job) {
-        let src = this.cache.get(job.key);
-        if (!src) {
-          const subject = buildSubject(job.spec, job.silhouette);
-          const tmp = document.createElement('canvas');
-          tmp.width = 192;
-          tmp.height = 192;
-          this.draw(subject, subject.yaw, tmp.getContext('2d'), 192, 192);
-          disposeSubject(subject);
-          this.cache.set(job.key, tmp);
-          src = tmp;
-        }
+  /** Drop thumbs for a catalog view that has been replaced. */
+  cancel() {
+    this.queue.length = 0;
+  }
+
+  pending() {
+    return this.queue.length > 0;
+  }
+
+  run(job) {
+    try {
+      let src = this.cache.get(job.key);
+      if (!src) {
+        const subject = buildSubject(job.spec, job.silhouette);
+        const tmp = document.createElement('canvas');
+        tmp.width = 192;
+        tmp.height = 192;
+        this.draw(subject, subject.yaw, tmp.getContext('2d'), 192, 192);
+        disposeSubject(subject);
+        this.cache.set(job.key, tmp);
+        src = tmp;
+      }
+      if (job.ctx) {
         job.ctx.clearRect(0, 0, job.px, job.px);
         job.ctx.drawImage(src, 0, 0, job.px, job.px);
       }
-      this.pump();
-    });
+    } catch (err) {
+      console.warn('catalog thumb failed', job.key, err);
+    }
+  }
+
+  /**
+   * Paint queued thumbnails. The open tab is flushed immediately so its
+   * pictures are on screen before the browser paints the empty cards.
+   */
+  flush(budget = 14) {
+    const t0 = performance.now();
+    let n = 0;
+    while (this.queue.length && (n < 1 || performance.now() - t0 < budget)) {
+      this.run(this.queue.shift());
+      n++;
+    }
+    if (this.queue.length && !this.pumping) {
+      this.pumping = true;
+      requestAnimationFrame(() => {
+        this.pumping = false;
+        this.flush();
+      });
+    }
   }
 }
 
@@ -253,10 +278,12 @@ export class Catalog {
   render() {
     if (!this.body) return;
     this.stopViewer();
+    getStage().cancel();
     this.body.innerHTML = '';
     this.game.hud.el.panelTitle.textContent = 'Hunter Catalog';
     if (this.view) this.renderDetail(this.view);
     else this.renderGrid();
+    getStage().flush(120);
   }
 
   /* ----------------------------- grid ------------------------------ */
@@ -559,6 +586,10 @@ export class Catalog {
         cv.height = h;
       }
       if (!state.drag) state.yaw += dt * 0.7;
+      if (stage.pending()) {
+        state.raf = requestAnimationFrame(tick);
+        return;
+      }
       stage.draw(subject, state.yaw, ctx, w, h);
       state.raf = requestAnimationFrame(tick);
     };
