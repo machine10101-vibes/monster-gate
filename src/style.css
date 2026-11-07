@@ -33,6 +33,21 @@ body {
   -webkit-user-select: none;
 }
 
+/* Landscape phones: the stage is pinned to the visible screen and grows when the toolbar hides. */
+html.landscape-full,
+html.landscape-full body {
+  width: 100%;
+  background: #0b0d10;
+}
+html.landscape-full:fullscreen,
+html.landscape-full:-webkit-full-screen,
+html.landscape-full:fullscreen #app,
+html.landscape-full:-webkit-full-screen #app {
+  width: 100%;
+  height: 100%;
+  background: #0b0d10;
+}
+
 #app {
   position: fixed;
   inset: 0;

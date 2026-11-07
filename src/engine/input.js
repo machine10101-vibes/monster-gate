@@ -150,7 +150,7 @@ export class Input {
       this.touch = true;
       document.body.classList.add('touch');
       const t = e.target;
-      if (t.closest && (t.closest('.tbtn') || t.closest('.slot') || t.closest('.mbtn') || t.closest('#panel') || t.closest('#dialog') || t.closest('.mini') || t.closest('#title') || t.closest('#loading'))) return;
+      if (t.closest && (t.closest('.tbtn') || t.closest('.slot') || t.closest('.mbtn') || t.closest('#panel') || t.closest('#dialog') || t.closest('.mini') || t.closest('#title') || t.closest('#loading') || t.closest('#rotate-overlay'))) return;
       const w = window.innerWidth;
       if (e.clientX < w * 0.42 && this.stick.id === null) {
         this.stick.id = e.pointerId;

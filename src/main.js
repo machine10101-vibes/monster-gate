@@ -15,6 +15,7 @@ import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS } from './ui/hud.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { clamp, lerp } from './engine/voxel.js';
+import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
@@ -80,9 +81,7 @@ class Game {
     this.tmpV = new THREE.Vector3();
     this.ray = new THREE.Raycaster();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
-    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 250));
+    this.bindImmersive();
   }
 
   initRenderer() {
@@ -133,6 +132,7 @@ class Game {
 
   start() {
     if (this.started) return;
+    if (this.input.touch && this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
     this.started = true;
     this.audio.unlock();
     this.cam.targetDist = 16;
@@ -165,10 +165,109 @@ class Game {
   }
 
   toggleFullscreen() {
-    const el = document.documentElement;
-    if (document.fullscreenElement) document.exitFullscreen?.();
-    else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
-    if (screen.orientation?.lock && this.input.touch) screen.orientation.lock('landscape').catch(() => {});
+    if (isFullscreen()) exitGameFullscreen();
+    else this.enterImmersive({ gesture: true, lock: this.input.touch });
+  }
+
+  /* ------------------------- landscape fullscreen ------------------------- */
+  bindImmersive() {
+    const sync = () => this.syncImmersive();
+    window.addEventListener('resize', sync);
+    window.addEventListener('orientationchange', () => {
+      this.tucked = false;
+      sync();
+      setTimeout(sync, 80);
+      setTimeout(sync, 350);
+    });
+    screen.orientation?.addEventListener?.('change', () => {
+      this.tucked = false;
+      sync();
+    });
+    window.visualViewport?.addEventListener('resize', () => this.resize());
+    window.visualViewport?.addEventListener('scroll', () => this.resize());
+    document.addEventListener('fullscreenchange', () => this.resize());
+    document.addEventListener('webkitfullscreenchange', () => this.resize());
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!this.input.touch || e.target.closest?.('#btn-fs')) return;
+        if (this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
+        else if (e.target.closest?.('#rotate-overlay')) requestGameFullscreen(true);
+      },
+      { capture: true }
+    );
+    sync();
+  }
+
+  isLandscape() {
+    return landscapeNow();
+  }
+
+  syncImmersive() {
+    if (!this.input.touch) {
+      this.resize();
+      return;
+    }
+    if (this.isLandscape()) this.enterImmersive();
+    else {
+      document.documentElement.classList.remove('landscape-full');
+      this.tucked = false;
+      this.clearTuck();
+      this.resize();
+    }
+  }
+
+  /**
+   * Landscape phones: hide the browser toolbar and stretch the game to the screen.
+   * `gesture` is set when this runs inside a tap, which is when browsers allow fullscreen.
+   */
+  enterImmersive({ gesture = false, lock = false } = {}) {
+    document.documentElement.classList.add('landscape-full');
+    const now = performance.now();
+    const cooled = !this.fsTriedAt || now - this.fsTriedAt > 900;
+    if (!isFullscreen() && (gesture || cooled)) {
+      this.fsTriedAt = now;
+      requestGameFullscreen(lock && gesture);
+    }
+    if (gesture || !this.tucked) {
+      this.tucked = true;
+      this.tuckChrome();
+    }
+    this.resize();
+  }
+
+  /** Scroll the mobile URL bar off, then pin the game to the visible screen. */
+  tuckChrome() {
+    if (isFullscreen() || this.tuckTimer) return;
+    const html = document.documentElement;
+    const tall = window.innerHeight + 120 + 'px';
+    html.style.height = 'auto';
+    html.style.minHeight = tall;
+    html.style.overflow = 'auto';
+    document.body.style.minHeight = tall;
+    const kick = () => window.scrollTo(0, 80);
+    kick();
+    setTimeout(kick, 40);
+    this.tuckTimer = setTimeout(() => {
+      this.tuckTimer = 0;
+      if (!document.documentElement.classList.contains('landscape-full')) return;
+      if (isFullscreen()) this.clearTuck();
+      else window.scrollTo(0, 1);
+      document.documentElement.style.overflow = 'hidden';
+      this.resize();
+    }, 280);
+  }
+
+  clearTuck() {
+    if (this.tuckTimer) {
+      clearTimeout(this.tuckTimer);
+      this.tuckTimer = 0;
+    }
+    const html = document.documentElement;
+    html.style.overflow = '';
+    html.style.height = '';
+    html.style.minHeight = '';
+    document.body.style.minHeight = '';
   }
 
   /* ------------------------------ quality ------------------------------ */
@@ -201,8 +300,33 @@ class Game {
   }
 
   resize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const app = document.getElementById('app');
+    const vv = window.visualViewport;
+    let w = window.innerWidth;
+    let h = window.innerHeight;
+    if (this.input?.touch && this.isLandscape?.()) {
+      if (isFullscreen()) {
+        w = window.innerWidth;
+        h = window.innerHeight;
+      } else if (vv) {
+        w = vv.width;
+        h = vv.height;
+      }
+      if (app) {
+        app.style.left = '0px';
+        app.style.top = (isFullscreen() ? 0 : Math.round(vv?.offsetTop || 0)) + 'px';
+        app.style.width = Math.round(w) + 'px';
+        app.style.height = Math.round(h) + 'px';
+      }
+    } else if (app) {
+      app.style.left = '';
+      app.style.top = '';
+      app.style.width = '';
+      app.style.height = '';
+    }
+    w = Math.round(w);
+    h = Math.round(h);
+    if (w < 2 || h < 2) return;
     const dpr = Math.min(window.devicePixelRatio || 1, this.quality.dpr) * this.resScale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
