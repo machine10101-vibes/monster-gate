@@ -1522,3 +1522,6 @@ body.touch .how {
     font-size: 13px;
   }
 }
+
+.cat-forge{margin:0 0 12px;padding:10px 12px;border:2px solid #7a3b14;border-radius:6px;background:linear-gradient(90deg,rgba(255,122,34,.22),rgba(60,30,20,.4));color:#ffe3bf;font-size:13px;line-height:1.4}
+.cat-forge b{display:block;color:#ffb347;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}

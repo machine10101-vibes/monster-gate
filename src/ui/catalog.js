@@ -248,8 +248,10 @@ export class Catalog {
     return cv.toDataURL('image/png');
   }
 
-  mount(body) {
+  mount(body, opts = {}) {
     this.body = body;
+    this.forge = !!opts.forge;
+    if (this.forge && this.tab === 'monsters') this.tab = 'weapons';
     this.view = null;
     this.render();
     return () => this.unmount();
@@ -280,7 +282,7 @@ export class Catalog {
     this.stopViewer();
     getStage().cancel();
     this.body.innerHTML = '';
-    this.game.hud.el.panelTitle.textContent = 'Hunter Catalog';
+    this.game.hud.el.panelTitle.textContent = this.forge ? 'The Forge' : 'Hunter Catalog';
     if (this.view) this.renderDetail(this.view);
     else this.renderGrid();
     getStage().flush(120);
@@ -308,6 +310,7 @@ export class Catalog {
       tabs.appendChild(b);
     }
     root.appendChild(tabs);
+    if (this.forge) root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Pick a weapon or armor piece, then forge it from monster parts. Pieces you have forged can be worn right here.`));
 
     const grid = el('div', 'cat-grid');
     const s = getStage();
@@ -339,7 +342,7 @@ export class Catalog {
       }
     }
     root.appendChild(grid);
-    root.appendChild(el('p', 'cat-foot', 'Defeat monsters to discover them and collect parts. Parts craft into weapons and armor that you can wear into the field.'));
+    root.appendChild(el('p', 'cat-foot', 'Defeat monsters to discover them and collect parts. Bring parts to the Forge in Oakhollow to craft weapons and armor you can wear into the field.'));
     this.body.appendChild(root);
   }
 
@@ -500,17 +503,24 @@ export class Catalog {
     info.appendChild(this.recipeChips(g));
     const actions = el('div', 'cat-actions');
     if (!pr.crafted(g.id)) {
-      const b = el('button', 'cat-btn' + (pr.canCraft(g) ? ' go' : ''), pr.canCraft(g) ? 'Craft' : 'Missing parts');
+      const can = this.forge && pr.canCraft(g);
+      const b = el('button', 'cat-btn' + (can ? ' go' : ''), !this.forge ? 'Forge at the smithy' : pr.canCraft(g) ? 'Forge it' : 'Missing parts');
       b.type = 'button';
-      b.disabled = !pr.canCraft(g);
+      b.disabled = !can;
       b.onclick = () => {
-        if (!pr.craft(g.id)) return;
+        if (!this.forge || !pr.craft(g.id)) return;
         this.game.applyGear();
         this.game.audio.quest();
-        this.game.hud.toast(`Crafted ${g.name}`, 1800);
+        this.game.hud.toast(`Forged ${g.name}`, 1800);
+        const f = this.game.world.forge;
+        if (f) {
+          this.game.fx.burst(f.x + 0.4, f.y + 1.1, f.z, [0xff8a1e, 0xffd27a, 0xffffff], 22, 4.5, 0.09, 0.9, 6, 2);
+          this.game.fx.ring(f.x + 0.6, f.y + 0.6, f.z, 0xffb347, 14, 2.5, 0.09, 0.5);
+        }
         this.render();
       };
       actions.appendChild(b);
+      if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the Forge next to Bram the Blacksmith in Oakhollow.'));
     } else {
       const worn = pr.worn(g.id);
       const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip (hotbar 8)' : 'Wear');

@@ -314,7 +314,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -377,6 +377,9 @@ export class HUD {
     } else if (name === 'catalog') {
       title.textContent = 'Hunter Catalog';
       this.cleanup = game.catalog.mount(body);
+    } else if (name === 'forge') {
+      title.textContent = 'The Forge';
+      this.cleanup = game.catalog.mount(body, { forge: true });
     } else if (name === 'waygate') {
       title.textContent = 'Waygate';
       const saved = (localStorage.getItem('mg-name') || 'Hunter').replace(/[<>"&]/g, '').slice(0, 16);

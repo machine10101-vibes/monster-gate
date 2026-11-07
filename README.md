@@ -36,7 +36,7 @@ South of Oakhollow, just off the road, is a stone-and-brass waygate. Press F the
 
 The first full monster is the Green Budge Dragon (Lv 4, found in the open fields). It bites at close range, spits ember volleys when you back off and enrages below 40% health. Every kill rolls parts: scales, hide, claws, fangs and a rare horn.
 
-Press C (or Menu > Hunter Catalog on touch) for the catalog. It lists monsters you have discovered, the parts they drop and the gear those parts craft into. Every picture in it is a live render of the same 3D model used in the game, and the detail view has a drag-to-rotate turntable.
+Weapons and armor are forged at the Forge beside Bram the Blacksmith in Oakhollow's south-west corner (press F next to the forge, or talk to Bram and press F through his dialog). Press C (or Menu > Hunter Catalog on touch) for the catalog. It lists monsters you have discovered, the parts they drop and the gear those parts craft into. Every picture in it is a live render of the same 3D model used in the game, and the detail view has a drag-to-rotate turntable.
 
 - Weapons: Budgefang Blade, Horn Maul (also hotbar slot 8) and Wyrmhorn Bow.
 - Armor: Budgescale helm, cuirass, gauntlets, greaves and boots. They show on the hero, add defense, and the full set gives +4 max health.

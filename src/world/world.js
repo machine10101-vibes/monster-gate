@@ -292,6 +292,8 @@ export class World {
       crate: [1, 2].map((s) => M.buildCrate(s)),
       barrel: [1, 2].map((s) => M.buildBarrel(s)),
       chest: M.buildChest(1),
+      forge: M.buildForge(3),
+      anvil: M.buildAnvil(4),
       hay: M.buildHay(1),
       fence: [1, 2, 3].map((s) => M.buildFencePiece(s)),
       sign: M.buildSignpost(1),
@@ -461,9 +463,19 @@ export class World {
     this.fenceLine(58.8, 83.5, 58.8, 88);
     this.fenceLine(86.8, 69, 86.8, 72);
 
+    const FX = 61.4;
+    const FZ = 86.1;
+    const fy = this.heightAt(FX, FZ);
+    this.putAt(m.forge, FX, FZ, Math.PI / 2, 1.2);
+    this.box(FX, FZ, 0.85, 1.25);
+    this.putAt(m.anvil, 63.4, 86.1, Math.PI / 2, 1);
+    this.circle(63.4, 86.1, 0.42);
+    this.lightSpots.push({ x: FX + 0.7, y: fy + 0.9, z: FZ, color: 0xff7a22 });
+    this.forge = { x: FX, y: fy, z: FZ, anvil: { x: 63.4, z: 86.1 } };
+
     this.npcSpots = {
       guild: { x: GUILD.x - 1.4, z: GUILD.z + 3.5 },
-      smith: { x: 67, z: 83.8 },
+      smith: { x: 64.3, z: 85.2 },
       farmer: { x: 90, z: 82 },
       child: { x: 72, z: 80.5 },
     };
