@@ -59,6 +59,9 @@ class Game {
     this.input = new Input(this.canvas);
     this.time = 0;
     this.hitstopT = 0;
+    this.punchAmt = 0;
+    this.slowT = 0;
+    this.slowK = 1;
     this.shakeAmt = 0;
     this.monsters = [];
     this.projectiles = [];
@@ -375,6 +378,15 @@ class Game {
 
   hitstop(t) {
     this.hitstopT = Math.max(this.hitstopT, t);
+  }
+
+  punch(a) {
+    this.punchAmt = Math.max(this.punchAmt, a);
+  }
+
+  slowmo(t, k = 0.3) {
+    this.slowT = Math.max(this.slowT, t);
+    this.slowK = k;
   }
 
   screenOf(x, y, z, withVis = false) {
@@ -1048,6 +1060,14 @@ class Game {
     if (cy < gh + 1.2) cy = gh + 1.2;
     this.camera.position.set(cx, cy, cz);
 
+    if (this.punchAmt > 0.002) {
+      const pl = this.punchAmt / Math.max(4, dist);
+      this.camera.position.x += (c.look.x - cx) * pl;
+      this.camera.position.y += (c.look.y - cy) * pl;
+      this.camera.position.z += (c.look.z - cz) * pl;
+      this.punchAmt *= Math.max(0, 1 - dt * 12);
+    }
+
     if (this.shakeAmt > 0.001) {
       const s = this.shakeAmt;
       this.camera.position.x += (Math.random() - 0.5) * s * 0.9;
@@ -1099,6 +1119,9 @@ class Game {
     if (this.hitstopT > 0) {
       this.hitstopT -= dt;
       dt *= 0.08;
+    } else if (this.slowT > 0) {
+      this.slowT -= dt;
+      dt *= this.slowK + (1 - this.slowK) * Math.max(0, 1 - this.slowT / 0.25) * (this.slowT < 0.25 ? 1 : 0);
     }
     this.step(dt, raw / 1000);
     this.renderer.render(this.scene, this.camera);
