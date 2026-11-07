@@ -3,6 +3,7 @@ import { buildHumanoid, buildHeld, S } from './humanoid.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
+import { skillMods } from '../systems/skillcast.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -78,6 +79,19 @@ export class Player {
     this.trail = new WeaponTrail(game.scene);
     this.tA = new THREE.Vector3();
     this.tB = new THREE.Vector3();
+    this.cds = {};
+    this.stillT = 0;
+    this.bulwarkT = 0;
+    this.warcryT = 0;
+    this.packT = 0;
+    this.leapT = 0;
+    this.leapArm = false;
+    this.leapLand = false;
+    this.leapPower = 14;
+    this.leapRadius = 2.4;
+    this.leapDir = new THREE.Vector3(0, 0, 1);
+    this.castT = 0;
+    this.castAnim = '';
     this.setHeld('blade');
     this.syncObj();
   }
@@ -151,7 +165,9 @@ export class Player {
       }
       return false;
     }
-    dmg = Math.max(1, Math.round(dmg * (1 - this.reduction)));
+    const mods = skillMods(g);
+    const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.bulwarkT > 0 ? 0.45 : 0));
+    dmg = Math.max(1, Math.round(dmg * (1 - dr)));
     this.hp = Math.max(0, this.hp - dmg);
     this.invuln = 0.9;
     this.hurtT = 0.4;
@@ -260,6 +276,14 @@ export class Player {
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.comboT = Math.max(0, this.comboT - dt);
     this.stamDelay = Math.max(0, this.stamDelay - dt);
+    this.castT = Math.max(0, this.castT - dt);
+    this.bulwarkT = Math.max(0, this.bulwarkT - dt);
+    this.warcryT = Math.max(0, this.warcryT - dt);
+    this.packT = Math.max(0, this.packT - dt);
+    for (const k of Object.keys(this.cds)) {
+      this.cds[k] -= dt;
+      if (this.cds[k] <= 0) delete this.cds[k];
+    }
 
     if (!this.dead) {
       if (this.stamDelay <= 0 && !(this.shielding && this.state === 'idle')) this.stamina = Math.min(this.maxStamina, this.stamina + 34 * dt);
@@ -348,6 +372,11 @@ export class Player {
     }
 
     if (this.wading && this.state !== 'roll') speed *= 0.65;
+    if (this.leapT > 0) {
+      this.leapT -= dt;
+      speed = 13;
+      moveDir.copy(this.leapDir);
+    }
 
     const prevAlong = this.vel.x * Math.sin(this.yaw) + this.vel.z * Math.cos(this.yaw);
     const rate = this.state === 'roll' ? 45 : this.state === 'attack' ? 26 : speed > 0 ? 15 : 12;
@@ -357,6 +386,8 @@ export class Player {
     this.knock.multiplyScalar(Math.max(0, 1 - dt * 9));
     this.moveBy(this.vel.x * dt, this.vel.z * dt);
     this.speed = Math.hypot(this.vel.x, this.vel.z);
+    if (!this.dead && this.speed < 0.35 && this.state !== 'roll') this.stillT = Math.min(2.5, this.stillT + dt);
+    else this.stillT = 0;
     if (dt > 1e-4) {
       const along = this.vel.x * Math.sin(this.yaw) + this.vel.z * Math.cos(this.yaw);
       this.accSm += ((along - prevAlong) / dt - this.accSm) * Math.min(1, dt * 9);
@@ -446,6 +477,11 @@ export class Player {
       this.vy -= 26 * dt;
       this.pos.y += this.vy * dt;
       if (this.pos.y <= target) {
+        if (this.leapArm && this.vy < 0) {
+          this.leapArm = false;
+          this.leapT = 0;
+          this.leapLand = true;
+        }
         if (this.vy < -7) {
           this.game.fx.burst(this.pos.x, target + 0.1, this.pos.z, [0xd9c9a0, 0x9bd06a], 8, 2, 0.1, 0.4);
         }
@@ -461,6 +497,7 @@ export class Player {
   doAttackHit(it) {
     const g = this.game;
     const f = this.facing;
+    const mods = skillMods(g);
     if (it.kind === 'melee') {
       const mult = this.combo === 2 ? 1.5 : 1;
       const reach = it.reach * (this.combo === 2 ? 1.2 : 1);
@@ -475,7 +512,8 @@ export class Player {
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
         const crit = Math.random() < 0.12;
-        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25)), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
+        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
+        if (mods.poison && !m.dead) m.afflict('poison', 4, 4);
         hits++;
       }
       if (this.combo === 2) {
@@ -489,16 +527,24 @@ export class Player {
         g.hitstop(0.05 + Math.min(0.06, hits * 0.02) + (this.combo === 2 ? 0.04 : 0));
         g.shake(this.combo === 2 ? 0.3 : 0.18);
         g.punch(this.combo === 2 ? 0.34 : 0.16);
-        this.fury = Math.min(100, this.fury + 7 * hits);
+        this.fury = Math.min(100, this.fury + Math.round(7 * mods.furyGain) * hits);
         g.audio.hit();
       }
     } else if (it.kind === 'ranged') {
+      let dmg = it.dmg;
+      let aimed = false;
+      if (mods.deadeye && this.stillT > 0.7) {
+        dmg = Math.round(dmg * 1.8);
+        aimed = true;
+        this.stillT = 0;
+        g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.2, this.pos.z), 'Aimed', 'crit');
+      }
       if (it.proj) {
         const sp = it.proj === 'gloom' ? 12 : 18;
-        g.spawnProjectile({ owner: 'player', kind: it.proj, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg: it.dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce: it.proj === 'crescent', homing: it.proj === 'gloom' ? 3.2 : 0 });
+        g.spawnProjectile({ owner: 'player', kind: it.proj, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce: it.proj === 'crescent', homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
         g.audio.tone(it.proj === 'gloom' ? 260 : 620, 0.14, 'sawtooth', 0.08, -200);
       } else {
-        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * 20, vz: f.z * 20, dmg: it.dmg, life: 1.3, r: 0.35 });
+        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * 20, vz: f.z * 20, dmg, life: 1.3, r: 0.35, crit: aimed });
         g.audio.tone(900, 0.08, 'triangle', 0.1, -500);
       }
     } else if (it.kind === 'throw') {
@@ -517,7 +563,17 @@ export class Player {
     this.setState('use', 0.32);
     this.potionDone = true;
     g.audio.bolt();
-    g.spawnProjectile({ owner: 'player', kind: 'bolt', x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.6, vx: f.x * 15, vz: f.z * 15, dmg: 11, life: 1.2, r: 0.5, pierce: true });
+    g.spawnProjectile({ owner: 'player', kind: 'bolt', spell: true, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.6, vx: f.x * 15, vz: f.z * 15, dmg: 11, life: 1.2, r: 0.5, pierce: true });
+  }
+
+  playCast(kind, dur = 0.34) {
+    if (this.dead) return;
+    this.castAnim = kind || 'cast';
+    this.castT = dur;
+    if (this.state !== 'roll' && this.state !== 'attack' && this.state !== 'dead' && this.state !== 'stagger') {
+      this.setState('use', Math.max(0.24, Math.min(0.4, dur)));
+      this.potionDone = true;
+    }
   }
 
   castFury() {
@@ -768,6 +824,31 @@ export class Player {
         break;
       }
       default:
+    }
+
+    if (this.leapArm || this.leapT > 0) {
+      const rising = this.vy > 0;
+      armR = rising ? -2.6 : -0.4;
+      armL = rising ? -2.6 : -0.2;
+      legL = rising ? -0.9 : 0.6;
+      legR = rising ? 0.2 : 0.7;
+      lean = rising ? 0.45 : 0.15;
+      torsoYaw = 0;
+    } else if (this.castT > 0) {
+      if (this.castAnim === 'spin') {
+        armR = -1.6;
+        armL = -1.6;
+        torsoYaw = Math.sin(this.castT * 32) * 1.15;
+        lean = 0.08;
+      } else if (this.castAnim === 'bash') {
+        armL = -1.9;
+        torsoYaw = 0.7;
+        lean = 0.12;
+      } else if (this.castAnim === 'slam') {
+        armR = -2.5;
+        armL = -2.5;
+        lean = 0.35;
+      }
     }
 
     if (flinch > 0 && this.state !== 'dead' && this.state !== 'roll') {

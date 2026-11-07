@@ -1,6 +1,8 @@
 import { iconCanvas, iconURL, heartCanvas } from './icons.js';
 import { clamp } from '../engine/voxel.js';
 import { GATE, GUILD, TOWN } from '../world/terrain.js';
+import { SKILLS } from '../data/skills.js';
+import { mountSkillTree, paintSkillIcon } from './skilltree.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Balanced steel. Three-hit rhythm.' },
@@ -320,7 +322,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -379,6 +381,7 @@ export class HUD {
            <div class="panel-row"><span>Fury</span><b>${Math.round(p.fury)} / 100</b></div>
            <div class="panel-row"><span>Weapon</span><b>${game.items[game.sel].name}</b></div>
            <div class="panel-row"><span>Defense</span><b>${game.progress.defense} (-${Math.round(game.progress.reduction * 100)}% damage)</b></div>
+           <div class="panel-row"><span>Path</span><b>${game.progress.className || 'Unchosen — press K'}</b></div>
            <p style="color:#aab;font-size:13px">${game.progress.defense ? (game.progress.activeSets.length ? game.progress.activeSets.map((x) => `${x.name}: ${x.bonus.replace('Full set: ', '')}`).join(' ') : 'Wearing dragon armor. Complete a set for a bonus.') : "Dark leather hunter's garb, steel bracers and a greatsword on your back."} Press C for the Hunter Catalog.</p>`);
     } else if (name === 'catalog') {
       title.textContent = 'Hunter Catalog';
@@ -386,6 +389,9 @@ export class HUD {
     } else if (name === 'forge') {
       title.textContent = 'The Forge';
       this.cleanup = game.catalog.mount(body, { forge: true });
+    } else if (name === 'skills') {
+      title.textContent = 'Skill Tree';
+      this.cleanup = mountSkillTree(body, game);
     } else if (name === 'alchemy') {
       title.textContent = "Lira's Alchemy";
       const paint = () => {
@@ -470,16 +476,18 @@ export class HUD {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
       const q = game.quality;
       const rows = [
-        ...(name === 'menu' ? [['Hunter Catalog', '<button id="set-cat">Open</button>']] : []),
+        ...(name === 'menu' ? [['Hunter Catalog', '<button id="set-cat">Open</button>'], ['Skill Tree', '<button id="set-skills">Open</button>']] : []),
         ['Graphics quality', `<button id="set-q">${q.label}</button>`],
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z Spirit Bolt - V Fury - 1-9 and 0 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z X V skills (empty Z is Spirit Bolt, empty V is Fury) - K skill tree - 1-9 and 0 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
       const catBtn = document.getElementById('set-cat');
       if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
+      const skillBtn = document.getElementById('set-skills');
+      if (skillBtn) skillBtn.onclick = () => this.openPanel('skills', game);
       document.getElementById('set-q').onclick = () => {
         game.cycleQuality();
         document.getElementById('set-q').textContent = game.quality.label;
@@ -505,6 +513,45 @@ export class HUD {
   }
   get panelOpen() {
     return !this.el.panel.classList.contains('hidden');
+  }
+
+  updateSkillbar(game) {
+    const bar = document.getElementById('skillbar');
+    if (!bar || !game?.progress || !game.player) return;
+    const eq = game.progress.equipped();
+    const keys = ['Z', 'X', 'V'];
+    const fallback = ['Bolt', 'Skill', 'Fury'];
+    if (!bar.dataset.built) {
+      bar.dataset.built = '1';
+      for (let i = 0; i < 3; i++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'skslot';
+        b.innerHTML = '<canvas></canvas><span class="skk"></span><span class="skn"></span><i class="skcd"></i>';
+        b.addEventListener('click', () => game.castSlot(i));
+        bar.appendChild(b);
+      }
+    }
+    [...bar.children].forEach((b, i) => {
+      const id = eq[i];
+      const skill = id && SKILLS[id];
+      const canvas = b.querySelector('canvas');
+      if (skill) paintSkillIcon(canvas, skill.shape, skill.color);
+      else {
+        const ctx = canvas.getContext('2d');
+        canvas.width = 16;
+        canvas.height = 16;
+        ctx.clearRect(0, 0, 16, 16);
+      }
+      b.querySelector('.skk').textContent = keys[i];
+      b.querySelector('.skn').textContent = skill ? skill.name : fallback[i];
+      b.title = skill ? skill.name : fallback[i];
+      b.classList.toggle('empty', !skill);
+      b.style.borderColor = skill ? skill.color : '';
+      const cd = skill ? game.player.cds[id] || 0 : 0;
+      const max = skill?.cd || 1;
+      b.querySelector('.skcd').style.transform = `scaleX(${cd > 0 ? Math.min(1, cd / max) : 0})`;
+    });
   }
 }
 

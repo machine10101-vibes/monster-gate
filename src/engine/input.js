@@ -60,8 +60,14 @@ export class Input {
         case 'KeyZ':
           this.press('bolt');
           break;
+        case 'KeyX':
+          this.press('skill');
+          break;
         case 'KeyV':
           this.press('fury');
+          break;
+        case 'KeyK':
+          this.press('panel:skills');
           break;
         case 'KeyJ':
         case 'Enter':

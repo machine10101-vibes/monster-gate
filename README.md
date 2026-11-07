@@ -21,12 +21,12 @@ npm run preview  # serve the production build
 | Attack | Click / J / Enter | Sword button |
 | Shield | Shift | Shield button |
 | Evade roll | Space / right-click | Dash button |
-| Spirit Bolt | Z | Bolt button |
-| Fury burst | V | Fury button |
+| Skill slots | Z, X, V | Bolt, Skill, and Fury buttons |
+| Skill tree | K | Menu → Skill Tree |
 | Select item | 1-9 / click hotbar | Tap hotbar |
 | Talk / Waygate | F | Talk button |
 | Rotate / zoom camera | R, [ ], wheel, middle-drag | Drag right side |
-| Panels | M map, E hunter, B satchel, C catalog, Q hunt log, T settings | Menu buttons |
+| Panels | M map, E hunter, B satchel, C catalog, Q hunt log, T settings, K skills | Menu buttons |
 
 ## Waygate
 
@@ -40,8 +40,18 @@ Weapons and armor are forged at the Forge beside Bram the Blacksmith in Oakhollo
 
 - Weapons: Budgefang Blade, Horn Maul (also hotbar slot 8) and Wyrmhorn Bow.
 - Armor: Budgescale helm, cuirass, gauntlets, greaves and boots. They show on the hero, add defense, and the full set gives +4 max health.
-- Progress (discoveries, parts, crafted gear, what is worn, gold and potions) is saved in localStorage.
+- Progress (discoveries, parts, crafted gear, what is worn, gold, potions, and your skill path) is saved in localStorage.
 - The dragon's palette and proportions live in `src/data/budge.js` and `buildBudgeDragon()` in `src/entities/creatures.js`. Catalog data (drops, recipes, stats) is in `src/data/catalog.js`.
+
+## Skill trees
+
+Press K (or Menu → Skill Tree) to choose Warrior, Ranger, or Mage. Each class has three paths, and each path has a passive, an active, and a special:
+
+- Warrior spends Fury. Tank, Fury, and Barbarian.
+- Ranger spends Stamina. Companion, Poison, and Sniper.
+- Mage spends Spirit. Fire, Ice, and Lightning.
+
+Choosing a path grants 2 points, then 1 more for every 2 monsters slain. Passives apply as soon as you learn them. Actives and specials equip to Z, X, and V. An empty Z is still Spirit Bolt, and an empty V is still Fury. Respec costs 15 gold. Changing path costs 25 gold and clears what you learned.
 
 ## Darksycle Dragon
 

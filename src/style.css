@@ -1541,3 +1541,200 @@ body.touch .how {
 @media (max-width: 720px) {
   .slot { width: 32px; height: 32px; }
 }
+
+#tb-skill {
+  right: 96px;
+  bottom: 148px;
+  width: 44px;
+  height: 44px;
+  font-family: var(--font-px);
+  font-size: 11px;
+  color: #ffe7a0;
+}
+
+#skillbar {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+.skslot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+  height: 32px;
+  padding: 2px 6px 2px 2px;
+  overflow: hidden;
+  background: linear-gradient(#303238, #202228);
+  border: 2px solid #121317;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: #efe7d2;
+}
+.skslot canvas {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  image-rendering: pixelated;
+  background: #14161b;
+}
+.skslot .skk {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  font-family: var(--font-px);
+  font-size: 7px;
+  color: #ffd23f;
+}
+.skslot .skn {
+  font-family: var(--font-px);
+  font-size: 7px;
+  line-height: 1.15;
+  text-align: left;
+}
+.skslot.empty {
+  opacity: 0.72;
+}
+.skslot .skcd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #7ec8ff;
+  transform-origin: left center;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+.sk-wrap { padding-right: 28px; }
+.sk-intro, .sk-note {
+  margin: 0 0 10px;
+  color: #c9c3b4;
+  font-size: 13px;
+}
+.sk-pick {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.sk-class {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 160px;
+  padding: 12px;
+  text-align: left;
+  background: #16181d;
+  border: 2px solid #3b3f4a;
+  border-radius: 8px;
+}
+.sk-class b { font-size: 16px; }
+.sk-class span, .sk-class small { color: #b7b1a4; font-size: 13px; line-height: 1.35; }
+.sk-class em { margin-top: auto; font-style: normal; color: #ffd23f; font-family: var(--font-px); font-size: 9px; }
+.sk-class:disabled { opacity: 0.55; }
+.sk-back { margin-top: 10px; }
+.sk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+  padding-right: 36px;
+}
+.sk-head b { display: block; font-size: 16px; }
+.sk-head span { color: #c9c3b4; font-size: 13px; }
+.sk-head-acts { display: flex; gap: 6px; margin-left: auto; }
+.sk-btn {
+  width: auto;
+  height: auto;
+  padding: 6px 10px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  line-height: 1.3;
+  color: #1a1408;
+  background: #ffd23f;
+  border: 2px solid #fff1b8;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.sk-btn:disabled {
+  color: #889;
+  background: #2a2c32;
+  border-color: #3b3f4a;
+}
+.sk-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.sk-col h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.sk-card {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #16181d;
+  border: 2px solid #2c3038;
+  border-radius: 6px;
+}
+.sk-card.locked { opacity: 0.5; }
+.sk-card.ready { border-color: #6a5a32; }
+.sk-card.learned { background: #1a1e18; }
+.sk-ico {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  image-rendering: pixelated;
+  background: #101216;
+  border-radius: 4px;
+}
+.sk-name { font-size: 14px; line-height: 1.2; }
+.sk-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 4px;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9ab;
+  border: 1px solid #3a4250;
+  border-radius: 3px;
+}
+.sk-tag.special { color: #ffd23f; border-color: #6a5a32; }
+.sk-tag.active { color: #cfe8ff; }
+.sk-card small { display: block; color: #9aa; font-size: 12px; margin-top: 2px; }
+.sk-card p { margin: 4px 0; color: #ddd6c8; font-size: 13px; }
+.sk-keys { display: flex; gap: 4px; }
+.sk-key {
+  min-width: 26px;
+  padding: 3px 6px;
+  font-family: var(--font-px);
+  font-size: 9px;
+  color: #efe7d2;
+  background: #22252c;
+  border: 2px solid #3b3f4a;
+  border-radius: 3px;
+}
+.sk-key.on { color: #1a1408; background: #ffd23f; border-color: #fff1b8; }
+.sk-learn { margin-top: 4px; }
+.sk-always { color: #8dcb8a !important; }
+.sk-lock { color: #889 !important; }
+.sk-equipped {
+  margin-top: 4px;
+  color: #ffe7a8;
+  font-family: var(--font-px);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+}
+@media (max-width: 800px) {
+  .sk-pick, .sk-cols { grid-template-columns: 1fr; }
+  .skslot { width: 78px; }
+}

@@ -58,6 +58,14 @@ export class Monster {
     this.cd = 1 + Math.random();
     this.hitCd = 0;
     this.stun = 0;
+    this.poisonT = 0;
+    this.poisonDps = 0;
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.slowT = 0;
+    this.slowMul = 1;
+    this.markT = 0;
+    this.markAmp = 0;
     this.flash = 0;
     this.dead = false;
     this.deadT = 0;
@@ -125,8 +133,57 @@ export class Monster {
     } else m.position.set(this.x, gy + 0.1, this.z);
   }
 
+  afflict(kind, time, power) {
+    if (this.dead) return;
+    if (kind === 'poison') {
+      this.poisonT = Math.max(this.poisonT || 0, time);
+      this.poisonDps = Math.max(this.poisonDps || 0, power);
+    } else if (kind === 'burn') {
+      this.burnT = Math.max(this.burnT || 0, time);
+      this.burnDps = Math.max(this.burnDps || 0, power);
+    } else if (kind === 'slow') {
+      const longer = time >= (this.slowT || 0);
+      this.slowT = Math.max(this.slowT || 0, time);
+      this.slowMul = longer ? power : Math.min(this.slowMul || 1, power);
+    } else if (kind === 'mark') {
+      this.markT = Math.max(this.markT || 0, time);
+      this.markAmp = power;
+    } else if (kind === 'stun') {
+      this.stun = Math.max(this.stun || 0, time);
+    }
+  }
+
+  tickStatus(dt) {
+    if (this.dead) return false;
+    const tick = (timeKey, dpsKey, accKey, color) => {
+      if (this[timeKey] <= 0) return;
+      this[timeKey] = Math.max(0, this[timeKey] - dt);
+      this[accKey] = (this[accKey] || 0) + dt;
+      if (this[accKey] < 0.5) return;
+      this[accKey] -= 0.5;
+      this.hp -= (this[dpsKey] || 0) * 0.5;
+      this.game.fx.burst(this.x, this.y + 0.8 + (this.hover || 0), this.z, color, 3, 1.4, 0.07, 0.35);
+    };
+    tick('poisonT', 'poisonDps', '_poisAcc', 0x7dff5a);
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.die();
+      return true;
+    }
+    tick('burnT', 'burnDps', '_burnAcc', 0xff7a1a);
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.die();
+      return true;
+    }
+    if (this.slowT > 0) this.slowT = Math.max(0, this.slowT - dt);
+    if (this.markT > 0) this.markT = Math.max(0, this.markT - dt);
+    return false;
+  }
+
   takeHit(dmg, dx, dz, knock, crit = false) {
     if (this.dead) return;
+    if (this.markT > 0) dmg = Math.max(1, Math.round(dmg * (1 + (this.markAmp || 0.4))));
     const g = this.game;
     this.hp -= dmg;
     this.flash = 0.18;
@@ -291,6 +348,7 @@ export class Monster {
     this.hitT = Math.max(0, this.hitT - dt);
     this.landT = Math.max(0, this.landT - dt);
     this.kick = Math.max(0, this.kick - dt * 4.5);
+    if (this.tickStatus(dt)) return;
     if (this.pend && this.stun <= 0) {
       this.pendT -= dt;
       if (this.pendT <= 0) this.launchHop();
@@ -627,6 +685,11 @@ export class Monster {
     this.hitCd = Math.max(0, (this.hitCd || 0) - dt);
     this.vx *= Math.max(0, 1 - dt * (this.air ? 0.4 : 7));
     this.vz *= Math.max(0, 1 - dt * (this.air ? 0.4 : 7));
+    if (this.slowT > 0) {
+      const slow = this.slowMul == null ? 0.6 : this.slowMul;
+      mvx *= slow;
+      mvz *= slow;
+    }
     const sx = mvx + this.vx;
     const sz = mvz + this.vz;
     this.moveSpd = Math.hypot(sx, sz);

@@ -16,6 +16,8 @@ import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
+import { CLASSES, SKILLS } from './data/skills.js';
+import { castSkill, clearSkillWorld, noteProjectileEnd, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
 import { MONSTERS, MATERIALS } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
@@ -420,13 +422,14 @@ class Game {
     const p = this.player;
     p.setArmor(pr.armorLook());
     p.reduction = pr.reduction;
-    const max = Math.min(40, 20 + this.rank * 2) + pr.bonusHp;
+    const mods = skillMods(this);
+    const max = Math.min(40, 20 + this.rank * 2) + pr.bonusHp + (mods.hp || 0);
     if (p.maxHp !== max) {
       const gain = Math.max(0, max - p.maxHp);
       p.maxHp = max;
       p.hp = Math.min(max, p.hp + gain);
     }
-    const maxMana = 50 + this.rank * 5 + pr.bonusMana;
+    const maxMana = 50 + this.rank * 5 + pr.bonusMana + (mods.mana || 0);
     if (p.maxMana !== maxMana) {
       p.maxMana = maxMana;
       p.mana = Math.min(maxMana, p.mana);
@@ -438,6 +441,76 @@ class Game {
       this.selectSlot(this.sel, true);
       this.refreshHud();
     }
+  }
+
+  castSlot(i) {
+    const p = this.player;
+    if (!p || p.dead) return false;
+    const id = this.progress.equipped()[i];
+    if (!id) {
+      if (i === 0) {
+        this.faceForAction();
+        p.castBolt();
+        return true;
+      }
+      if (i === 2) {
+        p.castFury();
+        return true;
+      }
+      this.hud.toast('No skill equipped. Press K.');
+      return false;
+    }
+    this.faceForAction();
+    return castSkill(this, id);
+  }
+
+  chooseClass(id) {
+    const cur = this.progress.classId;
+    if (!CLASSES[id] || cur === id) return false;
+    const cost = cur ? 25 : 0;
+    if (this.gold < cost) {
+      this.hud.toast('Need 25 gold to walk a different path.');
+      return false;
+    }
+    if (cost) this.addGold(-cost);
+    this.progress.setClass(id);
+    clearSkillWorld(this);
+    this.applyGear();
+    this.hud.toast(CLASSES[id].name + ' path chosen.');
+    return true;
+  }
+
+  learnSkill(id) {
+    if (!this.progress.learn(id)) return false;
+    this.applyGear();
+    const skill = SKILLS[id];
+    if (skill) this.hud.toast(skill.name + ' learned.', 1400);
+    return true;
+  }
+
+  equipSkill(slot, id) {
+    const ok = this.progress.equip(slot, id);
+    if (ok) this.hud.updateSkillbar(this);
+    return ok;
+  }
+
+  respecSkills() {
+    if (!this.progress.classId) return false;
+    const learned = Object.keys(this.progress.data.skills.learned).length;
+    if (!learned) {
+      this.hud.toast('No skills to respec.');
+      return false;
+    }
+    if (this.gold < 15) {
+      this.hud.toast('Respec costs 15 gold.');
+      return false;
+    }
+    this.addGold(-15);
+    this.progress.clearLearned();
+    clearSkillWorld(this);
+    this.applyGear();
+    this.hud.toast('Skills cleared. Points returned.');
+    return true;
   }
 
   checkDiscoveries(dt) {
@@ -468,6 +541,7 @@ class Game {
       this.hud.setGold(this.gold);
       this.hud.setRank(RANKS[this.rank]);
     }
+    this.hud.updateSkillbar(this);
   }
 
   /* ------------------------------ gameplay ------------------------------ */
@@ -503,6 +577,10 @@ class Game {
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshBasicMaterial({ color: 0xf0c8ff })));
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), new THREE.MeshBasicMaterial({ color: 0x6a2cc8, transparent: true, opacity: 0.55, depthWrite: false })));
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.86), new THREE.MeshBasicMaterial({ color: 0x1a1530, transparent: true, opacity: 0.35, depthWrite: false })));
+    } else if (kind === 'frost') {
+      mesh = new THREE.Group();
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), new THREE.MeshBasicMaterial({ color: 0xf4fbff })));
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.5, depthWrite: false })));
     } else if (kind === 'ember') {
       mesh = new THREE.Group();
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), new THREE.MeshBasicMaterial({ color: 0xfff0b0 })));
@@ -519,6 +597,7 @@ class Game {
   }
 
   killProjectile(p, fx = true) {
+    noteProjectileEnd(this, p);
     p.dead = true;
     this.scene.remove(p.mesh);
     p.mesh.traverse((o) => {
@@ -528,7 +607,7 @@ class Game {
       }
     });
     if (fx) {
-      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : p.kind === 'ember' ? [0xff7a1a, 0xffd25a, 0x6fd45a] : p.kind === 'crescent' || p.kind === 'gloom' ? [0xb25cff, 0xf0c8ff, 0x2b2450] : [0xffffff, 0xd9c9a0];
+      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : p.kind === 'frost' ? [0xd7f4ff, 0x8fd4ff] : p.kind === 'ember' ? [0xff7a1a, 0xffd25a, 0x6fd45a] : p.kind === 'crescent' || p.kind === 'gloom' ? [0xb25cff, 0xf0c8ff, 0x2b2450] : [0xffffff, 0xd9c9a0];
       this.fx.burst(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, c, 7, 2.6, 0.08, 0.35);
     }
   }
@@ -581,7 +660,7 @@ class Game {
       m.position.x += p.vx * dt;
       m.position.y += p.vy * dt;
       m.position.z += p.vz * dt;
-      if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember') m.rotation.x += dt * 8;
+      if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember' || p.kind === 'frost') m.rotation.x += dt * 8;
       if (p.kind === 'crescent') m.rotation.y += dt * 16;
       if (p.kind === 'gloom') m.rotation.y += dt * 5;
       if (p.homing && p.age > 0.25) this.steerProjectile(p, dt);
@@ -604,7 +683,8 @@ class Game {
           if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + (mon.hover || 0) + 0.8)) < 1.6) {
             p.hit.add(mon);
             const d = Math.hypot(p.vx, p.vz) || 1;
-            this.strikeMonster(mon, Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.vx / d, p.vz / d, p.kind === 'bolt' ? 3 : 2);
+            this.strikeMonster(mon, Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.vx / d, p.vz / d, p.kind === 'bolt' || p.kind === 'frost' ? 3 : 2, !!p.crit);
+            skillOnHit(this, p, mon);
             this.audio.hit();
             P.fury = Math.min(100, P.fury + 3);
             if (!p.pierce) {
@@ -642,8 +722,12 @@ class Game {
     const each = Math.ceil(n / coins);
     for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
     if (Math.random() < 0.18) this.dropCoin(m.x, m.y + 0.6, m.z, 0, 'heart');
+    const hadPoints = this.progress.classId ? this.progress.skillPoints().earned : 0;
     const fresh = !this.progress.seen(m.type);
     const parts = this.progress.harvest(m.type);
+    if (this.progress.classId && this.progress.skillPoints().earned > hadPoints) {
+      this.hud.toast('Skill point earned. Press K.', 2200);
+    }
     if (parts.length) {
       const line = parts.map((d) => `+${d.n} ${MATERIALS[d.id].name}`).join('   ');
       this.hud.toast(line, 2600);
@@ -660,10 +744,10 @@ class Game {
     const reward = 20 + this.rank * 15;
     this.addGold(reward);
     this.rank = Math.min(RANKS.length - 1, this.rank + 1);
+    this.applyGear();
     const p = this.player;
-    p.maxHp = Math.min(40, 20 + this.rank * 2) + this.progress.bonusHp;
     p.hp = p.maxHp;
-    p.maxMana = 50 + this.rank * 5 + this.progress.bonusMana;
+    p.mana = p.maxMana;
     this.quest = { text: `Slay ${5 + this.rank * 3} Gate monsters`, n: 0, total: 5 + this.rank * 3 };
     this.hud.setQuest(this.quest.text, 0, this.quest.total);
     this.hud.setRank(RANKS[this.rank]);
@@ -1113,11 +1197,9 @@ class Game {
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
     if (inp.take('evade') && !blocked) this.doEvade();
-    if (inp.take('bolt') && !blocked) {
-      this.faceForAction();
-      this.player.castBolt();
-    }
-    if (inp.take('fury') && !blocked) this.player.castFury();
+    if (inp.take('bolt') && !blocked) this.castSlot(0);
+    if (inp.take('skill') && !blocked) this.castSlot(1);
+    if (inp.take('fury') && !blocked) this.castSlot(2);
     inp.pressed.clear();
 
     if (this.talkNpc) {
@@ -1238,6 +1320,7 @@ class Game {
     if (this.started) this.sky.setHour(this.sky.hour + rawDt / 50);
 
     this.player.update(dt);
+    if (this.player) updateSkillWorld(this, dt);
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
     for (const m of this.monsters) m.update(dt);
