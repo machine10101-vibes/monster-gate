@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildSlime, buildBoar, buildWraith } from './creatures.js';
+import { buildSlime, buildBoar, buildWraith, buildBudgeDragon } from './creatures.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
 import { ZONE, GATE, TOWN, WATER_Y, CENTER } from '../world/terrain.js';
 
@@ -16,7 +16,11 @@ const DEFS = {
   voidslime: { name: 'Void Slime', hp: 26, radius: 0.55, speed: 3.0, dmg: 3, gold: [4, 8], aggro: 11, build: () => buildSlime('purple') },
   boar: { name: 'Thorn Boar', hp: 38, radius: 0.7, speed: 2.5, dmg: 3, gold: [5, 10], aggro: 10, build: buildBoar },
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
+  budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
 };
+
+export const MONSTER_BUILDERS = Object.fromEntries(Object.entries(DEFS).map(([k, v]) => [k, v.build]));
+export const MONSTER_STATS = Object.fromEntries(Object.entries(DEFS).map(([k, v]) => [k, { hp: v.hp, dmg: v.dmg, speed: v.speed }]));
 
 export class Monster {
   constructor(game, type, x, z) {
@@ -68,12 +72,14 @@ export class Monster {
     const g = this.game;
     this.hp -= dmg;
     this.flash = 0.18;
-    this.stun = this.type === 'boar' && this.state === 'charge' ? 0.05 : 0.28;
-    if (this.state === 'windup') this.state = 'chase';
-    const k = knock / (this.type === 'boar' ? 1.6 : 1);
+    const drake = this.type === 'budgedragon';
+    this.stun = this.type === 'boar' && this.state === 'charge' ? 0.05 : drake ? (this.state === 'windup' || this.state === 'bite' ? 0 : 0.14) : 0.28;
+    if (this.state === 'windup' && !drake) this.state = 'chase';
+    const k = knock / (this.type === 'boar' ? 1.6 : drake ? 2.4 : 1);
     this.vx = dx * k * 1.7;
     this.vz = dz * k * 1.7;
-    this.vy = this.type === 'wraith' ? 0 : 2.6;
+    this.vy = this.type === 'wraith' ? 0 : drake ? 1.2 : 2.6;
+    if (drake && !this.enraged && this.hp > 0 && this.hp < this.maxHp * 0.4) this.enrage();
     this.air = this.type === 'slime' || this.type === 'voidslime' ? this.air : false;
     const hx = this.x;
     const hy = this.y + 0.7 + this.hover;
@@ -84,12 +90,21 @@ export class Monster {
     if (this.hp <= 0) this.die();
   }
 
+  enrage() {
+    const g = this.game;
+    this.enraged = true;
+    this.cd = Math.min(this.cd, 0.3);
+    g.audio.tone(90, 0.55, 'sawtooth', 0.16, -30);
+    g.fx.ring(this.x, this.y + 0.3, this.z, 0xff6a2a, 10, 2.6, 0.1, 0.5);
+    g.hud.floatText(...g.screenOf(this.x, this.y + 2.2, this.z), 'Enraged!', 'crit');
+  }
+
   die() {
     const g = this.game;
     this.dead = true;
     this.deadT = 0;
     g.onMonsterKilled(this);
-    g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
+    g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
     g.audio.pop();
     g.hud.removePlate(this.id);
   }
@@ -329,6 +344,86 @@ export class Monster {
           }
           break;
         }
+        case 'budgedragon': {
+          const rage = this.enraged ? 1.3 : 1;
+          if (this.state === 'idle' || this.state === 'wander') {
+            if (sees) {
+              this.state = 'chase';
+              this.cd = 0.5;
+              g.audio.tone(130, 0.4, 'sawtooth', 0.1, -50);
+            } else {
+              this.wanderT -= dt;
+              if (this.wanderT <= 0) {
+                this.wanderT = 2.5 + Math.random() * 3;
+                const a = Math.random() * TAU;
+                this.target = { x: this.home.x + Math.cos(a) * 4, z: this.home.z + Math.sin(a) * 4 };
+              }
+              const tx = this.target.x - this.x;
+              const tz = this.target.z - this.z;
+              const td = Math.hypot(tx, tz);
+              if (td > 0.7) {
+                mvx = (tx / td) * 0.9;
+                mvz = (tz / td) * 0.9;
+                this.yaw += angDiff(this.yaw, Math.atan2(tx, tz)) * Math.min(1, dt * 4);
+              }
+            }
+          } else if (this.state === 'chase') {
+            if (!sees && dist > this.def.aggro * 1.6) this.state = 'idle';
+            this.yaw += angDiff(this.yaw, toP) * Math.min(1, dt * 7);
+            const spit = dist > 4.5 && dist < 10 && Math.random() < dt * 0.55;
+            if (dist > 1.9) {
+              mvx = (dx / dist) * this.def.speed * rage;
+              mvz = (dz / dist) * this.def.speed * rage;
+            }
+            if (this.cd <= 0 && dist < 2.4) {
+              this.state = 'windup';
+              this.atk = 'bite';
+              this.t = 0;
+            } else if (this.cd <= 0 && spit) {
+              this.state = 'windup';
+              this.atk = 'spit';
+              this.t = 0;
+            }
+          } else if (this.state === 'windup') {
+            this.yaw += angDiff(this.yaw, toP) * Math.min(1, dt * 9);
+            const wind = this.atk === 'spit' ? 0.75 : 0.34;
+            if (this.t > wind / rage) {
+              if (this.atk === 'spit') {
+                const a = Math.atan2(dx, dz);
+                for (const spread of [-0.16, 0, 0.16]) {
+                  g.spawnProjectile({ owner: 'enemy', kind: 'ember', x: this.x + Math.sin(a) * 1.4, y: this.y + 1.05, z: this.z + Math.cos(a) * 1.4, vx: Math.sin(a + spread) * 8, vz: Math.cos(a + spread) * 8, dmg: this.def.dmg - 1, life: 1.5, r: 0.38 });
+                }
+                g.fx.burst(this.x + Math.sin(a) * 1.4, this.y + 1.05, this.z + Math.cos(a) * 1.4, [0xff9a2a, 0xffe27a, 0xffffff], 10, 3, 0.1, 0.4);
+                g.audio.tone(220, 0.25, 'sawtooth', 0.09, -120);
+                this.state = 'recover';
+                this.t = 0;
+                this.cd = 1.6 / rage;
+              } else {
+                this.state = 'bite';
+                this.t = 0;
+                this.hitDone = false;
+                this.chargeDir.set(dx / (dist || 1), 0, dz / (dist || 1));
+                this.vx = this.chargeDir.x * 7.5;
+                this.vz = this.chargeDir.z * 7.5;
+                g.audio.tone(180, 0.15, 'square', 0.1, -90);
+              }
+            }
+          } else if (this.state === 'bite') {
+            if (!this.hitDone && dist < this.radius + 1.0) {
+              this.hitDone = true;
+              if (P.hurt(this.def.dmg, this.x, this.z, 7)) g.fx.burst(this.x, this.y + 0.9, this.z, [0xfff8e2, 0xff4d5a], 6, 2.5, 0.08, 0.3);
+            }
+            if (this.t > 0.3) {
+              this.state = 'recover';
+              this.t = 0;
+              this.cd = (this.hitDone ? 0.7 : 0.45) / rage;
+            }
+          } else if (this.state === 'recover') {
+            if (this.t > 0.45 / rage) this.state = 'chase';
+          }
+          if (this.enraged && Math.random() < dt * 6) g.fx.burst(this.x + Math.sin(this.yaw) * 1.5, this.y + 1.0, this.z + Math.cos(this.yaw) * 1.5, [0x9a9a9a, 0x6a6a6a], 1, 0.8, 0.12, 0.6, -0.6, 0.5);
+          break;
+        }
         default:
       }
     }
@@ -338,6 +433,7 @@ export class Monster {
     this.vz *= Math.max(0, 1 - dt * (this.air ? 0.4 : 7));
     const sx = mvx + this.vx;
     const sz = mvz + this.vz;
+    this.moveSpd = Math.hypot(sx, sz);
     this.moveBy(sx * dt, sz * dt);
 
     const gh = this.game.world.heightAt(this.x, this.z);
@@ -407,6 +503,47 @@ export class Monster {
       p.tail.rotation.z = Math.sin(t * 8) * 0.5;
       o.scale.setScalar(spawnS * this.baseScale);
       if (this.state === 'windup') this.model.mat.emissive.setRGB(0.35 + Math.sin(t * 30) * 0.15, 0.03, 0.0);
+    } else if (this.type === 'budgedragon') {
+      const p = m.parts;
+      const spd = this.puppet ? 1.5 : this.moveSpd || 0;
+      const c = t * (3 + spd * 1.5);
+      const walk = Math.min(1, spd / 2.4);
+      p.legs.forEach((l, i) => (l.rotation.x = Math.sin(c + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.6 * walk));
+      p.bodyG.position.y = 6 * 0.054 + Math.abs(Math.sin(c)) * 0.03 * walk + Math.sin(t * 2.2) * 0.008;
+      p.bodyG.rotation.z = Math.sin(c) * 0.035 * walk;
+      p.tail.forEach((s, i) => {
+        s.rotation.y = Math.sin(t * (this.state === 'chase' ? 5 : 2.4) - i * 0.9) * (0.32 + i * 0.05);
+        s.rotation.x = i === 0 ? -0.12 : 0.05;
+      });
+      const flying = this.state === 'chase' || this.state === 'bite';
+      p.wings.forEach((w, i) => {
+        const s = i === 0 ? -1 : 1;
+        w.rotation.z = s * (flying ? 0.5 + Math.sin(t * 11) * 0.42 : 0.7 + Math.sin(t * 2.5) * 0.06);
+      });
+      let headX = Math.sin(t * 1.7) * 0.04;
+      let jawX = 0.05 + Math.max(0, Math.sin(t * 0.9 + this.phase)) * 0.06;
+      let lean = 0;
+      let headY = Math.sin(t * 0.8) * 0.1 * (this.state === 'idle' ? 1 : 0);
+      if (this.state === 'windup') {
+        const k = Math.min(1, this.t / (this.atk === 'spit' ? 0.7 : 0.3));
+        headX = -0.42 * k;
+        jawX = 0.2 + 0.75 * k;
+        lean = -0.12 * k;
+        this.model.mat.emissive.setRGB(0.28 + Math.sin(t * 34) * 0.12, 0.07, 0);
+      } else if (this.state === 'bite') {
+        const k = Math.min(1, this.t / 0.1);
+        headX = 0.3 * k;
+        jawX = 0.8 * (1 - Math.min(1, this.t / 0.22)) + 0.04;
+        lean = 0.1 * k;
+      } else if (this.state === 'chase') {
+        headX = 0.1 + Math.sin(t * c * 0.5) * 0.03;
+        jawX = 0.12 + Math.max(0, Math.sin(t * 3)) * 0.1;
+      }
+      p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 16);
+      p.head.rotation.y += (headY - p.head.rotation.y) * Math.min(1, dt * 6);
+      p.jaw.rotation.x += (jawX - p.jaw.rotation.x) * Math.min(1, dt * 22);
+      p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * 12);
+      o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'wraith') {
       const b = m.body;
       b.rotation.z = Math.sin(t * 1.7) * 0.06;
@@ -419,7 +556,7 @@ export class Monster {
 
     const g = this.game;
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
@@ -447,6 +584,7 @@ export class Spawner {
     const spots = [
       ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
       ['boar', 52, 44], ['boar', 94, 48], ['slime', 100, 66], ['slime', 44, 70], ['slime', 76, 102],
+      ['budgedragon', 101, 70],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
     void w;
@@ -504,6 +642,8 @@ export class Spawner {
     if (spot.nearGate) type = r < 0.35 ? 'voidslime' : r < 0.7 ? 'wraith' : 'slime';
     else type = r < 0.45 ? 'slime' : r < 0.85 ? 'boar' : 'voidslime';
     if (g.sky.night > 0.6 && r > 0.6) type = 'wraith';
+    const drakes = g.monsters.filter((m) => !m.dead && m.type === 'budgedragon').length;
+    if (!spot.nearGate && drakes < 2 && this.rng.next() < 0.3) type = 'budgedragon';
     this.spawn(type, spot.x, spot.z);
     if (spot.nearGate) g.audio.portal();
   }

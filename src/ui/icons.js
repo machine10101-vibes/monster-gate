@@ -470,6 +470,47 @@ const ART = {
   ],
 };
 
+const recolor = (rows, map) => rows.map((r) => [...r].map((ch) => map[ch] || ch).join(''));
+
+ART.book = [
+  '................',
+  '..EEEEEEEEEEE...',
+  '.EeeeeeeeeeeEk..',
+  '.EeyyeeeeeeeEk..',
+  '.EeyyyeeeeeeEk..',
+  '.EeeyyyeeeeeEk..',
+  '.EeeeyeeeeeeEk..',
+  '.EeeeeeeeeeeEk..',
+  '.EttttttttteEk..',
+  '.EtttttttttEEk..',
+  '.EttttttttEEk...',
+  '..EEEEEEEEE.....',
+  '................',
+  '................',
+  '................',
+  '................',
+];
+ART.budgeblade = recolor(ART.blade, { l: 'h', g: 't', d: 'Y', y: 'e', b: 'E' });
+ART.budgebow = recolor(ART.bow, { b: 't', t: 'h' });
+ART.budgemaul = [
+  '................',
+  '..t.........t...',
+  '..tt.eeeee.tt...',
+  '...teeEeeEet....',
+  '....eEeeEeEe....',
+  '....eeEeeEee....',
+  '.....EEEEEE.....',
+  '......bb........',
+  '.....bb..h......',
+  '....bb..........',
+  '...bb...........',
+  '..bb............',
+  '.bb.............',
+  '................',
+  '................',
+  '................',
+];
+
 const cache = {};
 export function iconCanvas(name) {
   if (!cache[name]) cache[name] = make(ART[name] || ART.empty);

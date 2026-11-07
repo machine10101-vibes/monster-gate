@@ -35,6 +35,8 @@ export class Player {
     this.vy = 0;
     this.yaw = 0;
     this.maxHp = 20;
+    this.reduction = 0;
+    this.armorKey = '{}';
     this.hp = 20;
     this.maxStamina = 100;
     this.stamina = 100;
@@ -69,7 +71,26 @@ export class Player {
     this.syncObj();
   }
 
+  setArmor(look) {
+    const key = JSON.stringify(look || {});
+    if (this.armorKey === key) return;
+    this.armorKey = key;
+    const old = this.model;
+    const next = buildHumanoid({ armor: look || {} });
+    next.root.position.copy(old.root.position);
+    this.pivot.remove(old.root);
+    old.root.traverse((o) => {
+      if (o.isMesh && o.geometry) o.geometry.dispose();
+    });
+    this.model = next;
+    this.pivot.add(next.root);
+    this.heldKind = null;
+    const kind = this.wantHeld;
+    this.setHeld(kind);
+  }
+
   setHeld(kind) {
+    this.wantHeld = kind;
     if (this.heldKind === kind) return;
     this.heldKind = kind;
     const slot = this.model.heldSlot;
@@ -118,6 +139,7 @@ export class Player {
       }
       return false;
     }
+    dmg = Math.max(1, Math.round(dmg * (1 - this.reduction)));
     this.hp = Math.max(0, this.hp - dmg);
     this.invuln = 0.9;
     this.hurtT = 0.4;
@@ -449,7 +471,7 @@ export class Player {
     const t = this.game.time;
     const walk = Math.sin(this.cycle);
     const mv = this.moveAmt;
-    const heldBlade = this.heldKind === 'blade' || this.heldKind === 'axe' || this.heldKind === 'pick' || this.heldKind === 'hammer';
+    const heldBlade = this.heldKind === 'blade' || this.heldKind === 'axe' || this.heldKind === 'pick' || this.heldKind === 'hammer' || this.heldKind === 'budgeblade' || this.heldKind === 'budgemaul';
     const k = Math.min(1, dt * 18);
     let armR = heldBlade ? -0.85 : -0.25;
     let armL = 0;

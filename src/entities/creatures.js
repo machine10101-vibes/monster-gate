@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix, clamp, RNG } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
+import { BUDGE } from '../data/budge.js';
 
 const J = (c, x, y, z, s = 0, a = 0.06) => jitter(c, a, hash3(x, y, z, s));
 
@@ -174,6 +175,225 @@ export function buildWraith() {
   body.position.y = 0.0;
   root.add(body);
   return { root, body, mat, parts: { body } };
+}
+
+/* -------------------------- budge dragon --------------------------- */
+export function buildBudgeDragon() {
+  const S = 0.054;
+  const P = BUDGE;
+  const mat = toonMaterial({ vertexColors: true, emissive: new THREE.Color(0x000000) });
+  const dark = shade(P.scaleLo, 0.7);
+  const plate = (x, y, z, seed = 3) => {
+    const n = hash3(x >> 1, y >> 1, z >> 1, seed);
+    let c = n > 0.74 ? P.scaleHi : n > 0.22 ? P.scale : P.scaleLo;
+    if ((y & 1) === 0 && ((x + z) & 1) === 0) c = shade(c, 0.9);
+    return J(c, x, y, z, seed, 0.04);
+  };
+  const belly = (x, y, z) => J(z & 1 ? P.belly : P.bellyDark, x, y, z, 5, 0.03);
+  const horn = (x, y, z, k = 0) => J(k % 3 === 2 ? P.hornDark : P.horn, x, y, z, 6, 0.04);
+  const ball = (m, cx, cy, cz, rx, ry, rz, color, seed, noise = 0.12) => blob(m, cx, cy, cz, rx, ry, rz, color, seed, noise);
+
+  /* body + neck, pivot at bottom centre */
+  const B = new VoxelModel(22, 24, 40);
+  ball(B, 11, 8.5, 17, 7.6, 6.8, 11.5, (x, y, z, d) => (y <= 5 && d > 0.2 ? belly(x, y, z) : plate(x, y, z)), 7, 0.15);
+  ball(B, 11, 12.5, 27.5, 4.4, 5.2, 4.4, (x, y, z) => (z >= 29 && y < 11 ? belly(x, y, z) : plate(x, y, z)), 8);
+  ball(B, 11, 14.5, 30.5, 3.7, 4.2, 3.5, (x, y, z) => (y < 12 && z >= 31 ? belly(x, y, z) : plate(x, y, z)), 9);
+  for (const sx of [5.2, 16.8]) {
+    ball(B, sx, 7, 8, 3.6, 5.2, 5.4, plate, 10);
+    ball(B, sx > 11 ? 17.2 : 4.8, 8, 23, 3, 4.6, 4.4, plate, 11);
+  }
+  for (let z = 8; z <= 31; z += 3) {
+    let top = -1;
+    for (let y = 23; y >= 0; y--) {
+      if (B.has(10, y, z)) {
+        top = y;
+        break;
+      }
+    }
+    if (top < 0) continue;
+    const h = z > 24 ? 3 : 2;
+    for (let k = 1; k <= h; k++) for (const xx of [10, 11]) B.set(xx, top + k, z, horn(xx, top + k, z, k));
+  }
+
+  /* head, pivot at the neck joint */
+  const H = new VoxelModel(20, 22, 28);
+  H.box(5, 4, 5, 15, 12, 17, (x, y, z) => plate(x, y, z, 12));
+  H.box(6, 4, 17, 14, 9, 25, (x, y, z) => plate(x, y, z, 13));
+  H.box(7, 9, 18, 13, 10, 24, (x, y, z) => plate(x, y, z, 14));
+  H.box(5, 11, 7, 15, 13, 18, (x, y, z) => J(dark, x, y, z, 15, 0.05));
+  for (const side of [-1, 1]) {
+    // m(0) is the outer skull edge, counting inward
+    const m = (x) => (side < 0 ? 5 + x : 14 - x);
+    for (const [x, y] of [[0, 9], [1, 9], [2, 9], [0, 10], [1, 10], [2, 10]]) H.set(m(x), y, 16, x === 1 ? P.pupil : P.eye, true);
+    H.set(m(0), 11, 17, dark);
+    H.set(m(1), 11, 17, dark);
+    H.set(m(2), 11, 17, dark);
+    H.set(m(2), 10, 17, dark);
+    H.set(m(3), 10, 17, dark);
+    H.set(m(3), 9, 17, shade(dark, 0.9));
+    H.set(m(2), 7, 25, 0x1a0a0a);
+    H.set(m(2), 8, 25, 0x1a0a0a);
+    H.set(m(1), 3, 23, P.tooth);
+    H.set(m(1), 2, 23, P.tooth);
+    H.set(m(1), 1, 23, P.tooth);
+    H.set(m(2), 3, 20, P.tooth);
+    H.set(m(2), 2, 20, P.tooth);
+    const cheek = (d) => (side < 0 ? 4 - d : 15 + d);
+    for (const [d, y, z] of [[0, 6, 9], [1, 6, 9], [0, 7, 8], [0, 5, 10]]) H.set(cheek(d), y, z, horn(d, y, z, z));
+    for (let i = 0; i < 10; i++) {
+      const cx = 10 + side * (4.1 + i * 0.22);
+      const w = i < 5 ? 2.4 : i < 8 ? 1.6 : 0.9;
+      const y0 = Math.round(12 + i * 0.85);
+      const z0 = Math.round(9 - i * 0.9);
+      for (let xx = Math.floor(cx - w); xx <= Math.ceil(cx + w); xx++) {
+        if (Math.abs(xx + 0.5 - cx) > w / 2 + 0.01) continue;
+        for (let dz = 0; dz < (i < 6 ? 2 : 1); dz++) H.set(xx, y0, z0 - dz, horn(xx, y0, z0, i));
+        if (i < 5) H.set(xx, y0 + 1, z0, horn(xx, y0 + 1, z0, i));
+      }
+    }
+  }
+  for (let z = 7; z <= 15; z += 2) {
+    const h = z % 4 === 3 ? 3 : 2;
+    for (let k = 0; k < h; k++) for (const xx of [9, 10]) H.set(xx, 13 + k, z, horn(xx, 13 + k, z, k + 2));
+  }
+  H.set(9, 8, 17, P.tooth);
+
+  /* lower jaw, hinged under the skull */
+  const J2 = new VoxelModel(14, 9, 22);
+  J2.box(3, 0, 2, 11, 4, 14, (x, y, z) => (y === 0 ? belly(x, y, z) : plate(x, y, z, 16)));
+  J2.box(4, 0, 14, 10, 4, 19, (x, y, z) => (y === 0 ? belly(x, y, z) : plate(x, y, z, 17)));
+  J2.box(4, 3, 3, 10, 4, 14, (x, y, z) => J(P.mouth, x, y, z, 3, 0.05));
+  J2.box(6, 3, 5, 8, 4, 12, (x, y, z) => J(P.tongue, x, y, z, 4, 0.05));
+  for (const [x, z] of [[3, 7], [10, 7], [3, 11], [10, 11], [4, 17], [9, 17], [4, 14], [9, 14]]) {
+    J2.set(x, 4, z, P.tooth);
+    if (z > 12) J2.set(x, 5, z, P.tooth);
+  }
+  J2.set(5, 4, 18, P.tooth);
+  J2.set(8, 4, 18, P.tooth);
+
+  /* legs */
+  const makeLeg = (rear, seed) => {
+    const w = rear ? 10 : 8;
+    const L = new VoxelModel(w, 10, 10);
+    const cx = w / 2;
+    L.box(cx - 2.5, 4, 2, cx + 2.5, 10, 6, (x, y, z) => plate(x, y, z, seed));
+    L.box(cx - 3.5, 0, 1, cx + 3.5, 3, 8, (x, y, z) => plate(x, y, z, seed + 1));
+    L.box(cx - 2.5, 3, 2, cx + 2.5, 4, 7, (x, y, z) => J(dark, x, y, z, seed, 0.05));
+    for (const dx of [-3, -1, 1]) {
+      const x = Math.round(cx + dx);
+      L.set(x, 0, 8, P.claw);
+      L.set(x, 1, 8, P.claw);
+      L.set(x, 0, 9, P.claw);
+    }
+    return { model: L, cx };
+  };
+
+  /* wing, built for the +x side */
+  const W = new VoxelModel(21, 14, 20);
+  const zTrail = (x) => 9 + 6.5 * Math.abs(Math.sin(x * 0.5)) * (x / 20) + x * 0.12;
+  const yAt = () => 2;
+  for (let x = 1; x < 20; x++) {
+    const z0 = Math.round(7 - x * 0.1);
+    const z1 = Math.round(zTrail(x));
+    for (let z = z0; z <= z1; z++) W.set(x, yAt(x), z, J(z > z1 - 2 ? P.membraneHi : P.membrane, x, 0, z, 18, 0.05), false);
+  }
+  const bone = (x1, z1) => {
+    const steps = Math.ceil(Math.hypot(x1, z1 - 8) * 1.6);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = Math.round(t * x1);
+      const z = Math.round(8 + t * (z1 - 8));
+      const y = yAt(x);
+      W.set(x, y, z, dark);
+      W.set(x, y + 1, z, dark);
+    }
+  };
+  bone(19, 6);
+  for (const px of [3, 9, 16]) bone(px, Math.round(zTrail(px)));
+  W.box(0, 1, 7, 3, 4, 10, plate);
+  for (let i = 0; i < 3; i++) W.set(19, yAt(19) + 1 + i, 5, P.claw);
+
+  /* tail segments, each reaching toward -z from its joint */
+  const tailSeg = (w, h, len, seed, tip) => {
+    const T = new VoxelModel(w + 4, h + 4, len);
+    const cx = (w + 4) / 2;
+    const cy = (h + 4) / 2;
+    for (let z = 0; z < len; z++) {
+      const k = 0.6 + 0.4 * (z / (len - 1));
+      const rw = (w / 2) * k;
+      const rh = (h / 2) * k;
+      for (let y = 0; y < h + 4; y++)
+        for (let x = 0; x < w + 4; x++) {
+          const dx = (x + 0.5 - cx) / rw;
+          const dy = (y + 0.5 - cy) / rh;
+          if (dx * dx + dy * dy <= 1.02) T.set(x, y, z, dy < -0.35 ? belly(x, y, z) : plate(x, y, z, seed));
+        }
+      if (z % 3 === 1) {
+        const top = Math.round(cy + rh - 0.2);
+        for (const xx of [Math.floor(cx) - 1, Math.floor(cx)]) T.set(xx, top, z, horn(xx, top, z, z));
+      }
+    }
+    if (tip) {
+      for (let z = 0; z < 5; z++) {
+        const spread = 3.4 - z * 0.7;
+        for (let xx = Math.round(cx - spread); xx < Math.round(cx + spread); xx++) T.set(xx, Math.floor(cy), z, J(z === 0 ? P.horn : P.scaleHi, xx, 0, z, 19, 0.04));
+      }
+    }
+    return { model: T, cx, cy, len };
+  };
+
+  const root = new THREE.Group();
+  const bodyG = new THREE.Group();
+  bodyG.position.y = 6 * S;
+  root.add(bodyG);
+  const body = meshFrom(B, S, 11, 0, 17, mat);
+  bodyG.add(body);
+
+  const head = new THREE.Group();
+  head.position.set(0, 16 * S, 16 * S);
+  head.add(meshFrom(H, S, 10, 5, 6, mat));
+  bodyG.add(head);
+  const jaw = new THREE.Group();
+  jaw.position.set(0, -1 * S, 0);
+  jaw.add(meshFrom(J2, S, 7, 4, 2, mat));
+  head.add(jaw);
+
+  const wings = [];
+  for (const side of [-1, 1]) {
+    const g = new THREE.Group();
+    g.position.set(side * 5.4 * S, 13 * S, 4 * S);
+    const m = meshFrom(W, S, 0, 1, 8, mat);
+    m.scale.x = side;
+    g.add(m);
+    g.rotation.z = side * 0.7;
+    bodyG.add(g);
+    wings.push(g);
+  }
+
+  const legs = [];
+  const frontLeg = makeLeg(false, 21);
+  const rearLeg = makeLeg(true, 24);
+  for (const [lx, lz, def] of [[-4.6, 6.5, frontLeg], [4.6, 6.5, frontLeg], [-5.4, -8.5, rearLeg], [5.4, -8.5, rearLeg]]) {
+    const g = new THREE.Group();
+    g.position.set(lx * S, 10 * S, lz * S);
+    g.add(meshFrom(def.model, S, def.cx, 10, 3, mat));
+    root.add(g);
+    legs.push(g);
+  }
+
+  const tail = [];
+  const segs = [tailSeg(8, 8, 10, 30, false), tailSeg(6, 6, 9, 31, false), tailSeg(4, 4, 8, 32, true)];
+  let parent = bodyG;
+  segs.forEach((s, i) => {
+    const g = new THREE.Group();
+    g.position.set(0, i === 0 ? 7.5 * S : 0, i === 0 ? -10 * S : -(segs[i - 1].len - 0.5) * S);
+    g.add(meshFrom(s.model, S, s.cx, s.cy, s.len, mat));
+    parent.add(g);
+    parent = g;
+    tail.push(g);
+  });
+
+  return { root, mat, parts: { body, bodyG, head, jaw, legs, tail, wings } };
 }
 
 /* ------------------------------ fowl ------------------------------ */
