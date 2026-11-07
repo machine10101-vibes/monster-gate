@@ -937,6 +937,10 @@ class Game {
     const wd = w ? Math.hypot(p.x - w.x, p.z - w.z) : 99;
     const npcNear = this.ambient.npcs.find((n) => n.near);
     const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
+    if (!this.talkNpc && this.forgeNear && !npcNear) {
+      this.openForge();
+      return;
+    }
     if (!this.talkNpc && w && wd < 3.6 && wd <= nd) {
       this.hud.openPanel('waygate', this);
       this.hud.panelId = 'waygate';
@@ -951,6 +955,7 @@ class Game {
       } else {
         this.hud.hideDialog();
         this.talkNpc = null;
+        if (npc.def.service === 'forge') this.openForge();
       }
       this.audio.select();
       return;
@@ -961,6 +966,37 @@ class Game {
     near.dialogLeft = Math.min(2, near.def.lines.length - 1);
     this.hud.showDialog(near.name, near.nextLine());
     this.audio.select();
+  }
+
+  openForge() {
+    this.hud.openPanel('forge', this);
+    this.hud.panelId = 'forge';
+    this.audio.select();
+    const f = this.world.forge;
+    if (f) this.fx.burst(f.x + 0.4, f.y + 1.3, f.z, [0xff8a1e, 0xffd27a, 0xffffff], 10, 2.2, 0.08, 0.7, -1, 1.2);
+  }
+
+  updateForge(dt) {
+    const f = this.world.forge;
+    if (!f) return;
+    const P = this.player.pos;
+    const d = Math.hypot(P.x - f.x, P.z - f.z);
+    this.forgeNear = d < 3.6 && this.started;
+    if (d < 22 && Math.random() < dt * 9) {
+      this.fx.burst(f.x + 0.5, f.y + 0.7, f.z + (Math.random() - 0.5) * 0.4, [0xff8a1e, 0xffd27a, 0xff5a1a], 1, 0.6, 0.06, 1.1, -1.4, 1.6);
+    }
+    if (d < 22 && Math.random() < dt * 3) {
+      this.fx.burst(f.x, f.y + 2.5, f.z, [0x6a6a70, 0x8a8a90], 1, 0.35, 0.16, 1.6, -0.5, 0.8);
+    }
+    if (this.forgeNear && !this.forgeHinted) {
+      this.forgeHinted = true;
+      this.hud.toast('The Forge - press F to forge weapons and armor', 2600);
+    }
+    if (this.forgeNear) {
+      const [sx, sy, vis] = this.screenOf(f.x, f.y + 2.9, f.z, true);
+      this.hud.plate('forge', 'The Forge<small>F · forge gear</small>');
+      this.hud.placePlate('forge', sx, sy, vis);
+    } else this.hud.removePlate('forge');
   }
 
   handleInput() {
@@ -1180,7 +1216,8 @@ class Game {
       this.hud.plate('waygate', label);
       this.hud.placePlate('waygate', sx, sy, vis);
     } else this.hud.removePlate('waygate');
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear;
+    this.updateForge(dt);
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }

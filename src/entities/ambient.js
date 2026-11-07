@@ -24,6 +24,7 @@ const NPC_DEFS = [
       'Welcome to the Hunter Guild! The Monster Gate to the north has been restless again.',
       'Slay five creatures and the guild board will pay you in gold. Use Space to roll away from danger.',
       'Hold Shift to raise your shield. Blocking a charging boar is very satisfying.',
+      'Monster parts can be forged into gear. Bram the blacksmith keeps the forge by the south road.',
     ],
   },
   {
@@ -31,11 +32,13 @@ const NPC_DEFS = [
     name: 'Bram',
     title: 'Blacksmith',
     spot: 'smith',
-    yaw: 0.0,
+    service: 'forge',
+    yaw: -Math.PI / 2,
     look: { skin: 0xc58a5e, hair: 0x1c1410, hairStyle: 'short', beard: true, tunic: 0x6a4a32, sleeve: 0x6a4a32, apron: 0x3e3a38, pants: 0x2a2220, boots: 0x1f1814, bracer: true, seed: 5, metal: 0x777a80 },
     lines: [
       'Steel and leather, friend. That greatsword on your back has seen better days.',
       'Wraiths cannot take a hit from the hammer. Heavy swings, heavy knockback.',
+      'Bring me monster parts and the forge will turn them into weapons and armor. Step up and have a look.',
     ],
   },
   {

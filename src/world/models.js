@@ -1055,3 +1055,48 @@ export function buildCloud(seed) {
   M.box(2, 1, 4, 32, 2, 16, (x, y, z) => (M.has(x, y + 1, z) ? 0xcfdcec : null));
   return bundle([[M, 1.0, 17, 0, 10]]);
 }
+
+
+export function buildForge(seed = 3) {
+  const M = new VoxelModel(32, 40, 22);
+  const stone = (x, y, z) => J(((x >> 1) + (y >> 1) + (z >> 1)) % 2 ? 0x7d7f86 : 0x6b6e75, x, y, z, seed, 0.08);
+  const dark = (x, y, z) => J(0x2c2a2e, x, y, z, seed, 0.06);
+  M.box(3, 0, 2, 29, 4, 20, stone);
+  M.box(4, 4, 3, 28, 15, 19, stone);
+  M.carve(9, 5, 11, 23, 12, 19);
+  M.box(9, 5, 3, 23, 12, 11, dark);
+  M.box(9, 4, 11, 23, 5, 19, dark);
+  M.box(10, 5, 12, 22, 7, 19, (x, y, z) => ((x + z) % 3 === 0 ? 0xffb347 : (x * 7 + z) % 4 === 0 ? 0xff5a1a : 0xd92a0a), true);
+  for (let i = 0; i < 9; i++) {
+    const fx = 10 + ((i * 5) % 11);
+    const fz = 12 + ((i * 3) % 6);
+    const h = 3 + (i % 4);
+    M.box(fx, 7, fz, fx + 2, 7 + h, fz + 2, (x, y) => (y > 8 ? 0xffe27a : 0xff8a1a), true);
+  }
+  M.box(7, 12, 18, 25, 14, 20, (x, y, z) => J(0x4b3220, x, y, z, seed, 0.08));
+  M.box(5, 15, 4, 27, 19, 18, stone);
+  M.box(7, 19, 6, 25, 24, 16, stone);
+  M.box(11, 24, 8, 21, 40, 14, stone);
+  M.box(10, 38, 7, 22, 40, 15, (x, y, z) => J(0x55575e, x, y, z, seed, 0.06));
+  M.box(12, 39, 9, 20, 40, 13, 0x1a1618);
+  M.box(0, 2, 7, 4, 8, 15, (x, y, z) => J(0x6a4527, x, y, z, seed, 0.07));
+  M.box(0, 6, 8, 3, 8, 14, (x, y, z) => J(0x8a6a4a, x, y, z, seed, 0.07));
+  M.box(-1 + 1, 3, 10, 1, 5, 12, 0x3a3d44);
+  M.box(29, 4, 8, 32, 14, 10, 0x3a3d44);
+  M.box(29, 12, 14, 32, 14, 16, 0x3a3d44);
+  M.box(30, 11, 9, 32, 12, 15, 0x4a4e57);
+  return bundle([[M, 0.0625, 16, 0, 11]]);
+}
+
+export function buildAnvil(seed = 4) {
+  const M = new VoxelModel(18, 16, 10);
+  const iron = (x, y, z) => J(0x474b54, x, y, z, seed, 0.07);
+  M.box(5, 0, 2, 13, 3, 8, iron);
+  M.box(6, 3, 3, 12, 7, 7, iron);
+  M.box(3, 7, 2, 15, 10, 8, (x, y, z) => (y === 9 ? J(0x9298a4, x, y, z, seed, 0.05) : iron(x, y, z)));
+  M.box(0, 8, 3, 3, 10, 7, iron);
+  M.box(1, 9, 4, 3, 10, 6, iron);
+  M.box(6, 10, 4, 13, 11, 6, 0xff7a2a, true);
+  M.box(13, 10, 4, 15, 11, 6, 0xffb347, true);
+  return bundle([[M, 0.0625, 9, 0, 5]]);
+}
