@@ -86,6 +86,9 @@ export class Input {
         case 'KeyB':
           this.press('panel:bag');
           break;
+        case 'KeyC':
+          this.press('panel:catalog');
+          break;
         case 'KeyT':
           this.press('panel:settings');
           break;

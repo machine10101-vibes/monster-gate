@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix, clamp, RNG } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
+import { BUDGE } from '../data/budge.js';
+import { paintHelm, paintChest, paintArm, paintLeg } from './armor.js';
 
 export const S = 0.03;
 
 const J = (c, x, y, z, s = 0, a = 0.06) => jitter(c, a, hash3(x, y, z, s));
 
-function meshFrom(model, ox, oy, oz, mat, size = S) {
+export function meshFrom(model, ox, oy, oz, mat, size = S) {
   const g = model.build(size, ox, oy, oz);
   const grp = new THREE.Group();
   for (const kind of ['solid', 'glow']) {
@@ -120,6 +122,7 @@ export function buildHumanoid(o = {}) {
     T.box(slantX(30) - 1, ty(30), 1, slantX(30) + 1, ty(32), 4, 0x6b6c72);
     T.box(12, ty(2), 2, 20, ty(5), 4, (x, y, z) => J(0x3a2a1f, x, y, z, seed, 0.08));
   }
+  if (c.armor?.chest) paintChest(T, ty);
   const torso = meshFrom(T, 13, OY, 9, mat);
 
   /* ---------------------------- head --------------------------- */
@@ -172,7 +175,7 @@ export function buildHumanoid(o = {}) {
 
   const hairPal = [shade(c.hair, 0.78), c.hair, shade(c.hair, 1.18), shade(c.hair, 0.92)];
   const hairAt = (x, y, z) => hairPal[Math.floor(hash3(x >> 1, y >> 1, z >> 1, seed + 6) * 4)];
-  const style = c.hairStyle;
+  const style = c.armor?.helm ? 'bald' : c.hairStyle;
   if (style && style !== 'bald') {
     const messy = style === 'messy';
     const topR = messy ? 5.4 : 4.4;
@@ -253,6 +256,7 @@ export function buildHumanoid(o = {}) {
       }
     for (let x = 5; x < 15; x++) for (let z = 15; z < 18; z++) H.set(x, rowY(11), z, J(shade(c.hatColor || 0x2f6f4f, 0.85), x, 11, z, seed, 0.05));
   }
+  if (c.armor?.helm) paintHelm(H, rowY);
   const head = meshFrom(H, HC, rowY(0), HC, mat);
 
   /* ---------------------------- arms --------------------------- */
@@ -300,6 +304,7 @@ export function buildHumanoid(o = {}) {
     } else {
       fillBox(3, 20, 3, 10, 24, 11, (x, y, z) => J(shade(sleeve, 1.05), x, y, z, seed, 0.07));
     }
+    if (c.armor?.arms) paintArm(A, set);
     const grp = meshFrom(A, 6.5, 22, 7, mat);
     return grp;
   };
@@ -338,6 +343,7 @@ export function buildHumanoid(o = {}) {
       set(6, 20, 11, c.metal);
       for (let y = 18; y < 23; y++) for (let z = 3; z < 10; z++) if (z % 2 === 0 && y % 2 === 0) set(10, y, z, J(c.metal, y, z, 5, seed, 0.06));
     }
+    if (c.armor?.legs || c.armor?.boots) paintLeg(set, c.armor);
     return meshFrom(L, 6.5, 24, 6.5, mat);
   };
 
@@ -386,7 +392,7 @@ export function buildHumanoid(o = {}) {
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, mat };
 }
 
 function buildShield(mat) {
@@ -422,9 +428,11 @@ const heldCache = {};
 export function buildHeld(kind) {
   if (heldCache[kind]) return heldCache[kind].clone();
   const mat = toonMaterial({ vertexColors: true });
-  const M = new VoxelModel(16, 16, 56);
-  const cx = 8;
-  const cy = 8;
+  const tall = kind === 'budgebow';
+  const wide = kind === 'budgemaul';
+  const M = new VoxelModel(wide ? 26 : 16, tall ? 56 : 16, 56);
+  const cx = wide ? 13 : 8;
+  const cy = tall ? 28 : 8;
   const set = (x, y, z, c, glow = false) => M.set(cx + x, cy + y, z, c, glow);
   const steel = (x, y, z) => J(0xaeb1b9, x, y, z, 1, 0.07);
   const wood = (x, y, z) => J(0x7a4e2c, x, y, z, 2, 0.08);
@@ -478,6 +486,65 @@ export function buildHeld(kind) {
     for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, 14, 0x8a5a30);
   } else if (kind === 'stone') {
     for (let z = 2; z < 9; z++) for (let x = -3; x <= 2; x++) for (let y = -3; y <= 2; y++) if (Math.hypot(x + 0.5, y + 0.5, z - 5.5) < 3.8) set(x, y, z, J(0x8d939a, x, y, z, 7, 0.1));
+  } else if (kind === 'budgeblade') {
+    const wrap = (x, y, z) => J((z >> 1) % 2 ? BUDGE.scaleLo : BUDGE.scale, x, y, z, 21, 0.05);
+    for (let z = 1; z < 8; z++) for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, z, wrap(x, y, z));
+    for (let x = -1; x <= 0; x++) for (let y = -2; y <= 1; y++) set(x, y, 0, J(BUDGE.horn, x, y, 0, 22, 0.04));
+    for (let x = -5; x <= 4; x++) for (let y = -1; y <= 0; y++) set(x, y, 8, J(x === -1 || x === 0 ? BUDGE.bellyDark : BUDGE.horn, x, y, 8, 23, 0.04));
+    for (const [sx, dir] of [[-5, -1], [4, 1]]) {
+      for (let k = 1; k <= 4; k++) for (let y = -1; y <= 0; y++) set(sx + (k > 2 ? -dir * (k - 2) : 0), y, 8 + k, J(BUDGE.horn, sx, y, k, 24, 0.04));
+    }
+    for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, 9, BUDGE.vein, true);
+    for (let z = 10; z < 46; z++) {
+      const w = z < 28 ? 5 : z < 36 ? 4 : z < 41 ? 3 : z < 44 ? 2 : 1;
+      const x0 = -Math.floor(w / 2);
+      for (let xi = x0; xi < x0 + w; xi++) {
+        const edge = xi === x0 || xi === x0 + w - 1;
+        for (let y = -1; y <= 0; y++) set(xi, y, z, edge ? J(BUDGE.claw, xi, y, z, 25, 0.03) : J(BUDGE.horn, xi, y, z, 25, 0.05));
+      }
+      if (w >= 4 && z % 4 === 0 && z > 16) for (let y = -1; y <= 0; y++) set(x0 + w, y, z, J(BUDGE.hornDark, 0, y, z, 26, 0.04));
+      if (z > 12 && z < 40 && z % 5 !== 4) for (let y = -1; y <= 0; y++) set(0, y, z, BUDGE.vein, true);
+    }
+  } else if (kind === 'budgemaul') {
+    for (let z = 0; z < 32; z++) for (let x = 0; x <= 1; x++) for (let y = 0; y <= 1; y++) set(x - 1, y - 1, z, z < 12 ? J((z >> 1) % 2 ? BUDGE.scaleLo : BUDGE.scale, x, y, z, 27, 0.05) : wood(x, y, z));
+    for (let x = -2; x <= 1; x++) for (let y = -2; y <= 1; y++) set(x, y, 0, J(BUDGE.horn, x, y, 0, 28, 0.04));
+    for (let z = 27; z < 41; z++)
+      for (let y = -4; y <= 3; y++)
+        for (let x = -3; x <= 2; x++) {
+          const band = z === 27 || z === 40 || z === 33 || z === 34;
+          const c = band ? J(BUDGE.bellyDark, x, y, z, 29, 0.05) : (x + y + z) % 3 === 0 ? J(BUDGE.scaleLo, x, y, z, 29, 0.05) : J(BUDGE.scale, x, y, z, 29, 0.05);
+          set(x, y, z, c);
+        }
+    for (const [sx, dir] of [[-4, -1], [3, 1]]) {
+      for (let k = 0; k < 8; k++) {
+        const w = k < 4 ? 3 : k < 6 ? 2 : 1;
+        const xx = sx + dir * k;
+        const zz = 32 + Math.floor((k * k) / 8);
+        for (let yy = -2; yy < -2 + w; yy++)
+          for (let q = 0; q < w; q++) set(xx, yy, zz + q, J(k % 3 === 2 ? BUDGE.hornDark : BUDGE.horn, xx, yy, k, 30, 0.04));
+      }
+    }
+    for (let k = 0; k < 8; k++) {
+      const w = k < 3 ? 3 : k < 6 ? 2 : 1;
+      for (let x = -Math.floor(w / 2); x < w - Math.floor(w / 2); x++) for (let y = 0; y < Math.min(2, w); y++) set(x, y - 1, 41 + k, J(k % 3 === 2 ? BUDGE.hornDark : BUDGE.horn, x, y, k, 31, 0.04));
+    }
+    for (let y = -2; y <= 1; y++) set(-1, y, 40, BUDGE.vein, true);
+  } else if (kind === 'budgebow') {
+    for (let y = -20; y <= 20; y++) {
+      const bend = Math.round((1 - (y / 20) ** 2) * 10);
+      const ring = Math.abs(y) % 5 === 0;
+      const thick = Math.abs(y) < 6 ? 3 : 2;
+      for (let k = 0; k < thick; k++) {
+        const col = Math.abs(y) <= 3 ? J(k === 1 ? BUDGE.scaleLo : BUDGE.scale, y, k, 0, 32, 0.05) : ring ? BUDGE.hornDark : J(BUDGE.horn, y, k, 0, 33, 0.04);
+        set(0, y, 16 + bend + k, col);
+        if (thick === 3) set(-1, y, 16 + bend + k, col);
+      }
+      set(0, y, 16, Math.abs(y) % 4 === 0 ? 0xf4f0dc : 0xd8d2b8);
+    }
+    for (const dir of [-1, 1]) {
+      for (let k = 0; k < 4; k++) set(0, dir * (21 + k), 16 + (k < 2 ? 0 : -1), J(BUDGE.claw, k, dir, 0, 34, 0.03));
+    }
+    for (let z = 20; z < 30; z += 2) set(-1, 0, z, BUDGE.vein, true);
   }
   const g = meshFrom(M, cx, cy, 0, mat);
   heldCache[kind] = g;

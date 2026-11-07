@@ -15,6 +15,9 @@ import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS } from './ui/hud.js';
+import { Progress } from './systems/progress.js';
+import { Catalog } from './ui/catalog.js';
+import { MONSTERS, MATERIALS } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
@@ -65,6 +68,9 @@ class Game {
     this.rank = 0;
     this.quest = { text: 'Slay 5 Gate monsters', n: 0, total: 5 };
     this.items = ITEMS.map((i) => ({ ...i }));
+    this.progress = new Progress();
+    this.catalog = new Catalog(this);
+    this.discoverT = 0;
     this.sel = 0;
     this.started = false;
     this.zone = -1;
@@ -120,6 +126,7 @@ class Game {
     this.ambient = createAmbient(this);
     this.spawner.populate();
 
+    this.applyGear(true);
     this.hud.buildHotbar(this.items, (i) => this.selectSlot(i));
     this.selectSlot(0, true);
     this.refreshHud(true);
@@ -394,6 +401,43 @@ class Game {
     }
   }
 
+  applyGear(initial = false) {
+    const pr = this.progress;
+    const p = this.player;
+    p.setArmor(pr.armorLook());
+    p.reduction = pr.reduction;
+    const max = Math.min(40, 20 + this.rank * 2) + pr.bonusHp;
+    if (p.maxHp !== max) {
+      const gain = Math.max(0, max - p.maxHp);
+      p.maxHp = max;
+      p.hp = Math.min(max, p.hp + gain);
+    }
+    const w = pr.weaponItem;
+    this.items[7] = w ? { ...w } : { ...ITEMS[7] };
+    if (!initial) {
+      this.hud.buildHotbar(this.items, (i) => this.selectSlot(i));
+      this.selectSlot(this.sel, true);
+      this.refreshHud();
+    }
+  }
+
+  checkDiscoveries(dt) {
+    this.discoverT -= dt;
+    if (this.discoverT > 0) return;
+    this.discoverT = 0.5;
+    const P = this.player.pos;
+    for (const m of this.monsters) {
+      if (m.dead || this.progress.seen(m.type)) continue;
+      if (Math.hypot(m.x - P.x, m.z - P.z) > 15) continue;
+      this.progress.discover(m.type);
+      const info = MONSTERS.find((x) => x.id === m.type);
+      if (info) {
+        this.hud.banner('Catalog updated', info.name, 3000);
+        this.audio.quest();
+      }
+    }
+  }
+
   refreshHud(force = false) {
     const p = this.player;
     this.hud.setHP(p.hp, p.maxHp);
@@ -419,6 +463,10 @@ class Game {
       mesh = new THREE.Group();
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xd9ffff })));
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0x4ad0ff, transparent: true, opacity: 0.45, depthWrite: false })));
+    } else if (kind === 'ember') {
+      mesh = new THREE.Group();
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), new THREE.MeshBasicMaterial({ color: 0xfff0b0 })));
+      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.5, depthWrite: false })));
     } else {
       mesh = new THREE.Group();
       mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xf3d6ff })));
@@ -440,7 +488,7 @@ class Game {
       }
     });
     if (fx) {
-      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : [0xffffff, 0xd9c9a0];
+      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : p.kind === 'ember' ? [0xff7a1a, 0xffd25a, 0x6fd45a] : [0xffffff, 0xd9c9a0];
       this.fx.burst(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, c, 7, 2.6, 0.08, 0.35);
     }
   }
@@ -455,7 +503,8 @@ class Game {
       m.position.x += p.vx * dt;
       m.position.y += p.vy * dt;
       m.position.z += p.vz * dt;
-      if (p.kind === 'bolt' || p.kind === 'orb') m.rotation.x += dt * 8;
+      if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember') m.rotation.x += dt * 8;
+      if (p.kind === 'ember' && Math.random() < dt * 30) this.fx.burst(m.position.x, m.position.y, m.position.z, [0xff7a1a, 0x555555], 1, 0.6, 0.07, 0.35);
       if (p.age > p.life) {
         this.killProjectile(p, p.kind !== 'arrow');
         continue;
@@ -511,6 +560,15 @@ class Game {
     const each = Math.ceil(n / coins);
     for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
     if (Math.random() < 0.18) this.dropCoin(m.x, m.y + 0.6, m.z, 0, 'heart');
+    const fresh = !this.progress.seen(m.type);
+    const parts = this.progress.harvest(m.type);
+    if (parts.length) {
+      const line = parts.map((d) => `+${d.n} ${MATERIALS[d.id].name}`).join('   ');
+      this.hud.toast(line, 2600);
+      this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.map((d) => `+${d.n}`).join(' '), 'gold');
+      this.fx.burst(m.x, m.y + 1, m.z, [0x6fd45a, 0xf1e6c6, 0xffd23f], 12, 3.5, 0.1, 0.8);
+    }
+    if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
     this.quest.n++;
     if (this.quest.n >= this.quest.total) this.completeQuest();
     else this.hud.setQuest(this.quest.text, this.quest.n, this.quest.total);
@@ -521,7 +579,7 @@ class Game {
     this.gold += reward;
     this.rank = Math.min(RANKS.length - 1, this.rank + 1);
     const p = this.player;
-    p.maxHp = Math.min(40, 20 + this.rank * 2);
+    p.maxHp = Math.min(40, 20 + this.rank * 2) + this.progress.bonusHp;
     p.hp = p.maxHp;
     p.maxMana = 50 + this.rank * 5;
     this.quest = { text: `Slay ${5 + this.rank * 3} Gate monsters`, n: 0, total: 5 + this.rank * 3 };
@@ -991,6 +1049,7 @@ class Game {
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
     for (const m of this.monsters) m.update(dt);
+    if (this.started) this.checkDiscoveries(dt);
     if (this.monsters.some((m) => m.remove)) {
       for (const m of this.monsters) if (m.remove) m.dispose();
       this.monsters = this.monsters.filter((m) => !m.remove);

@@ -312,7 +312,9 @@ export class HUD {
   }
 
   openPanel(name, game) {
+    this.runCleanup();
     this.panelId = name;
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -370,7 +372,11 @@ export class HUD {
            <div class="panel-row"><span>Spirit</span><b>${Math.round(p.mana)} / ${p.maxMana}</b></div>
            <div class="panel-row"><span>Fury</span><b>${Math.round(p.fury)} / 100</b></div>
            <div class="panel-row"><span>Weapon</span><b>${game.items[game.sel].name}</b></div>
-           <p style="color:#aab;font-size:13px">Dark leather hunter's garb, steel bracers and a greatsword on your back.</p>`);
+           <div class="panel-row"><span>Defense</span><b>${game.progress.defense} (-${Math.round(game.progress.reduction * 100)}% damage)</b></div>
+           <p style="color:#aab;font-size:13px">${game.progress.defense ? (game.progress.setComplete ? 'Full Budgescale set: +4 max health.' : 'Wearing dragon-scale armor. Craft the full set for a health bonus.') : "Dark leather hunter's garb, steel bracers and a greatsword on your back."} Press C for the Hunter Catalog.</p>`);
+    } else if (name === 'catalog') {
+      title.textContent = 'Hunter Catalog';
+      this.cleanup = game.catalog.mount(body);
     } else if (name === 'waygate') {
       title.textContent = 'Waygate';
       const saved = (localStorage.getItem('mg-name') || 'Hunter').replace(/[<>"&]/g, '').slice(0, 16);
@@ -414,13 +420,16 @@ export class HUD {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
       const q = game.quality;
       const rows = [
+        ...(name === 'menu' ? [['Hunter Catalog', '<button id="set-cat">Open</button>']] : []),
         ['Graphics quality', `<button id="set-q">${q.label}</button>`],
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z Spirit Bolt - V Fury - 1-9 items - F talk - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z Spirit Bolt - V Fury - 1-9 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      const catBtn = document.getElementById('set-cat');
+      if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
       document.getElementById('set-q').onclick = () => {
         game.cycleQuality();
         document.getElementById('set-q').textContent = game.quality.label;
@@ -434,7 +443,13 @@ export class HUD {
     }
     this.el.panel.classList.remove('hidden');
   }
+  runCleanup() {
+    const fn = this.cleanup;
+    this.cleanup = null;
+    if (fn) fn();
+  }
   closePanel() {
+    this.runCleanup();
     this.panelId = null;
     this.el.panel.classList.add('hidden');
   }
