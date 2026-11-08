@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS } from './weaponModels.js';
+import { DUAL_KINDS, TALL_KINDS } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -895,6 +895,7 @@ export class Player {
     lerpRot(m.armR, 'z', armRz);
     lerpRot(m.armL, 'x', armL);
     lerpRot(m.armL, 'z', armLz);
+    m.heldSlot.rotation.x = AIMED_KINDS.has(this.heldKind) ? -m.armR.rotation.x : 0;
     const legSpeed = Math.min(1, dt * (this.state === 'attack' ? 30 : 26));
     lerpRot(m.legL, 'x', legL + legExtraL, legSpeed);
     lerpRot(m.legR, 'x', legR + legExtraR, legSpeed);
@@ -918,6 +919,9 @@ export class Player {
   }
 }
 
+/** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
+const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow']);
+
 const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear']);
 
 const TRAIL_SPEC = {
@@ -927,7 +931,7 @@ const TRAIL_SPEC = {
   hammer: { b: [0, 0, 0.6], t: [0, 0, 1.2], col: 0xe6e0d0, hot: 0xffd27a },
   budgeblade: { b: [0, 0, 0.35], t: [0, 0, 1.4], col: 0xb8ff8a, hot: 0xfff09a },
   budgemaul: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0xb8ff8a, hot: 0xfff09a },
-  darkscythe: { b: [-0.05, 0, 0.8], t: [-0.4, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
+  darkscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0xc78bff, hot: 0xe6c8ff },
   darksword: { b: [0, 0, 0.35], t: [-0.15, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
   budgegreatsword: { b: [0, 0, 0.5], t: [0, 0, 1.75], col: 0xb8ff8a, hot: 0xfff09a },
   darkgreatsword: { b: [0, 0, 0.5], t: [-0.2, 0, 1.8], col: 0xc78bff, hot: 0xe6c8ff },

@@ -35,7 +35,8 @@ function buildSubject(spec, silhouette) {
     const g = gearById(spec.id);
     const held = buildHeld(g.held);
     if (TALL_KINDS.has(g.held)) {
-      yaw = -0.85;
+      yaw = 0.85;
+      tilt.rotation.z = -0.32;
     } else if (g.wtype === 'crossbow') {
       held.rotation.z = Math.PI;
       const lay = new THREE.Group();
@@ -57,14 +58,14 @@ function buildSubject(spec, silhouette) {
     const mat = toonMaterial({ vertexColors: true });
     if (g.slot === 'shield') {
       const sm = buildShieldModel(g.set);
-      const mesh = meshFrom(sm.M, sm.ox, sm.oy, sm.oz, mat);
+      const mesh = meshFrom(sm.M, sm.ox, sm.oy, sm.oz, mat, sm.size);
       mesh.rotation.x = Math.PI / 2;
       tilt.add(mesh);
       yaw = 0.5;
       pitch = 0.12;
     } else {
       const bm = buildBookModel(g.set);
-      const mesh = meshFrom(bm.M, bm.ox, bm.oy, bm.oz, mat);
+      const mesh = meshFrom(bm.M, bm.ox, bm.oy, bm.oz, mat, bm.size);
       mesh.rotation.x = Math.PI / 2;
       mesh.rotation.z = -0.3;
       tilt.add(mesh);
