@@ -65,6 +65,15 @@ The second monster is the Darksycle Dragon (Lv 7, one roams the open fields). It
 - Armor: the Duskscale set (helm, cuirass, gauntlets, greaves, boots). The full set gives +2 max health and +20 max mana. Pieces from different sets can be mixed, and each set's bonus needs all five of its pieces.
 - The reference image for this dragon was not available when it was built, so the look comes from the name and brief. Its palette is in `src/data/darksycle.js` and its proportions in `buildDarksycleDragon()` in `src/entities/creatures.js`.
 
+## Monster-part weapons and armor
+
+Both dragons can be forged into the full weapon list and three armor sets. Everything is forged at the Forge, worn from the Forge or the catalog, and shown on the hero as a real voxel model.
+
+- Weapons per dragon: one-hand sword, two-hand sword, dual swords, war hammer, spear, war staff, wand, short bow, long bow and crossbow (Darksycle also keeps its Scythe). Each carries the weapon style that its mastery tracks: one-hand sword is Sword & Shield, two-hand sword, hammer and spear are Two-Handed, dual swords are Dual Wield, staff and wand keep their own masteries, and the bows and crossbow match their masteries. Held models live in `src/entities/weaponModels.js`. Dual swords show a matching blade in the off hand.
+- Armor per dragon: a metal set for the Warrior (helm, chest, gauntlets, legs, boots and a shield), a leather set for the Ranger (hide cap, jerkin, gloves, leggings, boots) and a cloth set for the Mage (hood, robe, gloves, trousers, slippers and a spell book). Metal sets are Budgescale Plate and Duskscale Plate. Leather sets are Budgehide Leathers and Duskhide Leathers. Cloth sets are Emberweave Robes and Gloomweave Robes. Painters live in `src/entities/armor.js`, `armorDark.js` and `armorSoft.js`, registered by set id in `armorSets.js`.
+- New parts: Budge Wing Membrane (cloth) and Dusk Hide (leather) now drop from the dragons.
+- Set bonuses need the five core pieces. Leather sets add stamina plus ranged damage (Budge) or crit chance (Darksycle). Cloth sets add mana plus spell damage. The shield adds defense and shows while you block. The spell book adds mana and spell damage, and while a book is worn Spell Book mastery also applies to staffs and wands.
+
 ## Rendering
 
 - Voxel models are meshed with per-vertex ambient occlusion and baked vertex colors.

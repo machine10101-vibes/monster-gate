@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
+import { DUAL_KINDS } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -130,9 +131,9 @@ export class Player {
     const off = this.model.offhand;
     if (off) {
       while (off.children.length) off.remove(off.children[0]);
-      if (kind === 'dual') {
-        const twin = buildHeld('blade');
-        twin.scale.setScalar(0.82);
+      if (DUAL_KINDS.has(kind)) {
+        const twin = buildHeld(kind === 'dual' ? 'blade' : kind);
+        twin.scale.setScalar(kind === 'dual' ? 0.82 : 0.95);
         twin.rotation.y = Math.PI;
         off.add(twin);
       }
@@ -322,7 +323,9 @@ export class Player {
     this.shielding = wantShield;
     if (wantShield && this.state === 'idle') this.state = 'idle';
     if (this.model.shieldG) this.model.shieldG.visible = this.shielding;
-    if (this.model.offhand) this.model.offhand.visible = this.heldKind === 'dual' && !this.shielding;
+    const dualHeld = DUAL_KINDS.has(this.heldKind);
+    if (this.model.offhand) this.model.offhand.visible = dualHeld && !this.shielding;
+    if (this.model.bookG) this.model.bookG.visible = !dualHeld && !this.shielding;
 
     let speed = 0;
     const moveDir = new THREE.Vector3();
@@ -915,7 +918,7 @@ export class Player {
   }
 }
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe']);
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -925,4 +928,12 @@ const TRAIL_SPEC = {
   budgeblade: { b: [0, 0, 0.35], t: [0, 0, 1.4], col: 0xb8ff8a, hot: 0xfff09a },
   budgemaul: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0xb8ff8a, hot: 0xfff09a },
   darkscythe: { b: [-0.05, 0, 0.8], t: [-0.4, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
+  darksword: { b: [0, 0, 0.35], t: [-0.15, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
+  budgegreatsword: { b: [0, 0, 0.5], t: [0, 0, 1.75], col: 0xb8ff8a, hot: 0xfff09a },
+  darkgreatsword: { b: [0, 0, 0.5], t: [-0.2, 0, 1.8], col: 0xc78bff, hot: 0xe6c8ff },
+  budgedual: { b: [0, 0, 0.25], t: [0.1, 0, 0.95], col: 0xb8ff8a, hot: 0xfff09a },
+  darkdual: { b: [0, 0, 0.25], t: [-0.2, 0, 0.95], col: 0xc78bff, hot: 0xe6c8ff },
+  darkhammer: { b: [0, 0, 0.8], t: [0, 0, 1.45], col: 0xc78bff, hot: 0xe6c8ff },
+  budgespear: { b: [0, 0, 1.6], t: [0, 0, 2.2], col: 0xb8ff8a, hot: 0xfff09a },
+  darkspear: { b: [0, 0, 1.6], t: [0, 0, 2.25], col: 0xc78bff, hot: 0xe6c8ff },
 };

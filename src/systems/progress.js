@@ -1,4 +1,4 @@
-import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, armorPieces, gearById } from '../data/catalog.js';
+import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 
 const KEY = 'monster-gate-hunter-v1';
@@ -153,19 +153,36 @@ export class Progress {
   }
 
   setComplete(setId) {
-    return armorPieces(setId).every((g) => this.worn(g.id));
+    return corePieces(setId).every((g) => this.worn(g.id));
   }
 
   get activeSets() {
     return SETS.filter((s) => this.setComplete(s.id));
   }
 
+  /** Worn pieces that carry a stat of their own (spell books). */
+  get wornPieces() {
+    return ARMOR_SLOTS.map((s) => gearById(this.data.armor[s])).filter(Boolean);
+  }
+
+  get bookWorn() {
+    return !!gearById(this.data.armor.book);
+  }
+
+  /** Summed stat bonuses from complete sets and from individual worn pieces. */
+  get gearBonus() {
+    const b = { hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0 };
+    for (const s of this.activeSets) for (const k of Object.keys(b)) b[k] += s[k] || 0;
+    for (const g of this.wornPieces) if (g.bonus) for (const k of Object.keys(g.bonus)) b[k] = (b[k] || 0) + g.bonus[k];
+    return b;
+  }
+
   get bonusHp() {
-    return this.activeSets.reduce((n, s) => n + s.hp, 0);
+    return this.gearBonus.hp;
   }
 
   get bonusMana() {
-    return this.activeSets.reduce((n, s) => n + s.mana, 0);
+    return this.gearBonus.mana;
   }
 
   get weaponItem() {

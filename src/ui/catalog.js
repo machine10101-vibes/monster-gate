@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { ARMOR_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SETS, SLOT_LABEL, armorPieces, gearById, monsterById, setById, weapons } from '../data/catalog.js';
+import { CORE_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SETS, SLOT_LABEL, TIER_LABEL, WEAPON_LABEL, armorPieces, gearById, monsterById, setById, weapons } from '../data/catalog.js';
 import { MONSTER_BUILDERS, MONSTER_STATS } from '../entities/monsters.js';
-import { buildHeld, buildHumanoid } from '../entities/humanoid.js';
+import { buildHeld, buildHumanoid, meshFrom } from '../entities/humanoid.js';
+import { TALL_KINDS, buildBookModel, buildShieldModel } from '../entities/weaponModels.js';
+import { toonMaterial } from '../engine/materials.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
 
 /* ------------------------------------------------------------------ */
@@ -32,15 +34,43 @@ function buildSubject(spec, silhouette) {
   } else if (spec.kind === 'weapon') {
     const g = gearById(spec.id);
     const held = buildHeld(g.held);
-    if (g.held === 'budgebow' || g.held === 'darkbow') {
+    if (TALL_KINDS.has(g.held)) {
       yaw = -0.85;
+    } else if (g.wtype === 'crossbow') {
+      held.rotation.z = Math.PI;
+      const lay = new THREE.Group();
+      lay.rotation.x = -Math.PI / 2;
+      lay.add(held);
+      tilt.rotation.z = -0.4;
+      tilt.add(lay);
+      yaw = 0.25;
+      pitch = 0.1;
     } else {
       held.rotation.x = -Math.PI / 2;
       tilt.rotation.z = -0.55;
       yaw = 0.4;
       pitch = 0.12;
     }
-    tilt.add(held);
+    if (g.wtype !== 'crossbow') tilt.add(held);
+  } else if (spec.kind === 'armor' && (gearById(spec.id).slot === 'shield' || gearById(spec.id).slot === 'book')) {
+    const g = gearById(spec.id);
+    const mat = toonMaterial({ vertexColors: true });
+    if (g.slot === 'shield') {
+      const sm = buildShieldModel(g.set);
+      const mesh = meshFrom(sm.M, sm.ox, sm.oy, sm.oz, mat);
+      mesh.rotation.x = Math.PI / 2;
+      tilt.add(mesh);
+      yaw = 0.5;
+      pitch = 0.12;
+    } else {
+      const bm = buildBookModel(g.set);
+      const mesh = meshFrom(bm.M, bm.ox, bm.oy, bm.oz, mat);
+      mesh.rotation.x = Math.PI / 2;
+      mesh.rotation.z = -0.3;
+      tilt.add(mesh);
+      yaw = 0.45;
+      pitch = 0.1;
+    }
   } else if (spec.kind === 'armor') {
     const g = gearById(spec.id);
     const keep = {
@@ -57,10 +87,14 @@ function buildSubject(spec, silhouette) {
     yaw = g.slot === 'arms' ? 0.5 : 0.55;
     pitch = g.slot === 'legs' || g.slot === 'boots' ? 0.12 : 0.2;
   } else if (spec.kind === 'set') {
-    const h = buildHumanoid({ armor: Object.fromEntries(ARMOR_SLOTS.map((s) => [s, spec.id])) });
+    const extra = setById(spec.id).tier === 'metal' ? 'shield' : setById(spec.id).tier === 'cloth' ? 'book' : null;
+    const h = buildHumanoid({ armor: Object.fromEntries([...CORE_SLOTS, ...(extra ? [extra] : [])].map((s) => [s, spec.id])) });
     h.armR.rotation.x = -0.9;
-    h.shieldG?.parent?.remove(h.shieldG);
-    h.heldSlot.add(buildHeld(spec.id === 'darksyceset' ? 'darkscythe' : 'budgeblade'));
+    if (extra === 'shield') {
+      h.shieldG.visible = true;
+      h.armL.rotation.set(-0.75, 0, 0.35);
+    } else h.shieldG?.parent?.remove(h.shieldG);
+    h.heldSlot.add(buildHeld(SET_HELD[spec.id]));
     tilt.add(h.root);
     yaw = 0.5;
     pitch = 0.14;
@@ -219,10 +253,25 @@ function el(tag, cls, html) {
   return n;
 }
 
-const SET_BLURB = {
-  budgeset: 'Five pieces of dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots.',
-  darksyceset: 'Five pieces of indigo scale lit from within by gloom: a sickle-horned helm, a core-burning cuirass, scythe-pauldron gauntlets, rune greaves and silent talon boots.',
+const SET_HELD = {
+  budgeset: 'budgeblade', darksyceset: 'darkscythe', budgeleather: 'budgecrossbow', darkleather: 'darkcrossbow', budgecloth: 'budgestaff', darkcloth: 'darkstaff',
 };
+
+const SET_BLURB = {
+  budgeset: 'Dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots, with a horn-bossed shield. The warrior set.',
+  darksyceset: 'Five pieces of indigo scale lit from within by gloom: a sickle-horned helm, a core-burning cuirass, scythe-pauldron gauntlets, rune greaves and silent talon boots, with a gloom-gem shield. The warrior set.',
+  budgeleather: 'Laced hide in budge green with bone-stud trim: a horn-stud cap, jerkin, bracer gloves, strapped leggings and claw-toed boots. Light and quiet. The ranger set.',
+  budgecloth: 'Wing-silk robes in budge green and gold: a pointed hood, sashed robe, flared cuffs, tied trousers and curled slippers, plus a fang-clasped grimoire. The mage set.',
+  darkleather: 'Indigo hide stitched with violet thread: a finned cowl, jerkin, talon bracers, strapped leggings and talon-capped boots. Built for shadows. The ranger set.',
+  darkcloth: 'Dusk-silk robes with glowing hems: a gem-browed hood, core-clasped robe, flared cuffs, sashed trousers and silent slippers, plus a humming grimoire. The mage set.',
+};
+
+function bonusText(b) {
+  const out = [];
+  if (b.mana) out.push(`+${b.mana} spirit`);
+  if (b.spell) out.push(`+${Math.round(b.spell * 100)}% spell`);
+  return out.join(', ');
+}
 
 export class Catalog {
   constructor(game) {
@@ -334,7 +383,7 @@ export class Catalog {
         const done = pieces.filter((g) => pr.crafted(g.id)).length;
         const known = pr.seen(set.monster);
         const complete = pr.setComplete(set.id);
-        grid.appendChild(this.heading(known ? monsterById(set.monster).name : '???'));
+        grid.appendChild(this.heading(known ? `${monsterById(set.monster).name} - ${TIER_LABEL[set.tier]} (${set.role})` : '???'));
         const card = this.card(s.thumb({ kind: 'set', id: set.id }, !known), known ? set.name : '???', known ? `${done}/${pieces.length} pieces${complete ? '  -  Complete' : ''}` : 'Undiscovered', (known ? 'set' : 'locked') + (complete ? ' worn' : ''));
         card.onclick = () => this.goto({ type: 'set', id: set.id });
         grid.appendChild(card);
@@ -376,7 +425,7 @@ export class Catalog {
       badge = 'Craftable';
       cls += ' ready';
     }
-    const sub = !known ? 'Undiscovered' : g.type === 'weapon' ? `Dmg ${g.item.dmg}` : `${SLOT_LABEL[g.slot]}  -  Def ${g.def}`;
+    const sub = !known ? 'Undiscovered' : g.type === 'weapon' ? `${WEAPON_LABEL[g.wtype]}  -  Dmg ${g.item.dmg}` : `${SLOT_LABEL[g.slot]}  -  Def ${g.def}`;
     const spec = { kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id };
     const card = this.card(getStage().thumb(spec, !known), known ? g.name : '???', sub, cls, badge);
     card.onclick = () => this.goto({ type: 'gear', id: g.id });
@@ -494,9 +543,9 @@ export class Catalog {
     const stats =
       g.type === 'weapon'
         ? g.stats.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')
-        : `<div><small>Slot</small><b>${SLOT_LABEL[g.slot]}</b></div><div><small>Defense</small><b>+${g.def}</b></div>`;
+        : `<div><small>Slot</small><b>${SLOT_LABEL[g.slot]}</b></div><div><small>Defense</small><b>+${g.def}</b></div>${g.bonus ? `<div><small>Bonus</small><b>${bonusText(g.bonus)}</b></div>` : ''}`;
     info.innerHTML = `<h3>${esc(g.name)}</h3>
-      <div class="cat-tags"><span>${g.type === 'weapon' ? 'Weapon' : 'Armor'}</span><span>From ${esc(m.name)}</span></div>
+      <div class="cat-tags"><span>${g.type === 'weapon' ? WEAPON_LABEL[g.wtype] : `${TIER_LABEL[setById(g.set).tier]} ${SLOT_LABEL[g.slot]}`}</span><span>From ${esc(m.name)}</span></div>
       <p>${esc(g.desc)}</p>
       <div class="cat-stats">${stats}</div>
       <h4>Parts needed</h4>`;
@@ -534,7 +583,10 @@ export class Catalog {
       actions.appendChild(b);
     }
     info.appendChild(actions);
-    if (g.type === 'armor') info.appendChild(el('p', 'cat-muted', `${esc(setById(g.set).name)}. ${esc(setById(g.set).bonus)}`));
+    if (g.type === 'armor') {
+      const set = setById(g.set);
+      info.appendChild(el('p', 'cat-muted', CORE_SLOTS.includes(g.slot) ? `${esc(set.name)}. ${esc(set.bonus)}` : `${esc(set.name)} extra. Worn alongside any set${g.slot === 'book' ? '; it also lets Spell Book mastery apply to staffs and wands' : ''}.`));
+    }
   }
 
   fillSet(info, set, known) {
@@ -546,7 +598,7 @@ export class Catalog {
     }
     const complete = pr.setComplete(set.id);
     info.innerHTML = `<h3>${esc(set.name)}</h3>
-      <div class="cat-tags"><span>Armor set</span><span>From ${esc(m.name)}</span><span>${pr.defense} defense worn</span></div>
+      <div class="cat-tags"><span>${TIER_LABEL[set.tier]} set</span><span>${set.role}</span><span>From ${esc(m.name)}</span><span>${pr.defense} defense worn</span></div>
       <p>${esc(SET_BLURB[set.id])}</p>
       <p class="${complete ? 'cat-ok' : 'cat-muted'}">${esc(set.bonus)}${complete ? ' (active)' : ''}</p>`;
     const list = el('div', 'cat-made');

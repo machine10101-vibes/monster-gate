@@ -641,6 +641,78 @@ ART.tome = [
 ];
 
 const cache = {};
+
+function draw(fn) {
+  const g = Array.from({ length: 16 }, () => Array(16).fill('.'));
+  const p = (x, y, c) => {
+    if (x >= 0 && y >= 0 && x < 16 && y < 16) g[y][x] = c;
+  };
+  const line = (x0, y0, x1, y1, c) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) p(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), c);
+  };
+  fn(p, line);
+  return g.map((r) => r.join(''));
+}
+
+const greatsword = (body, edge, guard, wood) =>
+  draw((p, line) => {
+    line(5, 10, 14, 1, body);
+    line(6, 10, 15, 1, edge);
+    line(5, 9, 13, 1, body);
+    line(2, 9, 6, 13, guard);
+    line(3, 9, 7, 13, guard);
+    line(3, 12, 1, 14, wood);
+    p(0, 15, guard);
+  });
+
+const spear = (body, edge, guard, wood, barb) =>
+  draw((p, line) => {
+    line(1, 14, 10, 5, wood);
+    line(2, 14, 11, 5, wood);
+    line(9, 6, 11, 4, guard);
+    line(10, 6, 12, 4, guard);
+    line(11, 4, 14, 1, body);
+    line(12, 4, 15, 1, edge);
+    line(11, 3, 13, 1, body);
+    if (barb) {
+      p(9, 3, barb);
+      p(8, 4, barb);
+      p(13, 7, barb);
+      p(12, 8, barb);
+    }
+  });
+
+const shortbow = (limb, grip, string, shaft, tip) =>
+  draw((p, line) => {
+    for (let y = 2; y <= 13; y++) {
+      const u = (y - 7.5) / 5.5;
+      const x = Math.round(3 + u * u * 4.5);
+      p(x, y, Math.abs(y - 7.5) < 1.6 ? grip : limb);
+    }
+    line(7, 2, 7, 13, string);
+    line(3, 8, 14, 8, shaft);
+    p(15, 8, tip);
+    p(14, 7, tip);
+    p(14, 9, tip);
+  });
+
+ART.budgegreatsword = greatsword('t', 'h', 'y', 'e');
+ART.darkgreatsword = greatsword('g', 'q', 'v', 'V');
+ART.darksword = recolor(ART.blade, { l: 'q', g: 'v', d: 'V', y: 'm', b: 'n' });
+ART.budgedual = recolor(ART.dual, { l: 'h', g: 't', d: 'Y', y: 'e', b: 'E' });
+ART.darkdual = recolor(ART.dual, { l: 'q', g: 'v', d: 'V', y: 'm', b: 'n' });
+ART.darkhammer = recolor(ART.budgemaul, { t: 'm', e: 'v', E: 'V', b: 'n', h: 'q' });
+ART.budgespear = spear('t', 'h', 'y', 'B', 'h');
+ART.darkspear = spear('l', 'q', 'v', 'n', 'm');
+ART.budgestaff = recolor(ART.darkstaff, { l: 'h', g: 't', q: 'y', m: 'o', v: 'e', V: 'E', n: 'B' });
+ART.budgewand = recolor(ART.wand, { c: 'o', h: 'y', b: 'e', y: 'Y' });
+ART.darkwand = recolor(ART.wand, { c: 'm', h: 'q', b: 'V', y: 'v' });
+ART.budgeshortbow = shortbow('t', 'e', 'w', 'B', 'h');
+ART.darkshortbow = shortbow('v', 'n', 'm', 'V', 'q');
+ART.budgecrossbow = recolor(ART.crossbow, { l: 'h', b: 'E', y: 'y' });
+ART.darkcrossbow = recolor(ART.crossbow, { l: 'q', b: 'V', y: 'm' });
+
 export function iconCanvas(name) {
   if (!cache[name]) cache[name] = make(ART[name] || ART.empty);
   return cache[name];

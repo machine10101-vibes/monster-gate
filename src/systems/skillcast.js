@@ -103,8 +103,14 @@ export function skillMods(game) {
   mods.slowMul = Math.max(0.25, mods.slowMul - pot * 0.03);
   mods.slowTime += pot * 0.4;
   mods.chain += pot * 0.04;
+  const gear = pr.gearBonus;
+  mods.stamina += gear.stamina;
+  mods.spell *= 1 + gear.spell;
+  mods.ranged *= 1 + gear.ranged;
+  mods.crit += gear.crit;
   const style = heldItem(game)?.style;
-  const wr = (id) => (style === id ? pr.weaponRank(id) : 0);
+  const bookActive = pr.bookWorn && (style === 'staff' || style === 'wand');
+  const wr = (id) => (style === id || (id === 'tome' && bookActive) ? pr.weaponRank(id) : 0);
   const sword = wr('swordshield');
   const two = wr('twohand');
   const dual = wr('dual');

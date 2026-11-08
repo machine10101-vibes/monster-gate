@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix, clamp, RNG } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
 import { BUDGE } from '../data/budge.js';
-import { paintHelm, paintChest, paintArm, paintLeg } from './armor.js';
-import * as dark from './armorDark.js';
+import { painterFor, PAINTER_SETS } from './armorSets.js';
 import { DARK } from '../data/darksycle.js';
+import { buildWeaponVoxels, buildShieldModel, buildBookModel, DUAL_KINDS } from './weaponModels.js';
 
-const isSet = (v, id) => v === id;
-const legFlags = (armor, id) => ({ legs: isSet(armor?.legs, id), boots: isSet(armor?.boots, id) });
+const legFlags = (armor, id) => ({ legs: armor?.legs === id, boots: armor?.boots === id });
 
 export const S = 0.03;
 
@@ -133,7 +132,7 @@ export function buildHumanoid(o = {}) {
       T.box(slantX(30) - 1, ty(30), 1, slantX(30) + 1, ty(32), 4, 0x6b6c72);
       T.box(12, ty(2), 2, 20, ty(5), 4, (x, y, z) => J(0x3a2a1f, x, y, z, seed, 0.08));
     }
-    if (c.armor?.chest) (c.armor.chest === 'darksyceset' ? dark.paintChest : paintChest)(T, ty);
+    painterFor(c.armor?.chest)?.paintChest(T, ty);
     torso = meshFrom(T, 13, OY, 9, mat);
   }
 
@@ -284,7 +283,7 @@ export function buildHumanoid(o = {}) {
         for (let x = 4; x < 16; x++)
           for (let z = 2; z < 6; z++) H.set(x, y, z, J(shade(col, 0.9), x, y, z, seed, 0.05));
     }
-    if (c.armor?.helm) (c.armor.helm === 'darksyceset' ? dark.paintHelm : paintHelm)(H, rowY);
+    painterFor(c.armor?.helm)?.paintHelm(H, rowY);
     head = meshFrom(H, HC, rowY(0), HC, mat);
   }
 
@@ -334,7 +333,7 @@ export function buildHumanoid(o = {}) {
       } else {
         fillBox(3, 20, 3, 10, 24, 11, (x, y, z) => J(shade(sleeve, 1.05), x, y, z, seed, 0.07));
       }
-      if (c.armor?.arms) (c.armor.arms === 'darksyceset' ? dark.paintArm : paintArm)(A, set);
+      painterFor(c.armor?.arms)?.paintArm(A, set);
       const grp = meshFrom(A, 6.5, 22, 7, mat);
       return grp;
     };
@@ -376,8 +375,7 @@ export function buildHumanoid(o = {}) {
         for (let y = 18; y < 23; y++) for (let z = 3; z < 10; z++) if (z % 2 === 0 && y % 2 === 0) set(10, y, z, J(c.metal, y, z, 5, seed, 0.06));
       }
       if (c.armor?.legs || c.armor?.boots) {
-        paintLeg(set, legFlags(c.armor, 'budgeset'));
-        dark.paintLeg(set, legFlags(c.armor, 'darksyceset'));
+        for (const id of PAINTER_SETS) painterFor(id).paintLeg(set, legFlags(c.armor, id));
       }
       return meshFrom(L, 6.5, 24, 6.5, mat);
     };
@@ -423,15 +421,33 @@ export function buildHumanoid(o = {}) {
   const offhand = new THREE.Group();
   offhand.position.set(0, -17.3 * S, 0);
   armL.add(offhand);
-  if (c.hero) {
-    shieldG.add(buildShield(mat));
+  if (c.hero || c.armor?.shield) {
+    shieldG.add(c.armor?.shield ? buildThemedShield(c.armor.shield, mat) : buildShield(mat));
     shieldG.visible = false;
+  }
+  const bookG = new THREE.Group();
+  bookG.position.set(0, -17.3 * S, 0);
+  armL.add(bookG);
+  if (c.armor?.book) {
+    const bm = buildBookModel(c.armor.book);
+    const bg = meshFrom(bm.M, bm.ox, bm.oy, bm.oz, mat);
+    bg.rotation.set(-0.55, 0, 0);
+    bg.position.set(0.01, -0.03, 0.12);
+    bookG.add(bg);
   }
 
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, torso, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, offhand, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, offhand, bookG, mat };
+}
+
+function buildThemedShield(setId, mat) {
+  const sm = buildShieldModel(setId);
+  const g = meshFrom(sm.M, sm.ox, sm.oy, sm.oz, mat);
+  g.position.set(0, -13.5 * S, 0);
+  g.traverse((o) => (o.castShadow = true));
+  return g;
 }
 
 function buildShield(mat) {
@@ -467,6 +483,12 @@ const heldCache = {};
 export function buildHeld(kind) {
   if (heldCache[kind]) return heldCache[kind].clone();
   const mat = toonMaterial({ vertexColors: true });
+  const themed = buildWeaponVoxels(kind);
+  if (themed) {
+    const g = meshFrom(themed.M, themed.ox, themed.oy, themed.oz, mat);
+    heldCache[kind] = g;
+    return g.clone();
+  }
   const tall = kind === 'budgebow' || kind === 'darkbow';
   const wide = kind === 'budgemaul' || kind === 'darkscythe';
   const M = new VoxelModel(wide ? 26 : 16, tall ? 56 : 16, 56);
