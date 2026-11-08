@@ -134,7 +134,7 @@ class Game {
     this.spawner.populate();
 
     this.applyGear(true);
-    this.hud.buildHotbar(this.items, (i) => this.selectSlot(i));
+    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
     this.selectSlot(0, true);
     this.refreshHud(true);
 
@@ -405,6 +405,17 @@ class Game {
     this.hud.updateSlots(this.items, this.sel);
   }
 
+  /** Hotbar taps select gear. Potions and philters are drunk on the tap. */
+  onHotbar(i) {
+    const it = this.items[i];
+    if (!it) return;
+    if (it.kind === 'use') {
+      if (this.player?.tryAttack(it)) this.selectSlot(i, true);
+      return;
+    }
+    this.selectSlot(i);
+  }
+
   selectSlot(i, silent = false) {
     if (i < 0 || i >= this.items.length) return;
     this.sel = i;
@@ -427,7 +438,7 @@ class Game {
     const w = pr.weaponItem;
     this.items[7] = w ? { ...w } : { ...ITEMS[7] };
     if (!initial) {
-      this.hud.buildHotbar(this.items, (i) => this.selectSlot(i));
+      this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
       this.selectSlot(this.sel, true);
       this.refreshHud();
     }

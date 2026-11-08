@@ -24,6 +24,7 @@ npm run preview  # serve the production build
 | Skill slots | Z, X, V | Bolt, Skill, and Fury buttons |
 | Skill tree | K | Menu → Skill Tree |
 | Select item | 1-9 / click hotbar | Tap hotbar |
+| Drink a potion | Click it on the hotbar, or select it and attack | Tap it on the hotbar |
 | Talk / Waygate | F | Talk button |
 | Rotate / zoom camera | R, [ ], wheel, middle-drag | Drag right side |
 | Panels | M map, E hunter, B satchel, C catalog, Q hunt log, T settings, K skills | Menu buttons |
