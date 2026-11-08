@@ -1,5 +1,5 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, armorPieces, gearById } from '../data/catalog.js';
-import { CLASSES, SKILLS } from '../data/skills.js';
+import { CLASSES, SKILLS, attrDef } from '../data/skills.js';
 
 const KEY = 'monster-gate-hunter-v1';
 
@@ -198,7 +198,27 @@ export class Progress {
     for (const id of Object.keys(learned)) {
       if (learned[id] && SKILLS[id]) spent += SKILLS[id].cost;
     }
+    const attrs = this.data.skills?.attrs || {};
+    for (const id of Object.keys(attrs)) {
+      if (attrDef(this.classId, id)) spent += attrs[id] | 0;
+    }
     return { earned, spent, left: Math.max(0, earned - spent) };
+  }
+
+  attrRank(id) {
+    return (this.data.skills?.attrs && this.data.skills.attrs[id]) || 0;
+  }
+
+  raiseAttr(id) {
+    const def = attrDef(this.classId, id);
+    if (!def) return false;
+    const rank = this.attrRank(id);
+    if (rank >= def.max) return false;
+    if (this.skillPoints().left < 1) return false;
+    if (!this.data.skills.attrs) this.data.skills.attrs = {};
+    this.data.skills.attrs[id] = rank + 1;
+    this.save();
+    return true;
   }
 
   hasSkill(id) {
@@ -211,7 +231,7 @@ export class Progress {
 
   setClass(id) {
     if (!CLASSES[id] || this.classId === id) return false;
-    this.data.skills = { classId: id, learned: {}, equipped: [null, null, null] };
+    this.data.skills = { classId: id, learned: {}, equipped: [null, null, null], attrs: {} };
     this.save();
     return true;
   }
@@ -247,6 +267,7 @@ export class Progress {
     if (!this.classId) return false;
     this.data.skills.learned = {};
     this.data.skills.equipped = [null, null, null];
+    this.data.skills.attrs = {};
     this.save();
     return true;
   }
@@ -275,5 +296,12 @@ function normalizeSkills(raw) {
       equipped[i] = id;
     }
   }
-  return { classId, learned, equipped };
+  const attrs = {};
+  if (classId && src.attrs && typeof src.attrs === 'object') {
+    for (const def of CLASSES[classId].attributes || []) {
+      const n = src.attrs[def.id] | 0;
+      if (n > 0) attrs[def.id] = Math.min(def.max, n);
+    }
+  }
+  return { classId, learned, equipped, attrs };
 }

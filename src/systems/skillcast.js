@@ -14,11 +14,22 @@ export function skillMods(game) {
     dr: 0,
     hp: 0,
     mana: 0,
+    stamina: 0,
     melee: 1,
+    ranged: 1,
+    spell: 1,
+    crit: 0,
     furyGain: 1,
+    furyRegen: 0,
+    manaCost: 1,
     poison: false,
+    poisonBonus: 0,
+    poisonTime: 0,
     burn: false,
+    burnDps: 3,
     slow: false,
+    slowMul: 0.6,
+    slowTime: 3,
     chain: 0,
     deadeye: false,
     wolf: 1,
@@ -51,11 +62,62 @@ export function skillMods(game) {
   if (has('static')) mods.chain = 0.25;
   if (p.warcryT > 0) mods.melee *= 1.3;
   if (p.packT > 0) mods.melee *= 1.4;
+  if (has('brace')) mods.hp += 6;
+  if (has('thickhide')) mods.hp += 12;
+  if (has('rampage')) mods.melee *= 1.1;
+  if (has('alpha')) {
+    mods.wolf = 1.8;
+    mods.wolfHeal = 2;
+  }
+  if (has('concentrated')) {
+    mods.poisonBonus += 3;
+    mods.poisonTime += 2;
+  }
+  if (has('immolate')) mods.burnDps = 5;
+  if (has('deepfreeze')) {
+    mods.slowMul = 0.4;
+    mods.slowTime = 4.5;
+  }
+  if (has('overcharge')) mods.chain = Math.max(mods.chain, 0.4);
+  const rank = (id) => pr.attrRank(id);
+  mods.hp += rank('vitality') * 4;
+  mods.melee *= 1 + rank('might') * 0.06;
+  mods.dr += rank('guard') * 0.03;
+  mods.furyGain *= 1 + rank('wrath') * 0.1;
+  mods.furyRegen += rank('wrath') * 0.45;
+  mods.stamina += rank('endurance') * 8;
+  mods.ranged *= 1 + rank('precision') * 0.06;
+  mods.crit += rank('agility') * 0.03;
+  mods.poisonBonus += rank('toxin');
+  mods.mana += rank('spiritwell') * 6;
+  mods.spell *= 1 + rank('arcana') * 0.06;
+  mods.manaCost = Math.max(0.55, 1 - rank('focus') * 0.06);
+  const pot = rank('potency');
+  mods.burnDps += pot;
+  mods.slowMul = Math.max(0.25, mods.slowMul - pot * 0.03);
+  mods.slowTime += pot * 0.4;
+  mods.chain += pot * 0.04;
   return mods;
 }
 
-function pay(p, skill) {
-  const cost = skill.resource || 0;
+export function scaleDmg(game, amount, kind) {
+  const mods = skillMods(game);
+  const mul = kind === 'spell' ? mods.spell : kind === 'ranged' ? mods.ranged : mods.melee;
+  return Math.max(1, Math.round((amount || 0) * (mul || 1)));
+}
+
+export function resourceCost(game, skill) {
+  const mods = skillMods(game);
+  let cost = skill.resource || 0;
+  if (skill.res === 'mana') cost = Math.max(1, Math.round(cost * (mods.manaCost ?? 1)));
+  if (skill.res === 'fury' && game.progress.hasSkill('brace') && skill.id === 'shieldbash') cost = Math.max(8, cost - 6);
+  if (skill.res === 'fury' && game.progress.hasSkill('rampage') && (skill.id === 'whirlwind' || skill.id === 'execute')) cost = Math.max(10, cost - 6);
+  return cost;
+}
+
+function pay(game, skill) {
+  const p = game.player;
+  const cost = resourceCost(game, skill);
   if (skill.res === 'fury') p.fury -= cost;
   else if (skill.res === 'mana') p.mana -= cost;
   else if (skill.res === 'stamina') {
@@ -64,8 +126,9 @@ function pay(p, skill) {
   }
 }
 
-function canPay(p, skill) {
-  const cost = skill.resource || 0;
+function canPay(game, skill) {
+  const p = game.player;
+  const cost = resourceCost(game, skill);
   if (skill.res === 'fury') return p.fury >= cost;
   if (skill.res === 'mana') return p.mana >= cost;
   if (skill.res === 'stamina') return p.stamina >= cost;
@@ -88,12 +151,12 @@ export function castSkill(game, id) {
     game.hud.toast('Not ready.');
     return false;
   }
-  if (!canPay(p, skill)) {
+  if (!canPay(game, skill)) {
     poorToast(game, skill);
     return false;
   }
   if (!effect(game, skill)) return false;
-  pay(p, skill);
+  pay(game, skill);
   p.cds[id] = skill.cd || 1;
   game.hud.floatText(...game.screenOf(p.pos.x, p.pos.y + 2.15, p.pos.z), skill.name, 'gold');
   return true;
@@ -137,6 +200,24 @@ function effect(game, s) {
       return spark(game, s);
     case 'chainlightning':
       return chainLightning(game, s);
+    case 'ironcitadel':
+      return ironCitadel(game, s);
+    case 'bloodstorm':
+      return bloodstorm(game, s);
+    case 'earthquake':
+      return earthquake(game, s);
+    case 'howl':
+      return howl(game, s);
+    case 'plaguearrow':
+      return plagueArrow(game, s);
+    case 'snipe':
+      return snipe(game, s);
+    case 'meteor':
+      return meteor(game, s);
+    case 'glacier':
+      return glacier(game, s);
+    case 'thunderclap':
+      return thunderclap(game, s);
     default:
       return false;
   }
@@ -152,9 +233,10 @@ function eachMonster(game, fn) {
   return n;
 }
 
-function coneHit(game, reach, dotMin, dmg, knock, fn) {
+function coneHit(game, reach, dotMin, dmg, knock, fn, kind = 'melee') {
   const p = game.player;
   const f = p.facing;
+  const dealt = scaleDmg(game, dmg, kind);
   let n = 0;
   eachMonster(game, (mon) => {
     const dx = mon.x - p.pos.x;
@@ -163,21 +245,22 @@ function coneHit(game, reach, dotMin, dmg, knock, fn) {
     if (dist > reach + (mon.radius || 0.5)) return;
     const dot = (dx * f.x + dz * f.z) / (dist || 1);
     if (dist > 0.45 && dot < dotMin) return;
-    game.strikeMonster(mon, dmg, f.x, f.z, knock, false);
+    game.strikeMonster(mon, dealt, f.x, f.z, knock, false);
     if (fn) fn(mon);
     n++;
   });
   return n;
 }
 
-function radiusHit(game, x, z, radius, dmg, knock, fn) {
+function radiusHit(game, x, z, radius, dmg, knock, fn, kind = 'melee') {
+  const dealt = dmg > 0 ? scaleDmg(game, dmg, kind) : 0;
   let n = 0;
   eachMonster(game, (mon) => {
     const dx = mon.x - x;
     const dz = mon.z - z;
     const dist = Math.hypot(dx, dz);
     if (dist > radius + (mon.radius || 0.4) * 0.4) return;
-    if (dmg > 0) game.strikeMonster(mon, dmg, dx / (dist || 1), dz / (dist || 1), knock, false);
+    if (dealt > 0) game.strikeMonster(mon, dealt, dx / (dist || 1), dz / (dist || 1), knock, false);
     if (fn) fn(mon);
     n++;
   });
@@ -200,9 +283,10 @@ function nearest(game, x, z, range, skip) {
 
 function shieldBash(game, s) {
   const p = game.player;
+  const braced = game.progress.hasSkill('brace');
   p.playCast('bash', 0.32);
-  const n = coneHit(game, s.reach, s.dot, s.power, s.knock, (mon) => {
-    if (!mon.dead) mon.afflict('stun', s.stun);
+  const n = coneHit(game, s.reach, s.dot, s.power + (braced ? 4 : 0), s.knock, (mon) => {
+    if (!mon.dead) mon.afflict('stun', s.stun + (braced ? 0.4 : 0));
   });
   game.fx.doSlash(p.pos.x, p.pos.y + 0.9, p.pos.z, Math.atan2(-p.facing.z, p.facing.x), 0.8, 0x9fd8ff, 1);
   game.audio.tone(n ? 180 : 240, 0.12, 'square', 0.1, n ? -40 : -120);
@@ -222,7 +306,8 @@ function bulwark(game, s) {
 function whirlwind(game, s) {
   const p = game.player;
   p.playCast('spin', 0.4);
-  const n = radiusHit(game, p.pos.x, p.pos.z, s.radius, s.power, 5);
+  const reach = s.radius + (game.progress.hasSkill('rampage') ? 0.5 : 0);
+  const n = radiusHit(game, p.pos.x, p.pos.z, reach, s.power, 5);
   game.fx.doSlash(p.pos.x, p.pos.y + 0.7, p.pos.z, 0.4, 1.3, 0xffb347, 1);
   game.fx.doSlash(p.pos.x, p.pos.y + 0.7, p.pos.z, 2.2, 1.3, 0xfff0b0, -1);
   game.audio.tone(220, 0.16, 'sawtooth', 0.09, -80);
@@ -242,9 +327,9 @@ function execute(game, s) {
     if (dist > s.reach + (mon.radius || 0.5)) return;
     const dot = (dx * f.x + dz * f.z) / (dist || 1);
     if (dist > 0.45 && dot < s.dot) return;
-    const finisher = mon.hp < mon.maxHp * 0.4;
-    const dmg = finisher ? Math.round(s.power * 2.4) : s.power;
-    game.strikeMonster(mon, dmg, f.x, f.z, 6, finisher);
+    const finisher = mon.hp < mon.maxHp * (game.progress.hasSkill('rampage') ? 0.5 : 0.4);
+    const raw = finisher ? Math.round(s.power * 2.4) : s.power;
+    game.strikeMonster(mon, scaleDmg(game, raw, 'melee'), f.x, f.z, 6, finisher);
     n++;
   });
   game.fx.doSlash(p.pos.x, p.pos.y + 0.8, p.pos.z, Math.atan2(-f.z, f.x), 1.05, 0xff5a46, 1);
@@ -261,8 +346,9 @@ function leap(game, s) {
   p.leapT = 0.48;
   p.leapArm = true;
   p.leapDir.copy(p.facing);
-  p.leapPower = s.power;
-  p.leapRadius = s.radius;
+  const hide = game.progress.hasSkill('thickhide');
+  p.leapPower = s.power + (hide ? 6 : 0);
+  p.leapRadius = s.radius + (hide ? 0.5 : 0);
   game.audio.tone(300, 0.12, 'triangle', 0.08, 180);
   return true;
 }
@@ -294,7 +380,7 @@ function warCry(game, s) {
 function callWolf(game, s) {
   const p = game.player;
   p.playCast('cast', 0.3);
-  summonWolf(game, s.dur || 30);
+  summonWolf(game, (s.dur || 30) + (game.progress.hasSkill('alpha') ? 12 : 0));
   game.audio.tone(420, 0.16, 'square', 0.08, -60);
   return true;
 }
@@ -393,7 +479,7 @@ function markedPrey(game, s) {
     return false;
   }
   p.playCast('cast', 0.24);
-  mon.afflict('mark', s.dur, s.amp);
+  mon.afflict('mark', s.dur, game.progress.hasSkill('killshot') ? 0.7 : s.amp);
   game.fx.ring(mon.x, mon.y + 0.15, mon.z, 0xffd23f, 12, 2.2, 0.08, 0.45);
   game.hud.floatText(...game.screenOf(mon.x, mon.y + 2, mon.z), 'Marked', 'crit');
   game.audio.tone(640, 0.1, 'square', 0.07, 80);
@@ -409,7 +495,7 @@ function fireball(game, s) {
     kind: 'ember',
     skill: 'fireball',
     spell: true,
-    splash: s.splash,
+    splash: s.splash + (game.progress.hasSkill('immolate') ? 6 : 0),
     radius: s.radius,
     x: p.pos.x + f.x * 0.6,
     y: p.pos.y + 1.2,
@@ -427,9 +513,7 @@ function fireball(game, s) {
 function flameWave(game, s) {
   const p = game.player;
   p.playCast('cast', 0.34);
-  const n = coneHit(game, s.reach, s.dot, s.power, 4, (mon) => {
-    if (!mon.dead) mon.afflict('burn', 4, 3);
-  });
+  const n = coneHit(game, s.reach, s.dot, s.power, 4, (mon) => applyBurn(game, mon, 4), 'spell');
   const f = p.facing;
   game.fx.burst(p.pos.x + f.x * 1.4, p.pos.y + 0.7, p.pos.z + f.z * 1.4, [0xff7a1a, 0xffd25a, 0xfff0b0], 16, 4, 0.12, 0.4);
   game.audio.tone(180, 0.18, 'sawtooth', 0.1, -40);
@@ -464,9 +548,9 @@ function iceNova(game, s) {
   p.playCast('cast', 0.32);
   radiusHit(game, p.pos.x, p.pos.z, s.radius, s.power, 4, (mon) => {
     if (mon.dead) return;
-    if (mon.slowT > 0) mon.afflict('stun', 1.1);
-    else mon.afflict('slow', 3, 0.55);
-  });
+    if (mon.slowT > 0) mon.afflict('stun', game.progress.hasSkill('deepfreeze') ? 1.4 : 1.1);
+    else applySlow(game, mon, 3, 0.55);
+  }, 'spell');
   game.fx.ring(p.pos.x, p.pos.y + 0.35, p.pos.z, 0xd7f4ff, 22, 4.5, 0.1, 0.5);
   game.audio.tone(680, 0.16, 'triangle', 0.09, -200);
   return true;
@@ -508,12 +592,13 @@ function chainLightning(game) {
   let y = p.pos.y + 1.2;
   let z = p.pos.z;
   const mods = skillMods(game);
+  const bonus = game.progress.hasSkill('overcharge') ? 3 : 0;
   for (const dmg of powers) {
     if (!cur || cur.dead) break;
     seen.add(cur);
     arcBetween(game, x, y, z, cur.x, cur.y + 0.9 + (cur.hover || 0), cur.z, 0xd7e4ff);
-    game.strikeMonster(cur, dmg, 0.2, 1, 3, false);
-    if (!cur.dead && mods.burn) cur.afflict('burn', 4, 3);
+    game.strikeMonster(cur, scaleDmg(game, dmg + bonus, 'spell'), 0.2, 1, 3, false);
+    if (!cur.dead && mods.burn) applyBurn(game, cur, 4);
     x = cur.x;
     y = cur.y + 1;
     z = cur.z;
@@ -522,6 +607,166 @@ function chainLightning(game) {
   game.audio.tone(760, 0.14, 'sawtooth', 0.1, 200);
   game.shake(0.12);
   return true;
+}
+
+function ironCitadel(game) {
+  const p = game.player;
+  p.ironHits = 3;
+  p.ironT = 6;
+  p.playCast('cast', 0.3);
+  game.fx.ring(p.pos.x, p.pos.y + 0.5, p.pos.z, 0x9fd8ff, 16, 2.8, 0.1, 0.5);
+  game.audio.tone(120, 0.18, 'square', 0.1, 20);
+  return true;
+}
+
+function bloodstorm(game) {
+  const p = game.player;
+  const dmg = 8 + Math.round(p.fury / 8);
+  p.playCast('spin', 0.4);
+  const n = radiusHit(game, p.pos.x, p.pos.z, 3.4, dmg, 6);
+  game.fx.doSlash(p.pos.x, p.pos.y + 0.8, p.pos.z, 0.2, 1.4, 0xff3a3a, 1);
+  game.fx.doSlash(p.pos.x, p.pos.y + 0.8, p.pos.z, 2.4, 1.4, 0xffd0a0, -1);
+  game.fx.ring(p.pos.x, p.pos.y + 0.3, p.pos.z, 0xff5a46, 16, 4, 0.1, 0.4);
+  game.audio.tone(160, 0.18, 'sawtooth', 0.1, -40);
+  if (n) game.shake(0.24);
+  return true;
+}
+
+function earthquake(game) {
+  const p = game.player;
+  p.playCast('slam', 0.34);
+  const n = radiusHit(game, p.pos.x, p.pos.z, 3.6, 16, 7, (mon) => {
+    if (!mon.dead) mon.afflict('stun', 0.6);
+  });
+  game.fx.shockwave(p.pos.x, p.pos.y, p.pos.z, 0xd9c9a0, 3.6);
+  game.fx.dust(p.pos.x, p.pos.y, p.pos.z, 14, 3);
+  game.audio.tone(70, 0.22, 'sawtooth', 0.12, -20);
+  if (n) game.shake(0.28);
+  return true;
+}
+
+function howl(game) {
+  const p = game.player;
+  p.playCast('cast', 0.28);
+  radiusHit(game, p.pos.x, p.pos.z, 4.5, 8, 3);
+  p.stamina = Math.min(p.maxStamina, p.stamina + 16);
+  const wolf = world(game).wolf;
+  if (wolf) wolf.bite = 0;
+  game.fx.ring(p.pos.x, p.pos.y + 0.6, p.pos.z, 0xd2b48c, 18, 5, 0.1, 0.45);
+  game.audio.tone(280, 0.2, 'sawtooth', 0.1, -30);
+  return true;
+}
+
+function plagueArrow(game) {
+  const p = game.player;
+  p.playCast('cast', 0.28);
+  const f = p.facing;
+  game.spawnProjectile({
+    owner: 'player',
+    kind: 'arrow',
+    skill: 'plaguearrow',
+    x: p.pos.x + f.x * 0.55,
+    y: p.pos.y + 1.2,
+    z: p.pos.z + f.z * 0.55,
+    vx: f.x * 22,
+    vz: f.z * 22,
+    dmg: 12,
+    life: 1.4,
+    r: 0.32,
+    pierce: true,
+  });
+  game.audio.tone(540, 0.1, 'triangle', 0.08, -200);
+  return true;
+}
+
+function snipe(game) {
+  const p = game.player;
+  p.playCast('cast', 0.32);
+  const shot = consumeAim(game, 18);
+  const f = p.facing;
+  game.spawnProjectile({
+    owner: 'player',
+    kind: 'arrow',
+    skill: 'snipe',
+    x: p.pos.x + f.x * 0.55,
+    y: p.pos.y + 1.25,
+    z: p.pos.z + f.z * 0.55,
+    vx: f.x * 32,
+    vz: f.z * 32,
+    dmg: shot.dmg,
+    crit: shot.crit,
+    life: 1.5,
+    r: 0.28,
+    pierce: true,
+  });
+  game.audio.tone(1100, 0.08, 'triangle', 0.1, -500);
+  return true;
+}
+
+function meteor(game) {
+  const p = game.player;
+  p.playCast('cast', 0.34);
+  const f = p.facing;
+  const extra = game.progress.hasSkill('immolate') ? 6 : 0;
+  game.spawnProjectile({
+    owner: 'player',
+    kind: 'ember',
+    skill: 'meteor',
+    spell: true,
+    splash: 18 + extra,
+    radius: 3,
+    x: p.pos.x + f.x * 0.7,
+    y: p.pos.y + 1.4,
+    z: p.pos.z + f.z * 0.7,
+    vx: f.x * 9,
+    vz: f.z * 9,
+    dmg: 6,
+    life: 1.6,
+    r: 0.55,
+  });
+  game.audio.tone(160, 0.2, 'sawtooth', 0.1, -60);
+  return true;
+}
+
+function glacier(game) {
+  const p = game.player;
+  p.playCast('cast', 0.32);
+  const n = coneHit(game, 4.2, 0.15, 11, 4, (mon) => applySlow(game, mon, 4, 0.4), 'spell');
+  const f = p.facing;
+  game.fx.burst(p.pos.x + f.x * 1.5, p.pos.y + 0.7, p.pos.z + f.z * 1.5, [0xd7f4ff, 0xffffff, 0x8fd4ff], 14, 3.5, 0.1, 0.4);
+  game.audio.tone(420, 0.16, 'triangle', 0.09, 80);
+  if (n) game.shake(0.14);
+  return true;
+}
+
+function thunderclap(game) {
+  const p = game.player;
+  p.playCast('cast', 0.28);
+  const n = radiusHit(game, p.pos.x, p.pos.z, 3.4, 13, 5, (mon) => {
+    if (!mon.dead) mon.afflict('stun', 0.35);
+  }, 'spell');
+  game.fx.ring(p.pos.x, p.pos.y + 0.4, p.pos.z, 0xd7e4ff, 20, 4.2, 0.1, 0.4);
+  game.fx.burst(p.pos.x, p.pos.y + 1.1, p.pos.z, [0xffffff, 0xb5e3ff], 12, 4, 0.08, 0.35);
+  game.audio.tone(640, 0.14, 'sawtooth', 0.1, 160);
+  if (n) game.shake(0.2);
+  return true;
+}
+
+function applyPoison(game, mon, time, dps) {
+  if (!mon || mon.dead) return;
+  const mods = skillMods(game);
+  mon.afflict('poison', time + (mods.poisonTime || 0), dps + (mods.poisonBonus || 0));
+}
+
+function applyBurn(game, mon, time) {
+  if (!mon || mon.dead) return;
+  mon.afflict('burn', time, skillMods(game).burnDps || 3);
+}
+
+function applySlow(game, mon, time, mul) {
+  if (!mon || mon.dead) return;
+  const mods = skillMods(game);
+  mon.afflict('slow', Math.max(time, mods.slowTime || time), Math.min(mul, mods.slowMul ?? mul));
 }
 
 function consumeAim(game, base) {
@@ -537,18 +782,21 @@ function consumeAim(game, base) {
 export function skillOnHit(game, proj, mon) {
   if (!mon || mon.dead) return;
   const id = proj.skill;
-  if (id === 'poisonvolley') mon.afflict('poison', 4, 4);
-  if (id === 'fireball') mon.afflict('burn', 4, 3);
-  if (id === 'frostbolt') mon.afflict('slow', 3.5, 0.55);
+  if (id === 'poisonvolley') applyPoison(game, mon, 4, 4);
+  if (id === 'plaguearrow') applyPoison(game, mon, 6, 8);
+  if (id === 'fireball' || id === 'meteor') applyBurn(game, mon, 4);
+  if (id === 'frostbolt') applySlow(game, mon, 3.5, 0.55);
+  if (id === 'snipe') mon.afflict('mark', 6, game.progress.hasSkill('killshot') ? 0.7 : 0.4);
   const mods = skillMods(game);
-  if (proj.spell && mods.burn) mon.afflict('burn', 4, 3);
-  if (proj.spell && mods.slow) mon.afflict('slow', 3, 0.6);
+  if (proj.spell && mods.burn) applyBurn(game, mon, 4);
+  if (proj.spell && mods.slow) applySlow(game, mon, 3, 0.6);
   if (!proj.spell && mods.poison && (proj.kind === 'arrow' || proj.kind === 'stone' || proj.kind === 'crescent' || proj.kind === 'gloom')) {
-    mon.afflict('poison', 4, 4);
+    applyPoison(game, mon, 4, 4);
   }
   if (proj.spell && mods.chain && !proj.chained && Math.random() < mods.chain) {
     proj.chained = true;
-    jumpLightning(game, mon, Math.max(1, Math.round((proj.dmg || 6) * 0.5)));
+    const bonus = game.progress.hasSkill('overcharge') ? 3 : 0;
+    jumpLightning(game, mon, scaleDmg(game, Math.max(1, Math.round((proj.dmg || 6) * 0.5)) + bonus, 'spell'));
   }
   if (proj.splash && !proj.splashed) {
     proj.splashed = true;
@@ -574,8 +822,8 @@ function explode(game, proj) {
     const dz = mon.z - m.z;
     const dist = Math.hypot(dx, dz);
     if (dist > r + (mon.radius || 0.4) * 0.3) return;
-    game.strikeMonster(mon, proj.splash || 8, dx / (dist || 1), dz / (dist || 1), 5, false);
-    if (!mon.dead && proj.skill === 'fireball') mon.afflict('burn', 4, 3);
+    game.strikeMonster(mon, scaleDmg(game, proj.splash || 8, 'spell'), dx / (dist || 1), dz / (dist || 1), 5, false);
+    if (!mon.dead && (proj.skill === 'fireball' || proj.skill === 'meteor')) applyBurn(game, mon, 4);
   });
 }
 
@@ -585,7 +833,7 @@ function jumpLightning(game, from, dmg) {
   arcBetween(game, from.x, from.y + 1, from.z, next.x, next.y + 1, next.z, 0xb5e3ff);
   game.strikeMonster(next, dmg, 0.2, 1, 2, false);
   const mods = skillMods(game);
-  if (!next.dead && mods.burn) next.afflict('burn', 4, 3);
+  if (!next.dead && mods.burn) applyBurn(game, next, 4);
 }
 
 function arcBetween(game, x1, y1, z1, x2, y2, z2, color) {
@@ -713,7 +961,7 @@ export function updateSkillWorld(game, dt) {
       c.acc = 0;
       eachMonster(game, (mon) => {
         if (Math.hypot(mon.x - c.x, mon.z - c.z) <= c.r + 0.2) {
-          mon.afflict('poison', 1.3, c.dps);
+          applyPoison(game, mon, 1.3, c.dps);
           mon.afflict('slow', 0.9, c.slow);
         }
       });

@@ -45,13 +45,15 @@ Weapons and armor are forged at the Forge beside Bram the Blacksmith in Oakhollo
 
 ## Skill trees
 
-Press K (or Menu → Skill Tree) to choose Warrior, Ranger, or Mage. Each class has three paths, and each path has a passive, an active, and a special:
+Press K (or Menu → Skill Tree) to choose Warrior, Ranger, or Mage. Each class has three paths, and each path runs five skills deep: a passive, an active, a special, another passive, and a capstone.
 
 - Warrior spends Fury. Tank, Fury, and Barbarian.
 - Ranger spends Stamina. Companion, Poison, and Sniper.
 - Mage spends Spirit. Fire, Ice, and Lightning.
 
-Choosing a path grants 2 points, then 1 more for every 2 monsters slain. Passives apply as soon as you learn them. Actives and specials equip to Z, X, and V. An empty Z is still Spirit Bolt, and an empty V is still Fury. Respec costs 15 gold. Changing path costs 25 gold and clears what you learned.
+The same points raise four attributes, three ranks each. Warrior raises Vitality, Might, Guard, and Wrath. Ranger raises Endurance, Precision, Agility, and Toxin. Mage raises Spirit, Arcana, Focus, and Potency.
+
+Choosing a path grants 2 points, then 1 more for every 2 monsters slain. Passives apply as soon as you learn them. Actives and specials equip to Z, X, and V. An empty Z is still Spirit Bolt, and an empty V is still Fury. Respec costs 15 gold and clears skills and attributes. Changing path costs 25 gold and clears what you learned.
 
 ## Darksycle Dragon
 

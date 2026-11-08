@@ -92,6 +92,8 @@ export class Player {
     this.leapDir = new THREE.Vector3(0, 0, 1);
     this.castT = 0;
     this.castAnim = '';
+    this.ironHits = 0;
+    this.ironT = 0;
     this.setHeld('blade');
     this.syncObj();
   }
@@ -166,8 +168,13 @@ export class Player {
       return false;
     }
     const mods = skillMods(g);
-    const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.bulwarkT > 0 ? 0.45 : 0));
-    dmg = Math.max(1, Math.round(dmg * (1 - dr)));
+    if (this.ironHits > 0 && this.ironT > 0) {
+      this.ironHits--;
+      dmg = 1;
+    } else {
+      const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.bulwarkT > 0 ? 0.45 : 0));
+      dmg = Math.max(1, Math.round(dmg * (1 - dr)));
+    }
     this.hp = Math.max(0, this.hp - dmg);
     this.invuln = 0.9;
     this.hurtT = 0.4;
@@ -278,6 +285,8 @@ export class Player {
     this.stamDelay = Math.max(0, this.stamDelay - dt);
     this.castT = Math.max(0, this.castT - dt);
     this.bulwarkT = Math.max(0, this.bulwarkT - dt);
+    this.ironT = Math.max(0, this.ironT - dt);
+    if (this.ironT <= 0) this.ironHits = 0;
     this.warcryT = Math.max(0, this.warcryT - dt);
     this.packT = Math.max(0, this.packT - dt);
     for (const k of Object.keys(this.cds)) {
@@ -288,7 +297,7 @@ export class Player {
     if (!this.dead) {
       if (this.stamDelay <= 0 && !(this.shielding && this.state === 'idle')) this.stamina = Math.min(this.maxStamina, this.stamina + 34 * dt);
       this.mana = Math.min(this.maxMana, this.mana + 1.6 * dt);
-      this.fury = Math.min(100, this.fury + 1.2 * dt);
+      this.fury = Math.min(100, this.fury + (1.2 + (skillMods(g).furyRegen || 0)) * dt);
     }
 
     const cy = g.cam.yaw;
@@ -511,9 +520,9 @@ export class Player {
         if (d > reach + m.radius) continue;
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
-        const crit = Math.random() < 0.12;
+        const crit = Math.random() < 0.12 + (mods.crit || 0);
         g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
-        if (mods.poison && !m.dead) m.afflict('poison', 4, 4);
+        if (mods.poison && !m.dead) m.afflict('poison', 4 + (mods.poisonTime || 0), 4 + (mods.poisonBonus || 0));
         hits++;
       }
       if (this.combo === 2) {
@@ -557,8 +566,9 @@ export class Player {
 
   castBolt() {
     const g = this.game;
-    if (this.dead || this.mana < 8 || this.state === 'roll' || this.state === 'stagger') return;
-    this.mana -= 8;
+    const cost = Math.max(1, Math.round(8 * (skillMods(g).manaCost ?? 1)));
+    if (this.dead || this.mana < cost || this.state === 'roll' || this.state === 'stagger') return;
+    this.mana -= cost;
     const f = this.facing;
     this.setState('use', 0.32);
     this.potionDone = true;

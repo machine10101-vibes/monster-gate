@@ -26,7 +26,7 @@ const NPC_DEFS = [
       'Hold Shift to raise your shield. Blocking a charging boar is very satisfying.',
       'Monster parts can be forged into gear. Bram the blacksmith keeps the forge by the south road.',
       'Lira the alchemist sells healing draughts and spirit philters from her stall on the south road.',
-      'When the hunt starts to stick, press K. Warrior, Ranger, and Mage each keep three paths, and every kill pays toward them.',
+      'When the hunt starts to stick, press K. Warrior, Ranger, and Mage each keep three paths, and the same points raise your attributes.',
     ],
   },
   {

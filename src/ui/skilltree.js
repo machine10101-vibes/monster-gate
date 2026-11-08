@@ -1,4 +1,5 @@
 import { CLASS_LIST, CLASSES, RESOURCE_NAME, SKILLS } from '../data/skills.js';
+import { resourceCost } from '../systems/skillcast.js';
 
 const SHAPES = {
   shield: [[5, 1, 6, 1], [3, 2, 10, 2], [3, 4, 10, 4], [4, 8, 8, 1], [5, 9, 6, 1], [6, 10, 4, 1], [7, 11, 2, 1]],
@@ -114,6 +115,8 @@ export function mountSkillTree(body, game) {
     const head = document.createElement('div');
     head.className = 'sk-head';
     const learned = Object.keys(game.progress.data.skills.learned).length;
+    const attrRanks = game.progress.data.skills.attrs || {};
+    const invested = learned || Object.values(attrRanks).some((n) => n > 0);
     head.innerHTML = `<div><b style="color:${cls.color}">${cls.name}</b><span>${pts.left} point${pts.left === 1 ? '' : 's'} ready · ${pts.spent} spent · ${game.gold} gold</span></div>`;
     const actions = document.createElement('div');
     actions.className = 'sk-head-acts';
@@ -121,7 +124,7 @@ export function mountSkillTree(body, game) {
     respec.type = 'button';
     respec.className = 'sk-btn';
     respec.textContent = 'Respec · 15g';
-    respec.disabled = !learned || game.gold < 15;
+    respec.disabled = !invested || game.gold < 15;
     respec.onclick = () => {
       if (game.respecSkills()) paint();
     };
@@ -139,8 +142,41 @@ export function mountSkillTree(body, game) {
 
     const note = document.createElement('p');
     note.className = 'sk-note';
-    note.textContent = `Passives are always on. Equip actives and specials below. ${cls.name} skills spend ${RESOURCE_NAME[cls.resource]}. Empty Z is still Spirit Bolt. Empty V is still Fury.`;
+    note.textContent = `Passives are always on. Attributes take the same points, one per rank. Equip actives and specials below. ${cls.name} skills spend ${RESOURCE_NAME[cls.resource]}. Empty Z is still Spirit Bolt. Empty V is still Fury.`;
     root.appendChild(note);
+
+    const attrs = document.createElement('section');
+    attrs.className = 'sk-attrs';
+    const attrHead = document.createElement('h3');
+    attrHead.textContent = 'Attributes';
+    attrs.appendChild(attrHead);
+    for (const attr of cls.attributes || []) {
+      const rank = game.progress.attrRank(attr.id);
+      const row = document.createElement('div');
+      row.className = 'sk-attr';
+      const name = document.createElement('b');
+      name.textContent = attr.name;
+      const desc = document.createElement('span');
+      desc.textContent = rank ? attr.rankText(rank) : attr.blurb;
+      const pips = document.createElement('div');
+      pips.className = 'sk-pips';
+      for (let i = 0; i < attr.max; i++) {
+        const pip = document.createElement('i');
+        if (i < rank) pip.className = 'on';
+        pips.appendChild(pip);
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sk-btn';
+      btn.textContent = rank >= attr.max ? 'Max' : '+1';
+      btn.disabled = rank >= attr.max || pts.left < 1;
+      btn.onclick = () => {
+        if (game.raiseAttr(attr.id)) paint();
+      };
+      row.append(name, desc, pips, btn);
+      attrs.appendChild(row);
+    }
+    root.appendChild(attrs);
 
     const cols = document.createElement('div');
     cols.className = 'sk-cols';
@@ -174,7 +210,7 @@ export function mountSkillTree(body, game) {
         title.append(document.createTextNode(s.name + ' '), tag);
         const meta = document.createElement('small');
         const bits = [`${s.cost} pt${s.cost > 1 ? 's' : ''}`];
-        if (s.resource) bits.push(`${s.resource} ${RESOURCE_NAME[s.res]}`, `${s.cd}s`);
+        if (s.resource) bits.push(`${resourceCost(game, s)} ${RESOURCE_NAME[s.res]}`, `${s.cd}s`);
         meta.textContent = bits.join(' · ');
         const desc = document.createElement('p');
         desc.textContent = s.desc;

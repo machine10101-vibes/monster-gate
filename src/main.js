@@ -16,8 +16,8 @@ import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
-import { CLASSES, SKILLS } from './data/skills.js';
-import { castSkill, clearSkillWorld, noteProjectileEnd, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
+import { CLASSES, SKILLS, attrDef } from './data/skills.js';
+import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
 import { MONSTERS, MATERIALS } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
@@ -434,6 +434,12 @@ class Game {
       p.maxMana = maxMana;
       p.mana = Math.min(maxMana, p.mana);
     }
+    const maxStamina = 100 + (mods.stamina || 0);
+    if (p.maxStamina !== maxStamina) {
+      const gain = Math.max(0, maxStamina - p.maxStamina);
+      p.maxStamina = maxStamina;
+      p.stamina = Math.min(maxStamina, p.stamina + gain);
+    }
     const w = pr.weaponItem;
     this.items[7] = w ? { ...w } : { ...ITEMS[7] };
     if (!initial) {
@@ -488,6 +494,14 @@ class Game {
     return true;
   }
 
+  raiseAttr(id) {
+    if (!this.progress.raiseAttr(id)) return false;
+    this.applyGear();
+    const def = attrDef(this.progress.classId, id);
+    if (def) this.hud.toast(def.name + ' raised.', 1200);
+    return true;
+  }
+
   equipSkill(slot, id) {
     const ok = this.progress.equip(slot, id);
     if (ok) this.hud.updateSkillbar(this);
@@ -497,7 +511,9 @@ class Game {
   respecSkills() {
     if (!this.progress.classId) return false;
     const learned = Object.keys(this.progress.data.skills.learned).length;
-    if (!learned) {
+    const attrs = this.progress.data.skills.attrs || {};
+    const invested = learned || Object.values(attrs).some((n) => n > 0);
+    if (!invested) {
       this.hud.toast('No skills to respec.');
       return false;
     }
@@ -683,10 +699,18 @@ class Game {
           if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + (mon.hover || 0) + 0.8)) < 1.6) {
             p.hit.add(mon);
             const d = Math.hypot(p.vx, p.vz) || 1;
-            this.strikeMonster(mon, Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.vx / d, p.vz / d, p.kind === 'bolt' || p.kind === 'frost' ? 3 : 2, !!p.crit);
+            const mods = skillMods(this);
+            let dealt = scaleDmg(this, Math.round(p.dmg * (0.9 + Math.random() * 0.25)), p.spell ? 'spell' : 'ranged');
+            if (!p.spell && this.progress.hasSkill('killshot') && mon.markT > 0) dealt = Math.round(dealt * 1.25);
+            let crit = !!p.crit;
+            if (!crit && Math.random() < (mods.crit || 0)) {
+              crit = true;
+              dealt = Math.round(dealt * 1.8);
+            }
+            this.strikeMonster(mon, dealt, p.vx / d, p.vz / d, p.kind === 'bolt' || p.kind === 'frost' ? 3 : 2, crit);
             skillOnHit(this, p, mon);
             this.audio.hit();
-            P.fury = Math.min(100, P.fury + 3);
+            P.fury = Math.min(100, P.fury + Math.round(3 * (mods.furyGain || 1)));
             if (!p.pierce) {
               this.killProjectile(p);
               break;
@@ -1296,7 +1320,7 @@ class Game {
     requestAnimationFrame(this.loop);
     const raw = now - this.last;
     this.last = now;
-    if (raw > 250) return;
+    if (!(raw >= 0) || raw > 250) return;
     this.adaptResolution(raw);
     let dt = Math.min(raw / 1000, 0.05);
     if (this.hitstopT > 0) {

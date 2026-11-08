@@ -1665,6 +1665,39 @@ body.touch .how {
   background: #2a2c32;
   border-color: #3b3f4a;
 }
+.sk-attrs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sk-attrs h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ffd23f;
+  font-size: 14px;
+}
+.sk-attr {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  gap: 2px 8px;
+  padding: 8px;
+  background: #16181d;
+  border: 2px solid #3a3424;
+  border-radius: 6px;
+}
+.sk-attr b { font-size: 14px; }
+.sk-attr span { color: #c9c3b4; font-size: 12px; }
+.sk-pips { display: flex; gap: 4px; align-items: center; }
+.sk-pips i {
+  width: 10px;
+  height: 10px;
+  background: #2a2c32;
+  border: 1px solid #6a5a32;
+}
+.sk-pips i.on { background: #ffd23f; }
+.sk-attr .sk-btn { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
 .sk-cols {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1735,6 +1768,6 @@ body.touch .how {
   letter-spacing: 0.03em;
 }
 @media (max-width: 800px) {
-  .sk-pick, .sk-cols { grid-template-columns: 1fr; }
+  .sk-pick, .sk-cols, .sk-attrs { grid-template-columns: 1fr; }
   .skslot { width: 78px; }
 }
