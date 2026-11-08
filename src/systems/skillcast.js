@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SKILLS } from '../data/skills.js';
+import { SKILLFX, fireExplosion, lightningArc, summonMeteor } from './skillfx.js';
 
 function world(game) {
   if (!game.skillState) game.skillState = { wolf: null, clouds: [], arcs: [] };
@@ -330,7 +331,7 @@ function shieldBash(game, s) {
   const n = coneHit(game, s.reach, s.dot, s.power + (braced ? 4 : 0), s.knock, (mon) => {
     if (!mon.dead) mon.afflict('stun', s.stun + (braced ? 0.4 : 0));
   });
-  game.fx.doSlash(p.pos.x, p.pos.y + 0.9, p.pos.z, Math.atan2(-p.facing.z, p.facing.x), 0.8, 0x9fd8ff, 1);
+  SKILLFX.shieldbash(game, p, n, s.reach);
   game.audio.tone(n ? 180 : 240, 0.12, 'square', 0.1, n ? -40 : -120);
   if (n) game.shake(0.16);
   return true;
@@ -340,7 +341,7 @@ function bulwark(game, s) {
   const p = game.player;
   p.bulwarkT = s.dur;
   p.playCast('cast', 0.3);
-  game.fx.ring(p.pos.x, p.pos.y + 0.4, p.pos.z, 0x9fd8ff, 18, 3.2, 0.1, 0.55);
+  SKILLFX.bulwark(game, p, s.dur);
   game.audio.tone(140, 0.2, 'square', 0.1, 30);
   return true;
 }
@@ -350,8 +351,7 @@ function whirlwind(game, s) {
   p.playCast('spin', 0.4);
   const reach = s.radius + (game.progress.hasSkill('rampage') ? 0.5 : 0);
   const n = radiusHit(game, p.pos.x, p.pos.z, reach, s.power, 5);
-  game.fx.doSlash(p.pos.x, p.pos.y + 0.7, p.pos.z, 0.4, 1.3, 0xffb347, 1);
-  game.fx.doSlash(p.pos.x, p.pos.y + 0.7, p.pos.z, 2.2, 1.3, 0xfff0b0, -1);
+  SKILLFX.whirlwind(game, p, reach);
   game.audio.tone(220, 0.16, 'sawtooth', 0.09, -80);
   if (n) game.shake(0.2);
   return true;
@@ -362,6 +362,7 @@ function execute(game, s) {
   p.playCast('bash', 0.34);
   const f = p.facing;
   let n = 0;
+  let anyFinisher = false;
   eachMonster(game, (mon) => {
     const dx = mon.x - p.pos.x;
     const dz = mon.z - p.pos.z;
@@ -370,11 +371,12 @@ function execute(game, s) {
     const dot = (dx * f.x + dz * f.z) / (dist || 1);
     if (dist > 0.45 && dot < s.dot) return;
     const finisher = mon.hp < mon.maxHp * (game.progress.hasSkill('rampage') ? 0.5 : 0.4);
+    if (finisher) anyFinisher = true;
     const raw = finisher ? Math.round(s.power * 2.4) : s.power;
     game.strikeMonster(mon, scaleDmg(game, raw, 'melee'), f.x, f.z, 6, finisher);
     n++;
   });
-  game.fx.doSlash(p.pos.x, p.pos.y + 0.8, p.pos.z, Math.atan2(-f.z, f.x), 1.05, 0xff5a46, 1);
+  SKILLFX.execute(game, p, anyFinisher, n);
   game.audio.tone(110, 0.16, 'sawtooth', 0.11, -60);
   if (n) game.shake(0.22);
   return true;
@@ -387,6 +389,7 @@ function leap(game, s) {
   p.pos.y += 0.3;
   p.leapT = 0.48;
   p.leapArm = true;
+  SKILLFX.leapStart(game, p);
   p.leapDir.copy(p.facing);
   const hide = game.progress.hasSkill('thickhide');
   p.leapPower = s.power + (hide ? 6 : 0);
@@ -399,8 +402,7 @@ export function leapImpact(game) {
   const p = game.player;
   const r = p.leapRadius || 2.4;
   const dmg = p.leapPower || 14;
-  game.fx.shockwave(p.pos.x, p.pos.y, p.pos.z, 0xd9c9a0, r);
-  game.fx.dust(p.pos.x, p.pos.y, p.pos.z, 10, 2.4);
+  SKILLFX.leapImpact(game, p.pos.x, p.pos.y, p.pos.z, r);
   game.shake(0.32);
   radiusHit(game, p.pos.x, p.pos.z, r, dmg, 7);
 }
@@ -412,8 +414,7 @@ function warCry(game, s) {
   radiusHit(game, p.pos.x, p.pos.z, s.radius, 0, 0, (mon) => {
     if (!mon.dead) mon.afflict('stun', s.stun);
   });
-  game.fx.ring(p.pos.x, p.pos.y + 0.5, p.pos.z, 0xff5a46, 20, 6, 0.12, 0.5);
-  game.fx.burst(p.pos.x, p.pos.y + 1.2, p.pos.z, [0xffe0c0, 0xff5a46], 10, 3, 0.08, 0.4);
+  SKILLFX.warcry(game, p, s.radius, s.dur);
   game.audio.tone(90, 0.28, 'sawtooth', 0.14, 40);
   game.shake(0.18);
   return true;
@@ -422,7 +423,11 @@ function warCry(game, s) {
 function callWolf(game, s) {
   const p = game.player;
   p.playCast('cast', 0.3);
+  const had = !!world(game).wolf;
   summonWolf(game, (s.dur || 30) + (game.progress.hasSkill('alpha') ? 12 : 0));
+  const w = world(game).wolf;
+  if (w && !had) SKILLFX.callwolf(game, w.x, w.y, w.z);
+  else if (w) SKILLFX.callwolf(game, w.x, w.y, w.z);
   game.audio.tone(420, 0.16, 'square', 0.08, -60);
   return true;
 }
@@ -434,7 +439,7 @@ function packTactics(game, s) {
   const st = world(game);
   if (!st.wolf) game.hud.toast('No companion to rally.');
   else st.wolf.lunge = 0.45;
-  game.fx.ring(p.pos.x, p.pos.y + 0.3, p.pos.z, 0xd2b48c, 12, 3, 0.08, 0.4);
+  SKILLFX.packtactics(game, p, st.wolf, s.dur);
   game.audio.tone(360, 0.12, 'square', 0.08, 40);
   return true;
 }
@@ -462,6 +467,7 @@ function poisonVolley(game, s) {
       r: 0.35,
     });
   }
+  SKILLFX.poisonvolley(game, p);
   game.audio.tone(700, 0.1, 'triangle', 0.08, -300);
   return true;
 }
@@ -473,12 +479,25 @@ function toxicCloud(game, s) {
   const x = p.pos.x + f.x * 3;
   const z = p.pos.z + f.z * 3;
   const y = game.world.heightAt(x, z);
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(s.radius, s.radius * 0.85, 1.3, 14, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0x6dce4a, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide })
+  const mesh = new THREE.Group();
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(s.radius, 18),
+    new THREE.MeshBasicMaterial({ color: 0x4aa83a, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
   );
-  mesh.position.set(x, y + 0.65, z);
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.06;
+  const rim = new THREE.Mesh(
+    new THREE.RingGeometry(s.radius * 0.9, s.radius, 24),
+    new THREE.MeshBasicMaterial({ color: 0x9aff6a, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })
+  );
+  rim.rotation.x = -Math.PI / 2;
+  rim.position.y = 0.07;
+  mesh.add(disc, rim);
+  mesh.position.set(x, y, z);
   game.scene.add(mesh);
+  game.vfx.ring(x, y + 0.1, z, { color: 0x8fe35a, r0: 0.3, r1: s.radius * 1.3, life: 0.45, thick: 0.1, fill: 0.2 });
+  game.vfx.glow(x, y + 0.7, z, 0x8fe35a, s.radius * 2.4, 0.5, { grow: 0.5, gain: 0.7 });
+  game.vfx.sparks(x, y + 0.3, z, [0xd7ffb0, 0x8fe35a, 0x4aa83a], 16, 3, 0.08, 0.8, -0.5, 1, 0.8);
   const st = world(game);
   st.clouds.push({ x, z, y, r: s.radius, t: s.dur, acc: 0, dps: s.dps, slow: s.slow, mesh });
   if (st.clouds.length > 3) {
@@ -509,6 +528,7 @@ function aimedShot(game, s) {
     r: 0.3,
     pierce: true,
   });
+  SKILLFX.aimedshot(game, p);
   game.audio.tone(980, 0.09, 'triangle', 0.1, -400);
   return true;
 }
@@ -522,7 +542,7 @@ function markedPrey(game, s) {
   }
   p.playCast('cast', 0.24);
   mon.afflict('mark', s.dur, game.progress.hasSkill('killshot') ? 0.7 : s.amp);
-  game.fx.ring(mon.x, mon.y + 0.15, mon.z, 0xffd23f, 12, 2.2, 0.08, 0.45);
+  SKILLFX.markedprey(game, p, mon);
   game.hud.floatText(...game.screenOf(mon.x, mon.y + 2, mon.z), 'Marked', 'crit');
   game.audio.tone(640, 0.1, 'square', 0.07, 80);
   return true;
@@ -548,6 +568,7 @@ function fireball(game, s) {
     life: 1.4,
     r: 0.45,
   });
+  SKILLFX.fireball(game, p);
   game.audio.tone(240, 0.14, 'sawtooth', 0.09, -80);
   return true;
 }
@@ -557,7 +578,7 @@ function flameWave(game, s) {
   p.playCast('cast', 0.34);
   const n = coneHit(game, s.reach, s.dot, s.power, 4, (mon) => applyBurn(game, mon, 4), 'spell');
   const f = p.facing;
-  game.fx.burst(p.pos.x + f.x * 1.4, p.pos.y + 0.7, p.pos.z + f.z * 1.4, [0xff7a1a, 0xffd25a, 0xfff0b0], 16, 4, 0.12, 0.4);
+  SKILLFX.flamewave(game, p, s.reach);
   game.audio.tone(180, 0.18, 'sawtooth', 0.1, -40);
   if (n) game.shake(0.16);
   return true;
@@ -581,6 +602,7 @@ function frostBolt(game, s) {
     life: 1.3,
     r: 0.42,
   });
+  SKILLFX.frostbolt(game, p);
   game.audio.tone(520, 0.1, 'triangle', 0.08, 120);
   return true;
 }
@@ -593,7 +615,7 @@ function iceNova(game, s) {
     if (mon.slowT > 0) mon.afflict('stun', game.progress.hasSkill('deepfreeze') ? 1.4 : 1.1);
     else applySlow(game, mon, 3, 0.55);
   }, 'spell');
-  game.fx.ring(p.pos.x, p.pos.y + 0.35, p.pos.z, 0xd7f4ff, 22, 4.5, 0.1, 0.5);
+  SKILLFX.icenova(game, p, s.radius);
   game.audio.tone(680, 0.16, 'triangle', 0.09, -200);
   return true;
 }
@@ -616,6 +638,7 @@ function spark(game, s) {
     life: 0.7,
     r: 0.35,
   });
+  SKILLFX.spark(game, p);
   game.audio.tone(880, 0.06, 'square', 0.07, -200);
   return true;
 }
@@ -638,7 +661,7 @@ function chainLightning(game) {
   for (const dmg of powers) {
     if (!cur || cur.dead) break;
     seen.add(cur);
-    arcBetween(game, x, y, z, cur.x, cur.y + 0.9 + (cur.hover || 0), cur.z, 0xd7e4ff);
+    lightningArc(game, { x, y, z }, { x: cur.x, y: cur.y + 0.9 + (cur.hover || 0), z: cur.z });
     game.strikeMonster(cur, scaleDmg(game, dmg + bonus, 'spell'), 0.2, 1, 3, false);
     if (!cur.dead && mods.burn) applyBurn(game, cur, 4);
     x = cur.x;
@@ -656,7 +679,7 @@ function ironCitadel(game) {
   p.ironHits = 3;
   p.ironT = 6;
   p.playCast('cast', 0.3);
-  game.fx.ring(p.pos.x, p.pos.y + 0.5, p.pos.z, 0x9fd8ff, 16, 2.8, 0.1, 0.5);
+  SKILLFX.ironcitadel(game, p, 6);
   game.audio.tone(120, 0.18, 'square', 0.1, 20);
   return true;
 }
@@ -666,9 +689,7 @@ function bloodstorm(game) {
   const dmg = 8 + Math.round(p.fury / 8);
   p.playCast('spin', 0.4);
   const n = radiusHit(game, p.pos.x, p.pos.z, 3.4, dmg, 6);
-  game.fx.doSlash(p.pos.x, p.pos.y + 0.8, p.pos.z, 0.2, 1.4, 0xff3a3a, 1);
-  game.fx.doSlash(p.pos.x, p.pos.y + 0.8, p.pos.z, 2.4, 1.4, 0xffd0a0, -1);
-  game.fx.ring(p.pos.x, p.pos.y + 0.3, p.pos.z, 0xff5a46, 16, 4, 0.1, 0.4);
+  SKILLFX.bloodstorm(game, p, 3.4);
   game.audio.tone(160, 0.18, 'sawtooth', 0.1, -40);
   if (n) game.shake(0.24);
   return true;
@@ -680,8 +701,7 @@ function earthquake(game) {
   const n = radiusHit(game, p.pos.x, p.pos.z, 3.6, 16, 7, (mon) => {
     if (!mon.dead) mon.afflict('stun', 0.6);
   });
-  game.fx.shockwave(p.pos.x, p.pos.y, p.pos.z, 0xd9c9a0, 3.6);
-  game.fx.dust(p.pos.x, p.pos.y, p.pos.z, 14, 3);
+  SKILLFX.earthquake(game, p, 3.6);
   game.audio.tone(70, 0.22, 'sawtooth', 0.12, -20);
   if (n) game.shake(0.28);
   return true;
@@ -694,7 +714,7 @@ function howl(game) {
   p.stamina = Math.min(p.maxStamina, p.stamina + 16);
   const wolf = world(game).wolf;
   if (wolf) wolf.bite = 0;
-  game.fx.ring(p.pos.x, p.pos.y + 0.6, p.pos.z, 0xd2b48c, 18, 5, 0.1, 0.45);
+  SKILLFX.howl(game, p, wolf, 4.5);
   game.audio.tone(280, 0.2, 'sawtooth', 0.1, -30);
   return true;
 }
@@ -717,6 +737,7 @@ function plagueArrow(game) {
     r: 0.32,
     pierce: true,
   });
+  SKILLFX.plaguearrow(game, p);
   game.audio.tone(540, 0.1, 'triangle', 0.08, -200);
   return true;
 }
@@ -741,6 +762,7 @@ function snipe(game) {
     r: 0.28,
     pierce: true,
   });
+  SKILLFX.snipe(game, p);
   game.audio.tone(1100, 0.08, 'triangle', 0.1, -500);
   return true;
 }
@@ -750,21 +772,17 @@ function meteor(game) {
   p.playCast('cast', 0.34);
   const f = p.facing;
   const extra = game.progress.hasSkill('immolate') ? 6 : 0;
-  game.spawnProjectile({
-    owner: 'player',
-    kind: 'ember',
-    skill: 'meteor',
-    spell: true,
-    splash: 18 + extra,
-    radius: 3,
-    x: p.pos.x + f.x * 0.7,
-    y: p.pos.y + 1.4,
-    z: p.pos.z + f.z * 0.7,
-    vx: f.x * 9,
-    vz: f.z * 9,
-    dmg: 6,
-    life: 1.6,
-    r: 0.55,
+  const prey = nearest(game, p.pos.x + f.x * 4, p.pos.z + f.z * 4, 11);
+  const tx = prey ? prey.x : p.pos.x + f.x * 6.5;
+  const tz = prey ? prey.z : p.pos.z + f.z * 6.5;
+  const h = p.model?.heldSlot ? p.pos : p.pos;
+  game.vfx.glow(h.x, h.y + 2.2, h.z, 0xff7a1a, 3, 0.4, { grow: 0.6 });
+  game.vfx.ring(h.x, h.y + 0.1, h.z, { color: 0xff7a1a, r0: 0.3, r1: 1.8, life: 0.4, thick: 0.12 });
+  summonMeteor(game, tx, tz, () => {
+    radiusHit(game, tx, tz, 3.1, 24 + extra, 7, (mon) => applyBurn(game, mon, 4), 'spell');
+    game.shake(0.5);
+    game.hitstop(0.06);
+    game.audio.tone(60, 0.3, 'sawtooth', 0.14, -20);
   });
   game.audio.tone(160, 0.2, 'sawtooth', 0.1, -60);
   return true;
@@ -775,7 +793,7 @@ function glacier(game) {
   p.playCast('cast', 0.32);
   const n = coneHit(game, 4.2, 0.15, 11, 4, (mon) => applySlow(game, mon, 4, 0.4), 'spell');
   const f = p.facing;
-  game.fx.burst(p.pos.x + f.x * 1.5, p.pos.y + 0.7, p.pos.z + f.z * 1.5, [0xd7f4ff, 0xffffff, 0x8fd4ff], 14, 3.5, 0.1, 0.4);
+  SKILLFX.glacier(game, p, 4.2);
   game.audio.tone(420, 0.16, 'triangle', 0.09, 80);
   if (n) game.shake(0.14);
   return true;
@@ -787,8 +805,7 @@ function thunderclap(game) {
   const n = radiusHit(game, p.pos.x, p.pos.z, 3.4, 13, 5, (mon) => {
     if (!mon.dead) mon.afflict('stun', 0.35);
   }, 'spell');
-  game.fx.ring(p.pos.x, p.pos.y + 0.4, p.pos.z, 0xd7e4ff, 20, 4.2, 0.1, 0.4);
-  game.fx.burst(p.pos.x, p.pos.y + 1.1, p.pos.z, [0xffffff, 0xb5e3ff], 12, 4, 0.08, 0.35);
+  SKILLFX.thunderclap(game, p, 3.4);
   game.audio.tone(640, 0.14, 'sawtooth', 0.1, 160);
   if (n) game.shake(0.2);
   return true;
@@ -856,8 +873,8 @@ export function noteProjectileEnd(game, proj) {
 function explode(game, proj) {
   const m = proj.mesh.position;
   const r = proj.radius || 2.2;
-  game.fx.burst(m.x, m.y, m.z, [0xff7a1a, 0xffd25a, 0xffffff], 16, 4.2, 0.12, 0.45);
-  game.fx.shockwave(m.x, m.y, m.z, 0xff7a1a, r * 0.7);
+  fireExplosion(game, m.x, m.y, m.z, r);
+  game.shake(0.14);
   eachMonster(game, (mon) => {
     if (proj.hit && proj.hit.has(mon)) return;
     const dx = mon.x - m.x;
@@ -872,18 +889,10 @@ function explode(game, proj) {
 function jumpLightning(game, from, dmg) {
   const next = nearest(game, from.x, from.z, 5, new Set([from]));
   if (!next) return;
-  arcBetween(game, from.x, from.y + 1, from.z, next.x, next.y + 1, next.z, 0xb5e3ff);
+  lightningArc(game, { x: from.x, y: from.y + 1, z: from.z }, { x: next.x, y: next.y + 1, z: next.z });
   game.strikeMonster(next, dmg, 0.2, 1, 2, false);
   const mods = skillMods(game);
   if (!next.dead && mods.burn) applyBurn(game, next, 4);
-}
-
-function arcBetween(game, x1, y1, z1, x2, y2, z2, color) {
-  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1, y1, z1), new THREE.Vector3(x2, y2, z2)]);
-  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1 });
-  const line = new THREE.Line(geo, mat);
-  game.scene.add(line);
-  world(game).arcs.push({ line, t: 0.18 });
 }
 
 function summonWolf(game, dur) {
@@ -967,8 +976,12 @@ function dropWolf(game) {
 function dropCloud(game, c) {
   if (!c || !c.mesh) return;
   game.scene.remove(c.mesh);
-  c.mesh.geometry.dispose();
-  c.mesh.material.dispose();
+  c.mesh.traverse((o) => {
+    if (o.isMesh) {
+      o.geometry.dispose();
+      o.material.dispose();
+    }
+  });
   c.mesh = null;
 }
 
@@ -998,7 +1011,7 @@ export function updateSkillWorld(game, dt) {
     const c = st.clouds[i];
     c.t -= dt;
     c.acc += dt;
-    if (c.mesh) c.mesh.material.opacity = 0.18 + Math.sin(c.t * 6) * 0.08;
+    if (c.mesh) cloudFx(game, c, dt);
     if (c.acc >= 0.45) {
       c.acc = 0;
       eachMonster(game, (mon) => {
@@ -1079,5 +1092,27 @@ function tickWolf(game, w, dt) {
       if (p.hp > before) game.hud.floatText(...game.screenOf(p.pos.x, p.pos.y + 1.8, p.pos.z), '+1', 'heal');
     }
     w.bite = p.packT > 0 ? 0.35 : 0.7;
+  }
+}
+
+function cloudFx(game, c, dt) {
+  const v = game.vfx;
+  const pulse = 0.5 + Math.sin(c.t * 5) * 0.5;
+  c.mesh.children[0].material.opacity = 0.14 + pulse * 0.1;
+  c.mesh.children[1].material.opacity = 0.35 + pulse * 0.25;
+  if (Math.random() < dt * 9 * v.density) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.sqrt(Math.random()) * c.r * 0.9;
+    v.glow(c.x + Math.cos(a) * d, c.y + 0.3 + Math.random() * 0.4, c.z + Math.sin(a) * d, Math.random() < 0.7 ? 0x6dce4a : 0x9a5ae0, 1.5 + Math.random(), 1.0, { vy: 0.5, vx: Math.cos(c.t) * 0.3, grow: 0.8, gain: 0.55 });
+  }
+  if (Math.random() < dt * 14 * v.density) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.sqrt(Math.random()) * c.r;
+    v.spark(c.x + Math.cos(a) * d, c.y + 0.1, c.z + Math.sin(a) * d, 0, 0.9 + Math.random() * 0.9, 0, Math.random() < 0.5 ? 0xb8ff7a : 0xd7ffb0, 0.07, 1.1, -0.2, 0.3);
+  }
+  if (Math.random() < dt * 5) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.sqrt(Math.random()) * c.r;
+    game.fx.emit(c.x + Math.cos(a) * d, c.y + 0.2, c.z + Math.sin(a) * d, 0, 0.7, 0, 0x2f5a2a, 0.22, 1.1, -0.3);
   }
 }

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { World } from './world/world.js';
 import { Sky } from './world/sky.js';
 import { FX } from './engine/fx.js';
+import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
 import { hideUniforms } from './engine/materials.js';
@@ -17,6 +18,7 @@ import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
+import { buildProjectileMesh, endProjectile, initProjectile, tickProjectile } from './systems/skillfx.js';
 import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
@@ -126,6 +128,8 @@ class Game {
     this.scene.add(this.world.group);
     this.sky = new Sky(this.scene, this.quality);
     this.fx = new FX(this.scene, this.quality);
+    this.vfx = new VFX(this);
+    this.fx.vfx = this.vfx;
     this.player = new Player(this);
     this.spawner = new Spawner(this);
     progress(0.95, 'Waking the villagers');
@@ -303,6 +307,7 @@ class Game {
 
   applyQuality() {
     const q = this.quality;
+    if (this.vfx) this.vfx.density = q.density;
     this.renderer.shadowMap.enabled = q.shadows;
     const sh = this.sky.sun.shadow;
     if (sh.mapSize.x !== q.shadowSize) {
@@ -605,57 +610,16 @@ class Game {
 
   /* ------------------------------ gameplay ------------------------------ */
   spawnProjectile(o) {
-    const kind = o.kind;
-    let mesh;
-    if (kind === 'arrow') {
-      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.7), new THREE.MeshBasicMaterial({ color: 0xe9d9a8 }));
-    } else if (kind === 'stone') {
-      mesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: 0xa9a9b2 }));
-    } else if (kind === 'bolt') {
-      mesh = new THREE.Group();
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xd9ffff })));
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0x4ad0ff, transparent: true, opacity: 0.45, depthWrite: false })));
-    } else if (kind === 'crescent') {
-      mesh = new THREE.Group();
-      const blade = new THREE.MeshBasicMaterial({ color: 0xe9e4ff });
-      const glow = new THREE.MeshBasicMaterial({ color: 0xb25cff, transparent: true, opacity: 0.5, depthWrite: false });
-      for (let i = 0; i < 7; i++) {
-        const a = -1.05 + i * 0.35;
-        const w = 0.26 - Math.abs(i - 3) * 0.045;
-        const seg = new THREE.Mesh(new THREE.BoxGeometry(w, 0.09, 0.2), blade);
-        seg.position.set(Math.sin(a) * 0.5, 0, Math.cos(a) * 0.5 - 0.35);
-        seg.rotation.y = a;
-        mesh.add(seg);
-        const halo = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.2, 0.34), glow);
-        halo.position.copy(seg.position);
-        halo.rotation.y = a;
-        mesh.add(halo);
-      }
-    } else if (kind === 'gloom') {
-      mesh = new THREE.Group();
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.32), new THREE.MeshBasicMaterial({ color: 0xf0c8ff })));
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.58, 0.58), new THREE.MeshBasicMaterial({ color: 0x6a2cc8, transparent: true, opacity: 0.55, depthWrite: false })));
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.86), new THREE.MeshBasicMaterial({ color: 0x1a1530, transparent: true, opacity: 0.35, depthWrite: false })));
-    } else if (kind === 'frost') {
-      mesh = new THREE.Group();
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), new THREE.MeshBasicMaterial({ color: 0xf4fbff })));
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0x8fd4ff, transparent: true, opacity: 0.5, depthWrite: false })));
-    } else if (kind === 'ember') {
-      mesh = new THREE.Group();
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), new THREE.MeshBasicMaterial({ color: 0xfff0b0 })));
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.5, depthWrite: false })));
-    } else {
-      mesh = new THREE.Group();
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: 0xf3d6ff })));
-      mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), new THREE.MeshBasicMaterial({ color: 0xb04dff, transparent: true, opacity: 0.45, depthWrite: false })));
-    }
+    const mesh = buildProjectileMesh(o);
     mesh.position.set(o.x, o.y, o.z);
     mesh.rotation.y = Math.atan2(o.vx, o.vz);
     this.scene.add(mesh);
-    this.projectiles.push({ vy: 0, gravity: 0, ...o, mesh, age: 0, hit: new Set() });
+    const proj = { vy: 0, gravity: 0, ...o, mesh, age: 0, hit: new Set() };
+    this.projectiles.push(proj);
+    initProjectile(this, proj);
   }
 
-  killProjectile(p, fx = true) {
+  killProjectile(p, fx = true, ground = false) {
     noteProjectileEnd(this, p);
     p.dead = true;
     this.scene.remove(p.mesh);
@@ -665,10 +629,8 @@ class Game {
         o.material.dispose();
       }
     });
-    if (fx) {
-      const c = p.kind === 'orb' ? [0xb04dff, 0xf3d6ff] : p.kind === 'bolt' ? [0x4ad0ff, 0xd9ffff] : p.kind === 'frost' ? [0xd7f4ff, 0x8fd4ff] : p.kind === 'ember' ? [0xff7a1a, 0xffd25a, 0x6fd45a] : p.kind === 'crescent' || p.kind === 'gloom' ? [0xb25cff, 0xf0c8ff, 0x2b2450] : [0xffffff, 0xd9c9a0];
-      this.fx.burst(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, c, 7, 2.6, 0.08, 0.35);
-    }
+    if (fx) endProjectile(this, p, ground);
+    else p.trail?.end();
   }
 
   steerProjectile(p, dt) {
@@ -723,15 +685,14 @@ class Game {
       if (p.kind === 'crescent') m.rotation.y += dt * 16;
       if (p.kind === 'gloom') m.rotation.y += dt * 5;
       if (p.homing && p.age > 0.25) this.steerProjectile(p, dt);
-      if ((p.kind === 'crescent' || p.kind === 'gloom') && Math.random() < dt * 24) this.fx.burst(m.position.x, m.position.y, m.position.z, [0xb25cff, 0x2b2450], 1, 0.5, 0.08, 0.4, 0, 0.2);
-      if (p.kind === 'ember' && Math.random() < dt * 30) this.fx.burst(m.position.x, m.position.y, m.position.z, [0xff7a1a, 0x555555], 1, 0.6, 0.07, 0.35);
+      tickProjectile(this, p, dt);
       if (p.age > p.life) {
         this.killProjectile(p, p.kind !== 'arrow');
         continue;
       }
       const gh = this.world.heightAt(m.position.x, m.position.z);
       if (m.position.y < gh + 0.1 || gh > m.position.y + 0.9) {
-        this.killProjectile(p);
+        this.killProjectile(p, true, true);
         continue;
       }
       if (p.owner === 'player') {
@@ -1413,6 +1374,7 @@ class Game {
     const night = this.sky.night;
     const scale = this.pxScale * 0.03;
     this.fx.update(dt, t, P.pos, scale, night, this.forestAmt);
+    this.vfx.update(dt, this.camera);
     this.world.haloMat.uniforms.uScale.value = scale;
     this.world.haloMat.uniforms.uNight.value = night;
     this.world.update(dt, t);

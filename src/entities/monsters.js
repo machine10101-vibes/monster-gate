@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildDarksycleDragon } from './creatures.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
+import { statusFx } from '../systems/skillfx.js';
 import { ZONE, GATE, TOWN, WATER_Y, CENTER } from '../world/terrain.js';
 
 const TAU = Math.PI * 2;
@@ -349,6 +350,7 @@ export class Monster {
     this.landT = Math.max(0, this.landT - dt);
     this.kick = Math.max(0, this.kick - dt * 4.5);
     if (this.tickStatus(dt)) return;
+    statusFx(g, this, dt);
     if (this.pend && this.stun <= 0) {
       this.pendT -= dt;
       if (this.pendT <= 0) this.launchHop();

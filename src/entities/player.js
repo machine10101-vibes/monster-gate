@@ -5,6 +5,7 @@ import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
 import { skillMods } from '../systems/skillcast.js';
+import { SKILLFX, meleeSwing } from '../systems/skillfx.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -525,7 +526,7 @@ export class Player {
     if (it.kind === 'melee') {
       const mult = this.combo === 2 ? 1.5 : 1;
       const reach = it.reach * (this.combo === 2 ? 1.2 : 1);
-      g.fx.doSlash(this.pos.x, this.pos.y + 0.55, this.pos.z, Math.atan2(-f.z, f.x), reach / 2.5, this.combo === 2 ? 0xffd27a : 0xfff2c0, this.combo === 1 ? -1 : 1);
+      meleeSwing(g, this, it, this.combo, reach);
       let hits = 0;
       for (const m of g.monsters) {
         if (m.dead) continue;
@@ -613,10 +614,8 @@ export class Player {
     g.audio.fury();
     g.shake(0.6);
     g.hitstop(0.1);
-    g.fx.ring(this.pos.x, this.pos.y + 0.3, this.pos.z, 0xffb347, 28, 8, 0.14, 0.6);
-    g.fx.ring(this.pos.x, this.pos.y + 0.6, this.pos.z, 0xfff0b0, 20, 5.5, 0.12, 0.5);
-    g.fx.burst(this.pos.x, this.pos.y + 0.5, this.pos.z, [0xff8a1e, 0xffd27a, 0xffffff], 30, 6, 0.14, 0.7);
-    g.fx.doSlash(this.pos.x, this.pos.y + 0.6, this.pos.z, 0, 2.2, 0xffb347, 1);
+    SKILLFX.warcry(g, this, 5.5, 0);
+    SKILLFX.whirlwind(g, this, 4.6, 0xffb347, 0xfff0b0);
     for (const m of g.monsters) {
       if (m.dead) continue;
       const dx = m.x - this.pos.x;
