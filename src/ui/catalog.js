@@ -87,6 +87,44 @@ function buildSubject(spec, silhouette) {
     tilt.add(h.root);
     yaw = g.slot === 'arms' ? 0.5 : 0.55;
     pitch = g.slot === 'legs' || g.slot === 'boots' ? 0.12 : 0.2;
+  } else if (spec.kind === 'held') {
+    const id = spec.id;
+    const held = buildHeld(id);
+    if (TALL_KINDS.has(id)) {
+      yaw = 0.85;
+      tilt.rotation.z = -0.32;
+      tilt.add(held);
+    } else if (String(id).includes('crossbow')) {
+      held.rotation.z = Math.PI;
+      const lay = new THREE.Group();
+      lay.rotation.x = -Math.PI / 2;
+      lay.add(held);
+      tilt.rotation.z = -0.4;
+      tilt.add(lay);
+      yaw = 0.25;
+      pitch = 0.1;
+    } else {
+      held.rotation.x = -Math.PI / 2;
+      tilt.rotation.z = -0.55;
+      yaw = 0.4;
+      pitch = 0.12;
+      tilt.add(held);
+    }
+  } else if (spec.kind === 'hunter') {
+    const h = buildHumanoid({ armor: spec.armor || {} });
+    if (spec.armor?.shield) {
+      h.shieldG.visible = true;
+      h.armL.rotation.set(-0.75, 0, 0.35);
+    } else if (spec.armor?.book) {
+      h.armL.rotation.set(-0.55, 0.15, 0.2);
+    }
+    if (spec.held) {
+      h.armR.rotation.x = -0.85;
+      h.heldSlot.add(buildHeld(spec.held));
+    }
+    tilt.add(h.root);
+    yaw = 0.55;
+    pitch = 0.16;
   } else if (spec.kind === 'set') {
     const extra = setById(spec.id).tier === 'metal' ? 'shield' : setById(spec.id).tier === 'cloth' ? 'book' : null;
     const h = buildHumanoid({ armor: Object.fromEntries([...CORE_SLOTS, ...(extra ? [extra] : [])].map((s) => [s, spec.id])) });
@@ -119,7 +157,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : 0.82) : spec.kind === 'set' ? 0.92 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 
@@ -238,6 +276,11 @@ const getStage = () => stage || (stage = new Stage());
 /** Renders a gear or monster to a small canvas (used for the hotbar). */
 export function renderThumb(spec, px = 64) {
   return getStage().thumb(spec, false, px);
+}
+
+/** Paint any thumbnails queued by renderThumb. */
+export function flushThumbs(budget = 80) {
+  getStage().flush(budget);
 }
 
 /* ------------------------------------------------------------------ */

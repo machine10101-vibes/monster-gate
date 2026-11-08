@@ -73,7 +73,7 @@ export function mountSkillTree(body, game) {
     intro.className = 'sk-intro';
     const slain = game.progress.totalKills();
     const banked = Math.floor(slain / 2);
-    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every 2 monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials equip to Z, X, and V.`;
+    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every 2 monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on skill bar slots 1, 2, and 3 (keys Z, X, and V).`;
     root.appendChild(intro);
     const row = document.createElement('div');
     row.className = 'sk-pick';
@@ -253,12 +253,13 @@ export function mountSkillTree(body, game) {
         if (on && s.kind !== 'passive') {
           const keys = document.createElement('div');
           keys.className = 'sk-keys';
-          ['Z', 'X', 'V'].forEach((key, slot) => {
+          ['1', '2', '3'].forEach((key, slot) => {
+            const hot = 'ZXV'[slot];
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'sk-key' + (eq[slot] === s.id ? ' on' : '');
             b.textContent = key;
-            b.title = eq[slot] === s.id ? `Unequip from ${key}` : `Equip to ${key}`;
+            b.title = eq[slot] === s.id ? `Take off skill bar ${key}` : `Place on skill bar ${key} (${hot})`;
             b.onclick = () => {
               game.equipSkill(slot, eq[slot] === s.id ? null : s.id);
               paint();
@@ -297,8 +298,8 @@ export function mountSkillTree(body, game) {
 
     const bar = document.createElement('div');
     bar.className = 'sk-equipped';
-    const labels = eq.map((id, i) => `${'ZXV'[i]} ${id ? SKILLS[id].name : 'empty'}`);
-    bar.textContent = 'Equipped  ' + labels.join('   ·   ');
+    const labels = eq.map((id, i) => `${i + 1} ${id ? SKILLS[id].name : 'empty'}`);
+    bar.textContent = 'Skill bar  ' + labels.join('   ·   ');
     root.appendChild(bar);
   };
 

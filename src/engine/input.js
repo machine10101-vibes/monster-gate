@@ -69,6 +69,9 @@ export class Input {
         case 'KeyK':
           this.press('panel:skills');
           break;
+        case 'KeyG':
+          this.press('panel:spellbook');
+          break;
         case 'KeyJ':
         case 'Enter':
           this.press('attack');

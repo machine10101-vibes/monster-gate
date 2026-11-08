@@ -21,13 +21,15 @@ npm run preview  # serve the production build
 | Attack | Click / J / Enter | Sword button |
 | Shield | Shift | Shield button |
 | Evade roll | Space / right-click | Dash button |
-| Skill slots | Z, X, V | Bolt, Skill, and Fury buttons |
+| Skill slots | Z, X, V, or the 1 2 3 buttons beside the bar | Skill buttons 1, 2, and 3 |
+| Skill book | G | Menu → Skill & Spell Book, or the book button |
 | Skill tree | K | Menu → Skill Tree |
 | Select item | 1-9 / click hotbar | Tap hotbar |
 | Drink a potion | Click it on the hotbar, or select it and attack | Tap it on the hotbar |
+| Character / bag | E character, B bag | Gear and bag buttons |
 | Talk / Waygate | F | Talk button |
 | Rotate / zoom camera | R, [ ], wheel, middle-drag | Drag right side |
-| Panels | M map, E hunter, B satchel, C catalog, Q hunt log, T settings, K skills | Menu buttons |
+| Panels | M map, E character, B bag, G skill book, C catalog, Q hunt log, T settings, K skills | Menu buttons |
 
 ## Waygate
 

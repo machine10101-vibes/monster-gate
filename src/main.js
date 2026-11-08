@@ -19,7 +19,7 @@ import { Progress } from './systems/progress.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
 import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
-import { MONSTERS, MATERIALS } from './data/catalog.js';
+import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
@@ -526,6 +526,21 @@ class Game {
     this.applyGear();
     const def = weaponDef(this.progress.classId, id);
     if (def) this.hud.toast(def.name + ' raised.', 1200);
+    return true;
+  }
+
+  wearPiece(id) {
+    const g = gearById(id);
+    if (!g || !this.progress.crafted(id)) return false;
+    const was = this.progress.worn(id);
+    this.progress.toggleWear(id);
+    this.applyGear();
+    if (g.type === 'weapon') {
+      if (!was) this.selectSlot(7, true);
+      else if (this.sel === 7) this.selectSlot(0, true);
+    }
+    this.audio.select();
+    this.hud.toast(was ? `${g.name} unequipped` : `${g.name} equipped`, 1200);
     return true;
   }
 

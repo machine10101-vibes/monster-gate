@@ -63,6 +63,11 @@
             <div class="ring"></div>
             <b class="num">100</b>
           </div>
+          <div id="cast-buttons" aria-label="Skill buttons">
+            <button type="button" class="cast" data-slot="0"><canvas width="16" height="16"></canvas><b>1</b><small>Z</small></button>
+            <button type="button" class="cast" data-slot="1"><canvas width="16" height="16"></canvas><b>2</b><small>X</small></button>
+            <button type="button" class="cast" data-slot="2"><canvas width="16" height="16"></canvas><b>3</b><small>V</small></button>
+          </div>
         </div>
 
         <div id="hints">
@@ -76,6 +81,7 @@
             <div id="clock"><span class="sun"></span><b id="clock-text">10:12</b></div>
             <button class="mbtn" data-panel="map"><i class="ico map"></i><kbd>M</kbd></button>
             <button class="mbtn" data-action="rotate"><i class="ico rot"></i><kbd>R</kbd></button>
+            <button class="mbtn" data-panel="spellbook" title="Skill and spell book"><i class="ico tome"></i><kbd>G</kbd></button>
           </div>
           <div class="row bottom">
             <button class="mbtn" data-panel="menu"><i class="ico dots"></i></button>
@@ -93,9 +99,9 @@
             <button id="tb-attack" class="tbtn big" data-act="attack"><i class="ico blade"></i></button>
             <button id="tb-evade" class="tbtn" data-act="evade"><i class="ico dash"></i></button>
             <button id="tb-shield" class="tbtn" data-act="shield"><i class="ico shield"></i></button>
-            <button id="tb-bolt" class="tbtn" data-act="bolt"><i class="ico bolt"></i></button>
-            <button id="tb-fury" class="tbtn" data-act="fury"><i class="ico fury"></i></button>
-            <button id="tb-skill" class="tbtn" data-act="skill" aria-label="Skill">X</button>
+            <button id="tb-bolt" class="tbtn" data-act="bolt" aria-label="Skill 1"><i class="ico bolt"></i><b class="tb-num">1</b></button>
+            <button id="tb-fury" class="tbtn" data-act="fury" aria-label="Skill 3"><i class="ico fury"></i><b class="tb-num">3</b></button>
+            <button id="tb-skill" class="tbtn" data-act="skill" aria-label="Skill 2"><b class="tb-num">2</b>X</button>
             <button id="tb-talk" class="tbtn talk hidden" data-act="talk"><i class="ico talk"></i></button>
           </div>
         </div>
