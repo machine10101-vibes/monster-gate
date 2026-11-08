@@ -914,45 +914,97 @@ function summonWolf(game, dur) {
     life: dur,
     lunge: 0,
     legs: mesh.userData.legs,
+    parts: mesh.userData,
+    vx: 0,
+    vz: 0,
+    gait: 0,
+    vyaw: p.yaw,
+    pitch: 0,
+    ay: 0,
   };
 }
 
 function buildWolf() {
   const g = new THREE.Group();
   const fur = new THREE.MeshToonMaterial({ color: 0x8d929c });
+  const light = new THREE.MeshToonMaterial({ color: 0xc4c8d0 });
   const dark = new THREE.MeshToonMaterial({ color: 0x2e323a });
   const cloth = new THREE.MeshToonMaterial({ color: 0x2f7f5a });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.86), fur);
-  body.position.y = 0.46;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.28, 0.32), fur);
-  head.position.set(0, 0.58, 0.52);
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.2), dark);
-  snout.position.set(0, 0.5, 0.74);
-  const earGeo = new THREE.BoxGeometry(0.08, 0.16, 0.08);
+  const eye = new THREE.MeshBasicMaterial({ color: 0xffd25a });
+  const bodyG = new THREE.Group();
+  bodyG.position.y = 0.5;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.84), fur);
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.34), fur);
+  chest.position.set(0, 0.02, 0.26);
+  const belly = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.6), light);
+  belly.position.set(0, -0.15, 0.0);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.16), cloth);
+  band.position.set(0, 0.02, 0.1);
+  bodyG.add(body, chest, belly, band);
+
+  const headG = new THREE.Group();
+  headG.position.set(0, 0.1, 0.46);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.26, 0.3), fur);
+  head.position.set(0, 0.05, 0.1);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.12, 0.22), light);
+  snout.position.set(0, -0.01, 0.34);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.05), dark);
+  nose.position.set(0, 0.02, 0.46);
+  const jaw = new THREE.Group();
+  jaw.position.set(0, -0.06, 0.28);
+  const jawM = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.2), dark);
+  jawM.position.z = 0.1;
+  jaw.add(jawM);
+  const earGeo = new THREE.BoxGeometry(0.08, 0.17, 0.07);
   const earL = new THREE.Mesh(earGeo, dark);
-  earL.position.set(0.1, 0.8, 0.48);
+  earL.position.set(0.1, 0.22, 0.04);
   const earR = new THREE.Mesh(earGeo, dark);
-  earR.position.set(-0.1, 0.8, 0.48);
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.36), dark);
-  tail.position.set(0, 0.62, -0.52);
-  tail.rotation.x = 0.5;
-  const band = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.1, 0.16), cloth);
-  band.position.set(0, 0.5, 0.12);
-  const legGeo = new THREE.BoxGeometry(0.1, 0.32, 0.1);
+  earR.position.set(-0.1, 0.22, 0.04);
+  const eyeGeo = new THREE.BoxGeometry(0.05, 0.04, 0.03);
+  const eyeL = new THREE.Mesh(eyeGeo, eye);
+  eyeL.position.set(0.09, 0.1, 0.26);
+  const eyeR = new THREE.Mesh(eyeGeo, eye);
+  eyeR.position.set(-0.09, 0.1, 0.26);
+  headG.add(head, snout, nose, jaw, earL, earR, eyeL, eyeR);
+  bodyG.add(headG);
+
+  const tail = new THREE.Group();
+  tail.position.set(0, 0.1, -0.42);
+  const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.22), dark);
+  t1.position.z = -0.1;
+  const t2G = new THREE.Group();
+  t2G.position.z = -0.2;
+  const t2 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.2), light);
+  t2.position.z = -0.1;
+  t2G.add(t2);
+  tail.add(t1, t2G);
+  tail.rotation.x = -0.5;
+  bodyG.add(tail);
+  g.add(bodyG);
+
+  const legGeo = new THREE.BoxGeometry(0.1, 0.17, 0.1);
+  const lowGeo = new THREE.BoxGeometry(0.085, 0.17, 0.085);
   const legs = [];
   for (const [x, z] of [
-    [0.12, 0.26],
-    [-0.12, 0.26],
-    [0.12, -0.26],
-    [-0.12, -0.26],
+    [0.12, 0.28],
+    [-0.12, 0.28],
+    [0.12, -0.28],
+    [-0.12, -0.28],
   ]) {
-    const leg = new THREE.Mesh(legGeo, dark);
-    leg.position.set(x, 0.16, z);
-    g.add(leg);
-    legs.push(leg);
+    const hipG = new THREE.Group();
+    hipG.position.set(x, 0.34, z);
+    const up = new THREE.Mesh(legGeo, fur);
+    up.position.y = -0.085;
+    const kneeG = new THREE.Group();
+    kneeG.position.y = -0.17;
+    const low = new THREE.Mesh(lowGeo, dark);
+    low.position.y = -0.085;
+    kneeG.add(low);
+    hipG.add(up, kneeG);
+    g.add(hipG);
+    legs.push({ hip: hipG, knee: kneeG });
   }
-  g.add(body, head, snout, earL, earR, tail, band);
-  g.userData.legs = legs;
+  g.userData = { legs, bodyG, headG, jaw, tail, tail2: t2G, earL, earR };
   return g;
 }
 
@@ -1064,19 +1116,32 @@ function tickWolf(game, w, dt) {
   const dx = tx - w.x;
   const dz = tz - w.z;
   const dist = Math.hypot(dx, dz) || 0;
-  if (dist > 0.35) {
-    const step = Math.min(dist, speed * dt);
-    w.x += (dx / dist) * step;
-    w.z += (dz / dist) * step;
-    w.yaw = Math.atan2(dx, dz);
+  const want = dist > 0.35 ? Math.min(speed, dist * 5) : 0;
+  const tvx = dist > 0.01 ? (dx / dist) * want : 0;
+  const tvz = dist > 0.01 ? (dz / dist) * want : 0;
+  const ak = 1 - Math.exp(-(want > Math.hypot(w.vx, w.vz) ? 9 : 6) * dt);
+  const ovx = w.vx;
+  const ovz = w.vz;
+  w.vx += (tvx - w.vx) * ak;
+  w.vz += (tvz - w.vz) * ak;
+  w.x += w.vx * dt;
+  w.z += w.vz * dt;
+  const spd = Math.hypot(w.vx, w.vz);
+  if (spd > 0.4) {
+    const ty = Math.atan2(w.vx, w.vz);
+    let dy = ty - w.yaw;
+    dy = ((dy + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    w.yaw += dy * (1 - Math.exp(-11 * dt));
+  } else if (prey) {
+    let dy = Math.atan2(prey.x - w.x, prey.z - w.z) - w.yaw;
+    dy = ((dy + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    w.yaw += dy * (1 - Math.exp(-9 * dt));
   }
-  w.y = game.world.heightAt(w.x, w.z);
-  w.mesh.position.set(w.x, w.y, w.z);
-  w.mesh.rotation.y = w.yaw;
-  const moving = dist > 0.4;
-  w.legs.forEach((leg, i) => {
-    leg.rotation.x = moving ? Math.sin(game.time * 14 + i) * 0.6 : 0;
-  });
+  const gy = game.world.heightAt(w.x, w.z);
+  w.y += (gy - w.y) * Math.min(1, dt * 18);
+  const acc = dt > 1e-4 ? (Math.hypot(w.vx, w.vz) - Math.hypot(ovx, ovz)) / dt : 0;
+  w.ay += (acc - w.ay) * Math.min(1, dt * 8);
+  animateWolf(game, w, spd, dt);
   w.bite -= dt;
   if (prey && Math.hypot(prey.x - w.x, prey.z - w.z) < 1.45 + (prey.radius || 0.4) && w.bite <= 0) {
     const mods = skillMods(game);
@@ -1116,3 +1181,56 @@ function cloudFx(game, c, dt) {
     game.fx.emit(c.x + Math.cos(a) * d, c.y + 0.2, c.z + Math.sin(a) * d, 0, 0.7, 0, 0x2f5a2a, 0.22, 1.1, -0.3);
   }
 }
+
+function animateWolf(game, w, spd, dt) {
+  const P = w.parts;
+  const run = Math.min(1, spd / 7);
+  const gallop = spd > 8.5;
+  w.gait += dt * (spd > 0.4 ? 3 + spd * 1.45 : 0);
+  const c = w.gait;
+  const idle = spd < 0.4;
+  const prevStep = w.stepIdx || 0;
+  const step = Math.floor(c / Math.PI);
+  w.stepIdx = step;
+  if (step !== prevStep && spd > 3) {
+    game.fx.dust(w.x, w.y, w.z, 1, 0.8);
+    if (spd > 8) game.vfx.sparks(w.x, w.y + 0.05, w.z, [0xd9c9a0], 1, 1, 0.05, 0.3, 4);
+  }
+  w.legs.forEach((leg, i) => {
+    const front = i < 2;
+    const side = i % 2;
+    const ph = gallop ? (front ? 0 : 1.1) + side * 0.35 : (i === 0 || i === 3 ? 0 : Math.PI);
+    const s = Math.sin(c + ph);
+    const cs = Math.cos(c + ph);
+    const amp = (gallop ? 0.95 : 0.6) * run;
+    const swing = Math.max(0, -cs);
+    const hipT = idle ? 0 : s * amp;
+    const kneeT = idle ? 0.08 : (front ? -1 : 1) * 0 + (0.15 + swing * (front ? 0.9 : 1.2)) * run;
+    leg.hip.rotation.x += (hipT - leg.hip.rotation.x) * Math.min(1, dt * 24);
+    leg.knee.rotation.x += ((front ? -kneeT * 0.8 : kneeT) - leg.knee.rotation.x) * Math.min(1, dt * 24);
+  });
+  const bodyBob = Math.abs(Math.sin(c)) * (gallop ? 0.1 : 0.04) * run;
+  P.bodyG.position.y = 0.5 + bodyBob - (w.bite > 0 && w.bite < 0.25 ? 0.03 : 0);
+  const pitchT = clamp(-w.ay * 0.012, -0.18, 0.18) + (gallop ? Math.sin(c) * 0.08 : Math.sin(c * 2) * 0.02 * run);
+  w.pitch += (pitchT - w.pitch) * Math.min(1, dt * 12);
+  P.bodyG.rotation.x = w.pitch;
+  P.bodyG.rotation.z = Math.sin(c) * 0.04 * run;
+  P.headG.rotation.x = -w.pitch * 0.6 + Math.sin(c * 2) * 0.05 * run + (idle ? Math.sin(game.time * 1.4) * 0.04 : 0) + (w.bite > 0 && w.bite < 0.22 ? 0.35 : 0);
+  P.headG.rotation.y = Math.sin(game.time * 0.9 + w.x) * 0.15 * (idle ? 1 : 0.2);
+  P.jaw.rotation.x = w.bite > 0 && w.bite < 0.22 ? 0.7 * (1 - w.bite / 0.22) : 0.05 + (run > 0.6 ? 0.15 : 0);
+  const sprint = w.lunge > 0 || game.player.packT > 0;
+  P.tail.rotation.x += ((idle ? -0.15 : sprint ? 0.1 : -0.55 + run * 0.25) - P.tail.rotation.x) * Math.min(1, dt * 8);
+  P.tail.rotation.y = Math.sin(game.time * (idle ? 5 : 9)) * (idle ? 0.35 : 0.18);
+  P.tail2.rotation.y = Math.sin(game.time * (idle ? 5 : 9) - 0.9) * 0.3;
+  P.earL.rotation.z = -0.1 + Math.sin(game.time * 3 + 1) * 0.05 - run * 0.3;
+  P.earR.rotation.z = 0.1 + Math.sin(game.time * 3.4) * 0.05 + run * 0.3;
+  w.mesh.position.set(w.x, w.y, w.z);
+  w.mesh.rotation.y = w.yaw;
+  if (game.player.packT > 0 && game.vfx) {
+    game.vfx.glowNow(w.x, w.y + 0.6, w.z, 0xffa850, 1.5, 0.45);
+    if (Math.random() < dt * 20) game.vfx.spark(w.x, w.y + 0.5, w.z, R2(-0.5, 0.5), R2(0.8, 1.8), R2(-0.5, 0.5), 0xffa850, 0.05, 0.5, -0.5, 0.3);
+  }
+}
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const R2 = (a, b) => a + Math.random() * (b - a);

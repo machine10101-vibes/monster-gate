@@ -4,6 +4,7 @@ import { DUAL_KINDS, TALL_KINDS } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
+import { SpringSet } from '../engine/motion.js';
 import { skillMods } from '../systems/skillcast.js';
 import { SKILLFX, meleeSwing } from '../systems/skillfx.js';
 
@@ -507,6 +508,7 @@ export class Player {
           this.leapT = 0;
           this.leapLand = true;
         }
+        if (this.vy < -4.5) this.landT = clamp(-this.vy * 0.012, 0.04, 0.16);
         if (this.vy < -7) {
           this.game.fx.burst(this.pos.x, target + 0.1, this.pos.z, [0xd9c9a0, 0x9bd06a], 8, 2, 0.1, 0.4);
         }
@@ -888,33 +890,136 @@ export class Player {
       crouch += 0.05 * f2;
     }
 
-    const s = Math.min(1, dt * rate);
-    const lerpRot = (obj, axis, v, kk = s) => (obj.rotation[axis] += (v - obj.rotation[axis]) * kk);
-    lerpRot(m.armR, 'x', armR);
-    lerpRot(m.armR, 'z', armRz);
-    lerpRot(m.armL, 'x', armL);
-    lerpRot(m.armL, 'z', armLz);
-    m.heldSlot.rotation.x = AIMED_KINDS.has(this.heldKind) ? -m.armR.rotation.x : 0;
-    const legSpeed = Math.min(1, dt * (this.state === 'attack' ? 30 : 26));
-    lerpRot(m.legL, 'x', legL + legExtraL, legSpeed);
-    lerpRot(m.legR, 'x', legR + legExtraR, legSpeed);
-    lerpRot(m.upper, 'y', torsoYaw);
-    lerpRot(m.upper, 'x', lean);
-    lerpRot(m.upper, 'z', tilt * 0.6, Math.min(1, dt * 12));
-    lerpRot(m.head, 'x', headPitch);
-    m.head.rotation.y = -m.upper.rotation.y * 0.55 + headYaw;
-    const cl = Math.cos(m.legL.rotation.x);
-    const cr = Math.cos(m.legR.rotation.x);
-    const planted = 0.72 - 0.72 * 0.55 * (1 - Math.max(cl, cr));
-    m.hip.position.y = this.state === 'roll' || this.state === 'dead' ? 24 * S - crouch + bobExtra : planted - crouch + bobExtra;
+    dt = Math.min(dt, 0.05);
+    const sp = this.sp || (this.sp = new SpringSet());
+    if (this.landT > 0) {
+      crouch += this.landT;
+      this.landT = Math.max(0, this.landT - dt * 0.6);
+    }
+    const airborne = this.leapArm || this.leapT > 0;
+    const locomoting = this.state !== 'attack' && this.state !== 'roll' && this.state !== 'dead' && !airborne;
+    const rangedAim = this.state === 'attack' && this.attackItem?.kind === 'ranged';
+
+    const flexOf = (total) => 0.14 + clamp(-total - 0.5, 0, 2.6) * 0.3;
+    let eR = flexOf(armR);
+    let eL = flexOf(armL);
+    const swingR = Math.max(0, -walk);
+    const swingL = Math.max(0, walk);
+    if (locomoting) {
+      eR += run * (0.3 + 0.55 * swingR) * (heldBlade ? 0.65 : 1);
+      eL += run * (0.3 + 0.55 * swingL);
+    }
+    if (rangedAim) {
+      const tt = clamp(this.stateT / this.stateDur, 0, 1);
+      const pull = tt < 0.6 ? ease(tt / 0.6) : 1 - ease((tt - 0.6) / 0.4);
+      eR = AIMED_KINDS.has(this.heldKind) ? 0.1 : eR;
+      eL = 0.3 + 0.8 * pull;
+    }
+    if (this.state === 'roll') {
+      eR = 1.6;
+      eL = 1.6;
+    } else if (this.state === 'dead') {
+      eR = 0.5;
+      eL = 0.5;
+    } else if (this.state === 'stagger') {
+      eR += 0.35;
+      eL += 0.35;
+    }
+    if (airborne) {
+      eR = this.vy > 0 ? 0.3 : 0.7;
+      eL = eR;
+    }
+
+    const swL = Math.pow(Math.max(0, -cs), 0.85);
+    const swR = Math.pow(Math.max(0, cs), 0.85);
+    let kL = 0.06 + run * (0.12 + swL * 1.05);
+    let kR = 0.06 + run * (0.12 + swR * 1.05);
+    legL += legExtraL * 0.5;
+    legR += legExtraR * 0.5;
+    if (this.state === 'attack') {
+      kL = 0.1 + Math.abs(legL) * 0.45;
+      kR = 0.1 + Math.abs(legR) * 0.45;
+    }
+    if (airborne) {
+      kL = this.vy > 0 ? 0.9 : 0.35;
+      kR = this.vy > 0 ? 0.25 : 0.45;
+    }
+    let flex = 0;
+    if (this.state === 'roll') {
+      kL = 1.5;
+      kR = 1.5;
+    } else if (this.state === 'dead') {
+      kL = 1.3 * (crouch / 0.16 || 0);
+      kR = 0.6 * (crouch / 0.16 || 0);
+    } else {
+      const cs2 = sp.step('crouch', crouch, dt, 18, 0.55);
+      flex = Math.acos(clamp(1 - Math.max(0, cs2) / 0.72, 0.2, 1));
+      legL -= flex;
+      legR -= flex;
+      kL += flex * 2;
+      kR += flex * 2;
+    }
+
+    let near = null;
+    let nd = 8;
+    for (const mon of this.game.monsters) {
+      if (mon.dead) continue;
+      const d = Math.hypot(mon.x - this.pos.x, mon.z - this.pos.z);
+      if (d < nd) {
+        nd = d;
+        near = mon;
+      }
+    }
+    if (near && this.state !== 'dead' && this.state !== 'roll') {
+      const want = angDiff(this.yaw, Math.atan2(near.x - this.pos.x, near.z - this.pos.z));
+      headYaw += clamp(want, -0.85, 0.85) * (this.state === 'attack' ? 0.8 : 0.65);
+      headPitch += clamp(((near.y + 1.1) - (this.pos.y + 1.6)) / Math.max(1.5, nd), -0.25, 0.25) * -0.6;
+    }
+
+    const pelvis = torsoYaw * 0.3 - walk * 0.1 * run * (locomoting ? 1 : 0);
+    const shoulderTargetR = armR + eR;
+    const shoulderTargetL = armL + eL;
+    const wA = rate;
+    const jR = sp.step('armRx', shoulderTargetR, dt, wA, 0.78);
+    m.armR.rotation.x = jR;
+    m.armR.rotation.z = sp.step('armRz', armRz, dt, wA * 0.8, 0.8);
+    m.armL.rotation.x = sp.step('armLx', shoulderTargetL, dt, wA, 0.78);
+    m.armL.rotation.z = sp.step('armLz', armLz, dt, wA * 0.8, 0.8);
+    m.elbowR.rotation.x = -sp.step('elR', eR, dt, wA * 0.75, 0.55);
+    m.elbowL.rotation.x = -sp.step('elL', eL, dt, wA * 0.75, 0.55);
+    m.heldSlot.rotation.x = AIMED_KINDS.has(this.heldKind) ? -(m.armR.rotation.x + m.elbowR.rotation.x) : 0;
+
+    const legW = this.state === 'attack' ? 30 : 26;
+    m.legL.rotation.x = sp.step('legL', legL, dt, legW, 0.85);
+    m.legR.rotation.x = sp.step('legR', legR, dt, legW, 0.85);
+    m.kneeL.rotation.x = sp.step('kL', kL, dt, 30, 0.8);
+    m.kneeR.rotation.x = sp.step('kR', kR, dt, 30, 0.8);
+    m.legL.rotation.z = 0;
+    m.legR.rotation.z = 0;
+    m.legL.position.y = 0;
+    m.legR.position.y = 0;
+
+    m.hip.rotation.y = sp.step('pelvis', pelvis, dt, 18, 0.8);
+    m.upper.rotation.y = sp.step('torsoY', torsoYaw - pelvis, dt, rate * 0.75, 0.7);
+    m.upper.rotation.x = sp.step('lean', lean, dt, 16, 0.7);
+    m.upper.rotation.z = sp.step('tiltZ', tilt * 0.6, dt, 12, 0.9);
+    m.head.rotation.x = sp.step('headX', headPitch, dt, 14, 0.65);
+    const torsoWorld = m.hip.rotation.y + m.upper.rotation.y;
+    m.head.rotation.y = sp.step('headY', -torsoWorld * 0.55 + headYaw - m.hip.rotation.y * 0, dt, 12, 0.75);
+    m.upper.position.y = Math.sin(t * 1.9) * 0.006 * idle;
+
+    const T = 12 * S;
+    const depth = (th, k) => T * Math.cos(th) + T * Math.cos(th + k);
+    if (this.state === 'roll' || this.state === 'dead') {
+      m.hip.position.y = 24 * S - crouch + bobExtra;
+    } else {
+      const d = Math.max(depth(m.legL.rotation.x, m.kneeL.rotation.x), depth(m.legR.rotation.x, m.kneeR.rotation.x));
+      m.hip.position.y = d + bobExtra;
+    }
     m.hip.position.x += (hipX - m.hip.position.x) * Math.min(1, dt * 14);
     this.pivot.rotation.x = pivotX;
     this.pivot.rotation.z += (tilt * 0.4 - this.pivot.rotation.z) * Math.min(1, dt * 10);
     this.pivot.position.y = pivotY;
-    m.legL.rotation.z = 0;
-    m.legR.rotation.z = 0;
-    m.legL.position.y = liftL;
-    m.legR.position.y = liftR;
   }
 }
 

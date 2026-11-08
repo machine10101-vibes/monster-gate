@@ -12,6 +12,25 @@ export const S = 0.03;
 
 const J = (c, x, y, z, s = 0, a = 0.06) => jitter(c, a, hash3(x, y, z, s));
 
+function slice(model, y0, y1) {
+  const out = new VoxelModel(model.sx, model.sy, model.sz);
+  for (let z = 0; z < model.sz; z++)
+    for (let y = Math.max(0, y0); y < Math.min(model.sy, y1); y++)
+      for (let x = 0; x < model.sx; x++) out.data[out.idx(x, y, z)] = model.data[model.idx(x, y, z)];
+  return out;
+}
+
+/** Splits a limb at a joint row: an upper piece pivoting at the root and a lower piece pivoting at the joint. */
+function splitLimb(model, ox, oy, oz, mat, joint) {
+  const upper = meshFrom(slice(model, joint, model.sy), ox, oy, oz, mat);
+  const lower = meshFrom(slice(model, 0, joint + 1), ox, joint, oz, mat);
+  lower.scale.set(0.975, 1, 0.975);
+  return { upper, lower };
+}
+
+export const ELBOW_Y = 12;
+export const KNEE_Y = 12;
+
 export function meshFrom(model, ox, oy, oz, mat, size = S) {
   const g = model.build(size, ox, oy, oz);
   const grp = new THREE.Group();
@@ -64,8 +83,8 @@ export function buildHumanoid(o = {}) {
   const need = (part) => !c.parts || c.parts.includes(part);
   let torso = new THREE.Group();
   let head = new THREE.Group();
-  let makeArm = () => new THREE.Group();
-  let makeLeg = () => new THREE.Group();
+  let makeArm = () => ({ upper: new THREE.Group(), lower: new THREE.Group() });
+  let makeLeg = () => ({ upper: new THREE.Group(), lower: new THREE.Group() });
 
   /* --------------------------- torso --------------------------- */
   if (need('torso')) {
@@ -366,8 +385,7 @@ export function buildHumanoid(o = {}) {
       const aSnap = A.data.slice();
       painterFor(c.armor?.arms)?.paintArm(A, set);
       relief(A, aSnap);
-      const grp = meshFrom(A, 6.5, 22, 7, mat);
-      return grp;
+      return splitLimb(A, 6.5, 22, 7, mat, ELBOW_Y);
     };
   }
 
@@ -411,7 +429,7 @@ export function buildHumanoid(o = {}) {
         for (const id of PAINTER_SETS) painterFor(id).paintLeg(set, legFlags(c.armor, id));
         relief(L, lSnap);
       }
-      return meshFrom(L, 6.5, 24, 6.5, mat);
+      return splitLimb(L, 6.5, 24, 6.5, mat, KNEE_Y);
     };
   }
 
@@ -432,36 +450,54 @@ export function buildHumanoid(o = {}) {
   const armR = new THREE.Group();
   armL.position.set(-10.7 * S, 17 * S, 0);
   armR.position.set(10.7 * S, 17 * S, 0);
-  armL.add(makeArm(-1));
-  armR.add(makeArm(1));
+  const elbowL = new THREE.Group();
+  const elbowR = new THREE.Group();
+  elbowL.position.y = -(22 - ELBOW_Y) * S;
+  elbowR.position.y = -(22 - ELBOW_Y) * S;
+  const aL = makeArm(-1);
+  const aR = makeArm(1);
+  armL.add(aL.upper, elbowL);
+  armR.add(aR.upper, elbowR);
+  elbowL.add(aL.lower);
+  elbowR.add(aR.lower);
   upper.add(armL, armR);
 
   const legL = new THREE.Group();
   const legR = new THREE.Group();
   legL.position.set(-4.1 * S, 0, 0);
   legR.position.set(4.1 * S, 0, 0);
-  legL.add(makeLeg(-1));
-  legR.add(makeLeg(1));
+  const kneeL = new THREE.Group();
+  const kneeR = new THREE.Group();
+  kneeL.position.y = -(24 - KNEE_Y) * S;
+  kneeR.position.y = -(24 - KNEE_Y) * S;
+  const lL = makeLeg(-1);
+  const lR = makeLeg(1);
+  legL.add(lL.upper, kneeL);
+  legR.add(lR.upper, kneeR);
+  kneeL.add(lL.lower);
+  kneeR.add(lR.lower);
   hip.add(legL, legR);
 
+  const handY = -(17.3 - (22 - ELBOW_Y)) * S;
   const hand = new THREE.Group();
-  hand.position.set(0, -17.3 * S, 0);
-  armR.add(hand);
+  hand.position.set(0, handY, 0);
+  elbowR.add(hand);
   const heldSlot = new THREE.Group();
   hand.add(heldSlot);
 
   const shieldG = new THREE.Group();
-  armL.add(shieldG);
+  shieldG.position.y = (22 - ELBOW_Y) * S;
+  elbowL.add(shieldG);
   const offhand = new THREE.Group();
-  offhand.position.set(0, -17.3 * S, 0);
-  armL.add(offhand);
+  offhand.position.set(0, handY, 0);
+  elbowL.add(offhand);
   if (c.hero || c.armor?.shield) {
     shieldG.add(c.armor?.shield ? buildThemedShield(c.armor.shield, mat) : buildShield(mat));
     shieldG.visible = false;
   }
   const bookG = new THREE.Group();
-  bookG.position.set(0, -17.3 * S, 0);
-  armL.add(bookG);
+  bookG.position.set(0, handY, 0);
+  elbowL.add(bookG);
   if (c.armor?.book) {
     const bm = buildBookModel(c.armor.book);
     const bg = meshFrom(bm.M, bm.ox, bm.oy, bm.oz, mat, bm.size);
@@ -473,7 +509,7 @@ export function buildHumanoid(o = {}) {
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, torso, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, offhand, bookG, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, legL, legR, kneeL, kneeR, hand, heldSlot, shieldG, offhand, bookG, mat };
 }
 
 function buildThemedShield(setId, mat) {
