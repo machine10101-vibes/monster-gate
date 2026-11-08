@@ -1,4 +1,4 @@
-/** Hunter paths. Each path runs five skills deep, and each class can raise four attributes. */
+/** Hunter paths. Each path runs five skills deep. Attributes and weapon masteries spend the same points. */
 
 export const RESOURCE_NAME = { fury: 'Fury', stamina: 'Stamina', mana: 'Spirit' };
 
@@ -159,10 +159,42 @@ mage.attributes = [
   { id: 'potency', name: 'Potency', max: 3, blurb: 'Burns, chills, and arcs grow stronger each rank.', rankText: (n) => `Burn +${n}, harder chills, more arcs` },
 ];
 
+warrior.weapons = [
+  { id: 'swordshield', name: 'Sword & Shield', max: 3, blurb: 'Swords hit 8% harder each rank. A raised shield sheds 4% more.', rankText: (n) => `+${n * 8}% sword damage, +${n * 4}% while blocking` },
+  { id: 'twohand', name: 'Two-Handed', max: 3, blurb: 'Axes, hammers, mauls, and scythes hit 10% harder and shove farther each rank.', rankText: (n) => `+${n * 10}% damage, +${n * 12}% knockback` },
+  { id: 'dual', name: 'Dual Wield', max: 3, blurb: 'Twin blades hit 6% harder, swing 7% faster, and crit 3% more each rank.', rankText: (n) => `+${n * 6}% damage, +${n * 7}% speed, +${n * 3}% crit` },
+];
+ranger.weapons = [
+  { id: 'shortbow', name: 'Short Bow', max: 3, blurb: 'Short bows hit 6% harder and loose 7% faster each rank.', rankText: (n) => `+${n * 6}% damage, +${n * 7}% speed` },
+  { id: 'longbow', name: 'Longbow', max: 3, blurb: 'Longbows hit 10% harder and crit 4% more each rank.', rankText: (n) => `+${n * 10}% damage, +${n * 4}% crit` },
+  { id: 'crossbow', name: 'Crossbow', max: 3, blurb: 'Bolts hit 8% harder, punch through, and gain 2 damage each rank.', rankText: (n) => `+${n * 8}% damage, +${n * 2} bolt damage, pierce` },
+];
+mage.weapons = [
+  { id: 'staff', name: 'Staff', max: 3, blurb: 'Staves add 8% spell damage and 4 spirit each rank.', rankText: (n) => `+${n * 8}% spell damage, +${n * 4} spirit` },
+  { id: 'wand', name: 'Wand', max: 3, blurb: 'Wands add 5% spell damage and cut spirit costs 5% each rank.', rankText: (n) => `+${n * 5}% spell damage, spirit cost -${n * 5}%` },
+  { id: 'tome', name: 'Spell Book', max: 3, blurb: 'Spell books add 7% spell damage, 6 spirit, and 3% crit each rank.', rankText: (n) => `+${n * 7}% spell damage, +${n * 6} spirit, +${n * 3}% crit` },
+];
+
+export const STYLE_LABEL = {
+  swordshield: 'Sword & Shield',
+  twohand: 'Two-Handed',
+  dual: 'Dual Wield',
+  shortbow: 'Short Bow',
+  longbow: 'Longbow',
+  crossbow: 'Crossbow',
+  staff: 'Staff',
+  wand: 'Wand',
+  tome: 'Spell Book',
+};
+
 export const CLASSES = { warrior, ranger, mage };
 
 export function attrDef(classId, id) {
   return (CLASSES[classId]?.attributes || []).find((a) => a.id === id) || null;
+}
+
+export function weaponDef(classId, id) {
+  return (CLASSES[classId]?.weapons || []).find((w) => w.id === id) || null;
 }
 
 export const SKILLS = {};

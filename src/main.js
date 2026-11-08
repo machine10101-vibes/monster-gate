@@ -16,7 +16,7 @@ import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
-import { CLASSES, SKILLS, attrDef } from './data/skills.js';
+import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
 import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
 import { MONSTERS, MATERIALS } from './data/catalog.js';
@@ -410,6 +410,7 @@ class Game {
     this.sel = i;
     const it = this.items[i];
     this.player.setHeld(it.held || null);
+    this.syncVitals();
     this.itemsChanged();
     if (!silent) {
       this.audio.select();
@@ -422,30 +423,37 @@ class Game {
     const p = this.player;
     p.setArmor(pr.armorLook());
     p.reduction = pr.reduction;
-    const mods = skillMods(this);
-    const max = Math.min(40, 20 + this.rank * 2) + pr.bonusHp + (mods.hp || 0);
-    if (p.maxHp !== max) {
-      const gain = Math.max(0, max - p.maxHp);
-      p.maxHp = max;
-      p.hp = Math.min(max, p.hp + gain);
-    }
-    const maxMana = 50 + this.rank * 5 + pr.bonusMana + (mods.mana || 0);
-    if (p.maxMana !== maxMana) {
-      p.maxMana = maxMana;
-      p.mana = Math.min(maxMana, p.mana);
-    }
-    const maxStamina = 100 + (mods.stamina || 0);
-    if (p.maxStamina !== maxStamina) {
-      const gain = Math.max(0, maxStamina - p.maxStamina);
-      p.maxStamina = maxStamina;
-      p.stamina = Math.min(maxStamina, p.stamina + gain);
-    }
+    this.syncVitals();
     const w = pr.weaponItem;
     this.items[7] = w ? { ...w } : { ...ITEMS[7] };
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.selectSlot(i));
       this.selectSlot(this.sel, true);
       this.refreshHud();
+    }
+  }
+
+  syncVitals() {
+    const p = this.player;
+    if (!p) return;
+    const mods = skillMods(this);
+    const max = Math.min(40, 20 + this.rank * 2) + this.progress.bonusHp + (mods.hp || 0);
+    if (p.maxHp !== max) {
+      const gain = Math.max(0, max - p.maxHp);
+      p.maxHp = max;
+      p.hp = Math.min(max, p.hp + gain);
+    }
+    const maxMana = 50 + this.rank * 5 + this.progress.bonusMana + (mods.mana || 0);
+    if (p.maxMana !== maxMana) {
+      const gain = Math.max(0, maxMana - p.maxMana);
+      p.maxMana = maxMana;
+      p.mana = Math.min(maxMana, p.mana + gain);
+    }
+    const maxStamina = 100 + (mods.stamina || 0);
+    if (p.maxStamina !== maxStamina) {
+      const gain = Math.max(0, maxStamina - p.maxStamina);
+      p.maxStamina = maxStamina;
+      p.stamina = Math.min(maxStamina, p.stamina + gain);
     }
   }
 
@@ -502,6 +510,14 @@ class Game {
     return true;
   }
 
+  raiseWeapon(id) {
+    if (!this.progress.raiseWeapon(id)) return false;
+    this.applyGear();
+    const def = weaponDef(this.progress.classId, id);
+    if (def) this.hud.toast(def.name + ' raised.', 1200);
+    return true;
+  }
+
   equipSkill(slot, id) {
     const ok = this.progress.equip(slot, id);
     if (ok) this.hud.updateSkillbar(this);
@@ -512,7 +528,8 @@ class Game {
     if (!this.progress.classId) return false;
     const learned = Object.keys(this.progress.data.skills.learned).length;
     const attrs = this.progress.data.skills.attrs || {};
-    const invested = learned || Object.values(attrs).some((n) => n > 0);
+    const weapons = this.progress.data.skills.weapons || {};
+    const invested = learned || Object.values(attrs).some((n) => n > 0) || Object.values(weapons).some((n) => n > 0);
     if (!invested) {
       this.hud.toast('No skills to respec.');
       return false;

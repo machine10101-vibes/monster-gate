@@ -116,7 +116,8 @@ export function mountSkillTree(body, game) {
     head.className = 'sk-head';
     const learned = Object.keys(game.progress.data.skills.learned).length;
     const attrRanks = game.progress.data.skills.attrs || {};
-    const invested = learned || Object.values(attrRanks).some((n) => n > 0);
+    const weaponRanks = game.progress.data.skills.weapons || {};
+    const invested = learned || Object.values(attrRanks).some((n) => n > 0) || Object.values(weaponRanks).some((n) => n > 0);
     head.innerHTML = `<div><b style="color:${cls.color}">${cls.name}</b><span>${pts.left} point${pts.left === 1 ? '' : 's'} ready · ${pts.spent} spent · ${game.gold} gold</span></div>`;
     const actions = document.createElement('div');
     actions.className = 'sk-head-acts';
@@ -142,7 +143,7 @@ export function mountSkillTree(body, game) {
 
     const note = document.createElement('p');
     note.className = 'sk-note';
-    note.textContent = `Passives are always on. Attributes take the same points, one per rank. Equip actives and specials below. ${cls.name} skills spend ${RESOURCE_NAME[cls.resource]}. Empty Z is still Spirit Bolt. Empty V is still Fury.`;
+    note.textContent = `Passives are always on. Attributes and weapon masteries take the same points, one per rank. A mastery applies while that weapon is in your hand. ${cls.name} skills spend ${RESOURCE_NAME[cls.resource]}.`;
     root.appendChild(note);
 
     const attrs = document.createElement('section');
@@ -177,6 +178,40 @@ export function mountSkillTree(body, game) {
       attrs.appendChild(row);
     }
     root.appendChild(attrs);
+
+    const weapons = document.createElement('section');
+    weapons.className = 'sk-attrs';
+    const weaponHead = document.createElement('h3');
+    weaponHead.textContent = 'Weapons';
+    weapons.appendChild(weaponHead);
+    const heldStyle = game.items[game.sel]?.style;
+    for (const weapon of cls.weapons || []) {
+      const rank = game.progress.weaponRank(weapon.id);
+      const row = document.createElement('div');
+      row.className = 'sk-attr' + (heldStyle === weapon.id ? ' held' : '');
+      const name = document.createElement('b');
+      name.textContent = weapon.name;
+      const desc = document.createElement('span');
+      desc.textContent = rank ? weapon.rankText(rank) : weapon.blurb;
+      const pips = document.createElement('div');
+      pips.className = 'sk-pips';
+      for (let i = 0; i < weapon.max; i++) {
+        const pip = document.createElement('i');
+        if (i < rank) pip.className = 'on';
+        pips.appendChild(pip);
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sk-btn';
+      btn.textContent = rank >= weapon.max ? 'Max' : '+1';
+      btn.disabled = rank >= weapon.max || pts.left < 1;
+      btn.onclick = () => {
+        if (game.raiseWeapon(weapon.id)) paint();
+      };
+      row.append(name, desc, pips, btn);
+      weapons.appendChild(row);
+    }
+    root.appendChild(weapons);
 
     const cols = document.createElement('div');
     cols.className = 'sk-cols';

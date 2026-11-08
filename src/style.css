@@ -1698,6 +1698,7 @@ body.touch .how {
 }
 .sk-pips i.on { background: #ffd23f; }
 .sk-attr .sk-btn { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+.sk-attr.held { border-color: #ffd23f; }
 .sk-cols {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

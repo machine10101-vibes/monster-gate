@@ -127,6 +127,16 @@ export class Player {
       g.traverse((o) => (o.castShadow = true));
       slot.add(g);
     }
+    const off = this.model.offhand;
+    if (off) {
+      while (off.children.length) off.remove(off.children[0]);
+      if (kind === 'dual') {
+        const twin = buildHeld('blade');
+        twin.scale.setScalar(0.82);
+        twin.rotation.y = Math.PI;
+        off.add(twin);
+      }
+    }
   }
 
   get facing() {
@@ -172,7 +182,7 @@ export class Player {
       this.ironHits--;
       dmg = 1;
     } else {
-      const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.bulwarkT > 0 ? 0.45 : 0));
+      const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.shielding ? mods.blockDr || 0 : 0) + (this.bulwarkT > 0 ? 0.45 : 0));
       dmg = Math.max(1, Math.round(dmg * (1 - dr)));
     }
     this.hp = Math.max(0, this.hp - dmg);
@@ -255,7 +265,8 @@ export class Player {
     this.attackHit = false;
     this.stamina = Math.max(0, this.stamina - item.stam);
     this.stamDelay = 0.7;
-    this.setState('attack', item.dur * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
+    const swing = skillMods(this.game).speed ?? 1;
+    this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
     this.game.audio.swing();
     return true;
   }
@@ -311,6 +322,7 @@ export class Player {
     this.shielding = wantShield;
     if (wantShield && this.state === 'idle') this.state = 'idle';
     if (this.model.shieldG) this.model.shieldG.visible = this.shielding;
+    if (this.model.offhand) this.model.offhand.visible = this.heldKind === 'dual' && !this.shielding;
 
     let speed = 0;
     const moveDir = new THREE.Vector3();
@@ -521,7 +533,7 @@ export class Player {
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
         const crit = Math.random() < 0.12 + (mods.crit || 0);
-        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
+        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee), dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
         if (mods.poison && !m.dead) m.afflict('poison', 4 + (mods.poisonTime || 0), 4 + (mods.poisonBonus || 0));
         hits++;
       }
@@ -540,21 +552,23 @@ export class Player {
         g.audio.hit();
       }
     } else if (it.kind === 'ranged') {
-      let dmg = it.dmg;
+      const focus = it.style === 'staff' || it.style === 'wand' || it.style === 'tome';
+      let dmg = it.dmg + (it.style === 'crossbow' ? mods.flatRanged || 0 : 0);
       let aimed = false;
-      if (mods.deadeye && this.stillT > 0.7) {
+      if (mods.deadeye && this.stillT > 0.7 && !focus) {
         dmg = Math.round(dmg * 1.8);
         aimed = true;
         this.stillT = 0;
         g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.2, this.pos.z), 'Aimed', 'crit');
       }
+      const pierce = (it.style === 'crossbow' && mods.pierce) || it.proj === 'crescent';
       if (it.proj) {
-        const sp = it.proj === 'gloom' ? 12 : 18;
-        g.spawnProjectile({ owner: 'player', kind: it.proj, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce: it.proj === 'crescent', homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
-        g.audio.tone(it.proj === 'gloom' ? 260 : 620, 0.14, 'sawtooth', 0.08, -200);
+        const sp = it.proj === 'gloom' ? 12 : it.proj === 'bolt' ? 16 : 18;
+        g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
+        g.audio.tone(it.proj === 'gloom' ? 260 : focus ? 720 : 620, 0.14, 'sawtooth', 0.08, -200);
       } else {
-        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * 20, vz: f.z * 20, dmg, life: 1.3, r: 0.35, crit: aimed });
-        g.audio.tone(900, 0.08, 'triangle', 0.1, -500);
+        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * (it.style === 'crossbow' ? 26 : 20), vz: f.z * (it.style === 'crossbow' ? 26 : 20), dmg, life: 1.3, r: 0.35, crit: aimed, pierce });
+        g.audio.tone(it.style === 'crossbow' ? 420 : 900, 0.08, 'triangle', 0.1, -500);
       }
     } else if (it.kind === 'throw') {
       if (it.count <= 0) return;

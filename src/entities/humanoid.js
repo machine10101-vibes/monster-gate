@@ -420,6 +420,9 @@ export function buildHumanoid(o = {}) {
 
   const shieldG = new THREE.Group();
   armL.add(shieldG);
+  const offhand = new THREE.Group();
+  offhand.position.set(0, -17.3 * S, 0);
+  armL.add(offhand);
   if (c.hero) {
     shieldG.add(buildShield(mat));
     shieldG.visible = false;
@@ -428,7 +431,7 @@ export function buildHumanoid(o = {}) {
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, torso, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, legL, legR, hand, heldSlot, shieldG, offhand, mat };
 }
 
 function buildShield(mat) {
@@ -636,6 +639,28 @@ export function buildHeld(kind) {
         for (let y = -1; y <= 0; y++) set(x - (dir < 0 ? 0 : 0), y, z, k > 11 ? DARK.edge : J(k % 3 === 2 ? DARK.bladeDark : DARK.blade, k, y, dir, 64, 0.03));
       }
     }
+  } else if (kind === 'dual') {
+    for (let z = 0; z < 5; z++) for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, z, J(0x4a2c16, x, y, z, 1, 0.1));
+    for (let z = 6; z < 28; z++) {
+      const w = z > 24 ? 1 : 2;
+      for (let x = 0; x < w; x++) set(x - 1, 0, z, z > 24 ? 0xd2d5dc : 0x8f939b);
+    }
+  } else if (kind === 'crossbow') {
+    for (let z = 2; z < 34; z++) for (let x = -1; x <= 0; x++) for (let y = -1; y <= 0; y++) set(x, y, z, wood(x, y, z));
+    for (let x = -8; x <= 7; x++) {
+      const drop = Math.round((Math.abs(x) / 8) * 3);
+      for (let y = -1; y <= 0; y++) set(x, y, 30 - drop, steel(x, y, 30));
+    }
+    for (let z = 28; z < 36; z++) set(0, 1, z, 0xe8e0c8);
+    set(0, 0, 36, 0xd2d5dc);
+  } else if (kind === 'wand') {
+    for (let z = 0; z < 30; z++) set(0, 0, z, wood(0, 0, z));
+    for (let z = 28; z < 34; z++) for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) if (Math.abs(x) + Math.abs(y) < 3) set(x, y, z, 0x6fd4ff, true);
+    set(0, 0, 34, 0xf4fbff, true);
+  } else if (kind === 'tome') {
+    for (let z = 4; z < 22; z++) for (let x = -6; x <= 5; x++) for (let y = -1; y <= 1; y++) set(x, y, z, y === 1 ? 0x6a3a22 : y === -1 ? 0xf2e2b8 : 0x8d4b2a);
+    for (let z = 6; z < 20; z += 3) set(0, 2, z, 0xc9a36a);
+    set(-6, 0, 12, 0xf4c542);
   }
   const g = meshFrom(M, cx, cy, 0, mat);
   heldCache[kind] = g;

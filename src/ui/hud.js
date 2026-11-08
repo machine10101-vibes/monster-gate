@@ -1,20 +1,24 @@
 import { iconCanvas, iconURL, heartCanvas } from './icons.js';
 import { clamp } from '../engine/voxel.js';
 import { GATE, GUILD, TOWN } from '../world/terrain.js';
-import { SKILLS } from '../data/skills.js';
+import { SKILLS, STYLE_LABEL } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
 
 export const ITEMS = [
-  { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Balanced steel. Three-hit rhythm.' },
+  { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
   { id: 'pick', icon: 'pick', name: 'Iron Pickaxe', kind: 'melee', dmg: 6, reach: 2.2, arc: 1.6, dur: 0.34, hit: 0.14, stam: 6, knock: 3, held: 'pick', desc: 'Quick swings, light damage.' },
-  { id: 'axe', icon: 'axe', name: 'Woodcutter Axe', kind: 'melee', dmg: 8, reach: 2.3, arc: 1.8, dur: 0.44, hit: 0.2, stam: 9, knock: 4, held: 'axe', desc: 'Heavy chops.' },
-  { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', dmg: 15, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'Slow, bone-shaking blows.' },
-  { id: 'bow', icon: 'bow', name: 'Hunter Bow', kind: 'ranged', dmg: 7, dur: 0.5, stam: 7, held: 'bow', desc: 'Loose arrows at range.' },
+  { id: 'axe', icon: 'axe', name: 'Woodcutter Axe', kind: 'melee', style: 'twohand', dmg: 8, reach: 2.3, arc: 1.8, dur: 0.44, hit: 0.2, stam: 9, knock: 4, held: 'axe', desc: 'Two-handed chops.' },
+  { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', style: 'twohand', dmg: 15, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'A two-handed hammer. Slow, bone-shaking blows.' },
+  { id: 'bow', icon: 'bow', name: 'Short Bow', kind: 'ranged', style: 'shortbow', dmg: 7, dur: 0.5, stam: 7, held: 'bow', desc: 'A short bow. Loose arrows at range.' },
   { id: 'stone', icon: 'stone', name: 'Throwing Stone', kind: 'throw', dmg: 4, dur: 0.38, stam: 4, count: 12, held: 'stone', desc: 'Pocket-sized pain.' },
   { id: 'potion', icon: 'potion', name: 'Healing Potion', kind: 'use', count: 10, held: 'potion', heal: 8, desc: 'Restores 8 health.' },
   { id: 'empty', icon: 'empty', name: 'Empty', kind: 'none' },
   { id: 'torch', icon: 'torch', name: 'Torch', kind: 'light', count: 18, held: 'torch', desc: 'Lights the way at night.' },
   { id: 'manapotion', icon: 'manapotion', name: 'Spirit Philter', kind: 'use', count: 2, held: 'manapotion', mana: 20, desc: 'Restores 20 spirit.' },
+  { id: 'dual', icon: 'dual', name: 'Twin Blades', kind: 'melee', style: 'dual', dmg: 8, reach: 2.2, arc: 2.3, dur: 0.32, hit: 0.13, stam: 8, knock: 3.2, held: 'dual', desc: 'A blade in each hand.' },
+  { id: 'crossbow', icon: 'crossbow', name: 'Hunter Crossbow', kind: 'ranged', style: 'crossbow', dmg: 11, dur: 0.64, stam: 9, held: 'crossbow', desc: 'A heavy bolt. Mastery lets it punch through.' },
+  { id: 'wand', icon: 'wand', name: 'Ash Wand', kind: 'ranged', style: 'wand', spell: true, proj: 'bolt', dmg: 8, dur: 0.34, stam: 4, held: 'wand', desc: 'A quick focus for spells.' },
+  { id: 'tome', icon: 'tome', name: 'Field Tome', kind: 'ranged', style: 'tome', spell: true, proj: 'bolt', dmg: 10, dur: 0.56, stam: 5, held: 'tome', desc: 'A traveling spell book.' },
 ];
 
 export const POTION_SHOP = {
@@ -72,7 +76,7 @@ export class HUD {
       b.appendChild(cv);
       const key = document.createElement('span');
       key.className = 'key';
-      key.textContent = i === 9 ? '0' : String(i + 1);
+      key.textContent = i > 9 ? '' : i === 9 ? '0' : String(i + 1);
       b.appendChild(key);
       const cnt = document.createElement('span');
       cnt.className = 'cnt';
@@ -380,6 +384,7 @@ export class HUD {
            <div class="panel-row"><span>Spirit</span><b>${Math.round(p.mana)} / ${p.maxMana}</b></div>
            <div class="panel-row"><span>Fury</span><b>${Math.round(p.fury)} / 100</b></div>
            <div class="panel-row"><span>Weapon</span><b>${game.items[game.sel].name}</b></div>
+           <div class="panel-row"><span>Style</span><b>${STYLE_LABEL[game.items[game.sel].style] || 'None'}</b></div>
            <div class="panel-row"><span>Defense</span><b>${game.progress.defense} (-${Math.round(game.progress.reduction * 100)}% damage)</b></div>
            <div class="panel-row"><span>Path</span><b>${game.progress.className || 'Unchosen — press K'}</b></div>
            <p style="color:#aab;font-size:13px">${game.progress.defense ? (game.progress.activeSets.length ? game.progress.activeSets.map((x) => `${x.name}: ${x.bonus.replace('Full set: ', '')}`).join(' ') : 'Wearing dragon armor. Complete a set for a bonus.') : "Dark leather hunter's garb, steel bracers and a greatsword on your back."} Press C for the Hunter Catalog.</p>`);

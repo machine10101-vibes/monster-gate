@@ -1,5 +1,5 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, armorPieces, gearById } from '../data/catalog.js';
-import { CLASSES, SKILLS, attrDef } from '../data/skills.js';
+import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 
 const KEY = 'monster-gate-hunter-v1';
 
@@ -202,6 +202,10 @@ export class Progress {
     for (const id of Object.keys(attrs)) {
       if (attrDef(this.classId, id)) spent += attrs[id] | 0;
     }
+    const weapons = this.data.skills?.weapons || {};
+    for (const id of Object.keys(weapons)) {
+      if (weaponDef(this.classId, id)) spent += weapons[id] | 0;
+    }
     return { earned, spent, left: Math.max(0, earned - spent) };
   }
 
@@ -221,6 +225,22 @@ export class Progress {
     return true;
   }
 
+  weaponRank(id) {
+    return (this.data.skills?.weapons && this.data.skills.weapons[id]) || 0;
+  }
+
+  raiseWeapon(id) {
+    const def = weaponDef(this.classId, id);
+    if (!def) return false;
+    const rank = this.weaponRank(id);
+    if (rank >= def.max) return false;
+    if (this.skillPoints().left < 1) return false;
+    if (!this.data.skills.weapons) this.data.skills.weapons = {};
+    this.data.skills.weapons[id] = rank + 1;
+    this.save();
+    return true;
+  }
+
   hasSkill(id) {
     return !!(this.data.skills?.learned && this.data.skills.learned[id]);
   }
@@ -231,7 +251,7 @@ export class Progress {
 
   setClass(id) {
     if (!CLASSES[id] || this.classId === id) return false;
-    this.data.skills = { classId: id, learned: {}, equipped: [null, null, null], attrs: {} };
+    this.data.skills = { classId: id, learned: {}, equipped: [null, null, null], attrs: {}, weapons: {} };
     this.save();
     return true;
   }
@@ -268,6 +288,7 @@ export class Progress {
     this.data.skills.learned = {};
     this.data.skills.equipped = [null, null, null];
     this.data.skills.attrs = {};
+    this.data.skills.weapons = {};
     this.save();
     return true;
   }
@@ -303,5 +324,12 @@ function normalizeSkills(raw) {
       if (n > 0) attrs[def.id] = Math.min(def.max, n);
     }
   }
-  return { classId, learned, equipped, attrs };
+  const weapons = {};
+  if (classId && src.weapons && typeof src.weapons === 'object') {
+    for (const def of CLASSES[classId].weapons || []) {
+      const n = src.weapons[def.id] | 0;
+      if (n > 0) weapons[def.id] = Math.min(def.max, n);
+    }
+  }
+  return { classId, learned, equipped, attrs, weapons };
 }

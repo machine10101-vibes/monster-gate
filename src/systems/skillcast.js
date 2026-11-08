@@ -34,6 +34,12 @@ export function skillMods(game) {
     deadeye: false,
     wolf: 1,
     wolfHeal: 0,
+    speed: 1,
+    knock: 1,
+    blockDr: 0,
+    flatRanged: 0,
+    pierce: false,
+    haste: 0,
   };
   if (!p || !pr) return mods;
   if (has('fortify')) {
@@ -97,7 +103,36 @@ export function skillMods(game) {
   mods.slowMul = Math.max(0.25, mods.slowMul - pot * 0.03);
   mods.slowTime += pot * 0.4;
   mods.chain += pot * 0.04;
+  const style = heldItem(game)?.style;
+  const wr = (id) => (style === id ? pr.weaponRank(id) : 0);
+  const sword = wr('swordshield');
+  const two = wr('twohand');
+  const dual = wr('dual');
+  const shortbow = wr('shortbow');
+  const longbow = wr('longbow');
+  const crossbow = wr('crossbow');
+  const staff = wr('staff');
+  const wand = wr('wand');
+  const tome = wr('tome');
+  mods.melee *= (1 + sword * 0.08) * (1 + two * 0.1) * (1 + dual * 0.06);
+  mods.ranged *= (1 + shortbow * 0.06) * (1 + longbow * 0.1) * (1 + crossbow * 0.08);
+  mods.spell *= (1 + staff * 0.08) * (1 + wand * 0.05) * (1 + tome * 0.07);
+  mods.knock = 1 + two * 0.12;
+  mods.blockDr = sword * 0.04;
+  mods.flatRanged = crossbow * 2;
+  mods.pierce = crossbow > 0;
+  mods.crit += dual * 0.03 + longbow * 0.04 + tome * 0.03;
+  mods.mana += staff * 4 + tome * 6;
+  mods.speed *= Math.max(0.7, 1 - dual * 0.07) * Math.max(0.7, 1 - shortbow * 0.07) * Math.max(0.75, 1 - wand * 0.06);
+  mods.haste = wand * 0.05;
+  if (wand) mods.manaCost *= Math.max(0.75, 1 - wand * 0.05);
   return mods;
+}
+
+function heldItem(game) {
+  const items = game?.items;
+  if (!items || game.sel == null) return null;
+  return items[game.sel] || null;
 }
 
 export function scaleDmg(game, amount, kind) {
@@ -157,7 +192,8 @@ export function castSkill(game, id) {
   }
   if (!effect(game, skill)) return false;
   pay(game, skill);
-  p.cds[id] = skill.cd || 1;
+  const haste = skillMods(game).haste || 0;
+  p.cds[id] = (skill.cd || 1) * Math.max(0.7, 1 - haste);
   game.hud.floatText(...game.screenOf(p.pos.x, p.pos.y + 2.15, p.pos.z), skill.name, 'gold');
   return true;
 }
