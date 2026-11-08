@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildDarksycleDragon } from './creatures.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
-import { ZONE, GATE, TOWN, WATER_Y, CENTER } from '../world/terrain.js';
+import { statusFx } from '../systems/skillfx.js';
+import { ZONE, GATE, TOWN, WATER_Y, CENTER, MINE, LAKE } from '../world/terrain.js';
 
 const TAU = Math.PI * 2;
 function angDiff(a, b) {
@@ -58,6 +59,14 @@ export class Monster {
     this.cd = 1 + Math.random();
     this.hitCd = 0;
     this.stun = 0;
+    this.poisonT = 0;
+    this.poisonDps = 0;
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.slowT = 0;
+    this.slowMul = 1;
+    this.markT = 0;
+    this.markAmp = 0;
     this.flash = 0;
     this.dead = false;
     this.deadT = 0;
@@ -125,8 +134,57 @@ export class Monster {
     } else m.position.set(this.x, gy + 0.1, this.z);
   }
 
+  afflict(kind, time, power) {
+    if (this.dead) return;
+    if (kind === 'poison') {
+      this.poisonT = Math.max(this.poisonT || 0, time);
+      this.poisonDps = Math.max(this.poisonDps || 0, power);
+    } else if (kind === 'burn') {
+      this.burnT = Math.max(this.burnT || 0, time);
+      this.burnDps = Math.max(this.burnDps || 0, power);
+    } else if (kind === 'slow') {
+      const longer = time >= (this.slowT || 0);
+      this.slowT = Math.max(this.slowT || 0, time);
+      this.slowMul = longer ? power : Math.min(this.slowMul || 1, power);
+    } else if (kind === 'mark') {
+      this.markT = Math.max(this.markT || 0, time);
+      this.markAmp = power;
+    } else if (kind === 'stun') {
+      this.stun = Math.max(this.stun || 0, time);
+    }
+  }
+
+  tickStatus(dt) {
+    if (this.dead) return false;
+    const tick = (timeKey, dpsKey, accKey, color) => {
+      if (this[timeKey] <= 0) return;
+      this[timeKey] = Math.max(0, this[timeKey] - dt);
+      this[accKey] = (this[accKey] || 0) + dt;
+      if (this[accKey] < 0.5) return;
+      this[accKey] -= 0.5;
+      this.hp -= (this[dpsKey] || 0) * 0.5;
+      this.game.fx.burst(this.x, this.y + 0.8 + (this.hover || 0), this.z, color, 3, 1.4, 0.07, 0.35);
+    };
+    tick('poisonT', 'poisonDps', '_poisAcc', 0x7dff5a);
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.die();
+      return true;
+    }
+    tick('burnT', 'burnDps', '_burnAcc', 0xff7a1a);
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.die();
+      return true;
+    }
+    if (this.slowT > 0) this.slowT = Math.max(0, this.slowT - dt);
+    if (this.markT > 0) this.markT = Math.max(0, this.markT - dt);
+    return false;
+  }
+
   takeHit(dmg, dx, dz, knock, crit = false) {
     if (this.dead) return;
+    if (this.markT > 0) dmg = Math.max(1, Math.round(dmg * (1 + (this.markAmp || 0.4))));
     const g = this.game;
     this.hp -= dmg;
     this.flash = 0.18;
@@ -206,7 +264,7 @@ export class Monster {
     const h = w.heightAt(x, z);
     if (h - this.y > 1.01 || h < WATER_Y - 0.1 || h > 9) return false;
     const zn = w.zoneAt(x, z);
-    if (zn === ZONE.TOWN) return false;
+    if (zn === ZONE.TOWN || zn === ZONE.MINE || w.onDock(x, z, 0.4)) return false;
     return true;
   }
 
@@ -291,6 +349,8 @@ export class Monster {
     this.hitT = Math.max(0, this.hitT - dt);
     this.landT = Math.max(0, this.landT - dt);
     this.kick = Math.max(0, this.kick - dt * 4.5);
+    if (this.tickStatus(dt)) return;
+    statusFx(g, this, dt);
     if (this.pend && this.stun <= 0) {
       this.pendT -= dt;
       if (this.pendT <= 0) this.launchHop();
@@ -508,6 +568,8 @@ export class Monster {
               } else {
                 this.state = 'bite';
                 this.t = 0;
+                g.vfx.slashArc(this.x, this.y + 0.95, this.z, Math.atan2(dx, dz), { radius: 1.9, thick: 1.0, sweep: 1.9, color: 0xfff0d0, hot: 0xffffff, tilt: 0.5, life: 0.22, sweepT: 0.1, forward: 0 });
+                g.vfx.glow(this.x + Math.sin(this.yaw) * 1.5, this.y + 1, this.z + Math.cos(this.yaw) * 1.5, 0xff6a5a, 2.2, 0.2, { grow: 0.5 });
                 this.hitDone = false;
                 this.chargeDir.set(dx / (dist || 1), 0, dz / (dist || 1));
                 this.vx = this.chargeDir.x * 7.5;
@@ -603,6 +665,8 @@ export class Monster {
               } else {
                 if (dist < 4.8 && P.hurt(this.def.dmg + 1, this.x, this.z, 8)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0xb25cff], 8, 3, 0.09, 0.35);
                 g.fx.ring(this.x, this.y + this.hover - 0.2, this.z, 0xb25cff, 14, 4.2, 0.1, 0.4);
+                g.vfx.slashArc(this.x, this.y + this.hover + 0.9, this.z, a, { radius: 3.4, thick: 1.5, sweep: 5.8, color: 0xb25cff, hot: 0xf0e0ff, life: 0.4, sweepT: 0.22, tail: 0.95, follow: () => ({ x: this.x, y: this.y + this.hover, z: this.z }) });
+                g.vfx.glow(this.x, this.y + this.hover + 0.9, this.z, 0xb25cff, 4, 0.3, { grow: 0.6, gain: 0.7 });
                 g.fx.dust(this.x, this.y, this.z, 6, 2.4, 0xb9a6e0);
                 this.vx = -(dx / dist) * 9;
                 this.vz = -(dz / dist) * 9;
@@ -627,8 +691,17 @@ export class Monster {
     this.hitCd = Math.max(0, (this.hitCd || 0) - dt);
     this.vx *= Math.max(0, 1 - dt * (this.air ? 0.4 : 7));
     this.vz *= Math.max(0, 1 - dt * (this.air ? 0.4 : 7));
-    const sx = mvx + this.vx;
-    const sz = mvz + this.vz;
+    if (this.slowT > 0) {
+      const slow = this.slowMul == null ? 0.6 : this.slowMul;
+      mvx *= slow;
+      mvz *= slow;
+    }
+    const accel = this.type === 'boar' ? (this.state === 'charge' ? 24 : 9) : this.type === 'budgedragon' ? 8 : this.type === 'darksycledragon' ? 5 : this.type === 'wraith' ? 4 : 30;
+    const ak = 1 - Math.exp(-accel * dt);
+    this.smx = (this.smx || 0) + (mvx - (this.smx || 0)) * ak;
+    this.smz = (this.smz || 0) + (mvz - (this.smz || 0)) * ak;
+    const sx = this.smx + this.vx;
+    const sz = this.smz + this.vz;
     this.moveSpd = Math.hypot(sx, sz);
     this.moveBy(sx * dt, sz * dt);
 
@@ -708,10 +781,18 @@ export class Monster {
     const bankT = this.type === 'darksycledragon' ? -lat * 0.05 - this.yawRate * 0.012 : this.type === 'wraith' ? -lat * 0.07 : -this.yawRate * 0.008;
     this.bank += (clamp(bankT, -0.32, 0.32) - (this.bank || 0)) * Math.min(1, dt * 7);
     if (Number.isNaN(this.bank)) this.bank = 0;
-    o.rotation.set(0, this.yaw, this.type === 'slime' || this.type === 'voidslime' ? 0 : this.bank);
+    if (this.vyaw == null) this.vyaw = this.yaw;
+    this.vyaw += angDiff(this.vyaw, this.yaw) * (1 - Math.exp(-(this.type === 'boar' ? 13 : this.type === 'wraith' ? 8 : 10) * dt));
+    const along = this.avx * Math.sin(this.yaw) + this.avz * Math.cos(this.yaw);
+    if (dt > 1e-4) this.accAlong = (this.accAlong || 0) + (((along - (this.prevAlong || 0)) / dt) - (this.accAlong || 0)) * Math.min(1, dt * 6);
+    this.prevAlong = along;
+    const pl = g.player.pos;
+    const lookYaw = this.dead ? 0 : clamp(angDiff(this.yaw, Math.atan2(pl.x - this.x, pl.z - this.z)), -0.75, 0.75) * (dist < 15 && this.state !== 'windup' && this.state !== 'charge' ? 0.7 : 0);
+    this.lookSm = (this.lookSm || 0) + (lookYaw - (this.lookSm || 0)) * Math.min(1, dt * 5);
+    o.rotation.set(0, this.vyaw, this.type === 'slime' || this.type === 'voidslime' ? 0 : this.bank);
 
     const heavy = this.type === 'budgedragon' || this.type === 'darksycledragon';
-    let rootX = -hk * (heavy ? 0.1 : 0.3);
+    let rootX = -hk * (heavy ? 0.1 : 0.3) + (this.type === 'slime' || this.type === 'voidslime' ? 0 : clamp(-(this.accAlong || 0) * (heavy ? 0.004 : 0.007), -0.12, 0.12));
     const rootZ = Math.sin(this.t * 70) * 0.05 * hk * (heavy ? 0.5 : 1);
     let rootY = 0;
     let rootSZ = 1;
@@ -779,6 +860,7 @@ export class Monster {
       else if (charging) headX = 0.42;
       else if (rec) headX = 0.32 + Math.sin(t * 7) * 0.04;
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);
+      p.head.rotation.y = this.lookSm * 0.8;
       p.body.rotation.z = winding ? Math.sin(t * 50) * 0.03 : Math.sin(c) * 0.025 * gait;
       p.body.scale.y = 1 + Math.sin(t * (rec ? 10 : 2.4)) * (rec ? 0.035 : 0.01);
       p.tail.rotation.z = Math.sin(t * (charging ? 16 : 8)) * 0.5;
@@ -830,6 +912,7 @@ export class Monster {
         jawX = 0.2 + 0.75 * wk;
         lean = -0.14 * wk;
         this.model.mat.emissive.setRGB(0.28 + Math.sin(t * 34) * 0.12, 0.07, 0);
+        if (this.atk === 'spit') g.vfx.glowNow(this.x + Math.sin(this.yaw) * 1.4, this.y + 1.05, this.z + Math.cos(this.yaw) * 1.4, 0xff8a1e, 0.6 + wk * 1.6, 0.9);
         if (this.atk === 'spit' && Math.random() < dt * 36) {
           g.fx.emit(this.x + Math.sin(this.yaw) * 1.4, this.y + 1.05, this.z + Math.cos(this.yaw) * 1.4, (Math.random() - 0.5) * 0.8, 0.8 + Math.random(), (Math.random() - 0.5) * 0.8, [0xff9a2a, 0xffe27a][Math.random() < 0.5 ? 0 : 1], 0.09, 0.35, -1);
         }
@@ -848,7 +931,7 @@ export class Monster {
       headX += this.kick * 0.35;
       lean += this.kick * 0.2;
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 16);
-      p.head.rotation.y += (headY - p.head.rotation.y) * Math.min(1, dt * 6);
+      p.head.rotation.y += (headY + this.lookSm - p.head.rotation.y) * Math.min(1, dt * 6);
       p.jaw.rotation.x += (jawX - p.jaw.rotation.x) * Math.min(1, dt * 22);
       p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * 12);
       o.scale.setScalar(spawnS * this.baseScale);
@@ -882,6 +965,7 @@ export class Monster {
         lean = -0.24 * k;
         const pulse = 0.18 + k * 0.25 + Math.sin(t * 30) * 0.06;
         this.model.mat.emissive.setRGB(pulse * 0.8, 0.02, pulse);
+        if (this.atk !== 'slash') g.vfx.glowNow(this.x + Math.sin(this.yaw) * 1.7, this.y + this.hover + 1.25, this.z + Math.cos(this.yaw) * 1.7, 0xb25cff, 0.6 + k * 2.2, 0.9);
         if (this.atk !== 'slash' && Math.random() < dt * 40 * k) {
           const a = Math.random() * TAU;
           const mx = this.x + Math.sin(this.yaw) * 1.7;
@@ -896,6 +980,7 @@ export class Monster {
       headX += this.kick * 0.3;
       lean += this.kick * 0.28;
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);
+      p.head.rotation.y += (this.lookSm * 0.9 - p.head.rotation.y) * Math.min(1, dt * 6);
       p.jaw.rotation.x += (jawX - p.jaw.rotation.x) * Math.min(1, dt * 18);
       p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * 8);
       p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04;
@@ -910,6 +995,7 @@ export class Monster {
       o.scale.setScalar(spawnS * this.baseScale);
       if (winding) {
         this.model.mat.emissive.setRGB(0.25 + Math.sin(t * 36) * 0.15, 0.0, 0.35);
+        g.vfx.glowNow(this.x + Math.sin(this.yaw) * 0.6, this.y + this.hover + 1.5, this.z + Math.cos(this.yaw) * 0.6, 0xc27bff, 0.5 + wk * 1.5, 0.9);
         if (Math.random() < dt * 30 * wk) {
           const a = Math.random() * TAU;
           g.fx.emit(this.x + Math.sin(this.yaw) * 0.6 + Math.cos(a) * 0.6, this.y + this.hover + 1.5 + Math.sin(a) * 0.6, this.z + Math.cos(this.yaw) * 0.6, -Math.cos(a) * 1.6, -Math.sin(a) * 1.6, 0, 0xc27bff, 0.08, 0.35, 0);
@@ -1102,8 +1188,8 @@ export class Spawner {
     const w = this.game.world;
     const spots = [
       ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
-      ['boar', 52, 44], ['boar', 94, 48], ['slime', 100, 66], ['slime', 44, 70], ['slime', 76, 102],
-      ['budgedragon', 101, 70], ['darksycledragon', 50, 90],
+      ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70], ['slime', 76, 102],
+      ['budgedragon', 120, 74], ['darksycledragon', 62, 120],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
     void w;
@@ -1141,7 +1227,9 @@ export class Spawner {
         z = CENTER.z + Math.sin(a) * rr;
       }
       if (!w.playable(x, z)) continue;
-      if (w.zoneAt(x, z) === ZONE.TOWN || w.zoneAt(x, z) === ZONE.WATER) continue;
+      const zn = w.zoneAt(x, z);
+      if (zn === ZONE.TOWN || zn === ZONE.WATER || zn === ZONE.LAKE || zn === ZONE.MINE) continue;
+      if (Math.hypot(x - MINE.x, z - MINE.z) < 17 || Math.hypot(x - LAKE.x, z - LAKE.z) < 16) continue;
       if (w.heightAt(x, z) < 0.9 || w.heightAt(x, z) > 7) continue;
       if (Math.hypot(x - P.x, z - P.z) < 14) continue;
       return { x, z, nearGate: roll < 0.45 };

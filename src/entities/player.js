@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
+import { DUAL_KINDS, TALL_KINDS } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
+import { SpringSet } from '../engine/motion.js';
+import { skillMods } from '../systems/skillcast.js';
+import { SKILLFX, meleeSwing } from '../systems/skillfx.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -78,6 +82,21 @@ export class Player {
     this.trail = new WeaponTrail(game.scene);
     this.tA = new THREE.Vector3();
     this.tB = new THREE.Vector3();
+    this.cds = {};
+    this.stillT = 0;
+    this.bulwarkT = 0;
+    this.warcryT = 0;
+    this.packT = 0;
+    this.leapT = 0;
+    this.leapArm = false;
+    this.leapLand = false;
+    this.leapPower = 14;
+    this.leapRadius = 2.4;
+    this.leapDir = new THREE.Vector3(0, 0, 1);
+    this.castT = 0;
+    this.castAnim = '';
+    this.ironHits = 0;
+    this.ironT = 0;
     this.setHeld('blade');
     this.syncObj();
   }
@@ -111,6 +130,16 @@ export class Player {
       g.traverse((o) => (o.castShadow = true));
       slot.add(g);
     }
+    const off = this.model.offhand;
+    if (off) {
+      while (off.children.length) off.remove(off.children[0]);
+      if (DUAL_KINDS.has(kind)) {
+        const twin = buildHeld(kind === 'dual' ? 'blade' : kind);
+        twin.scale.setScalar(kind === 'dual' ? 0.82 : 0.95);
+        twin.rotation.y = Math.PI;
+        off.add(twin);
+      }
+    }
   }
 
   get facing() {
@@ -136,7 +165,7 @@ export class Player {
     const f = this.facing;
     const blocked = this.shielding && this.state !== 'attack' && (f.x * -dx + f.z * -dz) / d > 0.25 && this.stamina > 0;
     if (blocked) {
-      this.stamina = Math.max(0, this.stamina - 14 - dmg * 3);
+      this.spend(14 + dmg * 3);
       this.stamDelay = 0.9;
       this.knock.set((dx / d) * knock * 0.5, 0, (dz / d) * knock * 0.5);
       g.fx.impact(this.pos.x + f.x * 0.6, this.pos.y + 1, this.pos.z + f.z * 0.6, -dx / d, -dz / d, [0xffffff, 0xffe27a, 0x9fd8ff], 0.9);
@@ -151,7 +180,14 @@ export class Player {
       }
       return false;
     }
-    dmg = Math.max(1, Math.round(dmg * (1 - this.reduction)));
+    const mods = skillMods(g);
+    if (this.ironHits > 0 && this.ironT > 0) {
+      this.ironHits--;
+      dmg = 1;
+    } else {
+      const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.shielding ? mods.blockDr || 0 : 0) + (this.bulwarkT > 0 ? 0.45 : 0));
+      dmg = Math.max(1, Math.round(dmg * (1 - dr)));
+    }
     this.hp = Math.max(0, this.hp - dmg);
     this.invuln = 0.9;
     this.hurtT = 0.4;
@@ -164,6 +200,7 @@ export class Player {
     g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), '-' + dmg, 'hurt');
     g.shake(0.25);
     g.hitstop(0.07);
+    if (this.state === 'gather') g.gather.cancel();
     if (this.state === 'attack' || this.state === 'use') this.setState('idle');
     if (this.hp <= 0) this.die();
     return true;
@@ -198,7 +235,43 @@ export class Player {
     this.stateDur = dur;
   }
 
+  spend(n) {
+    const used = Math.min(this.stamina, n);
+    this.stamina = Math.max(0, this.stamina - n);
+    if (used > 0) this.game.gather.train('stamina', used * 0.5);
+  }
+
+  beginGather(kind, x, z, face) {
+    this.gatherKind = kind;
+    this.gatherGo = { x, z };
+    this.gatherFace = face;
+    this.gatherReady = false;
+    this.gAnim = null;
+    this.setState('gather', 1e9);
+  }
+
+  endGather() {
+    if (this.state === 'gather') this.setState('idle');
+    this.gatherGo = null;
+    this.gatherReady = false;
+    this.gAnim = null;
+  }
+
+  /** Eat a gathered good from the bag. */
+  tryEat(good) {
+    if (this.dead || this.state === 'roll' || this.state === 'stagger' || this.state === 'attack' || this.state === 'use') return false;
+    if (this.hp >= this.maxHp) {
+      this.game.hud.toast('Already at full health', 1200);
+      return false;
+    }
+    if (this.state === 'gather') this.game.gather.cancel();
+    this.useFx = { heal: good.heal, mana: 0, eat: true };
+    this.setState('use', 0.6);
+    return true;
+  }
+
   tryAttack(item) {
+    if (this.state === 'gather') this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger') return false;
     if (this.state === 'attack' || this.state === 'use') {
       return false;
@@ -230,16 +303,19 @@ export class Player {
     this.attackItem = item;
     this.combo = this.comboT > 0 ? (this.combo + 1) % 3 : 0;
     this.attackHit = false;
-    this.stamina = Math.max(0, this.stamina - item.stam);
+    this.spend(item.stam);
     this.stamDelay = 0.7;
-    this.setState('attack', item.dur * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
+    const swing = skillMods(this.game).speed ?? 1;
+    this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
     this.game.audio.swing();
     return true;
   }
 
   tryRoll(dir) {
+    if (this.state === 'gather' && !this.dead) this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger' || this.stamina < 18) return false;
-    this.stamina -= 22;
+    this.spend(22);
+    this.game.gather.train('agility', 6);
     this.stamDelay = 0.8;
     this.rollDir.copy(dir.lengthSq() > 0.01 ? dir.clone().normalize() : this.facing);
     this.yaw = Math.atan2(this.rollDir.x, this.rollDir.z);
@@ -260,11 +336,21 @@ export class Player {
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.comboT = Math.max(0, this.comboT - dt);
     this.stamDelay = Math.max(0, this.stamDelay - dt);
+    this.castT = Math.max(0, this.castT - dt);
+    this.bulwarkT = Math.max(0, this.bulwarkT - dt);
+    this.ironT = Math.max(0, this.ironT - dt);
+    if (this.ironT <= 0) this.ironHits = 0;
+    this.warcryT = Math.max(0, this.warcryT - dt);
+    this.packT = Math.max(0, this.packT - dt);
+    for (const k of Object.keys(this.cds)) {
+      this.cds[k] -= dt;
+      if (this.cds[k] <= 0) delete this.cds[k];
+    }
 
     if (!this.dead) {
       if (this.stamDelay <= 0 && !(this.shielding && this.state === 'idle')) this.stamina = Math.min(this.maxStamina, this.stamina + 34 * dt);
       this.mana = Math.min(this.maxMana, this.mana + 1.6 * dt);
-      this.fury = Math.min(100, this.fury + 1.2 * dt);
+      this.fury = Math.min(100, this.fury + (1.2 + (skillMods(g).furyRegen || 0)) * dt);
     }
 
     const cy = g.cam.yaw;
@@ -278,13 +364,17 @@ export class Player {
     this.shielding = wantShield;
     if (wantShield && this.state === 'idle') this.state = 'idle';
     if (this.model.shieldG) this.model.shieldG.visible = this.shielding;
+    const dualHeld = DUAL_KINDS.has(this.heldKind);
+    if (this.model.offhand) this.model.offhand.visible = dualHeld && !this.shielding;
+    if (this.model.bookG) this.model.bookG.visible = !dualHeld && !this.shielding;
 
     let speed = 0;
     const moveDir = new THREE.Vector3();
+    const agi = 1 + (g.progress.level('agility') - 1) * 0.003;
     switch (this.state) {
       case 'roll': {
         const t = this.stateT / this.stateDur;
-        speed = 9.5 * (1 - t * 0.55);
+        speed = 9.5 * agi * (1 - t * 0.55);
         moveDir.copy(this.rollDir);
         if (this.stateT >= this.stateDur) this.setState('idle');
         break;
@@ -314,7 +404,8 @@ export class Player {
         if (!this.potionDone && this.stateT > 0.3) {
           this.potionDone = true;
           const fx = this.useFx || { heal: 8, mana: 0 };
-          g.audio.potion();
+          if (fx.eat) g.audio.tone(320, 0.06, 'square', 0.1, 120);
+          else g.audio.potion();
           if (fx.heal) {
             this.heal(fx.heal);
             g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff6a8a, 0xffc0cc, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
@@ -334,6 +425,23 @@ export class Player {
         }
         break;
       }
+      case 'gather': {
+        if (inputMag > 0.35 || this.hurtT > 0.3) {
+          g.gather.cancel();
+          break;
+        }
+        const go = this.gatherGo;
+        if (go && !this.gatherReady) {
+          const dx = go.x - this.pos.x;
+          const dz = go.z - this.pos.z;
+          const d = Math.hypot(dx, dz);
+          if (d > 0.16 && this.stateT < 4.5) {
+            moveDir.set(dx / d, 0, dz / d);
+            speed = Math.min(3.8, 0.9 + d * 5);
+          } else this.gatherReady = true;
+        }
+        break;
+      }
       case 'stagger':
         if (this.stateT >= this.stateDur) this.setState('idle');
         break;
@@ -342,12 +450,17 @@ export class Player {
       default: {
         if (inputMag > 0.05) {
           moveDir.copy(want).normalize();
-          speed = 4.7 * inputMag * (this.shielding ? 0.5 : 1);
+          speed = 4.7 * agi * inputMag * (this.shielding ? 0.5 : 1);
         }
       }
     }
 
     if (this.wading && this.state !== 'roll') speed *= 0.65;
+    if (this.leapT > 0) {
+      this.leapT -= dt;
+      speed = 13;
+      moveDir.copy(this.leapDir);
+    }
 
     const prevAlong = this.vel.x * Math.sin(this.yaw) + this.vel.z * Math.cos(this.yaw);
     const rate = this.state === 'roll' ? 45 : this.state === 'attack' ? 26 : speed > 0 ? 15 : 12;
@@ -357,6 +470,8 @@ export class Player {
     this.knock.multiplyScalar(Math.max(0, 1 - dt * 9));
     this.moveBy(this.vel.x * dt, this.vel.z * dt);
     this.speed = Math.hypot(this.vel.x, this.vel.z);
+    if (!this.dead && this.speed < 0.35 && this.state !== 'roll') this.stillT = Math.min(2.5, this.stillT + dt);
+    else this.stillT = 0;
     if (dt > 1e-4) {
       const along = this.vel.x * Math.sin(this.yaw) + this.vel.z * Math.cos(this.yaw);
       this.accSm += ((along - prevAlong) / dt - this.accSm) * Math.min(1, dt * 9);
@@ -365,7 +480,10 @@ export class Player {
 
     if (!this.dead && this.state !== 'roll' && this.state !== 'attack') {
       let target = this.yaw;
-      if (this.shielding || (inp.attackHeld && !this.game.input.touch)) {
+      if (this.state === 'gather') {
+        if (this.gatherReady) target = this.gatherFace;
+        else if (speed > 0.2) target = Math.atan2(moveDir.x, moveDir.z);
+      } else if (this.shielding || (inp.attackHeld && !this.game.input.touch)) {
         if (this.aimDir) target = Math.atan2(this.aimDir.x, this.aimDir.z);
       } else if (inputMag > 0.1) target = Math.atan2(moveDir.x, moveDir.z);
       this.yaw += angDiff(this.yaw, target) * Math.min(1, dt * 16);
@@ -374,13 +492,20 @@ export class Player {
 
     this.updateGround(dt);
 
+    if (this.state === 'idle' && this.speed > 3.4 && !this.wading) {
+      this.runAcc = (this.runAcc || 0) + this.speed * dt;
+      if (this.runAcc >= 12) {
+        this.runAcc -= 12;
+        g.gather.train('agility', 2);
+      }
+    }
     const moving = this.speed > 0.4 && this.state !== 'dead';
     this.moveAmt = lerp(this.moveAmt, moving ? clamp(this.speed / 4.7, 0.3, 1.4) : 0, Math.min(1, dt * 12));
     this.cycle += dt * (this.speed * 2.2 + 0.01);
     const foot = Math.floor(this.cycle / Math.PI);
     if (foot !== this.footIdx) {
       this.footIdx = foot;
-      if (moving && (this.state === 'idle' || this.state === 'use') && this.speed > 1.2 && !this.wading) {
+      if (moving && (this.state === 'idle' || this.state === 'use' || this.state === 'gather') && this.speed > 1.2 && !this.wading) {
         g.audio.step();
         if (this.speed > 3) g.fx.dust(this.pos.x - Math.sin(this.yaw) * 0.1, this.pos.y, this.pos.z - Math.cos(this.yaw) * 0.1, 2, 0.7);
       }
@@ -446,6 +571,12 @@ export class Player {
       this.vy -= 26 * dt;
       this.pos.y += this.vy * dt;
       if (this.pos.y <= target) {
+        if (this.leapArm && this.vy < 0) {
+          this.leapArm = false;
+          this.leapT = 0;
+          this.leapLand = true;
+        }
+        if (this.vy < -4.5) this.landT = clamp(-this.vy * 0.012, 0.04, 0.16);
         if (this.vy < -7) {
           this.game.fx.burst(this.pos.x, target + 0.1, this.pos.z, [0xd9c9a0, 0x9bd06a], 8, 2, 0.1, 0.4);
         }
@@ -461,10 +592,11 @@ export class Player {
   doAttackHit(it) {
     const g = this.game;
     const f = this.facing;
+    const mods = skillMods(g);
     if (it.kind === 'melee') {
       const mult = this.combo === 2 ? 1.5 : 1;
       const reach = it.reach * (this.combo === 2 ? 1.2 : 1);
-      g.fx.doSlash(this.pos.x, this.pos.y + 0.55, this.pos.z, Math.atan2(-f.z, f.x), reach / 2.5, this.combo === 2 ? 0xffd27a : 0xfff2c0, this.combo === 1 ? -1 : 1);
+      meleeSwing(g, this, it, this.combo, reach);
       let hits = 0;
       for (const m of g.monsters) {
         if (m.dead) continue;
@@ -474,8 +606,11 @@ export class Player {
         if (d > reach + m.radius) continue;
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
-        const crit = Math.random() < 0.12;
-        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25)), dx / (d || 1), dz / (d || 1), it.knock * (this.combo === 2 ? 1.5 : 1), crit);
+        const crit = Math.random() < 0.12 + (mods.crit || 0);
+        const dmgOut = Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee);
+        g.strikeMonster(m, dmgOut, dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
+        g.gather.train('strength', 2 + dmgOut * 0.8);
+        if (mods.poison && !m.dead) m.afflict('poison', 4 + (mods.poisonTime || 0), 4 + (mods.poisonBonus || 0));
         hits++;
       }
       if (this.combo === 2) {
@@ -489,17 +624,27 @@ export class Player {
         g.hitstop(0.05 + Math.min(0.06, hits * 0.02) + (this.combo === 2 ? 0.04 : 0));
         g.shake(this.combo === 2 ? 0.3 : 0.18);
         g.punch(this.combo === 2 ? 0.34 : 0.16);
-        this.fury = Math.min(100, this.fury + 7 * hits);
+        this.fury = Math.min(100, this.fury + Math.round(7 * mods.furyGain) * hits);
         g.audio.hit();
       }
     } else if (it.kind === 'ranged') {
+      const focus = it.style === 'staff' || it.style === 'wand' || it.style === 'tome';
+      let dmg = it.dmg + (it.style === 'crossbow' ? mods.flatRanged || 0 : 0);
+      let aimed = false;
+      if (mods.deadeye && this.stillT > 0.7 && !focus) {
+        dmg = Math.round(dmg * 1.8);
+        aimed = true;
+        this.stillT = 0;
+        g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.2, this.pos.z), 'Aimed', 'crit');
+      }
+      const pierce = (it.style === 'crossbow' && mods.pierce) || it.proj === 'crescent';
       if (it.proj) {
-        const sp = it.proj === 'gloom' ? 12 : 18;
-        g.spawnProjectile({ owner: 'player', kind: it.proj, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg: it.dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce: it.proj === 'crescent', homing: it.proj === 'gloom' ? 3.2 : 0 });
-        g.audio.tone(it.proj === 'gloom' ? 260 : 620, 0.14, 'sawtooth', 0.08, -200);
+        const sp = it.proj === 'gloom' ? 12 : it.proj === 'bolt' ? 16 : 18;
+        g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
+        g.audio.tone(it.proj === 'gloom' ? 260 : focus ? 720 : 620, 0.14, 'sawtooth', 0.08, -200);
       } else {
-        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * 20, vz: f.z * 20, dmg: it.dmg, life: 1.3, r: 0.35 });
-        g.audio.tone(900, 0.08, 'triangle', 0.1, -500);
+        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * (it.style === 'crossbow' ? 26 : 20), vz: f.z * (it.style === 'crossbow' ? 26 : 20), dmg, life: 1.3, r: 0.35, crit: aimed, pierce });
+        g.audio.tone(it.style === 'crossbow' ? 420 : 900, 0.08, 'triangle', 0.1, -500);
       }
     } else if (it.kind === 'throw') {
       if (it.count <= 0) return;
@@ -511,13 +656,24 @@ export class Player {
 
   castBolt() {
     const g = this.game;
-    if (this.dead || this.mana < 8 || this.state === 'roll' || this.state === 'stagger') return;
-    this.mana -= 8;
+    const cost = Math.max(1, Math.round(8 * (skillMods(g).manaCost ?? 1)));
+    if (this.dead || this.mana < cost || this.state === 'roll' || this.state === 'stagger') return;
+    this.mana -= cost;
     const f = this.facing;
     this.setState('use', 0.32);
     this.potionDone = true;
     g.audio.bolt();
-    g.spawnProjectile({ owner: 'player', kind: 'bolt', x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.6, vx: f.x * 15, vz: f.z * 15, dmg: 11, life: 1.2, r: 0.5, pierce: true });
+    g.spawnProjectile({ owner: 'player', kind: 'bolt', spell: true, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.6, vx: f.x * 15, vz: f.z * 15, dmg: 11, life: 1.2, r: 0.5, pierce: true });
+  }
+
+  playCast(kind, dur = 0.34) {
+    if (this.dead) return;
+    this.castAnim = kind || 'cast';
+    this.castT = dur;
+    if (this.state !== 'roll' && this.state !== 'attack' && this.state !== 'dead' && this.state !== 'stagger') {
+      this.setState('use', Math.max(0.24, Math.min(0.4, dur)));
+      this.potionDone = true;
+    }
   }
 
   castFury() {
@@ -530,10 +686,8 @@ export class Player {
     g.audio.fury();
     g.shake(0.6);
     g.hitstop(0.1);
-    g.fx.ring(this.pos.x, this.pos.y + 0.3, this.pos.z, 0xffb347, 28, 8, 0.14, 0.6);
-    g.fx.ring(this.pos.x, this.pos.y + 0.6, this.pos.z, 0xfff0b0, 20, 5.5, 0.12, 0.5);
-    g.fx.burst(this.pos.x, this.pos.y + 0.5, this.pos.z, [0xff8a1e, 0xffd27a, 0xffffff], 30, 6, 0.14, 0.7);
-    g.fx.doSlash(this.pos.x, this.pos.y + 0.6, this.pos.z, 0, 2.2, 0xffb347, 1);
+    SKILLFX.warcry(g, this, 5.5, 0);
+    SKILLFX.whirlwind(g, this, 4.6, 0xffb347, 0xfff0b0);
     for (const m of g.monsters) {
       if (m.dead) continue;
       const dx = m.x - this.pos.x;
@@ -767,7 +921,130 @@ export class Player {
         }
         break;
       }
+      case 'gather': {
+        const a = this.gAnim;
+        if (!a || !this.gatherReady) break;
+        const u = a.u;
+        rate = 28;
+        legExtraL = 0;
+        legExtraR = 0;
+        liftL = 0;
+        liftR = 0;
+        if (a.name === 'mine') {
+          if (u < 0.5) {
+            const p = ease(u / 0.5);
+            armR = lerp(-0.7, -3.0, p);
+            armL = lerp(-0.4, -2.75, p);
+            armRz = lerp(-0.05, 0.1, p);
+            armLz = lerp(0.05, -0.05, p);
+            lean = lerp(0.06, -0.3, p);
+            torsoYaw = lerp(0, 0.22, p);
+            legL = lerp(0.25, 0.5, p);
+            legR = lerp(-0.25, -0.2, p);
+            crouch = 0.02;
+            headPitch = lerp(0, -0.12, p);
+          } else if (u < 0.62) {
+            const f = ease((u - 0.5) / 0.12);
+            armR = lerp(-3.0, 0.1, f);
+            armL = lerp(-2.75, -0.1, f);
+            armRz = 0.1;
+            lean = lerp(-0.3, 0.62, f);
+            torsoYaw = lerp(0.22, -0.12, f);
+            legL = lerp(0.5, 0.85, f);
+            legR = lerp(-0.2, -0.55, f);
+            crouch = lerp(0.02, 0.13, f);
+            headPitch = lerp(-0.12, 0.2, f);
+          } else {
+            const q = ease((u - 0.62) / 0.38);
+            armR = lerp(0.1, -0.7, q);
+            armL = lerp(-0.1, -0.4, q);
+            armRz = 0.1 * (1 - q) - 0.05 * q;
+            lean = lerp(0.62, 0.06, q);
+            torsoYaw = lerp(-0.12, 0, q);
+            legL = lerp(0.85, 0.25, q);
+            legR = lerp(-0.55, -0.25, q);
+            crouch = lerp(0.13, 0.02, q);
+            headPitch = lerp(0.2, 0, q);
+          }
+        } else if (a.name === 'cast') {
+          const back = ease(clamp(u / 0.5, 0, 1));
+          const fwd = ease(clamp((u - 0.5) / 0.16, 0, 1));
+          const settle = ease(clamp((u - 0.72) / 0.28, 0, 1));
+          armR = lerp(lerp(-0.8, -2.7, back), -1.0, fwd);
+          armL = lerp(-0.4, -0.9, back) * (1 - fwd * 0.4);
+          lean = lerp(lerp(0.04, -0.22, back), 0.2, fwd) * (1 - settle * 0.7);
+          torsoYaw = lerp(0.2 * back, -0.15, fwd) * (1 - settle);
+          legL = 0.3;
+          legR = -0.3;
+          headPitch = lerp(0, 0.1, settle);
+        } else if (a.name === 'wait') {
+          const sway = Math.sin(t * 1.3) * 0.02;
+          armR = -1.05 + sway - a.dip * 0.22;
+          armL = -0.62 + sway * 0.5;
+          armLz = 0.12;
+          lean = 0.07;
+          torsoYaw = -0.12;
+          legL = 0.28;
+          legR = -0.28;
+          headPitch = 0.14 + a.dip * 0.12;
+          headYaw = Math.sin(t * 0.7) * 0.12;
+        } else if (a.name === 'bite') {
+          const y1 = ease(clamp(u / 0.3, 0, 1));
+          const y2 = ease(clamp((u - 0.35) / 0.65, 0, 1));
+          armR = lerp(lerp(-1.05, -2.3, y1), -1.1, y2);
+          armL = lerp(-0.62, -1.5, y1) * (1 - y2) + -0.6 * y2;
+          lean = lerp(lerp(0.07, -0.34, y1), 0.07, y2);
+          torsoYaw = -0.12;
+          legL = 0.4 * (1 - y2) + 0.28 * y2;
+          legR = -0.4 * (1 - y2) - 0.28 * y2;
+          headPitch = lerp(0.14, -0.2, y1) * (1 - y2) + 0.14 * y2;
+        } else if (a.name === 'net') {
+          const rise = ease(clamp(u / 0.22, 0, 1));
+          const dip = ease(clamp((u - 0.22) / 0.26, 0, 1));
+          const lift = ease(clamp((u - 0.58) / 0.28, 0, 1));
+          const rest = ease(clamp((u - 0.86) / 0.14, 0, 1));
+          armR = -0.6 - rise * 0.5;
+          armR = lerp(armR, 0.2, dip);
+          armR = lerp(armR, -1.5, lift);
+          armR = lerp(armR, -0.7, rest);
+          armL = lerp(-0.3, -0.8, rise) * (1 - dip) + lerp(0.1, -1.1, lift) * dip;
+          lean = lerp(0.1 * rise, 0.65, dip);
+          lean = lerp(lean, 0.15, lift);
+          lean = lerp(lean, 0.06, rest);
+          crouch = 0.1 * dip * (1 - lift);
+          legL = 0.55 * dip * (1 - lift) + 0.2;
+          legR = -0.35 * dip * (1 - lift) - 0.2;
+          torsoYaw = -0.1;
+          headPitch = 0.2 * dip * (1 - lift);
+        }
+        break;
+      }
       default:
+    }
+
+    if (this.leapArm || this.leapT > 0) {
+      const rising = this.vy > 0;
+      armR = rising ? -2.6 : -0.4;
+      armL = rising ? -2.6 : -0.2;
+      legL = rising ? -0.9 : 0.6;
+      legR = rising ? 0.2 : 0.7;
+      lean = rising ? 0.45 : 0.15;
+      torsoYaw = 0;
+    } else if (this.castT > 0) {
+      if (this.castAnim === 'spin') {
+        armR = -1.6;
+        armL = -1.6;
+        torsoYaw = Math.sin(this.castT * 32) * 1.15;
+        lean = 0.08;
+      } else if (this.castAnim === 'bash') {
+        armL = -1.9;
+        torsoYaw = 0.7;
+        lean = 0.12;
+      } else if (this.castAnim === 'slam') {
+        armR = -2.5;
+        armL = -2.5;
+        lean = 0.35;
+      }
     }
 
     if (flinch > 0 && this.state !== 'dead' && this.state !== 'roll') {
@@ -781,36 +1058,143 @@ export class Player {
       crouch += 0.05 * f2;
     }
 
-    const s = Math.min(1, dt * rate);
-    const lerpRot = (obj, axis, v, kk = s) => (obj.rotation[axis] += (v - obj.rotation[axis]) * kk);
-    lerpRot(m.armR, 'x', armR);
-    lerpRot(m.armR, 'z', armRz);
-    lerpRot(m.armL, 'x', armL);
-    lerpRot(m.armL, 'z', armLz);
-    const legSpeed = Math.min(1, dt * (this.state === 'attack' ? 30 : 26));
-    lerpRot(m.legL, 'x', legL + legExtraL, legSpeed);
-    lerpRot(m.legR, 'x', legR + legExtraR, legSpeed);
-    lerpRot(m.upper, 'y', torsoYaw);
-    lerpRot(m.upper, 'x', lean);
-    lerpRot(m.upper, 'z', tilt * 0.6, Math.min(1, dt * 12));
-    lerpRot(m.head, 'x', headPitch);
-    m.head.rotation.y = -m.upper.rotation.y * 0.55 + headYaw;
-    const cl = Math.cos(m.legL.rotation.x);
-    const cr = Math.cos(m.legR.rotation.x);
-    const planted = 0.72 - 0.72 * 0.55 * (1 - Math.max(cl, cr));
-    m.hip.position.y = this.state === 'roll' || this.state === 'dead' ? 24 * S - crouch + bobExtra : planted - crouch + bobExtra;
+    dt = Math.min(dt, 0.05);
+    const sp = this.sp || (this.sp = new SpringSet());
+    if (this.landT > 0) {
+      crouch += this.landT;
+      this.landT = Math.max(0, this.landT - dt * 0.6);
+    }
+    const airborne = this.leapArm || this.leapT > 0;
+    const locomoting = this.state !== 'attack' && this.state !== 'roll' && this.state !== 'dead' && !airborne;
+    const rangedAim = this.state === 'attack' && this.attackItem?.kind === 'ranged';
+
+    const flexOf = (total) => 0.14 + clamp(-total - 0.5, 0, 2.6) * 0.3;
+    let eR = flexOf(armR);
+    let eL = flexOf(armL);
+    const swingR = Math.max(0, -walk);
+    const swingL = Math.max(0, walk);
+    if (locomoting) {
+      eR += run * (0.3 + 0.55 * swingR) * (heldBlade ? 0.65 : 1);
+      eL += run * (0.3 + 0.55 * swingL);
+    }
+    if (rangedAim) {
+      const tt = clamp(this.stateT / this.stateDur, 0, 1);
+      const pull = tt < 0.6 ? ease(tt / 0.6) : 1 - ease((tt - 0.6) / 0.4);
+      eR = AIMED_KINDS.has(this.heldKind) ? 0.1 : eR;
+      eL = 0.3 + 0.8 * pull;
+    }
+    if (this.state === 'roll') {
+      eR = 1.6;
+      eL = 1.6;
+    } else if (this.state === 'dead') {
+      eR = 0.5;
+      eL = 0.5;
+    } else if (this.state === 'stagger') {
+      eR += 0.35;
+      eL += 0.35;
+    }
+    if (airborne) {
+      eR = this.vy > 0 ? 0.3 : 0.7;
+      eL = eR;
+    }
+
+    const swL = Math.pow(Math.max(0, -cs), 0.85);
+    const swR = Math.pow(Math.max(0, cs), 0.85);
+    let kL = 0.06 + run * (0.12 + swL * 1.05);
+    let kR = 0.06 + run * (0.12 + swR * 1.05);
+    legL += legExtraL * 0.5;
+    legR += legExtraR * 0.5;
+    if (this.state === 'attack') {
+      kL = 0.1 + Math.abs(legL) * 0.45;
+      kR = 0.1 + Math.abs(legR) * 0.45;
+    }
+    if (airborne) {
+      kL = this.vy > 0 ? 0.9 : 0.35;
+      kR = this.vy > 0 ? 0.25 : 0.45;
+    }
+    let flex = 0;
+    if (this.state === 'roll') {
+      kL = 1.5;
+      kR = 1.5;
+    } else if (this.state === 'dead') {
+      kL = 1.3 * (crouch / 0.16 || 0);
+      kR = 0.6 * (crouch / 0.16 || 0);
+    } else {
+      const cs2 = sp.step('crouch', crouch, dt, 18, 0.55);
+      flex = Math.acos(clamp(1 - Math.max(0, cs2) / 0.72, 0.2, 1));
+      legL -= flex;
+      legR -= flex;
+      kL += flex * 2;
+      kR += flex * 2;
+    }
+
+    let near = null;
+    let nd = 8;
+    for (const mon of this.game.monsters) {
+      if (mon.dead) continue;
+      const d = Math.hypot(mon.x - this.pos.x, mon.z - this.pos.z);
+      if (d < nd) {
+        nd = d;
+        near = mon;
+      }
+    }
+    if (near && this.state !== 'dead' && this.state !== 'roll') {
+      const want = angDiff(this.yaw, Math.atan2(near.x - this.pos.x, near.z - this.pos.z));
+      headYaw += clamp(want, -0.85, 0.85) * (this.state === 'attack' ? 0.8 : 0.65);
+      headPitch += clamp(((near.y + 1.1) - (this.pos.y + 1.6)) / Math.max(1.5, nd), -0.25, 0.25) * -0.6;
+    }
+
+    const pelvis = torsoYaw * 0.3 - walk * 0.1 * run * (locomoting ? 1 : 0);
+    const shoulderTargetR = armR + eR;
+    const shoulderTargetL = armL + eL;
+    const wA = rate;
+    const jR = sp.step('armRx', shoulderTargetR, dt, wA, 0.78);
+    m.armR.rotation.x = jR;
+    m.armR.rotation.z = sp.step('armRz', armRz, dt, wA * 0.8, 0.8);
+    m.armL.rotation.x = sp.step('armLx', shoulderTargetL, dt, wA, 0.78);
+    m.armL.rotation.z = sp.step('armLz', armLz, dt, wA * 0.8, 0.8);
+    m.elbowR.rotation.x = -sp.step('elR', eR, dt, wA * 0.75, 0.55);
+    m.elbowL.rotation.x = -sp.step('elL', eL, dt, wA * 0.75, 0.55);
+    m.heldSlot.rotation.x = AIMED_KINDS.has(this.heldKind) ? -(m.armR.rotation.x + m.elbowR.rotation.x) : 0;
+
+    const legW = this.state === 'attack' ? 30 : 26;
+    m.legL.rotation.x = sp.step('legL', legL, dt, legW, 0.85);
+    m.legR.rotation.x = sp.step('legR', legR, dt, legW, 0.85);
+    m.kneeL.rotation.x = sp.step('kL', kL, dt, 30, 0.8);
+    m.kneeR.rotation.x = sp.step('kR', kR, dt, 30, 0.8);
+    m.legL.rotation.z = 0;
+    m.legR.rotation.z = 0;
+    m.legL.position.y = 0;
+    m.legR.position.y = 0;
+
+    m.hip.rotation.y = sp.step('pelvis', pelvis, dt, 18, 0.8);
+    m.upper.rotation.y = sp.step('torsoY', torsoYaw - pelvis, dt, rate * 0.75, 0.7);
+    m.upper.rotation.x = sp.step('lean', lean, dt, 16, 0.7);
+    m.upper.rotation.z = sp.step('tiltZ', tilt * 0.6, dt, 12, 0.9);
+    m.head.rotation.x = sp.step('headX', headPitch, dt, 14, 0.65);
+    const torsoWorld = m.hip.rotation.y + m.upper.rotation.y;
+    m.head.rotation.y = sp.step('headY', -torsoWorld * 0.55 + headYaw - m.hip.rotation.y * 0, dt, 12, 0.75);
+    m.upper.position.y = Math.sin(t * 1.9) * 0.006 * idle;
+
+    const T = 12 * S;
+    const depth = (th, k) => T * Math.cos(th) + T * Math.cos(th + k);
+    if (this.state === 'roll' || this.state === 'dead') {
+      m.hip.position.y = 24 * S - crouch + bobExtra;
+    } else {
+      const d = Math.max(depth(m.legL.rotation.x, m.kneeL.rotation.x), depth(m.legR.rotation.x, m.kneeR.rotation.x));
+      m.hip.position.y = d + bobExtra;
+    }
     m.hip.position.x += (hipX - m.hip.position.x) * Math.min(1, dt * 14);
     this.pivot.rotation.x = pivotX;
     this.pivot.rotation.z += (tilt * 0.4 - this.pivot.rotation.z) * Math.min(1, dt * 10);
     this.pivot.position.y = pivotY;
-    m.legL.rotation.z = 0;
-    m.legR.rotation.z = 0;
-    m.legL.position.y = liftL;
-    m.legR.position.y = liftR;
   }
 }
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe']);
+/** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
+const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow']);
+
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -819,5 +1203,13 @@ const TRAIL_SPEC = {
   hammer: { b: [0, 0, 0.6], t: [0, 0, 1.2], col: 0xe6e0d0, hot: 0xffd27a },
   budgeblade: { b: [0, 0, 0.35], t: [0, 0, 1.4], col: 0xb8ff8a, hot: 0xfff09a },
   budgemaul: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0xb8ff8a, hot: 0xfff09a },
-  darkscythe: { b: [-0.05, 0, 0.8], t: [-0.4, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
+  darkscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0xc78bff, hot: 0xe6c8ff },
+  darksword: { b: [0, 0, 0.35], t: [-0.15, 0, 1.4], col: 0xc78bff, hot: 0xe6c8ff },
+  budgegreatsword: { b: [0, 0, 0.5], t: [0, 0, 1.75], col: 0xb8ff8a, hot: 0xfff09a },
+  darkgreatsword: { b: [0, 0, 0.5], t: [-0.2, 0, 1.8], col: 0xc78bff, hot: 0xe6c8ff },
+  budgedual: { b: [0, 0, 0.25], t: [0.1, 0, 0.95], col: 0xb8ff8a, hot: 0xfff09a },
+  darkdual: { b: [0, 0, 0.25], t: [-0.2, 0, 0.95], col: 0xc78bff, hot: 0xe6c8ff },
+  darkhammer: { b: [0, 0, 0.8], t: [0, 0, 1.45], col: 0xc78bff, hot: 0xe6c8ff },
+  budgespear: { b: [0, 0, 1.6], t: [0, 0, 2.2], col: 0xb8ff8a, hot: 0xfff09a },
+  darkspear: { b: [0, 0, 1.6], t: [0, 0, 2.25], col: 0xc78bff, hot: 0xe6c8ff },
 };

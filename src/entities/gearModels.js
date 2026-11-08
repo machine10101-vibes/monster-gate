@@ -90,7 +90,7 @@ function hornModel(mat) {
   return meshFrom(M, 11, 14, 7, mat, SZ);
 }
 
-function hideModel(mat) {
+function hideModel(mat, P = BUDGE) {
   const M = new VoxelModel(24, 22, 6);
   for (let y = 0; y < 18; y++)
     for (let x = 0; x < 22; x++) {
@@ -100,15 +100,15 @@ function hideModel(mat) {
       if (ex ** 3 + ey ** 3 > 1 + wob * 0.06) continue;
       const stitch = (ex > 0.82 || ey > 0.8) && (x + y) % 2 === 0;
       const scaly = (x + ((y >> 1) & 1) * 2) % 4 < 2;
-      const base = stitch ? BUDGE.horn : scaly ? BUDGE.scaleLo : shadeHide(x, y);
+      const base = stitch ? P.horn : scaly ? P.scaleLo : shadeHide(x, y, P);
       M.set(x, y + 1, 0, J(base, x, y, 0, 6, 0.05));
-      M.set(x, y + 1, 1, J(stitch ? BUDGE.hornDark : BUDGE.scaleLo, x, y, 1, 7, 0.05));
-      if (!stitch && ex < 0.86 && ey < 0.84 && !scaly) M.set(x, y + 1, 2, J(BUDGE.scale, x, y, 2, 8, 0.05));
+      M.set(x, y + 1, 1, J(stitch ? P.hornDark : P.scaleLo, x, y, 1, 7, 0.05));
+      if (!stitch && ex < 0.86 && ey < 0.84 && !scaly) M.set(x, y + 1, 2, J(P.scale, x, y, 2, 8, 0.05));
     }
   return meshFrom(M, 11, 10, 2, mat, SZ);
 }
 
-const shadeHide = (x, y) => ((x + y) % 5 === 0 ? BUDGE.scaleHi : BUDGE.scale);
+const shadeHide = (x, y, P) => ((x + y) % 5 === 0 ? P.scaleHi : P.scale);
 
 function duskScaleModel(mat) {
   const M = new VoxelModel(18, 20, 6);
@@ -170,7 +170,7 @@ function scytheHornModel(mat) {
   return meshFrom(M, 12, 14, 6, mat, SZ);
 }
 
-function membraneModel(mat) {
+function membraneModel(mat, P = DARK) {
   const M = new VoxelModel(26, 22, 6);
   for (let y = 0; y < 18; y++)
     for (let x = 0; x < 24; x++) {
@@ -178,14 +178,14 @@ function membraneModel(mat) {
       const ey = (y + 0.5) / 18;
       const scallop = 0.08 * Math.abs(Math.sin(x * 0.7));
       if (ex ** 2.4 + (ey - 0.5 + scallop * 0.5) ** 2 * 3.4 > 1) continue;
-      M.set(x, y + 1, 0, J(ex > 0.8 ? DARK.membraneHi : DARK.membrane, x, y, 0, 14, 0.05));
-      M.set(x, y + 1, 1, J(DARK.membrane, x, y, 1, 15, 0.05));
+      M.set(x, y + 1, 0, J(ex > 0.8 ? P.membraneHi : P.membrane, x, y, 0, 14, 0.05));
+      M.set(x, y + 1, 1, J(P.membrane, x, y, 1, 15, 0.05));
     }
   for (const sx of [4, 9, 12, 15, 20]) for (let y = 1; y < 17; y++) {
     const vein = (y + sx) % 4 === 0;
-    M.set(sx, y + 1, 2, vein ? DARK.glow : DARK.membraneHi, vein);
+    M.set(sx, y + 1, 2, vein ? P.glow : P.membraneHi, vein);
   }
-  for (let x = 2; x < 22; x++) M.set(x, 1, 2, J(DARK.scaleHi, x, 0, 2, 16, 0.04));
+  for (let x = 2; x < 22; x++) M.set(x, 1, 2, J(P.scaleHi, x, 0, 2, 16, 0.04));
   return meshFrom(M, 12, 10, 2, mat, SZ);
 }
 
@@ -207,7 +207,12 @@ function gloomCoreModel(mat) {
   return meshFrom(M, 9, 11, 9, mat, SZ);
 }
 
-const BUILDERS = { budgescale: scaleModel, budgefang: fangModel, budgeclaw: clawModel, budgehorn: hornModel, budgehide: hideModel, duskscale: duskScaleModel, duskclaw: duskClawModel, scythehorn: scytheHornModel, gloommembrane: membraneModel, gloomcore: gloomCoreModel };
+const DUSK_HIDE = { scale: 0x3b3268, scaleLo: 0x251f48, scaleHi: 0x574c9c, horn: DARK.trim, hornDark: DARK.bladeDark };
+const BUDGE_MEMBRANE = { membrane: BUDGE.membrane, membraneHi: BUDGE.membraneHi, glow: BUDGE.vein, scaleHi: BUDGE.scaleHi };
+
+const BUILDERS = {
+  budgemembrane: (mat) => membraneModel(mat, BUDGE_MEMBRANE),
+  duskhide: (mat) => hideModel(mat, DUSK_HIDE), budgescale: scaleModel, budgefang: fangModel, budgeclaw: clawModel, budgehorn: hornModel, budgehide: hideModel, duskscale: duskScaleModel, duskclaw: duskClawModel, scythehorn: scytheHornModel, gloommembrane: membraneModel, gloomcore: gloomCoreModel };
 const cache = {};
 
 export function buildMaterialModel(id) {

@@ -55,6 +55,7 @@ export class FX {
     }
     this.emit(x, y, z, 0, 0, 0, 0xffffff, 0.2 + power * 0.1, 0.08, 0);
     this.emit(x, y, z, 0, 0, 0, 0xfff2c0, 0.32 + power * 0.14, 0.04, 0);
+    this.vfx?.hit(x, y, z, dx, dz, Array.isArray(color) ? color[0] : color, power);
   }
 
   dust(x, y, z, count = 3, spread = 1, color = 0xd9c9a0) {
@@ -68,6 +69,7 @@ export class FX {
   shockwave(x, y, z, color = 0xd9c9a0, radius = 2.2) {
     this.ring(x, y + 0.08, z, color, 18, radius * 2.2, 0.12, 0.42);
     this.dust(x, y, z, 8, radius * 1.4, color);
+    this.vfx?.ring(x, y + 0.1, z, { color, r0: 0.3, r1: radius * 1.5, life: 0.4, thick: 0.14, gain: 0.55 });
   }
 
   makeTelegraphs() {

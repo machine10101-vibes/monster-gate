@@ -469,6 +469,24 @@ const ART = {
     '................',
     '................',
   ],
+  tome: [
+    '................',
+    '................',
+    '..kkkkkkkkkk....',
+    '..kyyyyyyyyyk...',
+    '..kywwwwwwyyk...',
+    '..kywwwwwwyyk...',
+    '..kywwwwwwyyk...',
+    '..kywwwmwwwyk...',
+    '..kywwwwwwyyk...',
+    '..kywwwwwwyyk...',
+    '..kyyyyyyyyyk...',
+    '..kkkkkkkkkkk...',
+    '....bbbbbbb.....',
+    '................',
+    '................',
+    '................',
+  ],
   talk: [
     '................',
     '..wwwwwwwwwwww..',
@@ -567,7 +585,228 @@ ART.darkstaff = [
   '................',
 ];
 
+ART.dual = [
+  '................',
+  '...........ll...',
+  '..........lgl...',
+  '.........lggd...',
+  '........lggd....',
+  '...ll..lggd.....',
+  '..lgl.lggd......',
+  '.lggdlggd.......',
+  'lggd.ggd........',
+  'ggd.lgd.........',
+  'gd.lgd..........',
+  'd.yy............',
+  '..yy............',
+  '.bb.............',
+  'bb..............',
+  '................',
+];
+ART.crossbow = [
+  '................',
+  '......ll........',
+  '.....l..l.......',
+  '....l....l......',
+  '...l..bb..l.....',
+  '..l...bb...l....',
+  '.l....bb....l...',
+  'llllllbbllllll..',
+  '......bb........',
+  '......bb........',
+  '......bb........',
+  '......yy........',
+  '......yy........',
+  '................',
+  '................',
+  '................',
+];
+ART.wand = [
+  '................',
+  '.............cc.',
+  '............chc.',
+  '...........ccc..',
+  '..........b.....',
+  '.........b......',
+  '........b.......',
+  '.......b........',
+  '......b.........',
+  '.....b..........',
+  '....b...........',
+  '...y............',
+  '..y.............',
+  '................',
+  '................',
+  '................',
+];
+ART.tome = [
+  '................',
+  '..bbbbbbbbbb....',
+  '.bttttttttttb...',
+  '.btbbbbbbbbtb...',
+  '.bttttttttttb...',
+  '.btbbbbbbbbtb...',
+  '.bttttttttttb...',
+  '.btbbbbbbbbtb...',
+  '.bttttttttttb...',
+  '.bbbbbbbbbbbb...',
+  '..yyyyyyyyyy....',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+];
+
 const cache = {};
+
+function draw(fn) {
+  const g = Array.from({ length: 16 }, () => Array(16).fill('.'));
+  const p = (x, y, c) => {
+    if (x >= 0 && y >= 0 && x < 16 && y < 16) g[y][x] = c;
+  };
+  const line = (x0, y0, x1, y1, c) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= n; i++) p(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), c);
+  };
+  fn(p, line);
+  return g.map((r) => r.join(''));
+}
+
+const greatsword = (body, edge, guard, wood) =>
+  draw((p, line) => {
+    line(5, 10, 14, 1, body);
+    line(6, 10, 15, 1, edge);
+    line(5, 9, 13, 1, body);
+    line(2, 9, 6, 13, guard);
+    line(3, 9, 7, 13, guard);
+    line(3, 12, 1, 14, wood);
+    p(0, 15, guard);
+  });
+
+const spear = (body, edge, guard, wood, barb) =>
+  draw((p, line) => {
+    line(1, 14, 10, 5, wood);
+    line(2, 14, 11, 5, wood);
+    line(9, 6, 11, 4, guard);
+    line(10, 6, 12, 4, guard);
+    line(11, 4, 14, 1, body);
+    line(12, 4, 15, 1, edge);
+    line(11, 3, 13, 1, body);
+    if (barb) {
+      p(9, 3, barb);
+      p(8, 4, barb);
+      p(13, 7, barb);
+      p(12, 8, barb);
+    }
+  });
+
+const shortbow = (limb, grip, string, shaft, tip) =>
+  draw((p, line) => {
+    for (let y = 2; y <= 13; y++) {
+      const u = (y - 7.5) / 5.5;
+      const x = Math.round(3 + u * u * 4.5);
+      p(x, y, Math.abs(y - 7.5) < 1.6 ? grip : limb);
+    }
+    line(7, 2, 7, 13, string);
+    line(3, 8, 14, 8, shaft);
+    p(15, 8, tip);
+    p(14, 7, tip);
+    p(14, 9, tip);
+  });
+
+ART.budgegreatsword = greatsword('t', 'h', 'y', 'e');
+ART.darkgreatsword = greatsword('g', 'q', 'v', 'V');
+ART.darksword = recolor(ART.blade, { l: 'q', g: 'v', d: 'V', y: 'm', b: 'n' });
+ART.budgedual = recolor(ART.dual, { l: 'h', g: 't', d: 'Y', y: 'e', b: 'E' });
+ART.darkdual = recolor(ART.dual, { l: 'q', g: 'v', d: 'V', y: 'm', b: 'n' });
+ART.darkhammer = recolor(ART.budgemaul, { t: 'm', e: 'v', E: 'V', b: 'n', h: 'q' });
+ART.budgespear = spear('t', 'h', 'y', 'B', 'h');
+ART.darkspear = spear('l', 'q', 'v', 'n', 'm');
+ART.budgestaff = recolor(ART.darkstaff, { l: 'h', g: 't', q: 'y', m: 'o', v: 'e', V: 'E', n: 'B' });
+ART.budgewand = recolor(ART.wand, { c: 'o', h: 'y', b: 'e', y: 'Y' });
+ART.darkwand = recolor(ART.wand, { c: 'm', h: 'q', b: 'V', y: 'v' });
+ART.budgeshortbow = shortbow('t', 'e', 'w', 'B', 'h');
+ART.darkshortbow = shortbow('v', 'n', 'm', 'V', 'q');
+ART.budgecrossbow = recolor(ART.crossbow, { l: 'h', b: 'E', y: 'y' });
+ART.darkcrossbow = recolor(ART.crossbow, { l: 'q', b: 'V', y: 'm' });
+
+ART.stats = draw((p, line) => {
+  for (let y = 11; y <= 13; y++) for (let x = 2; x <= 4; x++) p(x, y, y === 11 ? 'h' : 'y');
+  for (let y = 7; y <= 13; y++) for (let x = 6; x <= 8; x++) p(x, y, y === 7 ? 'q' : 'p');
+  for (let y = 3; y <= 13; y++) for (let x = 10; x <= 12; x++) p(x, y, y === 3 ? 'h' : 'e');
+  line(1, 14, 14, 14, 'g');
+});
+
+ART.strength = draw((p, line) => {
+  line(3, 12, 12, 3, 'B');
+  line(4, 12, 12, 4, 'b');
+  for (const [x, y] of [[2, 10], [3, 10], [2, 11], [3, 11], [4, 13], [5, 13], [4, 14], [5, 14]]) p(x, y, 'r');
+  for (const [x, y] of [[10, 2], [11, 2], [10, 3], [11, 3], [12, 4], [13, 4], [12, 5], [13, 5]]) p(x, y, 'r');
+  p(2, 10, 'R');
+  p(12, 5, 'R');
+  p(10, 2, 'o');
+  p(4, 13, 'o');
+});
+
+ART.agility = draw((p, line) => {
+  for (let y = 4; y <= 10; y++) for (let x = 7; x <= 11; x++) p(x, y, x === 7 ? 'E' : 'e');
+  for (let y = 10; y <= 12; y++) for (let x = 7; x <= 14; x++) p(x, y, y === 12 ? 'B' : 'e');
+  line(7, 4, 11, 4, 'E');
+  line(7, 5, 11, 5, 'h');
+  line(7, 13, 14, 13, 'B');
+  line(13, 10, 14, 11, 'E');
+  line(1, 3, 6, 6, 'w');
+  line(2, 5, 6, 7, 'l');
+  line(3, 7, 6, 8, 'g');
+  line(0, 1, 5, 4, 'l');
+});
+
+ART.stamina = draw((p, line) => {
+  line(9, 1, 4, 8, 'y');
+  line(10, 1, 5, 8, 'h');
+  line(4, 8, 10, 8, 'y');
+  line(5, 9, 10, 9, 'Y');
+  line(10, 8, 6, 15, 'y');
+  line(11, 9, 7, 14, 'h');
+  line(9, 1, 11, 1, 'h');
+});
+
+ART.mining = draw((p, line) => {
+  line(3, 13, 11, 5, 'B');
+  line(4, 13, 12, 5, 'b');
+  line(2, 5, 6, 2, 's');
+  line(6, 2, 11, 2, 's');
+  line(11, 2, 14, 5, 's');
+  line(2, 6, 5, 3, 'l');
+  line(7, 3, 10, 3, 'l');
+  line(10, 3, 13, 5, 'g');
+  line(12, 4, 14, 6, 'S');
+  line(2, 5, 3, 7, 'S');
+  p(7, 4, 'S');
+  p(8, 4, 'S');
+  p(9, 4, 'S');
+});
+
+ART.fishing = draw((p, line) => {
+  for (let y = 5; y <= 11; y++) {
+    const half = 3 - Math.abs(y - 8) * 0.9;
+    for (let x = 3; x <= 11; x++) {
+      const u = (x - 7) / 5;
+      const r = 3.4 * Math.sqrt(Math.max(0, 1 - u * u));
+      if (Math.abs(y - 8) <= r) p(x, y, y >= 9 ? 'C' : 'c');
+    }
+    void half;
+  }
+  line(12, 8, 14, 5, 'c');
+  line(12, 8, 14, 11, 'C');
+  line(13, 6, 13, 10, 'c');
+  p(5, 7, 'k');
+  p(4, 7, 'w');
+  line(5, 9, 10, 9, 'w');
+  line(7, 5, 9, 4, 'C');
+});
+
 export function iconCanvas(name) {
   if (!cache[name]) cache[name] = make(ART[name] || ART.empty);
   return cache[name];

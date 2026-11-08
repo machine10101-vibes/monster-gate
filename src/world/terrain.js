@@ -10,6 +10,9 @@ export const GATE = { x: 72, z: 33 };
 export const WATER_Y = 0.35;
 export const PLAY_RADIUS = 52;
 export const FARM = { x0: 90, z0: 84, x1: 108, z1: 99 };
+export const MINE = { x: 98, z: 66, pitR: 5.5, rimR: 10.5, blend: 5.5, rimH: 3, floorH: 1, rampX0: 88, rampHW: 1.5 };
+export const LAKE = { x: 54, z: 101, rx: 8.5, rz: 6.2 };
+export const DOCK = { x0: 54.9, x1: 66, z: 101, hw: 1.2, y: 1 };
 
 export const PATHS = {
   south: [[72, 82], [72, 90], [75, 100], [70, 112], [72, 125], [72, 140]],
@@ -17,6 +20,8 @@ export const PATHS = {
   east: [[80, 78], [92, 82], [99, 88], [112, 94], [128, 92]],
   west: [[64, 78], [54, 80], [46, 84]],
   forestWest: [[64, 72], [55, 66], [48, 60]],
+  mine: [[85, 66], [88.5, 66]],
+  lake: [[74.5, 97], [70, 99.5], [66.5, 101]],
 };
 
 export const RIVER = [
@@ -24,7 +29,7 @@ export const RIVER = [
 ];
 export const POND = { x: 34, z: 42, r: 7.5 };
 
-export const ZONE = { FIELD: 0, FOREST: 1, MOUNTAIN: 2, TOWN: 3, WATER: 4, FARM: 5, GATE: 6 };
+export const ZONE = { FIELD: 0, FOREST: 1, MOUNTAIN: 2, TOWN: 3, WATER: 4, FARM: 5, GATE: 6, MINE: 7, LAKE: 8 };
 
 function segDist(px, pz, ax, az, bx, bz) {
   const abx = bx - ax;
@@ -73,6 +78,8 @@ export function generateWorld() {
   const pathMask = new Float32Array(W * W);
   const slope = new Float32Array(W * W);
   const forest = new Float32Array(W * W);
+  const rampFlag = new Uint8Array(W * W);
+  const mineRel = new Uint8Array(W * W);
 
   for (let z = 0; z < W; z++) {
     for (let x = 0; x < W; x++) {
@@ -109,9 +116,15 @@ export function generateWorld() {
 
       const rd = polyDist(x + 0.5, z + 0.5, SMOOTH_RIVER);
       const pd = Math.hypot(x + 0.5 - POND.x, z + 0.5 - POND.z);
-      const waterD = Math.min(rd - 2.0, pd - POND.r);
+      const lakeD = (Math.hypot((x + 0.5 - LAKE.x) / LAKE.rx, (z + 0.5 - LAKE.z) / LAKE.rz) - 1) * ((LAKE.rx + LAKE.rz) / 2);
+      const waterD = Math.min(rd - 2.0, pd - POND.r, lakeD);
       const carve = 1 - smoothstep(-0.5, 3.2, waterD);
-      h = lerp(h, -0.5, carve);
+      h = lerp(h, -0.5 - (lakeD < 0 ? clamp(-lakeD / 4, 0, 1) : 0), carve);
+
+      const mdx = x + 0.5 - MINE.x;
+      const mdz = z + 0.5 - MINE.z;
+      const mineD = Math.hypot(mdx, mdz);
+      h = lerp(h, MINE.rimH, 1 - smoothstep(MINE.rimR, MINE.rimR + MINE.blend, mineD));
 
       if (x >= FARM.x0 - 2 && x <= FARM.x1 + 2 && z >= FARM.z0 - 2 && z <= FARM.z1 + 2) {
         const fx = Math.max(FARM.x0 - x, x - FARM.x1, FARM.z0 - z, z - FARM.z1, 0);
@@ -122,7 +135,13 @@ export function generateWorld() {
       h = mountainish ? Math.round(h) : Math.round(h * 2) / 2;
       if (dt < 12.5) h = 3;
       if (gdist < 5.5) h = 3;
+      const pitR = MINE.pitR + (n2 - 0.5) * 1.6;
+      const rampK = mdx >= MINE.rampX0 - MINE.x && mdx < -MINE.pitR && Math.abs(mdz) <= MINE.rampHW ? Math.floor(mdx - (MINE.rampX0 - MINE.x)) : -1;
+      if (mineD < pitR) h = MINE.floorH;
+      if (rampK >= 0) h = Math.max(MINE.floorH, MINE.rimH - 0.5 * (rampK + 1));
       H[i] = h;
+      rampFlag[i] = rampK >= 0 || (mineD < pitR && mdx < -2 && Math.abs(mdz) <= MINE.rampHW) ? 1 : 0;
+      mineRel[i] = mineD < pitR ? 1 : mineD < pitR + 2.2 ? 2 : mineD < MINE.rimR ? 3 : 0;
 
       let zn = ZONE.FIELD;
       if (m > 0.12) zn = ZONE.MOUNTAIN;
@@ -130,7 +149,8 @@ export function generateWorld() {
       if (dt < 15) zn = ZONE.TOWN;
       if (gdist < 8) zn = ZONE.GATE;
       if (x >= FARM.x0 && x <= FARM.x1 && z >= FARM.z0 && z <= FARM.z1) zn = ZONE.FARM;
-      if (h <= 0.5 && waterD < 1.4) zn = ZONE.WATER;
+      if (mineRel[i]) zn = ZONE.MINE;
+      if (h <= 0.5 && waterD < 1.4) zn = lakeD < 1.4 && rd - 2.0 > 1.4 && pd - POND.r > 1.4 ? ZONE.LAKE : ZONE.WATER;
       zone[i] = zn;
     }
   }
@@ -189,7 +209,7 @@ export function generateWorld() {
         [r, g, b] = gtint;
         if (tl === TILE.STONE || tl === TILE.MOSS_STONE) [r, g, b] = [0.95, 0.97, 1.0];
         if (tl === TILE.SNOW) [r, g, b] = [1, 1, 1];
-      } else if (zn === ZONE.WATER || h <= 0.5) {
+      } else if (zn === ZONE.WATER || zn === ZONE.LAKE || (h <= 0.5 && !mineRel[i])) {
         tl = h <= 0 ? TILE.GRAVEL : TILE.SAND;
         [r, g, b] = [1, 1, 1];
         if (h <= 0.5 && h > 0) tl = TILE.SAND;
@@ -204,6 +224,26 @@ export function generateWorld() {
         tl = jr > 0.935 && forestAmt < 0.6 ? TILE.FLOWER_GRASS : TILE.GRASS;
         [r, g, b] = t3;
         if (zn === ZONE.GATE) [r, g, b] = [r * 0.8, g * 0.85, b * 1.0];
+      }
+      if (mineRel[i]) {
+        const roll = hash2(x, z, 61);
+        if (rampFlag[i]) {
+          tl = TILE.COBBLE;
+          [r, g, b] = [0.95, 0.88, 0.8];
+          pathMask[i] = 1;
+        } else if (mineRel[i] === 1) {
+          tl = roll > 0.82 ? TILE.DIRT : TILE.GRAVEL;
+          [r, g, b] = [0.88, 0.84, 0.82];
+        } else if (mineRel[i] === 2) {
+          tl = roll > 0.8 ? TILE.MOSS_STONE : TILE.STONE;
+          [r, g, b] = [0.95, 0.95, 0.98];
+        } else {
+          const rocky = hash2(x >> 1, z >> 1, 62) > 0.55;
+          if (rocky && !pathMask[i]) {
+            tl = roll > 0.7 ? TILE.GRAVEL : TILE.STONE;
+            [r, g, b] = [0.95, 0.95, 0.98];
+          }
+        }
       }
       const bj = 0.94 + jr * 0.12;
       top[i] = tl;
@@ -228,6 +268,7 @@ const SIDE_TILES = {
   [TILE.SNOW]: [TILE.SNOW_SIDE, TILE.STONE],
   [TILE.SAND]: [TILE.SAND, TILE.GRAVEL],
   [TILE.GRAVEL]: [TILE.GRAVEL, TILE.GRAVEL],
+  [TILE.DIRT]: [TILE.DIRT, TILE.DIRT],
   [TILE.FARMLAND]: [TILE.DIRT, TILE.DIRT],
 };
 

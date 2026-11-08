@@ -1,18 +1,30 @@
 import { iconCanvas, iconURL, heartCanvas } from './icons.js';
+import { GOODS } from '../data/gathering.js';
+import { mountStats } from './stats.js';
 import { clamp } from '../engine/voxel.js';
-import { GATE, GUILD, TOWN } from '../world/terrain.js';
+import { GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
+import { SKILLS } from '../data/skills.js';
+import { mountSkillTree, paintSkillIcon } from './skilltree.js';
+import { mountGear } from './gear.js';
+import { mountBag } from './bag.js';
+import { flushThumbs, renderThumb } from './catalog.js';
+import { mountSpellbook } from './spellbook.js';
 
 export const ITEMS = [
-  { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Balanced steel. Three-hit rhythm.' },
+  { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
   { id: 'pick', icon: 'pick', name: 'Iron Pickaxe', kind: 'melee', dmg: 6, reach: 2.2, arc: 1.6, dur: 0.34, hit: 0.14, stam: 6, knock: 3, held: 'pick', desc: 'Quick swings, light damage.' },
-  { id: 'axe', icon: 'axe', name: 'Woodcutter Axe', kind: 'melee', dmg: 8, reach: 2.3, arc: 1.8, dur: 0.44, hit: 0.2, stam: 9, knock: 4, held: 'axe', desc: 'Heavy chops.' },
-  { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', dmg: 15, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'Slow, bone-shaking blows.' },
-  { id: 'bow', icon: 'bow', name: 'Hunter Bow', kind: 'ranged', dmg: 7, dur: 0.5, stam: 7, held: 'bow', desc: 'Loose arrows at range.' },
+  { id: 'axe', icon: 'axe', name: 'Woodcutter Axe', kind: 'melee', style: 'twohand', dmg: 8, reach: 2.3, arc: 1.8, dur: 0.44, hit: 0.2, stam: 9, knock: 4, held: 'axe', desc: 'Two-handed chops.' },
+  { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', style: 'twohand', dmg: 15, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'A two-handed hammer. Slow, bone-shaking blows.' },
+  { id: 'bow', icon: 'bow', name: 'Short Bow', kind: 'ranged', style: 'shortbow', dmg: 7, dur: 0.5, stam: 7, held: 'bow', desc: 'A short bow. Loose arrows at range.' },
   { id: 'stone', icon: 'stone', name: 'Throwing Stone', kind: 'throw', dmg: 4, dur: 0.38, stam: 4, count: 12, held: 'stone', desc: 'Pocket-sized pain.' },
   { id: 'potion', icon: 'potion', name: 'Healing Potion', kind: 'use', count: 10, held: 'potion', heal: 8, desc: 'Restores 8 health.' },
   { id: 'empty', icon: 'empty', name: 'Empty', kind: 'none' },
   { id: 'torch', icon: 'torch', name: 'Torch', kind: 'light', count: 18, held: 'torch', desc: 'Lights the way at night.' },
   { id: 'manapotion', icon: 'manapotion', name: 'Spirit Philter', kind: 'use', count: 2, held: 'manapotion', mana: 20, desc: 'Restores 20 spirit.' },
+  { id: 'dual', icon: 'dual', name: 'Twin Blades', kind: 'melee', style: 'dual', dmg: 8, reach: 2.2, arc: 2.3, dur: 0.32, hit: 0.13, stam: 8, knock: 3.2, held: 'dual', desc: 'A blade in each hand.' },
+  { id: 'crossbow', icon: 'crossbow', name: 'Hunter Crossbow', kind: 'ranged', style: 'crossbow', dmg: 11, dur: 0.64, stam: 9, held: 'crossbow', desc: 'A heavy bolt. Mastery lets it punch through.' },
+  { id: 'wand', icon: 'wand', name: 'Ash Wand', kind: 'ranged', style: 'wand', spell: true, proj: 'bolt', dmg: 8, dur: 0.34, stam: 4, held: 'wand', desc: 'A quick focus for spells.' },
+  { id: 'tome', icon: 'tome', name: 'Field Tome', kind: 'ranged', style: 'tome', spell: true, proj: 'bolt', dmg: 10, dur: 0.56, stam: 5, held: 'tome', desc: 'A traveling spell book.' },
 ];
 
 export const POTION_SHOP = {
@@ -70,7 +82,7 @@ export class HUD {
       b.appendChild(cv);
       const key = document.createElement('span');
       key.className = 'key';
-      key.textContent = i === 9 ? '0' : String(i + 1);
+      key.textContent = i > 9 ? '' : i === 9 ? '0' : String(i + 1);
       b.appendChild(key);
       const cnt = document.createElement('span');
       cnt.className = 'cnt';
@@ -320,7 +332,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -353,39 +365,40 @@ export class HUD {
         ctx.fillStyle = '#7ef6ff';
         ctx.fillRect(game.world.waygate.x - 2, game.world.waygate.z - 2, 5, 5);
       }
-      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. White: you.</p>');
+      ctx.fillStyle = '#ff9a3c';
+      ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
+      ctx.fillStyle = '#4ec8ff';
+      ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
+      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). White: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
       add(`<p><b>${q.text}</b><br/>Progress: ${q.n} / ${q.total}</p><p>Total monsters defeated: <b>${game.kills}</b></p><p style="color:#aab;font-size:13px">The Monster Gate in the northern forest keeps spitting out creatures. Slay them to earn guild gold.</p>`);
     } else if (name === 'bag') {
-      title.textContent = 'Satchel';
-      game.items
-        .filter((i) => i.id !== 'empty')
-        .forEach((it) => {
-          const r = document.createElement('div');
-          r.className = 'panel-row';
-          r.innerHTML = `<span>${it.name}${it.count !== undefined ? ' x' + it.count : ''}<br/><small style="color:#99a">${it.desc || ''}</small></span>`;
-          body.appendChild(r);
-        });
-      add(`<p style="margin-top:10px">Gold: <b style="color:#ffe27a">${game.gold}</b></p>`);
+      title.textContent = 'Bag';
+      this.cleanup = mountBag(body, game);
     } else if (name === 'gear') {
-      title.textContent = 'Hunter';
-      const p = game.player;
-      add(`<div class="panel-row"><span>Rank</span><b>${game.rank}</b></div>
-           <div class="panel-row"><span>Health</span><b>${p.hp} / ${p.maxHp}</b></div>
-           <div class="panel-row"><span>Stamina</span><b>${Math.round(p.stamina)} / ${p.maxStamina}</b></div>
-           <div class="panel-row"><span>Spirit</span><b>${Math.round(p.mana)} / ${p.maxMana}</b></div>
-           <div class="panel-row"><span>Fury</span><b>${Math.round(p.fury)} / 100</b></div>
-           <div class="panel-row"><span>Weapon</span><b>${game.items[game.sel].name}</b></div>
-           <div class="panel-row"><span>Defense</span><b>${game.progress.defense} (-${Math.round(game.progress.reduction * 100)}% damage)</b></div>
-           <p style="color:#aab;font-size:13px">${game.progress.defense ? (game.progress.activeSets.length ? game.progress.activeSets.map((x) => `${x.name}: ${x.bonus.replace('Full set: ', '')}`).join(' ') : 'Wearing dragon armor. Complete a set for a bonus.') : "Dark leather hunter's garb, steel bracers and a greatsword on your back."} Press C for the Hunter Catalog.</p>`);
+      title.textContent = 'Character';
+      this.cleanup = mountGear(body, game);
+    } else if (name === 'spellbook') {
+      title.textContent = 'Skill & Spell Book';
+      this.cleanup = mountSpellbook(body, game);
+    } else if (name === 'stats') {
+      title.textContent = 'Hunter Stats';
+      this.cleanup = mountStats(body, game, game.statsFocus);
+      game.statsFocus = null;
+    } else if (name === 'market') {
+      title.textContent = "Dalla's Market";
+      this.cleanup = mountMarket(body, game);
     } else if (name === 'catalog') {
       title.textContent = 'Hunter Catalog';
       this.cleanup = game.catalog.mount(body);
     } else if (name === 'forge') {
       title.textContent = 'The Forge';
       this.cleanup = game.catalog.mount(body, { forge: true });
+    } else if (name === 'skills') {
+      title.textContent = 'Skill Tree';
+      this.cleanup = mountSkillTree(body, game);
     } else if (name === 'alchemy') {
       title.textContent = "Lira's Alchemy";
       const paint = () => {
@@ -470,16 +483,35 @@ export class HUD {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
       const q = game.quality;
       const rows = [
-        ...(name === 'menu' ? [['Hunter Catalog', '<button id="set-cat">Open</button>']] : []),
+        ...(name === 'menu'
+          ? [
+              ['Character', '<button id="set-gear">Open</button>'],
+              ['Bag', '<button id="set-bag">Open</button>'],
+              ['Skill & Spell Book', '<button id="set-book">Open</button>'],
+              ['Hunter Catalog', '<button id="set-cat">Open</button>'],
+              ['Skill Tree', '<button id="set-skills">Open</button>'],
+              ['Hunter Stats', '<button id="set-stats">Open</button>'],
+            ]
+          : []),
         ['Graphics quality', `<button id="set-q">${q.label}</button>`],
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Z Spirit Bolt - V Fury - 1-9 and 0 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - G skill book - K skill tree - H stats - 1-9 and 0 items - E character - B bag - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      const statsBtn = document.getElementById('set-stats');
+      if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
       if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
+      const skillBtn = document.getElementById('set-skills');
+      if (skillBtn) skillBtn.onclick = () => this.openPanel('skills', game);
+      const gearBtn = document.getElementById('set-gear');
+      if (gearBtn) gearBtn.onclick = () => this.openPanel('gear', game);
+      const bagBtn = document.getElementById('set-bag');
+      if (bagBtn) bagBtn.onclick = () => this.openPanel('bag', game);
+      const bookBtn = document.getElementById('set-book');
+      if (bookBtn) bookBtn.onclick = () => this.openPanel('spellbook', game);
       document.getElementById('set-q').onclick = () => {
         game.cycleQuality();
         document.getElementById('set-q').textContent = game.quality.label;
@@ -506,6 +538,167 @@ export class HUD {
   get panelOpen() {
     return !this.el.panel.classList.contains('hidden');
   }
+
+  updateSkillbar(game) {
+    const bar = document.getElementById('skillbar');
+    if (!bar || !game?.progress || !game.player) return;
+    const eq = game.progress.equipped();
+    const keys = ['Z', 'X', 'V'];
+    const fallback = ['Bolt', 'Skill', 'Fury'];
+    const rightIds = ['tb-bolt', 'tb-skill', 'tb-fury'];
+    if (!bar.dataset.built) {
+      bar.dataset.built = '1';
+      for (let i = 0; i < 3; i++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'skslot';
+        b.innerHTML = '<canvas></canvas><span class="skk"></span><span class="skn"></span><i class="skcd"></i>';
+        b.addEventListener('click', () => {
+          if (game.progress.equipped()[i]) game.castSlot(i);
+          else game.hud.openPanel('spellbook', game);
+        });
+        b.addEventListener('dragover', (e) => e.preventDefault());
+        b.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData('text/plain').replace(/^skill:/, '');
+          if (SKILLS[id]) game.equipSkill(i, id);
+          if (game.hud.panelId === 'spellbook') game.hud.openPanel('spellbook', game);
+        });
+        bar.appendChild(b);
+      }
+      document.querySelectorAll('#cast-buttons .cast').forEach((b) => {
+        b.addEventListener('click', () => game.castSlot(Number(b.dataset.slot)));
+      });
+    }
+    const paintOne = (b, i, canvas) => {
+      const id = eq[i];
+      const skill = id && SKILLS[id];
+      if (b.dataset.sid !== (id || '')) {
+        b.dataset.sid = id || '';
+        if (skill) paintSkillIcon(canvas, skill.shape, skill.color);
+        else {
+          canvas.width = 16;
+          canvas.height = 16;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, 16, 16);
+          const fb = rightIds[i] === 'tb-bolt' ? 'bolt' : rightIds[i] === 'tb-fury' ? 'fury' : '';
+          if (fb) ctx.drawImage(iconCanvas(fb), 0, 0);
+        }
+      }
+      return skill;
+    };
+    [...bar.children].forEach((b, i) => {
+      const canvas = b.querySelector('canvas');
+      const skill = paintOne(b, i, canvas);
+      b.querySelector('.skk').textContent = String(i + 1);
+      b.querySelector('.skn').textContent = skill ? skill.name : fallback[i];
+      b.title = skill ? `${skill.name} (${keys[i]})` : `${fallback[i]} (${keys[i]}). Open the skill book to place one here.`;
+      b.classList.toggle('empty', !skill);
+      b.style.borderColor = skill ? skill.color : '';
+      const cd = skill ? game.player.cds[skill.id] || 0 : 0;
+      const max = skill?.cd || 1;
+      b.querySelector('.skcd').style.transform = `scaleX(${cd > 0 ? Math.min(1, cd / max) : 0})`;
+      const cast = document.querySelector(`#cast-buttons .cast[data-slot="${i}"]`);
+      if (cast) {
+        const sk = paintOne(cast, i, cast.querySelector('canvas'));
+        cast.classList.toggle('on', !!sk);
+        cast.style.borderColor = sk ? sk.color : '';
+        cast.title = sk ? sk.name : fallback[i];
+        cast.querySelector('small').textContent = keys[i];
+        const cd2 = sk ? game.player.cds[sk.id] || 0 : 0;
+        cast.classList.toggle('cd', cd2 > 0);
+      }
+      const touch = document.getElementById(rightIds[i]);
+      if (touch) {
+        let cv = touch.querySelector('canvas');
+        if (!cv) {
+          cv = document.createElement('canvas');
+          cv.className = 'skico';
+          touch.appendChild(cv);
+        }
+        const sk = paintOne(touch, i, cv);
+        touch.classList.toggle('has-skill', !!sk);
+        touch.title = sk ? sk.name : fallback[i];
+        const cd3 = sk ? game.player.cds[sk.id] || 0 : 0;
+        touch.classList.toggle('cd', cd3 > 0);
+      }
+    });
+  }
 }
 
 export { TOWN };
+
+
+function mountMarket(body, game) {
+  const pr = game.progress;
+  const paint = () => {
+    body.innerHTML = '';
+    const intro = document.createElement('p');
+    intro.className = 'alc-intro mk-intro';
+    intro.innerHTML = "<b>Dalla's Market</b>Fresh ore and fish are always welcome. I will buy what the pit and the lake give you.";
+    body.appendChild(intro);
+    const gold = document.createElement('p');
+    gold.className = 'alc-gold';
+    gold.textContent = `Your gold: ${game.gold}`;
+    body.appendChild(gold);
+    let total = 0;
+    let any = false;
+    for (const g of Object.values(GOODS)) {
+      const n = pr.good(g.id);
+      total += n * g.price;
+      if (!n) continue;
+      any = true;
+      const row = document.createElement('div');
+      row.className = 'alc-row';
+      const holder = document.createElement('div');
+      holder.className = 'mk-thumb';
+      const cv = renderThumb({ kind: 'good', id: g.id }, 96);
+      holder.appendChild(cv);
+      row.appendChild(holder);
+      const info = document.createElement('div');
+      info.className = 'alc-info';
+      info.innerHTML = `<b>${g.name}</b><span>${g.desc}</span><small>Carried ${n} · ${g.price}g each</small>`;
+      row.appendChild(info);
+      const col = document.createElement('div');
+      col.className = 'mk-btns';
+      const one = document.createElement('button');
+      one.type = 'button';
+      one.className = 'alc-buy';
+      one.textContent = `Sell 1  ${g.price}g`;
+      one.onclick = () => {
+        if (game.sellGood(g.id, 1)) paint();
+      };
+      col.appendChild(one);
+      if (n > 1) {
+        const all = document.createElement('button');
+        all.type = 'button';
+        all.className = 'alc-buy';
+        all.textContent = `Sell ${n}  ${n * g.price}g`;
+        all.onclick = () => {
+          if (game.sellGood(g.id, n)) paint();
+        };
+        col.appendChild(all);
+      }
+      row.appendChild(col);
+      body.appendChild(row);
+    }
+    if (!any) {
+      const p = document.createElement('p');
+      p.className = 'bag-empty';
+      p.textContent = 'You have nothing to sell. Mine copper and tin in the Greyrock Pit east of town, or fish Mirrormere from its dock.';
+      body.appendChild(p);
+    } else {
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'alc-buy mk-all';
+      all.textContent = `Sell everything  ${total}g`;
+      all.onclick = () => {
+        if (game.sellAllGoods()) paint();
+      };
+      body.appendChild(all);
+    }
+    flushThumbs(240);
+  };
+  paint();
+  return () => {};
+}
