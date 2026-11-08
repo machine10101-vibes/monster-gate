@@ -21,6 +21,9 @@ import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
 import { buildProjectileMesh, endProjectile, initProjectile, tickProjectile } from './systems/skillfx.js';
 import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
+import { Gathering } from './systems/gather.js';
+import { GOODS } from './data/gathering.js';
+import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { clamp, lerp } from './engine/voxel.js';
@@ -40,6 +43,8 @@ const ZONE_NAMES = {
   [ZONE.WATER]: ['Waters', 'Silverrun River'],
   [ZONE.FARM]: ['Farmland', "Tobin's Farm"],
   [ZONE.GATE]: ['Danger', 'The Monster Gate'],
+  [ZONE.MINE]: ['Mine', 'Greyrock Pit'],
+  [ZONE.LAKE]: ['Lake', 'Mirrormere'],
 };
 
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
@@ -130,6 +135,7 @@ class Game {
     this.fx = new FX(this.scene, this.quality);
     this.vfx = new VFX(this);
     this.fx.vfx = this.vfx;
+    this.gather = new Gathering(this);
     this.player = new Player(this);
     this.spawner = new Spawner(this);
     progress(0.95, 'Waking the villagers');
@@ -1049,6 +1055,11 @@ class Game {
     const wd = w ? Math.hypot(p.x - w.x, p.z - w.z) : 99;
     const npcNear = this.ambient.npcs.find((n) => n.near);
     const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
+    if (!this.talkNpc && this.gather.interact()) return;
+    if (!this.talkNpc && this.marketNear && !npcNear) {
+      this.openMarket();
+      return;
+    }
     if (!this.talkNpc && this.alchemyNear && !npcNear) {
       this.openAlchemy();
       return;
@@ -1143,6 +1154,61 @@ class Game {
       this.hud.plate('alchemy', "Lira's Alchemy<small>F · buy potions</small>");
       this.hud.placePlate('alchemy', sx, sy, vis);
     } else this.hud.removePlate('alchemy');
+  }
+
+  sellGood(id, n = 1) {
+    const g = GOODS[id];
+    if (!g || !this.progress.takeGood(id, n)) return false;
+    this.addGold(g.price * n);
+    this.audio.coin();
+    const m = this.world.market;
+    if (m) this.fx.burst(m.x, m.y + 1.3, m.z, [0xffd23f, 0xfff3a8, 0xffffff], 10, 2, 0.07, 0.6, 3, 2);
+    this.hud.toast(`Sold ${n} ${g.name.toLowerCase()} for ${g.price * n}g`, 1400);
+    return true;
+  }
+
+  sellAllGoods() {
+    let gold = 0;
+    for (const g of Object.values(GOODS)) {
+      const n = this.progress.good(g.id);
+      if (n > 0 && this.progress.takeGood(g.id, n)) gold += n * g.price;
+    }
+    if (!gold) return false;
+    this.addGold(gold);
+    this.audio.coin();
+    this.hud.toast(`Sold your catch and ore for ${gold}g`, 1800);
+    return true;
+  }
+
+  eatGood(id) {
+    const g = GOODS[id];
+    if (!g || !g.heal || this.progress.good(id) < 1) return false;
+    if (!this.player.tryEat(g)) return false;
+    this.progress.takeGood(id, 1);
+    return true;
+  }
+
+  openMarket() {
+    this.hud.openPanel('market', this);
+    this.hud.panelId = 'market';
+    this.audio.select();
+  }
+
+  updateMarket() {
+    const m = this.world.market;
+    if (!m) return;
+    const P = this.player.pos;
+    const d = Math.hypot(P.x - m.x, P.z - m.z);
+    this.marketNear = d < 3.2 && this.started;
+    if (this.marketNear && !this.marketHinted) {
+      this.marketHinted = true;
+      this.hud.toast("Dalla's Market - press F to sell ore and fish", 2600);
+    }
+    if (this.marketNear) {
+      const [sx, sy, vis] = this.screenOf(m.x, m.y + 2.4, m.z, true);
+      this.hud.plate('market', "Dalla's Market<small>F · sell ore &amp; fish</small>");
+      this.hud.placePlate('market', sx, sy, vis);
+    } else this.hud.removePlate('market');
   }
 
   openForge() {
@@ -1395,7 +1461,10 @@ class Game {
     } else this.hud.removePlate('waygate');
     this.updateForge(dt);
     this.updateAlchemy(dt);
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear || this.alchemyNear;
+    this.updateMarket();
+    updateGatherSites(this.world, dt, t, this);
+    this.gather.update(dt);
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear || this.alchemyNear || this.marketNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }

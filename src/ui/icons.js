@@ -731,6 +731,82 @@ ART.darkshortbow = shortbow('v', 'n', 'm', 'V', 'q');
 ART.budgecrossbow = recolor(ART.crossbow, { l: 'h', b: 'E', y: 'y' });
 ART.darkcrossbow = recolor(ART.crossbow, { l: 'q', b: 'V', y: 'm' });
 
+ART.stats = draw((p, line) => {
+  for (let y = 11; y <= 13; y++) for (let x = 2; x <= 4; x++) p(x, y, y === 11 ? 'h' : 'y');
+  for (let y = 7; y <= 13; y++) for (let x = 6; x <= 8; x++) p(x, y, y === 7 ? 'q' : 'p');
+  for (let y = 3; y <= 13; y++) for (let x = 10; x <= 12; x++) p(x, y, y === 3 ? 'h' : 'e');
+  line(1, 14, 14, 14, 'g');
+});
+
+ART.strength = draw((p, line) => {
+  line(3, 12, 12, 3, 'B');
+  line(4, 12, 12, 4, 'b');
+  for (const [x, y] of [[2, 10], [3, 10], [2, 11], [3, 11], [4, 13], [5, 13], [4, 14], [5, 14]]) p(x, y, 'r');
+  for (const [x, y] of [[10, 2], [11, 2], [10, 3], [11, 3], [12, 4], [13, 4], [12, 5], [13, 5]]) p(x, y, 'r');
+  p(2, 10, 'R');
+  p(12, 5, 'R');
+  p(10, 2, 'o');
+  p(4, 13, 'o');
+});
+
+ART.agility = draw((p, line) => {
+  for (let y = 4; y <= 10; y++) for (let x = 7; x <= 11; x++) p(x, y, x === 7 ? 'E' : 'e');
+  for (let y = 10; y <= 12; y++) for (let x = 7; x <= 14; x++) p(x, y, y === 12 ? 'B' : 'e');
+  line(7, 4, 11, 4, 'E');
+  line(7, 5, 11, 5, 'h');
+  line(7, 13, 14, 13, 'B');
+  line(13, 10, 14, 11, 'E');
+  line(1, 3, 6, 6, 'w');
+  line(2, 5, 6, 7, 'l');
+  line(3, 7, 6, 8, 'g');
+  line(0, 1, 5, 4, 'l');
+});
+
+ART.stamina = draw((p, line) => {
+  line(9, 1, 4, 8, 'y');
+  line(10, 1, 5, 8, 'h');
+  line(4, 8, 10, 8, 'y');
+  line(5, 9, 10, 9, 'Y');
+  line(10, 8, 6, 15, 'y');
+  line(11, 9, 7, 14, 'h');
+  line(9, 1, 11, 1, 'h');
+});
+
+ART.mining = draw((p, line) => {
+  line(3, 13, 11, 5, 'B');
+  line(4, 13, 12, 5, 'b');
+  line(2, 5, 6, 2, 's');
+  line(6, 2, 11, 2, 's');
+  line(11, 2, 14, 5, 's');
+  line(2, 6, 5, 3, 'l');
+  line(7, 3, 10, 3, 'l');
+  line(10, 3, 13, 5, 'g');
+  line(12, 4, 14, 6, 'S');
+  line(2, 5, 3, 7, 'S');
+  p(7, 4, 'S');
+  p(8, 4, 'S');
+  p(9, 4, 'S');
+});
+
+ART.fishing = draw((p, line) => {
+  for (let y = 5; y <= 11; y++) {
+    const half = 3 - Math.abs(y - 8) * 0.9;
+    for (let x = 3; x <= 11; x++) {
+      const u = (x - 7) / 5;
+      const r = 3.4 * Math.sqrt(Math.max(0, 1 - u * u));
+      if (Math.abs(y - 8) <= r) p(x, y, y >= 9 ? 'C' : 'c');
+    }
+    void half;
+  }
+  line(12, 8, 14, 5, 'c');
+  line(12, 8, 14, 11, 'C');
+  line(13, 6, 13, 10, 'c');
+  p(5, 7, 'k');
+  p(4, 7, 'w');
+  line(5, 9, 10, 9, 'w');
+  line(7, 5, 9, 4, 'C');
+});
+
 export function iconCanvas(name) {
   if (!cache[name]) cache[name] = make(ART[name] || ART.empty);
   return cache[name];

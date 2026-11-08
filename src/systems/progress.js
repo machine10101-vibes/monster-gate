@@ -1,5 +1,6 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
+import { GOODS, LEVEL_SKILLS, MAX_LEVEL, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
 
 const KEY = 'monster-gate-hunter-v1';
 
@@ -12,6 +13,8 @@ const blank = () => ({
   weapon: null,
   gold: 0,
   stock: {},
+  xp: {},
+  goods: {},
 });
 
 /** Discoveries, harvested parts, crafted gear and what is worn. Persisted in localStorage. */
@@ -25,6 +28,8 @@ export class Progress {
       /* corrupt save: start fresh */
     }
     this.data.skills = normalizeSkills(this.data.skills);
+    this.data.xp = normalizeXp(this.data.xp);
+    this.data.goods = normalizeGoods(this.data.goods);
   }
 
   save() {
@@ -300,6 +305,56 @@ export class Progress {
     return true;
   }
 
+  /* ----------------------------- skill levels ----------------------------- */
+  xp(id) {
+    return this.data.xp[id] || 0;
+  }
+
+  level(id) {
+    return levelForXp(this.xp(id));
+  }
+
+  /** Adds XP and returns the new level when the skill levelled up, otherwise 0. */
+  addXp(id, amount) {
+    if (!LEVEL_SKILLS[id] || !(amount > 0)) return 0;
+    const before = this.level(id);
+    const total = Math.min(xpForLevel(MAX_LEVEL), this.xp(id) + amount);
+    this.data.xp[id] = Math.round(total * 10) / 10;
+    this.save();
+    const after = this.level(id);
+    return after > before ? after : 0;
+  }
+
+  get totalLevel() {
+    return SKILL_ORDER.reduce((n, id) => n + this.level(id), 0);
+  }
+
+  get totalXp() {
+    return SKILL_ORDER.reduce((n, id) => n + this.xp(id), 0);
+  }
+
+  /* ---------------------------- gathered goods ---------------------------- */
+  good(id) {
+    return this.data.goods[id] | 0;
+  }
+
+  addGood(id, n = 1) {
+    if (!GOODS[id]) return;
+    this.data.goods[id] = this.good(id) + n;
+    this.save();
+  }
+
+  takeGood(id, n = 1) {
+    if (!GOODS[id] || this.good(id) < n) return false;
+    this.data.goods[id] = this.good(id) - n;
+    this.save();
+    return true;
+  }
+
+  totalGoods() {
+    return Object.values(this.data.goods).reduce((a, b) => a + (b | 0), 0);
+  }
+
   clearLearned() {
     if (!this.classId) return false;
     this.data.skills.learned = {};
@@ -349,4 +404,26 @@ function normalizeSkills(raw) {
     }
   }
   return { classId, learned, equipped, attrs, weapons };
+}
+
+function normalizeXp(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    for (const id of SKILL_ORDER) {
+      const n = Number(raw[id]);
+      if (n > 0 && isFinite(n)) out[id] = Math.min(xpForLevel(MAX_LEVEL), n);
+    }
+  }
+  return out;
+}
+
+function normalizeGoods(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    for (const id of Object.keys(GOODS)) {
+      const n = raw[id] | 0;
+      if (n > 0) out[id] = n;
+    }
+  }
+  return out;
 }

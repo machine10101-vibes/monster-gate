@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildDarksycleDragon } from './creatures.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
 import { statusFx } from '../systems/skillfx.js';
-import { ZONE, GATE, TOWN, WATER_Y, CENTER } from '../world/terrain.js';
+import { ZONE, GATE, TOWN, WATER_Y, CENTER, MINE, LAKE } from '../world/terrain.js';
 
 const TAU = Math.PI * 2;
 function angDiff(a, b) {
@@ -264,7 +264,7 @@ export class Monster {
     const h = w.heightAt(x, z);
     if (h - this.y > 1.01 || h < WATER_Y - 0.1 || h > 9) return false;
     const zn = w.zoneAt(x, z);
-    if (zn === ZONE.TOWN) return false;
+    if (zn === ZONE.TOWN || zn === ZONE.MINE || w.onDock(x, z, 0.4)) return false;
     return true;
   }
 
@@ -1188,8 +1188,8 @@ export class Spawner {
     const w = this.game.world;
     const spots = [
       ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
-      ['boar', 52, 44], ['boar', 94, 48], ['slime', 100, 66], ['slime', 44, 70], ['slime', 76, 102],
-      ['budgedragon', 101, 70], ['darksycledragon', 50, 90],
+      ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70], ['slime', 76, 102],
+      ['budgedragon', 120, 74], ['darksycledragon', 62, 120],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
     void w;
@@ -1227,7 +1227,9 @@ export class Spawner {
         z = CENTER.z + Math.sin(a) * rr;
       }
       if (!w.playable(x, z)) continue;
-      if (w.zoneAt(x, z) === ZONE.TOWN || w.zoneAt(x, z) === ZONE.WATER) continue;
+      const zn = w.zoneAt(x, z);
+      if (zn === ZONE.TOWN || zn === ZONE.WATER || zn === ZONE.LAKE || zn === ZONE.MINE) continue;
+      if (Math.hypot(x - MINE.x, z - MINE.z) < 17 || Math.hypot(x - LAKE.x, z - LAKE.z) < 16) continue;
       if (w.heightAt(x, z) < 0.9 || w.heightAt(x, z) > 7) continue;
       if (Math.hypot(x - P.x, z - P.z) < 14) continue;
       return { x, z, nearGate: roll < 0.45 };

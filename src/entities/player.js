@@ -165,7 +165,7 @@ export class Player {
     const f = this.facing;
     const blocked = this.shielding && this.state !== 'attack' && (f.x * -dx + f.z * -dz) / d > 0.25 && this.stamina > 0;
     if (blocked) {
-      this.stamina = Math.max(0, this.stamina - 14 - dmg * 3);
+      this.spend(14 + dmg * 3);
       this.stamDelay = 0.9;
       this.knock.set((dx / d) * knock * 0.5, 0, (dz / d) * knock * 0.5);
       g.fx.impact(this.pos.x + f.x * 0.6, this.pos.y + 1, this.pos.z + f.z * 0.6, -dx / d, -dz / d, [0xffffff, 0xffe27a, 0x9fd8ff], 0.9);
@@ -200,6 +200,7 @@ export class Player {
     g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), '-' + dmg, 'hurt');
     g.shake(0.25);
     g.hitstop(0.07);
+    if (this.state === 'gather') g.gather.cancel();
     if (this.state === 'attack' || this.state === 'use') this.setState('idle');
     if (this.hp <= 0) this.die();
     return true;
@@ -234,7 +235,43 @@ export class Player {
     this.stateDur = dur;
   }
 
+  spend(n) {
+    const used = Math.min(this.stamina, n);
+    this.stamina = Math.max(0, this.stamina - n);
+    if (used > 0) this.game.gather.train('stamina', used * 0.5);
+  }
+
+  beginGather(kind, x, z, face) {
+    this.gatherKind = kind;
+    this.gatherGo = { x, z };
+    this.gatherFace = face;
+    this.gatherReady = false;
+    this.gAnim = null;
+    this.setState('gather', 1e9);
+  }
+
+  endGather() {
+    if (this.state === 'gather') this.setState('idle');
+    this.gatherGo = null;
+    this.gatherReady = false;
+    this.gAnim = null;
+  }
+
+  /** Eat a gathered good from the bag. */
+  tryEat(good) {
+    if (this.dead || this.state === 'roll' || this.state === 'stagger' || this.state === 'attack' || this.state === 'use') return false;
+    if (this.hp >= this.maxHp) {
+      this.game.hud.toast('Already at full health', 1200);
+      return false;
+    }
+    if (this.state === 'gather') this.game.gather.cancel();
+    this.useFx = { heal: good.heal, mana: 0, eat: true };
+    this.setState('use', 0.6);
+    return true;
+  }
+
   tryAttack(item) {
+    if (this.state === 'gather') this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger') return false;
     if (this.state === 'attack' || this.state === 'use') {
       return false;
@@ -266,7 +303,7 @@ export class Player {
     this.attackItem = item;
     this.combo = this.comboT > 0 ? (this.combo + 1) % 3 : 0;
     this.attackHit = false;
-    this.stamina = Math.max(0, this.stamina - item.stam);
+    this.spend(item.stam);
     this.stamDelay = 0.7;
     const swing = skillMods(this.game).speed ?? 1;
     this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
@@ -275,8 +312,10 @@ export class Player {
   }
 
   tryRoll(dir) {
+    if (this.state === 'gather' && !this.dead) this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger' || this.stamina < 18) return false;
-    this.stamina -= 22;
+    this.spend(22);
+    this.game.gather.train('agility', 6);
     this.stamDelay = 0.8;
     this.rollDir.copy(dir.lengthSq() > 0.01 ? dir.clone().normalize() : this.facing);
     this.yaw = Math.atan2(this.rollDir.x, this.rollDir.z);
@@ -331,10 +370,11 @@ export class Player {
 
     let speed = 0;
     const moveDir = new THREE.Vector3();
+    const agi = 1 + (g.progress.level('agility') - 1) * 0.003;
     switch (this.state) {
       case 'roll': {
         const t = this.stateT / this.stateDur;
-        speed = 9.5 * (1 - t * 0.55);
+        speed = 9.5 * agi * (1 - t * 0.55);
         moveDir.copy(this.rollDir);
         if (this.stateT >= this.stateDur) this.setState('idle');
         break;
@@ -364,7 +404,8 @@ export class Player {
         if (!this.potionDone && this.stateT > 0.3) {
           this.potionDone = true;
           const fx = this.useFx || { heal: 8, mana: 0 };
-          g.audio.potion();
+          if (fx.eat) g.audio.tone(320, 0.06, 'square', 0.1, 120);
+          else g.audio.potion();
           if (fx.heal) {
             this.heal(fx.heal);
             g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff6a8a, 0xffc0cc, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
@@ -384,6 +425,23 @@ export class Player {
         }
         break;
       }
+      case 'gather': {
+        if (inputMag > 0.35 || this.hurtT > 0.3) {
+          g.gather.cancel();
+          break;
+        }
+        const go = this.gatherGo;
+        if (go && !this.gatherReady) {
+          const dx = go.x - this.pos.x;
+          const dz = go.z - this.pos.z;
+          const d = Math.hypot(dx, dz);
+          if (d > 0.16 && this.stateT < 4.5) {
+            moveDir.set(dx / d, 0, dz / d);
+            speed = Math.min(3.8, 0.9 + d * 5);
+          } else this.gatherReady = true;
+        }
+        break;
+      }
       case 'stagger':
         if (this.stateT >= this.stateDur) this.setState('idle');
         break;
@@ -392,7 +450,7 @@ export class Player {
       default: {
         if (inputMag > 0.05) {
           moveDir.copy(want).normalize();
-          speed = 4.7 * inputMag * (this.shielding ? 0.5 : 1);
+          speed = 4.7 * agi * inputMag * (this.shielding ? 0.5 : 1);
         }
       }
     }
@@ -422,7 +480,10 @@ export class Player {
 
     if (!this.dead && this.state !== 'roll' && this.state !== 'attack') {
       let target = this.yaw;
-      if (this.shielding || (inp.attackHeld && !this.game.input.touch)) {
+      if (this.state === 'gather') {
+        if (this.gatherReady) target = this.gatherFace;
+        else if (speed > 0.2) target = Math.atan2(moveDir.x, moveDir.z);
+      } else if (this.shielding || (inp.attackHeld && !this.game.input.touch)) {
         if (this.aimDir) target = Math.atan2(this.aimDir.x, this.aimDir.z);
       } else if (inputMag > 0.1) target = Math.atan2(moveDir.x, moveDir.z);
       this.yaw += angDiff(this.yaw, target) * Math.min(1, dt * 16);
@@ -431,13 +492,20 @@ export class Player {
 
     this.updateGround(dt);
 
+    if (this.state === 'idle' && this.speed > 3.4 && !this.wading) {
+      this.runAcc = (this.runAcc || 0) + this.speed * dt;
+      if (this.runAcc >= 12) {
+        this.runAcc -= 12;
+        g.gather.train('agility', 2);
+      }
+    }
     const moving = this.speed > 0.4 && this.state !== 'dead';
     this.moveAmt = lerp(this.moveAmt, moving ? clamp(this.speed / 4.7, 0.3, 1.4) : 0, Math.min(1, dt * 12));
     this.cycle += dt * (this.speed * 2.2 + 0.01);
     const foot = Math.floor(this.cycle / Math.PI);
     if (foot !== this.footIdx) {
       this.footIdx = foot;
-      if (moving && (this.state === 'idle' || this.state === 'use') && this.speed > 1.2 && !this.wading) {
+      if (moving && (this.state === 'idle' || this.state === 'use' || this.state === 'gather') && this.speed > 1.2 && !this.wading) {
         g.audio.step();
         if (this.speed > 3) g.fx.dust(this.pos.x - Math.sin(this.yaw) * 0.1, this.pos.y, this.pos.z - Math.cos(this.yaw) * 0.1, 2, 0.7);
       }
@@ -539,7 +607,9 @@ export class Player {
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
         const crit = Math.random() < 0.12 + (mods.crit || 0);
-        g.strikeMonster(m, Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee), dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
+        const dmgOut = Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee);
+        g.strikeMonster(m, dmgOut, dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
+        g.gather.train('strength', 2 + dmgOut * 0.8);
         if (mods.poison && !m.dead) m.afflict('poison', 4 + (mods.poisonTime || 0), 4 + (mods.poisonBonus || 0));
         hits++;
       }
@@ -848,6 +918,104 @@ export class Player {
           this.deadFx = true;
           this.game.fx.shockwave(this.pos.x, this.pos.y, this.pos.z, 0xd9c9a0, 1.2);
           this.game.shake(0.25);
+        }
+        break;
+      }
+      case 'gather': {
+        const a = this.gAnim;
+        if (!a || !this.gatherReady) break;
+        const u = a.u;
+        rate = 28;
+        legExtraL = 0;
+        legExtraR = 0;
+        liftL = 0;
+        liftR = 0;
+        if (a.name === 'mine') {
+          if (u < 0.5) {
+            const p = ease(u / 0.5);
+            armR = lerp(-0.7, -3.0, p);
+            armL = lerp(-0.4, -2.75, p);
+            armRz = lerp(-0.05, 0.1, p);
+            armLz = lerp(0.05, -0.05, p);
+            lean = lerp(0.06, -0.3, p);
+            torsoYaw = lerp(0, 0.22, p);
+            legL = lerp(0.25, 0.5, p);
+            legR = lerp(-0.25, -0.2, p);
+            crouch = 0.02;
+            headPitch = lerp(0, -0.12, p);
+          } else if (u < 0.62) {
+            const f = ease((u - 0.5) / 0.12);
+            armR = lerp(-3.0, 0.1, f);
+            armL = lerp(-2.75, -0.1, f);
+            armRz = 0.1;
+            lean = lerp(-0.3, 0.62, f);
+            torsoYaw = lerp(0.22, -0.12, f);
+            legL = lerp(0.5, 0.85, f);
+            legR = lerp(-0.2, -0.55, f);
+            crouch = lerp(0.02, 0.13, f);
+            headPitch = lerp(-0.12, 0.2, f);
+          } else {
+            const q = ease((u - 0.62) / 0.38);
+            armR = lerp(0.1, -0.7, q);
+            armL = lerp(-0.1, -0.4, q);
+            armRz = 0.1 * (1 - q) - 0.05 * q;
+            lean = lerp(0.62, 0.06, q);
+            torsoYaw = lerp(-0.12, 0, q);
+            legL = lerp(0.85, 0.25, q);
+            legR = lerp(-0.55, -0.25, q);
+            crouch = lerp(0.13, 0.02, q);
+            headPitch = lerp(0.2, 0, q);
+          }
+        } else if (a.name === 'cast') {
+          const back = ease(clamp(u / 0.5, 0, 1));
+          const fwd = ease(clamp((u - 0.5) / 0.16, 0, 1));
+          const settle = ease(clamp((u - 0.72) / 0.28, 0, 1));
+          armR = lerp(lerp(-0.8, -2.7, back), -1.0, fwd);
+          armL = lerp(-0.4, -0.9, back) * (1 - fwd * 0.4);
+          lean = lerp(lerp(0.04, -0.22, back), 0.2, fwd) * (1 - settle * 0.7);
+          torsoYaw = lerp(0.2 * back, -0.15, fwd) * (1 - settle);
+          legL = 0.3;
+          legR = -0.3;
+          headPitch = lerp(0, 0.1, settle);
+        } else if (a.name === 'wait') {
+          const sway = Math.sin(t * 1.3) * 0.02;
+          armR = -1.05 + sway - a.dip * 0.22;
+          armL = -0.62 + sway * 0.5;
+          armLz = 0.12;
+          lean = 0.07;
+          torsoYaw = -0.12;
+          legL = 0.28;
+          legR = -0.28;
+          headPitch = 0.14 + a.dip * 0.12;
+          headYaw = Math.sin(t * 0.7) * 0.12;
+        } else if (a.name === 'bite') {
+          const y1 = ease(clamp(u / 0.3, 0, 1));
+          const y2 = ease(clamp((u - 0.35) / 0.65, 0, 1));
+          armR = lerp(lerp(-1.05, -2.3, y1), -1.1, y2);
+          armL = lerp(-0.62, -1.5, y1) * (1 - y2) + -0.6 * y2;
+          lean = lerp(lerp(0.07, -0.34, y1), 0.07, y2);
+          torsoYaw = -0.12;
+          legL = 0.4 * (1 - y2) + 0.28 * y2;
+          legR = -0.4 * (1 - y2) - 0.28 * y2;
+          headPitch = lerp(0.14, -0.2, y1) * (1 - y2) + 0.14 * y2;
+        } else if (a.name === 'net') {
+          const rise = ease(clamp(u / 0.22, 0, 1));
+          const dip = ease(clamp((u - 0.22) / 0.26, 0, 1));
+          const lift = ease(clamp((u - 0.58) / 0.28, 0, 1));
+          const rest = ease(clamp((u - 0.86) / 0.14, 0, 1));
+          armR = -0.6 - rise * 0.5;
+          armR = lerp(armR, 0.2, dip);
+          armR = lerp(armR, -1.5, lift);
+          armR = lerp(armR, -0.7, rest);
+          armL = lerp(-0.3, -0.8, rise) * (1 - dip) + lerp(0.1, -1.1, lift) * dip;
+          lean = lerp(0.1 * rise, 0.65, dip);
+          lean = lerp(lean, 0.15, lift);
+          lean = lerp(lean, 0.06, rest);
+          crouch = 0.1 * dip * (1 - lift);
+          legL = 0.55 * dip * (1 - lift) + 0.2;
+          legR = -0.35 * dip * (1 - lift) - 0.2;
+          torsoYaw = -0.1;
+          headPitch = 0.2 * dip * (1 - lift);
         }
         break;
       }

@@ -1,10 +1,13 @@
 import { iconCanvas, iconURL, heartCanvas } from './icons.js';
+import { GOODS } from '../data/gathering.js';
+import { mountStats } from './stats.js';
 import { clamp } from '../engine/voxel.js';
-import { GATE, GUILD, TOWN } from '../world/terrain.js';
+import { GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
 import { mountGear } from './gear.js';
 import { mountBag } from './bag.js';
+import { flushThumbs, renderThumb } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
 
 export const ITEMS = [
@@ -329,7 +332,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -362,7 +365,11 @@ export class HUD {
         ctx.fillStyle = '#7ef6ff';
         ctx.fillRect(game.world.waygate.x - 2, game.world.waygate.z - 2, 5, 5);
       }
-      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. White: you.</p>');
+      ctx.fillStyle = '#ff9a3c';
+      ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
+      ctx.fillStyle = '#4ec8ff';
+      ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
+      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). White: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
@@ -376,6 +383,13 @@ export class HUD {
     } else if (name === 'spellbook') {
       title.textContent = 'Skill & Spell Book';
       this.cleanup = mountSpellbook(body, game);
+    } else if (name === 'stats') {
+      title.textContent = 'Hunter Stats';
+      this.cleanup = mountStats(body, game, game.statsFocus);
+      game.statsFocus = null;
+    } else if (name === 'market') {
+      title.textContent = "Dalla's Market";
+      this.cleanup = mountMarket(body, game);
     } else if (name === 'catalog') {
       title.textContent = 'Hunter Catalog';
       this.cleanup = game.catalog.mount(body);
@@ -476,6 +490,7 @@ export class HUD {
               ['Skill & Spell Book', '<button id="set-book">Open</button>'],
               ['Hunter Catalog', '<button id="set-cat">Open</button>'],
               ['Skill Tree', '<button id="set-skills">Open</button>'],
+              ['Hunter Stats', '<button id="set-stats">Open</button>'],
             ]
           : []),
         ['Graphics quality', `<button id="set-q">${q.label}</button>`],
@@ -484,7 +499,9 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - G skill book - K skill tree - 1-9 and 0 items - E character - B bag - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - G skill book - K skill tree - H stats - 1-9 and 0 items - E character - B bag - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      const statsBtn = document.getElementById('set-stats');
+      if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
       if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
       const skillBtn = document.getElementById('set-skills');
@@ -610,3 +627,78 @@ export class HUD {
 }
 
 export { TOWN };
+
+
+function mountMarket(body, game) {
+  const pr = game.progress;
+  const paint = () => {
+    body.innerHTML = '';
+    const intro = document.createElement('p');
+    intro.className = 'alc-intro mk-intro';
+    intro.innerHTML = "<b>Dalla's Market</b>Fresh ore and fish are always welcome. I will buy what the pit and the lake give you.";
+    body.appendChild(intro);
+    const gold = document.createElement('p');
+    gold.className = 'alc-gold';
+    gold.textContent = `Your gold: ${game.gold}`;
+    body.appendChild(gold);
+    let total = 0;
+    let any = false;
+    for (const g of Object.values(GOODS)) {
+      const n = pr.good(g.id);
+      total += n * g.price;
+      if (!n) continue;
+      any = true;
+      const row = document.createElement('div');
+      row.className = 'alc-row';
+      const holder = document.createElement('div');
+      holder.className = 'mk-thumb';
+      const cv = renderThumb({ kind: 'good', id: g.id }, 96);
+      holder.appendChild(cv);
+      row.appendChild(holder);
+      const info = document.createElement('div');
+      info.className = 'alc-info';
+      info.innerHTML = `<b>${g.name}</b><span>${g.desc}</span><small>Carried ${n} · ${g.price}g each</small>`;
+      row.appendChild(info);
+      const col = document.createElement('div');
+      col.className = 'mk-btns';
+      const one = document.createElement('button');
+      one.type = 'button';
+      one.className = 'alc-buy';
+      one.textContent = `Sell 1  ${g.price}g`;
+      one.onclick = () => {
+        if (game.sellGood(g.id, 1)) paint();
+      };
+      col.appendChild(one);
+      if (n > 1) {
+        const all = document.createElement('button');
+        all.type = 'button';
+        all.className = 'alc-buy';
+        all.textContent = `Sell ${n}  ${n * g.price}g`;
+        all.onclick = () => {
+          if (game.sellGood(g.id, n)) paint();
+        };
+        col.appendChild(all);
+      }
+      row.appendChild(col);
+      body.appendChild(row);
+    }
+    if (!any) {
+      const p = document.createElement('p');
+      p.className = 'bag-empty';
+      p.textContent = 'You have nothing to sell. Mine copper and tin in the Greyrock Pit east of town, or fish Mirrormere from its dock.';
+      body.appendChild(p);
+    } else {
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'alc-buy mk-all';
+      all.textContent = `Sell everything  ${total}g`;
+      all.onclick = () => {
+        if (game.sellAllGoods()) paint();
+      };
+      body.appendChild(all);
+    }
+    flushThumbs(240);
+  };
+  paint();
+  return () => {};
+}

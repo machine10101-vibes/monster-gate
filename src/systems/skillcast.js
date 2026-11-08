@@ -43,6 +43,8 @@ export function skillMods(game) {
     haste: 0,
   };
   if (!p || !pr) return mods;
+  mods.melee *= 1 + (pr.level('strength') - 1) * 0.01;
+  mods.stamina += pr.level('stamina') - 1;
   if (has('fortify')) {
     mods.dr += p.shielding ? 0.22 : 0.1;
     mods.hp += 10;
@@ -163,7 +165,7 @@ function pay(game, skill) {
   if (skill.res === 'fury') p.fury -= cost;
   else if (skill.res === 'mana') p.mana -= cost;
   else if (skill.res === 'stamina') {
-    p.stamina -= cost;
+    p.spend(cost);
     p.stamDelay = 0.6;
   }
 }

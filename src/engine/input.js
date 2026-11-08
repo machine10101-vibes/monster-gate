@@ -72,6 +72,9 @@ export class Input {
         case 'KeyG':
           this.press('panel:spellbook');
           break;
+        case 'KeyH':
+          this.press('panel:stats');
+          break;
         case 'KeyJ':
         case 'Enter':
           this.press('attack');

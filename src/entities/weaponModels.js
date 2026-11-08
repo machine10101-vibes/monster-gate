@@ -381,6 +381,68 @@ function ironPick() {
   return c.done();
 }
 
+function fishingPole() {
+  const T = THEMES.iron;
+  const c = ctx();
+  rod(c, -10, 20, 2.4, (x, y, z) => J(z % 6 < 3 ? 0xc79a62 : 0xb58852, x, y, z, 50, 0.05));
+  wrapRod(c, T, 21, 30, 2.3, 0xd23a3a, 0x8f2323);
+  ringAt(c, 20, 2.4, T.guard, 2);
+  ball(c, 3.4, 0, 14, 3.4, (x, y, z, d) => (d > 0.78 ? J(0x4a4e58, x, y, z, 51, 0.05) : J(0xb8bcc6, x, y, z, 52, 0.05)), false, 0.6, 1);
+  for (let z = 12; z <= 17; z++) c.set(2, -2, z, 0x4a4e58);
+  c.set(5, 0, 14, 0x2f3238);
+  c.set(6, 0, 14, 0xc9a24a);
+  for (let z = 30; z <= 128; z++) {
+    const t = (z - 30) / 98;
+    const r = Math.max(0.9, 2.1 * (1 - t * 0.7));
+    const bend = Math.round(t * t * 5);
+    for (let y = -2; y < 2; y++) for (let x = -2; x < 2; x++) {
+      if (Math.hypot(x + 0.5, y + 0.5) > r) continue;
+      c.set(x, y + bend, z, J(z % 14 < 7 ? 0xd9b177 : 0xc9a066, x, y, z, 53, 0.04));
+    }
+    if (z % 20 === 8 && z < 120) {
+      const gy = Math.round(t * t * 5) + 2;
+      c.set(0, gy, z, 0xc9ccd4);
+      c.set(-1, gy, z, 0xc9ccd4);
+      c.set(0, gy + 1, z, 0xc9ccd4);
+    }
+  }
+  c.set(0, 5 + 1, 129, 0xffffff);
+  c.set(-1, 5 + 1, 129, 0xc9ccd4);
+  ball(c, 0, 0, -12, 2.6, (x, y, z) => J(0x6b4325, x, y, z, 54, 0.06));
+  return c.done();
+}
+
+function fishingNet() {
+  const T = THEMES.iron;
+  const c = ctx();
+  haft(c, T, -10, 64, 2.2, 0x8a5a30, 0);
+  wrapRod(c, T, 8, 24, 2.4, 0x6b4a2c, 0x4a3220);
+  ringAt(c, 52, 2.3, T.guard, 3);
+  const cz = 82;
+  const R = 17;
+  for (let a = 0; a < 140; a++) {
+    const ang = (a / 140) * Math.PI * 2;
+    const x = Math.cos(ang) * R;
+    const z = cz + Math.sin(ang) * R;
+    for (let dy = 0; dy <= 1; dy++) c.set(Math.round(x), dy, Math.round(z), J(0xb58852, a, dy, 0, 55, 0.05));
+  }
+  for (let t = 0; t < 14; t++) c.set(0, 0, 64 + t, J(0x8a5a30, t, 0, 0, 56, 0.05));
+  for (let y = 0; y > -15; y--) {
+    const rr = R * Math.sqrt(Math.max(0, 1 - (y / -15) ** 2)) ;
+    for (let x = -R; x <= R; x++)
+      for (let z = -R; z <= R; z++) {
+        const d = Math.hypot(x + 0.5, z + 0.5);
+        if (d > rr || d < rr - 1.2) continue;
+        const lat = ((x + z + y * 3) & 3) === 0 || ((x - z + y * 3) & 3) === 0;
+        if (!lat) continue;
+        c.set(x, y - 1, cz + z, J(0xe6d9b0, x, y, z, 57, 0.05));
+      }
+  }
+  c.set(3, -6, cz + 2, 0xff7a4a);
+  c.set(2, -6, cz + 2, 0xff9a6a);
+  return c.done();
+}
+
 function scythe() {
   const T = THEMES.dark;
   const c = ctx();
@@ -726,6 +788,8 @@ const BUILDERS = {
   ...BOWS,
   axe: ironAxe,
   pick: ironPick,
+  fishrod: fishingPole,
+  fishnet: fishingNet,
   hammer: ironHammer,
   wand: ashWand,
   tome: fieldTome,

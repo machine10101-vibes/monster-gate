@@ -24,12 +24,13 @@ npm run preview  # serve the production build
 | Skill slots | Z, X, V, or the 1 2 3 buttons beside the bar | Skill buttons 1, 2, and 3 |
 | Skill book | G | Menu → Skill & Spell Book, or the book button |
 | Skill tree | K | Menu → Skill Tree |
+| Hunter stats | H | Menu → Hunter Stats |
 | Select item | 1-9 / click hotbar | Tap hotbar |
 | Drink a potion | Click it on the hotbar, or select it and attack | Tap it on the hotbar |
 | Character / bag | E character, B bag | Gear and bag buttons |
 | Talk / Waygate | F | Talk button |
 | Rotate / zoom camera | R, [ ], wheel, middle-drag | Drag right side |
-| Panels | M map, E character, B bag, G skill book, C catalog, Q hunt log, T settings, K skills | Menu buttons |
+| Panels | M map, E character, B bag, G skill book, H stats, C catalog, Q hunt log, T settings, K skills | Menu buttons |
 
 ## Waygate
 
@@ -47,6 +48,8 @@ Weapons and armor are forged at the Forge beside Bram the Blacksmith in Oakhollo
 - The dragon's palette and proportions live in `src/data/budge.js` and `buildBudgeDragon()` in `src/entities/creatures.js`. Catalog data (drops, recipes, stats) is in `src/data/catalog.js`.
 
 ## Skill trees
+
+Gathering: east of town, the Greyrock Pit is sunk into the ground with a cobbled ramp leading down to it. It holds three copper rocks and two tin rocks. South-west of town, Mirrormere has a walk-out dock with two net spots (shrimp, Fishing 1) and two pole spots (trout, Fishing 3). Stand next to a rock or on the dock and press F: the hunter walks into place, swaps to the pickaxe, net or pole, and works until you move, attack or get hurt. Ore and fish go into the bag (Gathered), fish can be eaten from there, and Dalla's market stall (the pumpkin stall in town) buys everything. Strength, Agility, Stamina, Mining and Fishing each level from 1 to 99 on a RuneScape-style XP curve; press H for the stats page. Strength adds 1% melee damage a level, Agility 0.3% move speed, Stamina 1 maximum stamina.
 
 Press K (or Menu → Skill Tree) to choose Warrior, Ranger, or Mage. Each class has three paths, and each path runs five skills deep: a passive, an active, a special, another passive, and a capstone.
 

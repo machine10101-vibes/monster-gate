@@ -1,4 +1,5 @@
 import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
+import { GOODS, GOODS_ORDER, TOOLS } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 function cell(canvas, name, sub, extra) {
@@ -54,6 +55,47 @@ export function mountBag(body, game) {
     });
     carried.appendChild(cgrid);
     root.appendChild(carried);
+
+    const tools = document.createElement('section');
+    tools.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Tools' }));
+    const tgrid = document.createElement('div');
+    tgrid.className = 'bag-grid';
+    for (const t of TOOLS.filter((x) => x.id !== 'pickaxe')) {
+      const b = cell(renderThumb({ kind: 'held', id: t.held }, 96), t.name, t.desc);
+      b.classList.add('part');
+      tgrid.appendChild(b);
+    }
+    tools.appendChild(tgrid);
+    root.appendChild(tools);
+
+    const gath = document.createElement('section');
+    gath.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Gathered' }));
+    const ggrid2 = document.createElement('div');
+    ggrid2.className = 'bag-grid';
+    let anyGood = false;
+    for (const id of GOODS_ORDER) {
+      const n = game.progress.good(id);
+      if (!n) continue;
+      anyGood = true;
+      const g = GOODS[id];
+      const b = cell(renderThumb({ kind: 'good', id }, 96), g.name, g.heal ? `Eat: +${g.heal} health` : `Sells for ${g.price}g`, badge(String(n), 'bag-n'));
+      b.classList.add('part');
+      if (g.heal) {
+        b.classList.add('edible');
+        b.onclick = () => {
+          if (game.eatGood(id)) paint();
+        };
+      }
+      ggrid2.appendChild(b);
+    }
+    if (!anyGood) {
+      const p = document.createElement('p');
+      p.className = 'bag-empty';
+      p.textContent = 'Ore from the Greyrock Pit and fish from Mirrormere are kept here. Sell them at the market stall.';
+      gath.appendChild(p);
+    }
+    gath.appendChild(ggrid2);
+    root.appendChild(gath);
 
     const gear = document.createElement('section');
     gear.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Gear' }));

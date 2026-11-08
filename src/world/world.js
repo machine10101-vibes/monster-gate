@@ -7,6 +7,7 @@ import {
 } from './terrain.js';
 import * as M from './models.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
+import { FISH_SPOTS, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -32,7 +33,13 @@ export class World {
     return clamp(Math.floor(z), 0, W - 1) * W + clamp(Math.floor(x), 0, W - 1);
   }
   heightAt(x, z) {
+    const d = this.dock;
+    if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
     return this.data.H[this.idx(x, z)];
+  }
+  onDock(x, z, pad = 0) {
+    const d = this.dock;
+    return !!d && x > d.x0 - pad && x < d.x1 + pad && z > d.z - d.hw - pad && z < d.z + d.hw + pad;
   }
   isWater(x, z) {
     return this.heightAt(x, z) < WATER_Y;
@@ -239,6 +246,7 @@ export class World {
     this.buildGate();
     this.buildFarm();
     this.buildWindmill();
+    buildGatherSites(this);
 
     progress(0.65, 'Scattering flowers and mushrooms');
     await nextFrame();
@@ -403,6 +411,7 @@ export class World {
     this.box(67, 85.5, 2.1, 0.9);
     this.putAt(stallB, 77, 86, 0, 1);
     this.box(77, 85.5, 2.1, 0.9);
+    this.market = { x: 77, y: this.heightAt(77, 84.2), z: 84.2 };
     const stallC = M.buildStall(3, [0x5b3d86, 0xe4d4f6], 'potion');
     this.putAt(stallC, 72, 86, 0, 1);
     this.box(72, 85.5, 2.1, 0.9);
@@ -629,7 +638,7 @@ export class World {
       if (h < 0.9) return false;
       if (this.nearPath(x, z, 2)) return false;
       const zn = D.zone[i];
-      if (zn === ZONE.TOWN || zn === ZONE.FARM || zn === ZONE.GATE || zn === ZONE.WATER) return false;
+      if (zn === ZONE.TOWN || zn === ZONE.FARM || zn === ZONE.GATE || zn === ZONE.WATER || zn === ZONE.LAKE || zn === ZONE.MINE) return false;
       if (Math.hypot(x - GATE.x, z - GATE.z) < 9) return false;
       if (Math.hypot(x - TOWN.x, z - TOWN.z) < 15) return false;
       return true;
@@ -690,6 +699,11 @@ export class World {
     }
   }
 
+  waterClear(x, z) {
+    if (this.onDock(x, z, 1.6)) return false;
+    return !FISH_SPOTS.some((f) => Math.hypot(f.x - x, f.z - z) < 1.9);
+  }
+
   scatterCover() {
     const m = this.models;
     const rng = new RNG(999);
@@ -706,19 +720,19 @@ export class World {
         const i = this.idx(x, z);
         const h = D.H[i];
         const zn = D.zone[i];
-        if (D.pathMask[i] || zn === ZONE.FARM) continue;
+        if (D.pathMask[i] || zn === ZONE.FARM || zn === ZONE.MINE) continue;
         const fo = D.forest[i];
         const y = h;
         const rot = rng.next() * Math.PI * 2;
         if (h < WATER_Y) {
-          if (h <= 0 && rng.next() < 0.035 && d < 55) {
+          if (h <= 0 && rng.next() < 0.035 && d < 55 && this.waterClear(x, z)) {
             const flower = rng.next() < 0.2;
             this.putAt(flower ? m.lily[2] : pickOf(m.lily.slice(0, 2)), x, z, rot, 1, { y: WATER_Y + 0.02, cover: true });
           }
           continue;
         }
         if (h <= 0.5 + 0.01 && h >= WATER_Y) {
-          if (rng.next() < 0.16 * dens) this.putAt(pickOf(m.reeds), x, z, rot, 1, cover);
+          if (rng.next() < 0.16 * dens && this.waterClear(x, z)) this.putAt(pickOf(m.reeds), x, z, rot, 1, cover);
           continue;
         }
         if (zn === ZONE.TOWN || zn === ZONE.GATE) {
@@ -872,6 +886,8 @@ export class World {
       else if (t === TILE.COBBLE) [r, g, b] = [170, 170, 176];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];
       else if (t === TILE.SAND) [r, g, b] = [225, 205, 150];
+      else if (t === TILE.GRAVEL) [r, g, b] = [150, 146, 142];
+      else if (t === TILE.DIRT) [r, g, b] = [150, 112, 78];
       else if (t === TILE.FARMLAND) [r, g, b] = [200, 170, 70];
       else {
         const fo = D.forest[i];
@@ -896,6 +912,10 @@ export class World {
     }
     ctx.fillStyle = '#6a3d86';
     ctx.fillRect(70, 84, 4, 3);
+    if (this.dock) {
+      ctx.fillStyle = '#7a5230';
+      ctx.fillRect(Math.floor(this.dock.x0), Math.floor(this.dock.z - this.dock.hw), Math.ceil(this.dock.x1 - this.dock.x0), 2);
+    }
     ctx.fillStyle = '#6b4a2b';
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
       ctx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);

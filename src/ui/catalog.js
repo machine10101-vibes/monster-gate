@@ -5,6 +5,7 @@ import { buildHeld, buildHumanoid, meshFrom } from '../entities/humanoid.js';
 import { TALL_KINDS, buildBookModel, buildShieldModel } from '../entities/weaponModels.js';
 import { toonMaterial } from '../engine/materials.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
+import { goodsVoxels } from '../world/gatherModels.js';
 
 /* ------------------------------------------------------------------ */
 /* Offscreen 3D stage: renders the same in-game models to 2D canvases   */
@@ -31,6 +32,11 @@ function buildSubject(spec, silhouette) {
     tilt.rotation.z = spec.id === 'budgefang' ? -0.35 : spec.id === 'duskclaw' ? -0.2 : 0;
     yaw = 0.55;
     pitch = 0.18;
+  } else if (spec.kind === 'good') {
+    const [gm, size, ox, oy, oz] = goodsVoxels(spec.id);
+    tilt.add(meshFrom(gm, ox, oy, oz, toonMaterial({ vertexColors: true }), size));
+    yaw = spec.id === 'shrimp' ? 0.5 : spec.id === 'trout' ? 0.75 : 0.6;
+    pitch = spec.id === 'trout' || spec.id === 'shrimp' ? 0.3 : 0.24;
   } else if (spec.kind === 'weapon') {
     const g = gearById(spec.id);
     const held = buildHeld(g.held);
