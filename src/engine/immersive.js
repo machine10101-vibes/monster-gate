@@ -1,4 +1,4 @@
-/** Fullscreen + browser-chrome helpers for landscape phones. */
+/** Fullscreen + browser-chrome helpers for phones and iPad. */
 
 export function isLandscape() {
   return window.innerWidth > window.innerHeight;
@@ -8,37 +8,55 @@ export function isFullscreen() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
+/** iPad, including iPadOS Safari which presents itself as a desktop Mac. */
+export function isTablet() {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPod/i.test(ua) && !/iPad/i.test(ua)) return false;
+  if (/iPad/i.test(ua)) return true;
+  const points = navigator.maxTouchPoints || 0;
+  if (points > 1 && (navigator.platform === 'MacIntel' || /Macintosh/i.test(ua))) return true;
+  const touch = points > 1 || 'ontouchstart' in window;
+  if (!touch) return false;
+  const shortSide = Math.min(window.screen?.width || 0, window.screen?.height || 0);
+  return shortSide >= 744;
+}
+
 function lockLandscape() {
   const pending = screen.orientation?.lock?.('landscape');
   pending?.catch?.(() => {});
 }
 
-/** Ask the browser to drop its toolbar. Requires a user gesture on most phones. */
+function callFullscreen(el, opts) {
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
+  if (!req) return Promise.reject(new Error('unsupported'));
+  try {
+    const result = opts === undefined ? req.call(el) : req.call(el, opts);
+    if (result && typeof result.then === 'function') return result;
+    return isFullscreen() ? Promise.resolve() : Promise.reject(new Error('no fullscreen'));
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}
+
+/**
+ * Hide the browser header. iPad Safari accepts this from a tap, and rejects
+ * `navigationUI` on some versions, so a rejection is tried again without it.
+ * Returns a promise that resolves true when the page is fullscreen.
+ */
 export function requestGameFullscreen(lock = false) {
   if (isFullscreen()) {
     if (lock) lockLandscape();
-    return;
+    return Promise.resolve(true);
   }
-  const el = document.documentElement;
-  const req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!req) return;
-  let pending;
-  try {
-    pending = req.call(el, { navigationUI: 'hide' });
-  } catch {
-    try {
-      pending = req.call(el);
-    } catch {
-      return;
-    }
-  }
-  if (pending && typeof pending.then === 'function') {
-    pending.then(() => {
-      if (lock) lockLandscape();
-    }).catch(() => {});
-  } else if (lock) {
-    lockLandscape();
-  }
+  const root = document.documentElement;
+  const app = document.getElementById('app');
+  const ask = (el) => callFullscreen(el, { navigationUI: 'hide' }).catch(() => callFullscreen(el));
+  let pending = ask(root);
+  if (app && app !== root) pending = pending.catch(() => ask(app));
+  return pending.then(() => {
+    if (lock) lockLandscape();
+    return true;
+  }).catch(() => false);
 }
 
 export function exitGameFullscreen() {
