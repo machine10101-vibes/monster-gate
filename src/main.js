@@ -37,7 +37,7 @@ import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cl
 
 const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
-import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
+import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
@@ -205,7 +205,9 @@ class Game {
     if (this.started) return;
     if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
     document.body.classList.add('hunting');
-    if (this.input.touch && this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
+    if (this.input.touch && (this.isLandscape() || isTablet())) {
+      this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
+    }
     this.started = true;
     this.audio.unlock();
     this.cam.targetDist = 16;
@@ -709,11 +711,12 @@ class Game {
 
   toggleFullscreen() {
     if (isFullscreen()) exitGameFullscreen();
-    else this.enterImmersive({ gesture: true, lock: this.input.touch });
+    else this.enterImmersive({ gesture: true, lock: this.input.touch && !isTablet() });
   }
 
   /* ------------------------- landscape fullscreen ------------------------- */
   bindImmersive() {
+    if (isTablet()) document.body.classList.add('tablet');
     const sync = () => this.syncImmersive();
     window.addEventListener('resize', sync);
     window.addEventListener('orientationchange', () => {
@@ -735,15 +738,17 @@ class Game {
     window.visualViewport?.addEventListener('scroll', onViewport);
     document.addEventListener('fullscreenchange', onViewport);
     document.addEventListener('webkitfullscreenchange', onViewport);
-    window.addEventListener(
-      'pointerdown',
-      (e) => {
-        if (!this.started || this.walletBusy || !this.input.touch || e.target.closest?.('#btn-fs, #title, #wallet-help, #loading')) return;
-        if (this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
-        else if (e.target.closest?.('#rotate-overlay')) requestGameFullscreen(true);
-      },
-      { capture: true }
-    );
+    // Safari counts a tap as touchend or click. pointerdown is too early, so iPad keeps its toolbar.
+    const ask = (e) => {
+      if (!this.started || this.walletBusy || this.fsPending) return;
+      if (e.target.closest?.('input, textarea, select, #btn-fs, #title, #wallet-help, #loading, #account-panel')) return;
+      const tablet = isTablet();
+      if (!this.input.touch && !tablet) return;
+      if (this.isLandscape() || tablet) this.enterImmersive({ gesture: true, lock: this.isLandscape() && !tablet });
+      else if (e.target.closest?.('#rotate-overlay')) requestGameFullscreen(true);
+    };
+    window.addEventListener('touchend', ask, { capture: true });
+    window.addEventListener('click', ask, { capture: true });
     sync();
   }
 
@@ -757,7 +762,7 @@ class Game {
       this.resize();
       return;
     }
-    if (this.isLandscape()) this.enterImmersive();
+    if (this.isLandscape() || isTablet()) this.enterImmersive();
     else {
       document.documentElement.classList.remove('landscape-full');
       this.tucked = false;
@@ -774,11 +779,22 @@ class Game {
     document.documentElement.classList.add('landscape-full');
     const now = performance.now();
     const cooled = !this.fsTriedAt || now - this.fsTriedAt > 900;
-    if (!isFullscreen() && (gesture || cooled)) {
+    const tablet = isTablet();
+    // A tablet toolbar only hides from a real tap. Retrying on a timer is rejected and leaves the header up.
+    if (!isFullscreen() && !this.fsPending && (gesture || (!tablet && cooled))) {
       this.fsTriedAt = now;
-      requestGameFullscreen(lock && gesture);
+      this.fsPending = true;
+      requestGameFullscreen(lock && gesture).then((ok) => {
+        this.fsPending = false;
+        if (ok) this.clearTuck();
+        else if (!tablet && !this.tucked) {
+          this.tucked = true;
+          this.tuckChrome();
+        }
+        this.resize();
+      });
     }
-    if (gesture || !this.tucked) {
+    if (!tablet && (gesture || !this.tucked)) {
       this.tucked = true;
       this.tuckChrome();
     }
@@ -854,7 +870,7 @@ class Game {
     const vv = window.visualViewport;
     let w = window.innerWidth;
     let h = window.innerHeight;
-    if (this.input?.touch && this.isLandscape?.()) {
+    if (this.input?.touch && (this.isLandscape?.() || isTablet())) {
       if (isFullscreen()) {
         w = window.innerWidth;
         h = window.innerHeight;

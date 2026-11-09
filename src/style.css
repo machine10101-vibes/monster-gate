@@ -51,7 +51,11 @@ html.landscape-full body {
 html.landscape-full:fullscreen,
 html.landscape-full:-webkit-full-screen,
 html.landscape-full:fullscreen #app,
-html.landscape-full:-webkit-full-screen #app {
+html.landscape-full:-webkit-full-screen #app,
+html:fullscreen,
+html:-webkit-full-screen,
+html:fullscreen #app,
+html:-webkit-full-screen #app {
   width: 100%;
   height: 100%;
   background: #0b0d10;
@@ -1417,6 +1421,9 @@ h1 em {
 body.touch .touch-only {
   display: block;
 }
+body.tablet .touch-only {
+  display: none;
+}
 body.touch .how {
   display: none;
 }
@@ -1464,7 +1471,7 @@ body.touch .how {
 @media (orientation: portrait) {
   /* The title screen stays upright so Klever can show fingerprint and confirm.
      Landscape is asked for only after the hunt has started. */
-  body.touch.hunting #rotate-overlay {
+  body.touch.hunting:not(.tablet) #rotate-overlay {
     display: flex;
   }
   body.touch #title .title-inner {
