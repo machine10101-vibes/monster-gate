@@ -451,6 +451,7 @@ class Game {
     this.syncVitals();
     const w = pr.weaponItem;
     this.items[7] = w ? { ...w } : { ...ITEMS[7] };
+    p.setSheath(w?.held || 'blade');
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
       this.selectSlot(this.sel, true);

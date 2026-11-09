@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, TALL_KINDS } from './weaponModels.js';
+import { DUAL_KINDS, TALL_KINDS, gripRoll, sheathMount } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -69,6 +69,7 @@ export class Player {
     this.wading = false;
     this.aimYaw = 0;
     this.heldKind = null;
+    this.sheathKind = null;
     this.torchLight = new THREE.PointLight(0xffa850, 0, 10, 1.6);
     this.torchLight.position.set(0, 1.6, 0.4);
     this.obj.add(this.torchLight);
@@ -117,11 +118,35 @@ export class Player {
     this.heldKind = null;
     const kind = this.wantHeld;
     this.setHeld(kind);
+    this.syncSheath();
+  }
+
+  /** Equipped weapon to carry on the back whenever it is not in the hand. */
+  setSheath(kind) {
+    this.sheathKind = kind || null;
+    this.syncSheath();
+  }
+
+  syncSheath() {
+    const slot = this.model.backSlot;
+    if (!slot) return;
+    while (slot.children.length) slot.remove(slot.children[0]);
+    const kind = this.sheathKind;
+    if (!kind || kind === this.heldKind) return;
+    const g = buildHeld(kind);
+    g.traverse((o) => (o.castShadow = true));
+    const m = sheathMount(kind);
+    g.position.set(m.x, m.y, m.z);
+    g.rotation.set(m.rx, m.ry, m.rz);
+    slot.add(g);
   }
 
   setHeld(kind) {
     this.wantHeld = kind;
-    if (this.heldKind === kind) return;
+    if (this.heldKind === kind) {
+      this.syncSheath();
+      return;
+    }
     this.heldKind = kind;
     const slot = this.model.heldSlot;
     while (slot.children.length) slot.remove(slot.children[0]);
@@ -140,6 +165,7 @@ export class Player {
         off.add(twin);
       }
     }
+    this.syncSheath();
   }
 
   get facing() {
@@ -1168,7 +1194,17 @@ export class Player {
     m.armL.rotation.z = sp.step('armLz', armLz, dt, wA * 0.8, 0.8);
     m.elbowR.rotation.x = -sp.step('elR', eR, dt, wA * 0.75, 0.55);
     m.elbowL.rotation.x = -sp.step('elL', eL, dt, wA * 0.75, 0.55);
-    m.heldSlot.rotation.x = AIMED_KINDS.has(this.heldKind) ? -(m.armR.rotation.x + m.elbowR.rotation.x) : 0;
+    const aimed = AIMED_KINDS.has(this.heldKind);
+    m.heldSlot.rotation.x = aimed ? -(m.armR.rotation.x + m.elbowR.rotation.x) : 0;
+    let roll = gripRoll(this.heldKind);
+    if (roll && !aimed && this.state === 'attack' && this.attackItem?.kind === 'melee' && this.combo !== 2) {
+      const tt = clamp(this.stateT / Math.max(0.0001, this.stateDur), 0, 1);
+      const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
+      const cut = tt < hitT ? ease(tt / hitT) : 1 - ease(clamp((tt - hitT) / (1 - hitT), 0, 1));
+      roll = lerp(roll, 0, cut);
+    }
+    m.heldSlot.rotation.z = roll;
+    if (m.offhand) m.offhand.rotation.z = DUAL_KINDS.has(this.heldKind) ? roll : 0;
 
     const legW = this.state === 'attack' ? 30 : 26;
     m.legL.rotation.x = sp.step('legL', legL, dt, legW, 0.85);

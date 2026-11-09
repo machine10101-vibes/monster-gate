@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
+import { gripRoll } from './weaponModels.js';
 
 const LOOKS = [
   { tunic: 0x2c3d4a, hair: 0x1c140e, hairStyle: 'messy' },
@@ -40,6 +41,7 @@ export class RemoteHunter {
     const look = LOOKS[n];
     this.model = buildHumanoid({ ...look, hero: true, seed: n + 4 });
     const held = buildHeld('blade');
+    this.model.heldSlot.rotation.z = gripRoll('blade');
     this.model.heldSlot.add(held);
     this.obj = new THREE.Group();
     this.pivot = new THREE.Group();

@@ -147,34 +147,6 @@ export function buildHumanoid(o = {}) {
     }
 
     if (c.hero) {
-      const slantX = (y) => 18 + ((30 - y) / 44) * 7;
-      for (let y = -13; y <= 30; y++) {
-        const cx = slantX(y);
-        let w = 4;
-        let colFn;
-        if (y >= 21) {
-          w = 2;
-          colFn = (x, yy, z) => J(0x2b2020, x, yy, z, seed, 0.1);
-        } else if (y >= 18) {
-          w = 9;
-          colFn = (x, yy, z) => J(0x6b6c72, x, yy, z, seed, 0.06);
-        } else {
-          w = y < -9 ? 3 : 5;
-          colFn = (x, yy, z) => {
-            const mid = Math.abs(x - cx) < 0.8;
-            return J(mid ? 0x6d6e75 : 0xa4a6ae, x, yy, z, seed, 0.06);
-          };
-        }
-        const x0 = Math.round(cx - w / 2);
-        for (let xi = x0; xi < x0 + w; xi++) {
-          for (let z = 1; z <= 3; z++) {
-            if (y >= 18 && y < 21 && z < 3) continue;
-            if (y < 18 && z === 1) continue;
-            T.set(xi, ty(y), z, colFn(xi, y, z));
-          }
-        }
-      }
-      T.box(slantX(30) - 1, ty(30), 1, slantX(30) + 1, ty(32), 4, 0x6b6c72);
       T.box(12, ty(2), 2, 20, ty(5), 4, (x, y, z) => J(0x3a2a1f, x, y, z, seed, 0.08));
     }
     const tSnap = T.data.slice();
@@ -462,6 +434,11 @@ export function buildHumanoid(o = {}) {
   elbowR.add(aR.lower);
   upper.add(armL, armR);
 
+  /* Sheathed weapon. The hilt sits over the right shoulder; the model hangs down the back. */
+  const backSlot = new THREE.Group();
+  backSlot.position.set(0.02, 0.34, -0.3);
+  upper.add(backSlot);
+
   const legL = new THREE.Group();
   const legR = new THREE.Group();
   legL.position.set(-4.1 * S, 0, 0);
@@ -509,7 +486,7 @@ export function buildHumanoid(o = {}) {
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, legL, legR, kneeL, kneeR, hand, heldSlot, shieldG, offhand, bookG, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, legL, legR, kneeL, kneeR, hand, heldSlot, backSlot, shieldG, offhand, bookG, mat };
 }
 
 function buildThemedShield(setId, mat) {
@@ -529,14 +506,23 @@ function buildShield(mat) {
 /* ------------------------------------------------------------------ */
 
 const heldCache = {};
+
+function cloneHeld(src) {
+  const g = src.clone(true);
+  g.traverse((o) => {
+    if (o.isMesh && o.geometry) o.geometry = o.geometry.clone();
+  });
+  return g;
+}
+
 export function buildHeld(kind) {
-  if (heldCache[kind]) return heldCache[kind].clone();
+  if (heldCache[kind]) return cloneHeld(heldCache[kind]);
   const mat = toonMaterial({ vertexColors: true });
   const themed = buildWeaponVoxels(kind);
   if (themed) {
     const g = meshFrom(themed.M, themed.ox, themed.oy, themed.oz, mat, themed.size);
     heldCache[kind] = g;
-    return g.clone();
+    return cloneHeld(g);
   }
   const M = new VoxelModel(16, 16, 56);
   const cx = 8;
@@ -558,7 +544,7 @@ export function buildHeld(kind) {
   }
   const g = meshFrom(M, cx, cy, 0, mat);
   heldCache[kind] = g;
-  return g.clone();
+  return cloneHeld(g);
 }
 
 export { clamp, mix };

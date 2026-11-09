@@ -13,6 +13,31 @@ export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual']);
 /** Held kinds whose model is taller than wide (bows). */
 export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow']);
 
+/**
+ * Swords are sculpted flat in the horizontal plane. Rolled a quarter turn,
+ * the edge faces a side swing instead of the flat slapping into it.
+ */
+const EDGE_HOLD = new Set([
+  'blade', 'dual',
+  'budgeblade', 'budgegreatsword', 'budgedual',
+  'darksword', 'darkgreatsword', 'darkdual',
+]);
+
+/** Resting roll of a weapon in the hand, around the grip. */
+export function gripRoll(kind) {
+  return EDGE_HOLD.has(kind) ? Math.PI / 2 : 0;
+}
+
+/**
+ * Placement of a carried weapon on the back slot.
+ * Hafted weapons run along +z; bows are already upright along +y.
+ */
+export function sheathMount(kind) {
+  if (TALL_KINDS.has(kind)) return { x: 0.1, y: 0.02, z: 0, rx: 0.12, ry: 0, rz: -0.2 };
+  // Hilt by the right hip, blade running up the back toward the left shoulder.
+  return { x: 0.1, y: -0.14, z: 0, rx: -Math.PI / 2, ry: 0, rz: 0.48 };
+}
+
 const THEMES = {
   budge: {
     wrap: BUDGE.scale, wrapLo: BUDGE.scaleLo, wrapHi: BUDGE.scaleHi, blade: BUDGE.horn, edge: BUDGE.claw, dark: BUDGE.hornDark,
