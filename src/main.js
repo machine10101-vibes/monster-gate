@@ -30,6 +30,7 @@ import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { clearSession, isMobile, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
+import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
 
@@ -108,6 +109,9 @@ class Game {
     this.wallet = null;
     this.walletBusy = false;
     this.walletNote = '';
+    this.cloudState = 'off';
+    this.cloudSyncing = false;
+    this.cloudConflict = false;
     this.saveAcc = 0;
     this.accountWatch = false;
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
@@ -167,7 +171,7 @@ class Game {
     this.applyQuality();
     const session = readSession();
     if (session) {
-      this.applyWallet(session);
+      await this.applyWallet(session);
       this.watchAccount();
     }
     this.refreshWalletUi();
@@ -183,7 +187,7 @@ class Game {
 
   start() {
     if (this.started) return;
-    if (!this.wallet?.address) return;
+    if (!this.wallet?.address || this.cloudSyncing) return;
     if (this.input.touch && this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
     this.started = true;
     this.audio.unlock();
@@ -201,9 +205,7 @@ class Game {
     this.watchAccount();
   }
 
-  applyWallet(session) {
-    this.wallet = session;
-    this.walletNote = this.progress.useAddress(session.address);
+  rebindFromProgress() {
     this.gold = this.progress.gold;
     this.items = ITEMS.map((i) => ({ ...i }));
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
@@ -211,6 +213,51 @@ class Game {
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
     this.selectSlot(0, true);
     this.refreshHud(true);
+  }
+
+  bindCloudPush() {
+    this.progress.onCloud = (data) => {
+      schedulePush(this.wallet, data, (result) => {
+        if (!result) return;
+        if (result.revision) this.progress.revision = result.revision;
+        if (result.conflict && !this.cloudConflict) {
+          this.cloudConflict = true;
+          this.progress.onCloud = null;
+          this.hud?.toast('A newer hunt is saved to this wallet. Reload to use it.', 4200);
+        }
+      });
+    };
+  }
+
+  async applyWallet(session) {
+    this.wallet = session;
+    this.cloudConflict = false;
+    this.progress.onCloud = null;
+    this.walletNote = this.progress.useAddress(session.address);
+    this.rebindFromProgress();
+    this.cloudSyncing = true;
+    this.cloudState = 'off';
+    this.refreshWalletUi();
+    const gate = { open: true };
+    try {
+      const result = await Promise.race([
+        syncHunt(session, this.progress, gate).catch(() => ({ state: 'error', replaced: false })),
+        new Promise((_, reject) => setTimeout(() => {
+          gate.open = false;
+          reject(new Error('timeout'));
+        }, 8000)),
+      ]);
+      this.cloudState = result.state;
+      if (result.replaced) {
+        this.walletNote = 'loaded';
+        this.rebindFromProgress();
+      }
+      if (result.state === 'on') this.bindCloudPush();
+    } catch {
+      this.cloudState = 'error';
+    }
+    this.cloudSyncing = false;
+    this.refreshWalletUi();
   }
 
   refreshWalletUi() {
@@ -223,6 +270,7 @@ class Game {
     const signed = !!this.wallet?.address;
     sign.classList.toggle('hidden', signed);
     start.classList.toggle('hidden', !signed);
+    start.disabled = !!this.cloudSyncing;
     swap.classList.toggle('hidden', !signed);
     if (!signed) {
       help?.classList.add('hidden');
@@ -240,7 +288,14 @@ class Game {
       : this.walletNote === 'claimed'
         ? 'Your hunt is now saved to '
         : 'Welcome back. This hunt belongs to ';
-    status.append(lead, who, '. It stays on this browser under that wallet.');
+    const tail = this.cloudSyncing
+      ? '. Opening the hunt saved to this wallet…'
+      : this.cloudState === 'on'
+        ? '. It is saved to this wallet.'
+        : this.cloudState === 'error'
+          ? '. Saved on this browser. The guild record could not be reached.'
+          : '. It stays on this browser under that wallet.';
+    status.append(lead, who, tail);
   }
 
   async onWallet() {
@@ -254,8 +309,7 @@ class Game {
       : 'Confirm the signature in the Klever extension…';
     try {
       const session = await signIn();
-      this.applyWallet(session);
-      this.refreshWalletUi();
+      await this.applyWallet(session);
       this.watchAccount();
     } catch (err) {
       const help = document.getElementById('wallet-help');
@@ -330,9 +384,13 @@ class Game {
     sign.addEventListener('click', () => this.onWallet());
     swap.addEventListener('click', () => {
       this.captureHunter();
+      flushCloud();
       clearSession();
+      clearCloudToken();
+      this.progress.onCloud = null;
       this.wallet = null;
       this.walletNote = '';
+      this.cloudState = 'off';
       this.refreshWalletUi();
       this.onWallet();
     });
@@ -352,7 +410,10 @@ class Game {
       this.last = performance.now();
       if (document.hidden) this.captureHunter();
     });
-    window.addEventListener('pagehide', () => this.captureHunter());
+    window.addEventListener('pagehide', () => {
+      this.captureHunter();
+      flushCloud();
+    });
     document.addEventListener('pointerdown', () => this.audio.unlock(), { once: true });
   }
 

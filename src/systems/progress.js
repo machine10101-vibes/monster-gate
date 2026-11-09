@@ -31,10 +31,12 @@ const blank = () => ({
   goods: {},
 });
 
-/** Discoveries, harvested parts, crafted gear and what is worn. Persisted in localStorage for one Klever address. */
+/** Discoveries, harvested parts, crafted gear and what is worn. Persisted for one Klever address. */
 export class Progress {
   constructor() {
     this.address = null;
+    this.revision = 0;
+    this.onCloud = null;
     this.loadRaw(readRaw(ANON_KEY));
   }
 
@@ -53,7 +55,8 @@ export class Progress {
     }
     const anon = readRaw(ANON_KEY);
     this.loadRaw(anon);
-    this.save();
+    // Do not stamp savedAt here. The guild record may already hold a newer hunt.
+    this.save(false);
     try {
       if (anon && localStorage.getItem(saveKey(address))) localStorage.removeItem(ANON_KEY);
     } catch {
@@ -70,11 +73,19 @@ export class Progress {
     this.data.hunter = normalizeHunter(this.data.hunter);
   }
 
-  save() {
+  save(echo = true) {
+    if (echo) this.data.savedAt = Date.now();
     try {
       localStorage.setItem(saveKey(this.address), JSON.stringify(this.data));
     } catch {
       /* storage unavailable */
+    }
+    if (echo && this.address && typeof this.onCloud === 'function') {
+      try {
+        this.onCloud(this.data);
+      } catch {
+        /* the local hunt is already written */
+      }
     }
   }
 

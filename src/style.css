@@ -1303,6 +1303,11 @@ h1 em {
 .start:active {
   transform: translateY(3px);
 }
+.start:disabled {
+  animation: none;
+  opacity: 0.55;
+  cursor: wait;
+}
 @keyframes float {
   to {
     transform: translateY(-4px);
