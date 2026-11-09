@@ -612,7 +612,6 @@ export class Catalog {
         if (!this.forge || !pr.craft(g.id)) return;
         this.game.applyGear();
         if (g.type === 'weapon') this.game.selectSlot(0, true);
-        if (g.type === 'weapon') this.game.selectSlot(7, true);
         this.game.audio.quest();
         this.game.hud.toast(`Forged ${g.name}`, 1800);
         const f = this.game.world.forge;

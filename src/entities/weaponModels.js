@@ -34,8 +34,8 @@ export function gripRoll(kind) {
  */
 export function sheathMount(kind) {
   if (TALL_KINDS.has(kind)) return { x: 0.1, y: 0.02, z: 0, rx: 0.12, ry: 0, rz: -0.2 };
-  // Hilt over the right shoulder, tip down the back.
-  return { x: 0.08, y: 0.2, z: 0, rx: Math.PI / 2, ry: 0, rz: -0.42 };
+  // Model tip is +z. Pitch that end straight down so the hilt sits above the shoulder.
+  return { x: 0.12, y: 0.34, z: 0.02, rx: Math.PI / 2, ry: 0.15, rz: 0 };
 }
 
 const THEMES = {

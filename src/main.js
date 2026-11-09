@@ -430,10 +430,22 @@ class Game {
     this.selectSlot(i);
   }
 
+  /** The starter blade stands in for whatever weapon is actually equipped. */
+  carried(it) {
+    const w = this.progress.weaponItem;
+    if (w && it && (it.id === 'blade' || it.held === 'blade')) return { ...w };
+    return it;
+  }
+
   selectSlot(i, silent = false) {
     if (i < 0 || i >= this.items.length) return;
     this.sel = i;
-    const it = this.items[i];
+    const raw = this.items[i];
+    const it = this.carried(raw);
+    if (it !== raw) {
+      this.items[i] = it;
+      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
+    }
     this.player.setHeld(it.held || null);
     this.syncVitals();
     this.itemsChanged();
@@ -935,7 +947,13 @@ class Game {
   doAttack() {
     const P = this.player;
     if (P.dead) return;
-    const it = this.items[this.sel];
+    let it = this.carried(this.items[this.sel]);
+    if (it !== this.items[this.sel]) {
+      this.items[this.sel] = it;
+      this.player.setHeld(it.held || null);
+      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
+      this.itemsChanged();
+    }
     if (it.kind === 'light' || it.kind === 'none') {
       this.hud.toast(it.kind === 'light' ? 'Torch lit - hold it up in the dark' : 'Nothing equipped', 900);
       return;

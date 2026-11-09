@@ -142,6 +142,7 @@ export class Player {
   }
 
   setHeld(kind) {
+    if (kind === 'blade' && this.sheathKind && this.sheathKind !== 'blade') kind = this.sheathKind;
     this.wantHeld = kind;
     if (this.heldKind === kind) {
       this.syncSheath();
