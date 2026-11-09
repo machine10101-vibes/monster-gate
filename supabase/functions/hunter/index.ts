@@ -93,6 +93,69 @@ async function load(admin: Admin, body: Record<string, unknown>): Promise<Respon
   });
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function accountUser(accessToken: unknown): Promise<{ id: string; email: string } | Response> {
+  if (typeof accessToken !== "string" || accessToken.length < 20 || accessToken.length > 8192) {
+    return json({ error: "Sign in again." }, 401);
+  }
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !key) return json({ error: "The guild record could not be opened." }, 503);
+  const res = await fetch(`${url}/auth/v1/user`, {
+    headers: { authorization: `Bearer ${accessToken}`, apikey: key },
+  });
+  if (!res.ok) return json({ error: "Sign in again." }, 401);
+  const user = await res.json().catch(() => null) as { id?: string; email?: string } | null;
+  const id = typeof user?.id === "string" ? user.id : "";
+  const email = typeof user?.email === "string" ? user.email.trim().toLowerCase() : "";
+  if (!UUID_RE.test(id) || email.length < 3) return json({ error: "Sign in again." }, 401);
+  return { id, email };
+}
+
+async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const user = await accountUser(body.accessToken);
+  if (user instanceof Response) return user;
+  const { data, error } = await admin
+    .from("hunter_accounts")
+    .select("progress, revision")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) return json({ error: "The guild record could not be opened." }, 503);
+  const row = data as { progress?: Record<string, unknown>; revision?: number | string } | null;
+  if (!row?.progress) return json({ progress: null, revision: 0, savedAt: 0 });
+  return json({
+    progress: row.progress,
+    revision: Number(row.revision) || 0,
+    savedAt: Number(row.progress.savedAt) || 0,
+  });
+}
+
+async function accountSave(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const user = await accountUser(body.accessToken);
+  if (user instanceof Response) return user;
+  const progress = sanitizeProgress(body.progress, Date.now());
+  if (!progress) return json({ error: "That hunt cannot be stored." }, 400);
+  const { data, error } = await admin.rpc("save_account_hunt", {
+    p_user_id: user.id,
+    p_email: user.email,
+    p_progress: progress,
+  });
+  if (error || !data || typeof data !== "object") return json({ error: "The guild record could not be saved." }, 503);
+  const result = data as { ok?: boolean; revision?: number | string; savedAt?: number | string; progress?: unknown };
+  const savedAt = Number(result.savedAt) || 0;
+  const revision = Number(result.revision) || 0;
+  if (!result.ok) {
+    return json({
+      error: "A newer hunt is already saved to this account.",
+      progress: result.progress ?? null,
+      revision,
+      savedAt,
+    }, 409);
+  }
+  return json({ revision, savedAt });
+}
+
 async function save(admin: Admin, body: Record<string, unknown>): Promise<Response> {
   const address = await sessionAddress(admin, body.token);
   if (address instanceof Response) return address;
@@ -140,6 +203,8 @@ export default {
     if (body.op === "auth") return auth(admin, body);
     if (body.op === "load") return load(admin, body);
     if (body.op === "save") return save(admin, body);
+    if (body.op === "account-load") return accountLoad(admin, body);
+    if (body.op === "account-save") return accountSave(admin, body);
     return json({ error: "The request was not understood." }, 400);
   }),
 };
