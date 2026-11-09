@@ -373,6 +373,158 @@ export class Roster {
     }
   }
 
+  /** True when this browser holds a character the guild record should know about. */
+  hasLocalProgress() {
+    return this.chars.length > 0 || this.deleted.length > 0;
+  }
+
+  /**
+   * Fold a guild record into this roster.
+   * Each character keeps the hunt with the later savedAt.
+   * A character that exists on only one side is kept.
+   * An empty roster on this device does not count as newer than a saved hunt.
+   */
+  mergeFrom(raw) {
+    if (!raw || typeof raw !== 'object') {
+      return { replaced: false, push: this.hasLocalProgress(), replacedIds: [] };
+    }
+    if (!(raw.roster && Array.isArray(raw.roster.chars))) {
+      if (!this.hasLocalProgress()) {
+        this.loadRaw(raw);
+        return { replaced: this.chars.length > 0, push: false, replacedIds: this.chars.map((c) => c.id) };
+      }
+      return { replaced: false, push: true, replacedIds: [] };
+    }
+    return this.mergeRoster(raw);
+  }
+
+  mergeRoster(raw) {
+    const remoteChars = [];
+    const seen = new Set();
+    for (const entry of raw.roster.chars.slice(0, MAX_CHARACTERS)) {
+      const c = plainChar(entry);
+      if (!c || seen.has(c.id)) continue;
+      seen.add(c.id);
+      remoteChars.push({
+        char: c,
+        hunt: entry.hunt && typeof entry.hunt === 'object' ? entry.hunt : null,
+      });
+    }
+    const remoteDeleted = [];
+    for (const entry of Array.isArray(raw.roster.deleted) ? raw.roster.deleted : []) {
+      const c = plainChar(entry);
+      if (!c) continue;
+      remoteDeleted.push({
+        ...c,
+        deletedAt: Number(entry.deletedAt) || 0,
+        hunt: entry.hunt && typeof entry.hunt === 'object' ? entry.hunt : null,
+      });
+    }
+    const stamp = (hunt) => Number(hunt?.savedAt) || 0;
+    const deletedAt = (list, id) => {
+      const d = list.find((x) => x.id === id);
+      return d ? Number(d.deletedAt) || 0 : 0;
+    };
+    let tookRemote = false;
+    let localAhead = false;
+    const replacedIds = [];
+
+    for (const d of remoteDeleted) {
+      const local = this.get(d.id);
+      if (!local) continue;
+      const localAt = stamp(this.hunt(d.id));
+      if (d.deletedAt >= localAt && d.deletedAt >= deletedAt(this.deleted, d.id)) {
+        this.chars = this.chars.filter((c) => c.id !== d.id);
+        dropKey(this.huntKey(d.id));
+        tookRemote = true;
+        replacedIds.push(d.id);
+      }
+    }
+
+    for (const remote of remoteChars) {
+      const id = remote.char.id;
+      const remoteAt = stamp(remote.hunt);
+      const localGone = deletedAt(this.deleted, id);
+      if (localGone > remoteAt && localGone >= deletedAt(remoteDeleted, id)) {
+        localAhead = true;
+        continue;
+      }
+      if (!this.get(id) && deletedAt(remoteDeleted, id) >= remoteAt && deletedAt(remoteDeleted, id) > 0) continue;
+
+      const local = this.get(id);
+      if (!local) {
+        if (this.chars.length >= MAX_CHARACTERS) {
+          const localOnly = this.chars
+            .filter((c) => !seen.has(c.id))
+            .map((c) => ({ c, at: stamp(this.hunt(c.id)) }))
+            .sort((a, b) => a.at - b.at);
+          if (!localOnly.length || remoteAt < localOnly[0].at) {
+            localAhead = true;
+            continue;
+          }
+          const drop = localOnly[0].c;
+          this.chars = this.chars.filter((c) => c.id !== drop.id);
+          dropKey(this.huntKey(drop.id));
+        }
+        if (remote.hunt) writeJson(this.huntKey(id), remote.hunt);
+        else dropKey(this.huntKey(id));
+        this.chars.push(remote.char);
+        this.deleted = this.deleted.filter((d) => d.id !== id);
+        tookRemote = true;
+        replacedIds.push(id);
+        continue;
+      }
+
+      const localAt = stamp(this.hunt(id));
+      if (remote.hunt && remoteAt > localAt) {
+        writeJson(this.huntKey(id), remote.hunt);
+        local.name = remote.char.name;
+        local.look = remote.char.look;
+        local.fav = remote.char.fav;
+        if (remote.char.playedAt > local.playedAt) local.playedAt = remote.char.playedAt;
+        tookRemote = true;
+        replacedIds.push(id);
+      } else if (localAt > remoteAt || (!remote.hunt && this.hunt(id))) {
+        localAhead = true;
+      } else if (!this.hunt(id) && remote.hunt) {
+        writeJson(this.huntKey(id), remote.hunt);
+        tookRemote = true;
+        replacedIds.push(id);
+      }
+    }
+
+    for (const c of this.chars) if (!seen.has(c.id)) localAhead = true;
+
+    const active = new Set(this.chars.map((c) => c.id));
+    const beforeDeleted = this.deleted.map((d) => `${d.id}:${d.deletedAt}`).join('|');
+    const deleted = new Map();
+    for (const d of [...this.deleted, ...remoteDeleted]) {
+      if (active.has(d.id)) continue;
+      const prev = deleted.get(d.id);
+      if (!prev || d.deletedAt >= prev.deletedAt) deleted.set(d.id, d);
+    }
+    this.deleted = [...deleted.values()].sort((a, b) => b.deletedAt - a.deletedAt);
+    const afterDeleted = this.deleted.map((d) => `${d.id}:${d.deletedAt}`).join('|');
+    if (afterDeleted !== beforeDeleted) {
+      const remoteIds = new Set(remoteDeleted.map((d) => `${d.id}:${d.deletedAt}`));
+      const localIds = new Set(beforeDeleted ? beforeDeleted.split('|') : []);
+      if (this.deleted.some((d) => remoteIds.has(`${d.id}:${d.deletedAt}`) && !localIds.has(`${d.id}:${d.deletedAt}`))) tookRemote = true;
+      if ([...localIds].some((id) => id && !remoteIds.has(id))) localAhead = true;
+    }
+
+    if (!this.chars.some((c) => c.id === this.last)) {
+      const remoteLast = raw.roster.last;
+      this.last = this.chars.some((c) => c.id === remoteLast) ? remoteLast : this.chars[0]?.id || null;
+    }
+    const remoteAt = Number(raw.savedAt) || 0;
+    let newest = localAhead ? Math.max(this.savedAt, remoteAt) : remoteAt;
+    for (const c of this.chars) newest = Math.max(newest, stamp(this.hunt(c.id)));
+    this.savedAt = newest;
+    this.prune();
+    this.persist();
+    return { replaced: tookRemote, push: localAhead, replacedIds };
+  }
+
   save() {
     this.persist();
   }
