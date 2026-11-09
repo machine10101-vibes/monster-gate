@@ -452,6 +452,39 @@ export function buildIceFloe(seed, r = 7) {
   return bundle([[M, 0.125, c, 0, c]]);
 }
 
+/** A round hole cut through the ice: dark water inside a lip of chipped ice and shaved snow. */
+export function buildIceHole(seed = 1) {
+  const n = 32;
+  const c = n / 2;
+  const M = new VoxelModel(n, 4, n);
+  for (let z = 0; z < n; z++)
+    for (let x = 0; x < n; x++) {
+      const dx = x + 0.5 - c;
+      const dz = z + 0.5 - c;
+      const d = Math.hypot(dx, dz) + (hash3(x, z, seed, 21) - 0.5) * 1.3;
+      if (d < 7) {
+        const glint = hash3(x >> 1, z >> 1, seed, 22) > 0.86;
+        M.set(x, 0, z, glint ? 0x2f78ae : hash3(x, z, seed, 23) > 0.5 ? 0x0c3a5e : 0x0a2f4e);
+      } else if (d < 8.6) {
+        M.set(x, 0, z, ICE_DEEP);
+        M.set(x, 1, z, iceCol(x, 1, z, hash3(x, z, seed, 24), seed));
+        if (hash3(x, z, seed, 25) > 0.55) M.set(x, 2, z, iceCol(x, 2, z, 0.9, seed));
+      } else if (d < 12.5) {
+        const k = hash3(x, z, seed, 26);
+        if (k > 0.38) M.set(x, 0, z, k > 0.82 ? iceCol(x, 0, z, 0.9, seed) : snowCol(x, 0, z, seed));
+        if (k > 0.78 && d < 11) M.set(x, 1, z, snowCol(x, 1, z, seed + 2));
+      }
+    }
+  for (let k = 0; k < 5; k++) {
+    const a = hash3(k, seed, 5, 27) * Math.PI * 2;
+    const r = 9.6 + hash3(k, seed, 6, 28) * 2.2;
+    const x = Math.round(c + Math.cos(a) * r);
+    const z = Math.round(c + Math.sin(a) * r);
+    M.box(x, 0, z, x + 2, 2, z + 2, (xx, yy, zz) => iceCol(xx, yy, zz, 0.7 + yy * 0.2, seed + 3));
+  }
+  return bundle([[M, 0.12, c, 0, c]]);
+}
+
 export function buildArcticModels() {
   return {
     frostPines: [buildFrostPine(1, 5, 6), buildFrostPine(2, 6, 7), buildFrostPine(3, 4, 5), buildFrostPine(4, 7, 7)],
@@ -473,6 +506,7 @@ export function buildArcticModels() {
     frozenLogs: [1, 2].map((s) => buildFrozenLogs(s)),
     windbreak: [1].map((s) => buildWindbreak(s)),
     floes: [buildIceFloe(1, 5), buildIceFloe(2, 8)],
+    iceHoles: [buildIceHole(1), buildIceHole(2)],
   };
 }
 

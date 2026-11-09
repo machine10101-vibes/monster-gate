@@ -324,7 +324,7 @@ function shrimpModel() {
 }
 
 function troutModel() {
-  const M = new VoxelModel(36, 16, 10);
+  const M = new VoxelModel(40, 16, 10);
   const L = 26;
   for (let x = 0; x < L; x++) {
     const t = x / (L - 1);
@@ -352,12 +352,7 @@ function troutModel() {
       M.set(6 + 12 + k, 8 - 5 - Math.round(1.5 - Math.abs(k - 3) * 0.4), z, J(0xb5a36a, k, 1, z, 43, 0.05));
     }
   }
-  for (let k = 0; k < 6; k++) {
-    for (const z of [4, 5]) {
-      M.set(6 + L - 1 + 1 + Math.floor(k * 0.7), 8 + k, z, J(0x8c7d44, k, 0, z, 44, 0.05));
-      M.set(6 + L - 1 + 1 + Math.floor(k * 0.7), 8 - k - 1, z, J(0x8c7d44, k, 1, z, 45, 0.05));
-    }
-  }
+  fishTail(M, 6 + L, 8, [4, 5], 6, 6, 6, 0x8c7d44, 44);
   for (const z of [1.2, 8.2]) {
     M.set(6 + 3, 9, z | 0, 0xffffff);
     M.set(6 + 3, 10, z | 0, 0x15120f);
@@ -367,6 +362,168 @@ function troutModel() {
     for (let k = 0; k < 4; k++) M.set(6 + 7 + k, 6 - Math.floor(k * 0.4), z, J(0xc9b87a, k, 2, z, 46, 0.05));
   }
   return [M, 0.06, 18, 8, 5];
+}
+
+/**
+ * Shared body for the river and ice fish. Head at the low x end, tail at the high x end,
+ * the way the trout is built, so the leaping fish all face the same way.
+ */
+function fishBody(o) {
+  const x0 = 6;
+  const sy = o.rh * 2 + 8;
+  const sz = o.sz || 10;
+  const M = new VoxelModel(o.L + (o.tailLen || 8) + 14, sy, sz);
+  const cy = Math.floor(sy / 2);
+  const cz = sz / 2;
+  for (let x = 0; x < o.L; x++) {
+    const t = x / (o.L - 1);
+    const rh = o.prof(t);
+    const rz = Math.max(0.8, rh * o.wide);
+    for (let y = 0; y < sy; y++)
+      for (let z = 0; z < sz; z++) {
+        const dy = y + 0.5 - cy;
+        const dz = z + 0.5 - cz;
+        if ((dy / rh) ** 2 + (dz / rz) ** 2 > 1) continue;
+        const c = o.paint(dy / rh, t, x, y, z, dz / rz);
+        M.set(x + x0, y, z, J(c, x, y, z, o.seed, 0.04));
+      }
+  }
+  return { M, x0, cy, cz, sz };
+}
+
+function fishEyes(M, x, y, ring = 0x15120f, white = 0xffffff) {
+  for (const dir of [-1, 1]) {
+    for (let z = dir < 0 ? 0 : M.sz - 1; z >= 0 && z < M.sz; z -= dir) {
+      if (!M.has(x, y, z)) continue;
+      M.set(x, y, z, white);
+      M.set(x + 1, y, z, ring);
+      break;
+    }
+  }
+}
+
+function fishFin(M, x, y, len, col, dir, seed, zs, rise = 0.6) {
+  for (let k = 0; k < len; k++)
+    for (const z of zs) M.set(x + k, y + dir * (1 + Math.round(Math.sin((k / (len - 1)) * Math.PI) * len * rise)), z, J(col, k, y, z, seed, 0.05));
+}
+
+/** A filled, forked tail. `up` and `down` are the lobe heights; a taller upper lobe makes it shark-like. */
+function fishTail(M, x, cy, zs, len, up, down, col, seed) {
+  for (let k = 0; k < len; k++) {
+    const f = (k + 1) / len;
+    const hu = Math.max(1, Math.round(1 + (up - 1) * f));
+    const hd = Math.max(1, Math.round(1 + (down - 1) * f));
+    const cut = k > len * 0.45 ? Math.round(((k - len * 0.45) / (len * 0.55)) * Math.min(up, down) * 0.7) : 0;
+    for (let d = cut; d < hu; d++) for (const z of zs) M.set(x + k, cy + d, z, J(col, k, d, z, seed, 0.06));
+    for (let d = cut; d < hd; d++) for (const z of zs) M.set(x + k, cy - 1 - d, z, J(shade(col, 0.92), k, d, z, seed + 1, 0.06));
+  }
+}
+
+function pikeMinnowModel() {
+  const L = 24;
+  const { M, x0, cy, cz } = fishBody({
+    L, rh: 4, wide: 0.6, seed: 51,
+    prof: (t) => 3.5 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.85)), 0.62) + 0.7,
+    paint: (u, t, x, y, z) => {
+      if (u > 0.4) return t > 0.7 && hash3(x, y, z, 52) > 0.8 ? 0x3a3a1e : 0x6b6a32;
+      if (u > 0.05) return t > 0.55 && u < 0.28 ? 0x4a4a28 : 0xb4b27a;
+      if (u > -0.4) return 0xd8d4a6;
+      return 0xf2eed8;
+    },
+  });
+  for (let k = 0; k < 8; k++) for (const z of [4, 5]) M.set(x0 + 14 + k, cy + 3 + Math.round(1.6 - Math.abs(k - 3.5) * 0.5), z, J(0x8a8444, k, 0, z, 53, 0.05));
+  fishFin(M, x0 + 14, cy - 2, 6, 0xcdb87a, -1, 54, [4, 5], 0.3);
+  for (const dz of [2, 7]) for (let k = 0; k < 3; k++) M.set(x0 + 8 + k, cy - 1 - Math.floor(k * 0.4), dz, 0xd8c88a);
+  for (let z = 3; z <= 6; z++) M.set(x0, cy - 1, z, 0x2a2018);
+  fishTail(M, x0 + L, cy, [4, 5], 6, 5, 5, 0xb4a460, 55);
+  fishEyes(M, x0 + 3, cy + 1);
+  return [M, 0.06, 16, cy, cz];
+}
+
+function salmonModel() {
+  const L = 31;
+  const { M, x0, cy, cz } = fishBody({
+    L, rh: 6, wide: 0.55, seed: 61,
+    prof: (t) => 5.4 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.78)), 0.66) + 0.7,
+    paint: (u, t, x, y, z) => {
+      if (u > 0.5) return hash3(x, y, z, 62) > 0.86 ? 0x1a2428 : 0x3c5a6a;
+      if (u > 0.1) return hash3(x, y, z, 63) > 0.9 && t > 0.2 ? 0x1f2a30 : 0x8aa4b0;
+      if (u > -0.12) return t > 0.25 && t < 0.85 ? 0xe49aa0 : 0xcad8dc;
+      if (u > -0.5) return 0xd6e2e4;
+      return 0xf6f0e4;
+    },
+  });
+  for (let k = 0; k < 8; k++) for (const z of [4, 5]) M.set(x0 + 12 + k, cy + 5 + Math.round(2.2 - Math.abs(k - 3.5) * 0.6), z, J(0x4a6674, k, 0, z, 64, 0.05));
+  for (const z of [4, 5]) for (let k = 0; k < 2; k++) M.set(x0 + L - 8 + k, cy + 4, z, 0x364e5a);
+  fishFin(M, x0 + 14, cy - 5, 6, 0xd9a0a0, -1, 65, [4, 5], 0.3);
+  for (const dz of [2, 7]) for (let k = 0; k < 5; k++) M.set(x0 + 7 + k, cy - 2 - Math.floor(k * 0.5), dz, J(0xe4b0b0, k, 2, dz, 66, 0.05));
+  M.set(x0 - 1, cy - 1, 4, 0xcfd9dc);
+  M.set(x0 - 1, cy - 1, 5, 0xcfd9dc);
+  M.set(x0, cy - 3, 4, 0x2a1a1c);
+  M.set(x0, cy - 3, 5, 0x2a1a1c);
+  M.set(x0 + 1, cy - 4, 4, 0x2a1a1c);
+  M.set(x0 + 1, cy - 4, 5, 0x2a1a1c);
+  fishTail(M, x0 + L, cy, [4, 5], 8, 7, 7, 0x445e6c, 67);
+  fishEyes(M, x0 + 4, cy + 1);
+  return [M, 0.06, 20, cy, cz];
+}
+
+function pikeModel() {
+  const L = 40;
+  const { M, x0, cy, cz } = fishBody({
+    L, rh: 6, wide: 0.58, seed: 71,
+    prof: (t) => 4.7 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.55) + 0.9,
+    paint: (u, t, x, y, z, w) => {
+      if (u > 0.42) return 0x4a6a2c;
+      if (u > -0.2) {
+        const dot = hash3(x >> 1, y, z >> 1, 72) > 0.7 && t > 0.14 && Math.abs(w) > 0.3;
+        return dot ? 0xe2dc9c : 0x6a8a3a;
+      }
+      return u > -0.55 ? 0xb8c490 : 0xeee8cc;
+    },
+  });
+  for (let k = 0; k < 8; k++) for (const z of [4, 5]) M.set(x0 + L - 12 + k, cy + 3 + Math.round(1.8 - Math.abs(k - 3.5) * 0.45), z, J(0xb5662e, k, 0, z, 73, 0.05));
+  fishFin(M, x0 + L - 12, cy - 3, 7, 0xb5662e, -1, 74, [4, 5], 0.25);
+  for (const dz of [2, 7]) for (let k = 0; k < 4; k++) M.set(x0 + 9 + k, cy - 3 - Math.floor(k * 0.4), dz, J(0xc9783a, k, 3, dz, 75, 0.05));
+  for (let k = 1; k <= 4; k++) for (const z of [4, 5]) M.set(x0 - k, cy - 1, z, J(0x5a7a34, k, 0, z, 76, 0.05));
+  for (let k = 1; k <= 3; k++) for (const z of [4, 5]) M.set(x0 - k, cy - 2, z, J(0xcfd2a0, k, 1, z, 77, 0.05));
+  for (const z of [3, 6]) for (let k = 1; k < 5; k += 2) M.set(x0 + k - 2, cy - 2, z, 0xf4f0e0);
+  fishTail(M, x0 + L, cy, [4, 5], 7, 6, 6, 0x8a5a2a, 78);
+  fishEyes(M, x0 + 4, cy + 2, 0x15120f, 0xf0d070);
+  return [M, 0.055, 22, cy, cz];
+}
+
+function sturgeonModel() {
+  const L = 46;
+  const { M, x0, cy, cz } = fishBody({
+    L, rh: 6, wide: 0.78, sz: 12, seed: 81,
+    prof: (t) => 5.1 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.62)), 0.6) + 0.8,
+    paint: (u, t, x, y, z, w) => {
+      if (u > 0.55) return hash3(x, y, z, 82) > 0.8 ? 0x4a4e4a : 0x5d625a;
+      if (u > 0.05) return hash3(x, y, z, 83) > 0.85 ? 0x7e8478 : 0x6f7468;
+      if (u > -0.4) return 0xa6a490;
+      return 0xe2d9b8;
+    },
+  });
+  for (let x = 4; x < L - 6; x += 3) {
+    const top = M.sy;
+    for (let y = top - 1; y >= 0; y--) if (M.has(x0 + x, y, 6)) { M.set(x0 + x, y + 1, 6, 0xd4cfae); break; }
+    for (const side of [-1, 1]) {
+      const z = Math.round(cz - 0.5 + side * (Math.max(1, 3.4 * (0.4 + 0.6 * Math.sin(Math.PI * (x / L)))) ));
+      for (let y = cy + 1; y >= cy - 3; y--) if (M.has(x0 + x, y, z) && y === cy) M.set(x0 + x, y, z, 0xcfc9a6);
+    }
+  }
+  for (let x = 5; x < L - 8; x += 3) for (const z of [3, 8]) for (let y = cy - 3; y <= cy + 2; y++) if (M.has(x0 + x, y, z) && hash3(x, y, z, 84) > 0.5) M.set(x0 + x, y, z, 0xd4cfae);
+  for (let k = 1; k <= 7; k++) for (const z of [5, 6]) M.set(x0 - k, cy - 1 - (k > 4 ? 0 : 0), z, J(0x7c8072, k, 0, z, 85, 0.05));
+  for (let k = 1; k <= 6; k++) for (const z of [5, 6]) M.set(x0 - k, cy - 2, z, J(0xcfc8a8, k, 1, z, 86, 0.05));
+  for (const z of [4, 7]) for (let k = 0; k < 3; k++) M.set(x0 - 1 + k, cy - 3 - 0, z, 0x8a7a54);
+  for (const dz of [3, 8]) M.set(x0 - 1, cy - 3, dz, 0x8a7a54);
+  for (let k = 0; k < 9; k++) for (const z of [5, 6]) M.set(x0 + L - 14 + k, cy + 4 + Math.round(2 - Math.abs(k - 4) * 0.5), z, J(0x555a52, k, 0, z, 87, 0.05));
+  fishFin(M, x0 + L - 12, cy - 4, 7, 0x8a8a78, -1, 88, [5, 6], 0.3);
+  for (const dz of [2, 9]) for (let k = 0; k < 5; k++) M.set(x0 + 11 + k, cy - 3 - Math.floor(k * 0.4), dz, J(0x9a9a84, k, 2, dz, 89, 0.05));
+  fishTail(M, x0 + L, cy, [5, 6], 9, 11, 5, 0x555a52, 90);
+  fishEyes(M, x0 + 5, cy + 1, 0x15120f, 0xe8e2c8);
+  return [M, 0.05, 25, cy, cz];
 }
 
 const WOOD = {
@@ -463,6 +620,10 @@ const GOODS_MODELS = {
   tin_ore: () => oreChunk('tin'),
   shrimp: shrimpModel,
   trout: troutModel,
+  pikeminnow: pikeMinnowModel,
+  salmon: salmonModel,
+  pike: pikeModel,
+  sturgeon: sturgeonModel,
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),
   maple_logs: () => logStack('maple'),

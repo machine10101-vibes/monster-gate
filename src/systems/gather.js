@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, chopChance, chopSwingTime, fishChance, fishTickTime, lightChance, lightTime, mineChance, mineSwingTime, treeByLog } from '../data/gathering.js';
+import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, chopChance, chopSwingTime, fishChance, fishTickTime, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
 import { buildCampfire, goodsVoxels } from '../world/gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
@@ -120,13 +120,20 @@ export class Gathering {
         best = { kind: 'chop', node: n, x: n.x, y: n.y + 2.4, z: n.z };
       }
     }
-    if (w.onDock(P.x, P.z, 0.5)) {
-      for (const s of w.fishSpots || []) {
-        const d = Math.hypot(s.x - P.x, s.z - P.z);
-        if (d < 5.2 && d < bd) {
-          bd = d;
-          best = { kind: s.kind, node: s, x: s.x, y: WATER_Y + 1.2, z: s.z };
-        }
+    const onDock = w.onDock(P.x, P.z, 0.5);
+    for (const s of w.fishSpots || []) {
+      let d;
+      if (s.site === 'lake') {
+        if (!onDock) continue;
+        d = Math.hypot(s.x - P.x, s.z - P.z);
+        if (d >= 5.2) continue;
+      } else {
+        d = Math.hypot(s.standX - P.x, s.standZ - P.z);
+        if (d >= (s.reach || 3.2) || Math.abs(P.y - s.standY) > 1.6) continue;
+      }
+      if (d < bd) {
+        bd = d;
+        best = { kind: s.kind, node: s, x: s.x, y: s.y + 1.2, z: s.z };
       }
     }
     return best;
@@ -143,10 +150,18 @@ export class Gathering {
       const ok = pr.level('woodcutting') >= tree.level;
       return `${tree.name} tree<small>${ok ? 'F · chop' : `Needs Woodcutting Lv ${tree.level}`}</small>`;
     }
-    const f = t.kind === 'net' ? FISH.shrimp : FISH.trout;
-    const ok = pr.level('fishing') >= f.level;
-    const name = t.kind === 'net' ? 'Net fishing spot' : 'Pole fishing spot';
-    return `${name}<small>${ok ? `F · catch ${f.name.toLowerCase()}` : `Needs Fishing Lv ${f.level}`}</small>`;
+    const need = this.spotLevel(t.node);
+    const ok = pr.level('fishing') >= need;
+    return `${t.node.title}<small>${ok ? `F · ${this.spotVerb(t.node)}` : `Needs Fishing Lv ${need}`}</small>`;
+  }
+
+  spotLevel(node) {
+    return Math.min(...node.catches.map((id) => FISH[id].level));
+  }
+
+  spotVerb(node) {
+    const names = node.catches.map((id) => FISH[id].name.toLowerCase());
+    return names.length === 1 ? `catch ${names[0]}` : `fish for ${names.join(' or ')}`;
   }
 
   /* -------------------------------- sessions -------------------------------- */
@@ -172,13 +187,14 @@ export class Gathering {
       }
       spec = { kind: 'chop', node: t.node, tree, go: { x: t.node.standX, z: t.node.standZ }, face: Math.atan2(t.node.x - t.node.standX, t.node.z - t.node.standZ) };
     } else {
-      const fish = t.kind === 'net' ? FISH.shrimp : FISH.trout;
-      if (pr.level('fishing') < fish.level) {
-        g.hud.toast(`You need Fishing level ${fish.level} to catch ${fish.name.toLowerCase()}.`, 2200);
+      const need = this.spotLevel(t.node);
+      if (pr.level('fishing') < need) {
+        const first = t.node.catches.map((id) => FISH[id]).sort((a, b) => a.level - b.level)[0];
+        g.hud.toast(`You need Fishing level ${need} to catch ${first.name.toLowerCase()}.`, 2200);
         return false;
       }
       const s = t.node;
-      spec = { kind: t.kind, node: s, fish, go: { x: s.standX, z: s.standZ }, face: Math.atan2(s.x - s.standX, s.z - s.standZ) };
+      spec = { kind: t.kind, node: s, fish: pickFish(s.catches, pr.level('fishing')), go: { x: s.standX, z: s.standZ }, face: Math.atan2(s.x - s.standX, s.z - s.standZ) };
     }
     spec.tool = TOOL_HELD[spec.kind];
     spec.ready = false;
@@ -244,7 +260,7 @@ export class Gathering {
     } else if (this.session) {
       const s = this.session;
       const [sx, sy, vis] = g.screenOf(s.node.x, (s.node.y || WATER_Y) + 1.6, s.node.z, true);
-      const what = s.kind === 'mine' ? `Mining ${s.node.type}` : s.kind === 'chop' ? `Chopping ${s.tree.name.toLowerCase()}` : s.kind === 'light' ? `Lighting ${GOODS[s.log].name.toLowerCase()}` : s.kind === 'net' ? 'Netting shrimp' : 'Fishing for trout';
+      const what = s.kind === 'mine' ? `Mining ${s.node.type}` : s.kind === 'chop' ? `Chopping ${s.tree.name.toLowerCase()}` : s.kind === 'light' ? `Lighting ${GOODS[s.log].name.toLowerCase()}` : s.node.catches.length > 1 ? 'Ice fishing' : s.kind === 'net' ? `Netting ${s.fish.name.toLowerCase()}` : `Fishing for ${s.fish.name.toLowerCase()}`;
       g.hud.plate('gather', `${what}<small>${s.ready ? 'Move to stop' : 'Walking over…'}</small>`);
       g.hud.placePlate('gather', sx, sy, vis);
     } else g.hud.removePlate('gather');
@@ -610,16 +626,18 @@ export class Gathering {
     s.prevU = s.u;
     s.u += dt / dur;
     const sp = s.node;
+    const wy = sp.y;
     const f = p.facing;
     const tx = p.pos.x + f.x * 1.55;
     const tz = p.pos.z + f.z * 1.55;
     if (s.prevU < 0.42 && s.u >= 0.42) {
-      g.fx.burst(tx, WATER_Y + 0.1, tz, [0xbfeaff, 0xffffff], 9, 2.2, 0.07, 0.5, -5, 1);
-      g.fx.ring(tx, WATER_Y + 0.07, tz, 0xbfeaff, 10, 1.8, 0.07, 0.5);
+      g.fx.burst(tx, wy + 0.1, tz, [0xbfeaff, 0xffffff], 9, 2.2, 0.07, 0.5, -5, 1);
+      g.fx.ring(tx, wy + 0.07, tz, 0xbfeaff, 10, 1.8, 0.07, 0.5);
       g.audio.noise(0.2, 0.12, 900, 0.8);
     }
     if (s.prevU < 0.72 && s.u >= 0.72) {
-      g.fx.burst(tx, WATER_Y + 0.2, tz, [0xbfeaff, 0xffffff], 6, 2.4, 0.05, 0.5, 8, 2);
+      g.fx.burst(tx, wy + 0.2, tz, [0xbfeaff, 0xffffff], 6, 2.4, 0.05, 0.5, 8, 2);
+      s.fish = pickFish(sp.catches, lvl) || s.fish;
       if (Math.random() <= fishChance(s.fish, lvl)) this.caught(s, sp, tx, tz);
       else if (Math.random() < 0.5) g.hud.toast('The net comes up empty.', 700);
     }
@@ -642,6 +660,7 @@ export class Gathering {
     const sp = s.node;
     const bx = sp.x;
     const bz = sp.z;
+    const wy = sp.y;
     if (s.phase === 'cast') {
       s.u += dt / 1.05;
       p.gAnim = { name: 'cast', u: Math.min(1, s.u) };
@@ -652,8 +671,8 @@ export class Gathering {
         s.t = 0;
         s.wait = fishTickTime(lvl) * rand(0.8, 1.3);
         s.nibbled = false;
-        g.fx.ring(bx, WATER_Y + 0.07, bz, 0xbfeaff, 10, 1.6, 0.07, 0.55);
-        g.fx.burst(bx, WATER_Y + 0.1, bz, [0xbfeaff, 0xffffff], 6, 2, 0.06, 0.4, -4, 1);
+        g.fx.ring(bx, wy + 0.07, bz, 0xbfeaff, 10, 1.6, 0.07, 0.55);
+        g.fx.burst(bx, wy + 0.1, bz, [0xbfeaff, 0xffffff], 6, 2, 0.06, 0.4, -4, 1);
         g.audio.noise(0.18, 0.1, 900, 0.8);
       }
     } else if (s.phase === 'wait') {
@@ -662,17 +681,18 @@ export class Gathering {
       if (q > 0.55 && q < 0.95) dip = Math.max(0, Math.sin((q - 0.55) * 38)) * 0.6 * (q < 0.8 ? 0.5 : 1);
       if (q > 0.55 && !s.nibbled) {
         s.nibbled = true;
-        g.fx.ring(bx, WATER_Y + 0.07, bz, 0xffffff, 8, 1.2, 0.06, 0.4);
+        g.fx.ring(bx, wy + 0.07, bz, 0xffffff, 8, 1.2, 0.06, 0.4);
       }
       p.gAnim = { name: 'wait', u: q, dip };
       this.drawLine(s, bx, bz, 1, dip * 0.12);
       if (s.t >= s.wait) {
+        s.fish = pickFish(sp.catches, lvl) || s.fish;
         if (Math.random() <= fishChance(s.fish, lvl)) {
           s.phase = 'bite';
           s.t = 0;
           s.u = 0;
-          g.fx.burst(bx, WATER_Y + 0.15, bz, [0xbfeaff, 0xffffff], 12, 2.8, 0.07, 0.6, -6, 2.2);
-          g.fx.ring(bx, WATER_Y + 0.07, bz, 0xbfeaff, 12, 2.2, 0.08, 0.6);
+          g.fx.burst(bx, wy + 0.15, bz, [0xbfeaff, 0xffffff], 12, 2.8, 0.07, 0.6, -6, 2.2);
+          g.fx.ring(bx, wy + 0.07, bz, 0xbfeaff, 12, 2.2, 0.08, 0.6);
           g.audio.tone(880, 0.08, 'triangle', 0.1, 400);
         } else {
           s.t = 0;
@@ -711,7 +731,7 @@ export class Gathering {
     const g = this.game;
     const tip = this.tipWorld();
     const t = g.time;
-    const by = WATER_Y + 0.06 - dip + Math.sin(t * 2.4) * 0.025;
+    const by = s.node.y + 0.06 - dip + Math.sin(t * 2.4) * 0.025;
     const ex = tip.x + (bx - tip.x) * k;
     const ez = tip.z + (bz - tip.z) * k;
     const flight = Math.sin(k * Math.PI) * 1.4;
@@ -738,11 +758,11 @@ export class Gathering {
     const fish = s.fish;
     g.progress.addGood(fish.id, 1);
     this.train('fishing', fish.xp, true);
-    g.hud.toast(fish.id === 'trout' ? 'You catch a trout.' : 'You catch some shrimp.', 1800);
+    g.hud.toast(fish.catchText, 1800);
     g.audio.coin();
-    g.fx.burst(tx, WATER_Y + 0.2, tz, [0xbfeaff, 0xffffff], 14, 3.4, 0.08, 0.7, 8, 2.8);
-    g.fx.ring(tx, WATER_Y + 0.07, tz, 0xbfeaff, 14, 2.4, 0.08, 0.6);
-    this.flyGood(fish.id, tx, WATER_Y + 0.3, tz, P.x, P.y + 1.4, P.z, 0.8);
+    g.fx.burst(tx, sp.y + 0.2, tz, [0xbfeaff, 0xffffff], 14, 3.4, 0.08, 0.7, 8, 2.8);
+    g.fx.ring(tx, sp.y + 0.07, tz, 0xbfeaff, 14, 2.4, 0.08, 0.6);
+    this.flyGood(fish.id, tx, sp.y + 0.3, tz, P.x, P.y + 1.4, P.z, 0.8);
     g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[fish.id].name}`, 'gold');
     g.bagDirty = true;
   }
@@ -755,7 +775,7 @@ export class Gathering {
       this.models[id] = meshFrom(m, ox, oy, oz, this.mat, size);
     }
     const mesh = this.models[id].clone();
-    mesh.scale.setScalar(id === 'trout' || id === 'shrimp' ? 0.9 : id.endsWith('_logs') ? 0.62 : 0.75);
+    mesh.scale.setScalar(FISH[id] ? (id === 'sturgeon' ? 0.75 : 0.9) : id.endsWith('_logs') ? 0.62 : 0.75);
     g.scene.add(mesh);
     this.flyers.push({ mesh, x0, y0, z0, x1, y1, z1, t: 0, dur, spin: rand(4, 9), id });
   }
@@ -772,7 +792,7 @@ export class Gathering {
       const ey = P.y + 1.3;
       const e = u * u * (3 - 2 * u);
       f.mesh.position.set(f.x0 + (ex - f.x0) * e, f.y0 + (ey - f.y0) * e + Math.sin(u * Math.PI) * 1.5, f.z0 + (ez - f.z0) * e);
-      f.mesh.rotation.set(u * f.spin * 0.5, u * f.spin, f.id === 'trout' || f.id === 'shrimp' ? Math.sin(u * 14) * 0.6 : 0);
+      f.mesh.rotation.set(u * f.spin * 0.5, u * f.spin, FISH[f.id] ? Math.sin(u * 14) * 0.6 : 0);
       if (u >= 1) {
         g.fx.burst(ex, ey, ez, f.id.endsWith('ore') ? [0xffd9a0, 0xffffff] : [0xbfeaff, 0xffffff], 7, 2, 0.06, 0.5, -1, 0.8);
         g.scene.remove(f.mesh);

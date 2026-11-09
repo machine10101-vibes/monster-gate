@@ -84,12 +84,16 @@ export const LEVEL_SKILLS = {
     id: 'fishing',
     name: 'Fishing',
     color: '#4ec8ff',
-    blurb: 'Fish Mirrormere from the dock. Nets catch shrimp, poles land trout.',
+    blurb: 'Fish Mirrormere from the dock and work the Silverrun river with a net or pole. Ice holes on the Glimmerfrost lake give up pike and sturgeon.',
     effect: (lvl) => `${Math.round(fishChance(FISH.shrimp, lvl) * 100)}% shrimp catch chance`,
     unlocks: [
       [1, 'Shrimp (small net)'],
       [3, 'Trout (fishing pole)'],
+      [8, 'Pike minnow (small net, river)'],
+      [12, 'Salmon (fishing pole, river)'],
       [15, 'Quicker bites'],
+      [20, 'Pike (ice fishing hole)'],
+      [30, 'Sturgeon (ice fishing hole)'],
       [30, 'Keener line work'],
     ],
   },
@@ -160,6 +164,8 @@ export const FISH = {
     level: 1,
     xp: 10,
     base: 0.45,
+    odds: 1,
+    catchText: 'You catch some shrimp.',
   },
   trout: {
     id: 'trout',
@@ -169,6 +175,52 @@ export const FISH = {
     level: 3,
     xp: 50,
     base: 0.32,
+    odds: 1,
+    catchText: 'You catch a trout.',
+  },
+  pikeminnow: {
+    id: 'pikeminnow',
+    name: 'Pike minnow',
+    tool: 'net',
+    toolName: 'small net',
+    level: 8,
+    xp: 34,
+    base: 0.42,
+    odds: 1,
+    catchText: 'You scoop up a pike minnow.',
+  },
+  salmon: {
+    id: 'salmon',
+    name: 'Salmon',
+    tool: 'rod',
+    toolName: 'fishing pole',
+    level: 12,
+    xp: 95,
+    base: 0.3,
+    odds: 1,
+    catchText: 'You land a salmon.',
+  },
+  pike: {
+    id: 'pike',
+    name: 'Pike',
+    tool: 'rod',
+    toolName: 'fishing pole',
+    level: 20,
+    xp: 150,
+    base: 0.28,
+    odds: 0.68,
+    catchText: 'You haul a pike out of the hole.',
+  },
+  sturgeon: {
+    id: 'sturgeon',
+    name: 'Sturgeon',
+    tool: 'rod',
+    toolName: 'fishing pole',
+    level: 30,
+    xp: 280,
+    base: 0.2,
+    odds: 0.32,
+    catchText: 'You haul a sturgeon out of the hole!',
   },
 };
 
@@ -219,16 +271,20 @@ export const GOODS = {
   tin_ore: { id: 'tin_ore', name: 'Tin ore', desc: 'Silvery ore from the Greyrock Pit.', price: 4, kind: 'ore' },
   shrimp: { id: 'shrimp', name: 'Shrimp', desc: 'Netted in Mirrormere. Eat to restore 2 health.', price: 3, heal: 2, kind: 'fish' },
   trout: { id: 'trout', name: 'Trout', desc: 'Pole-caught in Mirrormere. Eat to restore 6 health.', price: 9, heal: 6, kind: 'fish' },
+  pikeminnow: { id: 'pikeminnow', name: 'Pike minnow', desc: 'Netted in the Silverrun river. Eat to restore 4 health.', price: 7, heal: 4, kind: 'fish' },
+  salmon: { id: 'salmon', name: 'Salmon', desc: 'Pole-caught in the Silverrun river. Eat to restore 10 health.', price: 18, heal: 10, kind: 'fish' },
+  pike: { id: 'pike', name: 'Pike', desc: 'Hauled through the Glimmerfrost ice. Eat to restore 14 health.', price: 28, heal: 14, kind: 'fish' },
+  sturgeon: { id: 'sturgeon', name: 'Sturgeon', desc: 'An armoured giant from under the Glimmerfrost ice. Eat to restore 20 health.', price: 52, heal: 20, kind: 'fish' },
   birch_logs: { id: 'birch_logs', name: 'Birch logs', desc: 'Pale wood from the meadow west of Oakhollow. Light it with a tinderbox.', price: 4, kind: 'log', tree: 'birch' },
   oak_logs: { id: 'oak_logs', name: 'Oak logs', desc: 'Heavy timber from the oak grove. Light it with a tinderbox.', price: 8, kind: 'log', tree: 'oak' },
   maple_logs: { id: 'maple_logs', name: 'Maple logs', desc: 'Red maple wood. Light it with a tinderbox once Firemaking is 10.', price: 16, kind: 'log', tree: 'maple' },
 };
-export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'shrimp', 'trout', 'birch_logs', 'oak_logs', 'maple_logs'];
+export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'shrimp', 'trout', 'pikeminnow', 'salmon', 'pike', 'sturgeon', 'birch_logs', 'oak_logs', 'maple_logs'];
 
 export const TOOLS = [
   { id: 'pickaxe', held: 'pick', name: 'Iron Pickaxe', desc: 'Used on rocks in the Greyrock Pit.' },
-  { id: 'fishrod', held: 'fishrod', name: 'Fishing Pole', desc: 'Used at pole spots off the dock to land trout.' },
-  { id: 'fishnet', held: 'fishnet', name: 'Small Net', desc: 'Used at net spots off the dock to scoop shrimp.' },
+  { id: 'fishrod', held: 'fishrod', name: 'Fishing Pole', desc: 'Used at pole spots and ice fishing holes to land trout, salmon, pike and sturgeon.' },
+  { id: 'fishnet', held: 'fishnet', name: 'Small Net', desc: 'Used at net spots on the dock and the river to scoop shrimp and pike minnow.' },
   { id: 'tinderbox', held: 'tinder', name: 'Tinderbox', desc: 'Lights a campfire from logs in the bag.' },
 ];
 
@@ -245,6 +301,19 @@ export function mineSwingTime(level) {
 
 export function fishChance(fish, level) {
   return Math.min(0.95, lerp(fish.base, 0.9, Math.min(1, (level - fish.level) / 50 + 0.0)));
+}
+
+/** The fish a spot can give a hunter of this level, picked by odds. Null when none are unlocked yet. */
+export function pickFish(ids, level, roll = Math.random()) {
+  const open = ids.map((id) => FISH[id]).filter((f) => f && f.level <= level);
+  if (!open.length) return null;
+  const total = open.reduce((a, f) => a + f.odds, 0);
+  let r = roll * total;
+  for (const f of open) {
+    r -= f.odds;
+    if (r < 0) return f;
+  }
+  return open[open.length - 1];
 }
 
 export function fishTickTime(level) {
