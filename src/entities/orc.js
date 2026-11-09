@@ -1,248 +1,421 @@
 import * as THREE from 'three';
-import { VoxelModel, hash3, jitter, shade } from '../engine/voxel.js';
+import { VoxelModel, RNG, hash3, jitter, shade, clamp } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
+import { meshFrom, splitLimb, relief, buildHeld } from './humanoid.js';
 
-/** Chunk size matches the other creature sculpts, a little finer so the face reads. */
-const S = 0.038;
+/**
+ * Orc scout, built like the hero: a torso, a head, and arms and legs that
+ * split at the elbow and knee. Muscle is sculpted from ellipsoids with a
+ * chunky olive palette, then fur, straps and tusks are painted on top and
+ * given the same relief pass the armor sets get.
+ */
+const S = 0.032;
+const TAU = Math.PI * 2;
 
-const skin = (x, y, z) => {
-  const n = hash3(x, y, z, 11);
-  const c = n < 0.16 ? 0x3a6226 : n < 0.42 ? 0x527c34 : n < 0.74 ? 0x679644 : 0x7eae58;
-  return jitter(c, 0.055, n);
+const SKIN = [0x42592b, 0x4f6a33, 0x5d7a3c, 0x6b8a47];
+const FUR = [0x2f2924, 0x3d352d, 0x4e433a, 0x62564a, 0x786b5d];
+const LEATHER = [0x3a2418, 0x4c3322, 0x5e4230];
+const BONE = [0xd9ceb4, 0xe8dcc0, 0xf4ead4];
+
+const skin = (x, y, z, k = 0) => jitter(SKIN[Math.floor(hash3(x >> 1, y >> 1, z >> 1, 11 + k) * 4)], 0.035, hash3(x, y, z, 12));
+const fur = (x, y, z, tip = 0) => {
+  const i = clamp(Math.floor(hash3(x, y, z, 21) * 3) + Math.min(1, tip), 0, 4);
+  return jitter(FUR[i], 0.05, hash3(x, y, z, 22));
 };
-const fur = (x, y, z) => {
-  const n = hash3(x, y, z, 21);
-  const c = n < 0.18 ? 0x3c3832 : n < 0.42 ? 0x5a5046 : n < 0.7 ? 0x75685c : n < 0.88 ? 0x8e8072 : 0xa89886;
-  return jitter(c, 0.06, n);
-};
-const hide = (x, y, z) => {
-  const n = hash3(x, y, z, 31);
-  const c = n < 0.3 ? 0x3a2416 : n < 0.62 ? 0x5c3c26 : 0x6e4c32;
-  return jitter(c, 0.05, n);
-};
+const leather = (x, y, z) => jitter(LEATHER[Math.floor(hash3(x >> 1, y, z >> 1, 31) * 3)], 0.05, hash3(x, y, z, 32));
+const bone = (x, y, z) => jitter(BONE[Math.floor(hash3(x, y >> 1, z, 41) * 3)], 0.03, hash3(x, y, z, 42));
 
-function meshFrom(model, ox, oy, oz, mat) {
-  const g = model.build(S, ox, oy, oz);
-  const grp = new THREE.Group();
-  if (g.solid) {
-    const m = new THREE.Mesh(g.solid, mat);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    grp.add(m);
+const muscle = (M, cx, cy, cz, rx, ry, rz, tone = 1) =>
+  M.ellipsoid(cx, cy, cz, rx, ry, rz, (x, y, z) => shade(skin(x, y, z), tone * (1 + ((y - cy) / ry) * 0.05)));
+
+function frontZ(M, x, y) {
+  for (let z = M.sz - 1; z >= 0; z--) if (M.has(x, y, z)) return z;
+  return -1;
+}
+function backZ(M, x, y) {
+  for (let z = 0; z < M.sz; z++) if (M.has(x, y, z)) return z;
+  return -1;
+}
+const colorAt = (M, x, y, z) => M.get(x, y, z) & 0xffffff;
+
+/** Spiky fur: a noisy ellipsoid plus tufts that stick out along the surface normal. */
+function furClump(M, cx, cy, cz, rx, ry, rz, seed, spike = 3, up = 0) {
+  const rng = new RNG(seed);
+  for (let z = Math.floor(cz - rz - 1); z <= Math.ceil(cz + rz + 1); z++)
+    for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry + 1); y++)
+      for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx + 1); x++) {
+        const dx = (x + 0.5 - cx) / rx;
+        const dy = (y + 0.5 - cy) / ry;
+        const dz = (z + 0.5 - cz) / rz;
+        if (dx * dx + dy * dy + dz * dz <= 1 + (hash3(x, y, z, seed) - 0.5) * 0.5) M.set(x, y, z, fur(x, y, z));
+      }
+  const count = Math.round((rx + ry + rz) * 4.5);
+  for (let i = 0; i < count; i++) {
+    const u = rng.range(-1, 1);
+    const a = rng.range(0, TAU);
+    const s = Math.sqrt(1 - u * u);
+    let ux = s * Math.cos(a);
+    let uy = u + up;
+    let uz = s * Math.sin(a);
+    const len = Math.hypot(ux, uy, uz) || 1;
+    ux /= len;
+    uy /= len;
+    uz /= len;
+    const px = cx + s * Math.cos(a) * rx;
+    const py = cy + u * ry;
+    const pz = cz + s * Math.sin(a) * rz;
+    const L = rng.int(1, spike);
+    for (let k = 0; k <= L; k++) {
+      const x = Math.round(px + ux * k);
+      const y = Math.round(py + uy * k);
+      const z = Math.round(pz + uz * k);
+      M.set(x, y, z, fur(x, y, z, k));
+    }
   }
-  if (g.glow) grp.add(new THREE.Mesh(g.glow, new THREE.MeshBasicMaterial({ vertexColors: true })));
-  return grp;
 }
 
-function paintLeg(M) {
-  M.ellipsoid(7, 20, 7, 4.3, 5.2, 3.5, skin);
-  M.ellipsoid(7, 11, 7.2, 3.4, 5.6, 3.1, skin);
-  M.ellipsoid(7, 15.2, 7.6, 3.5, 2.1, 3.1, (x, y, z) => shade(skin(x, y, z), 0.9));
-  M.box(3, 0, 3, 11, 4, 12, skin);
-  for (const x0 of [3, 6, 9]) {
-    M.box(x0, 0, 11, x0 + 3, 3, 15, skin);
-    M.box(x0 + 1, 2, 14, x0 + 2, 3, 15, 0x24341c);
+/** Wraps a band one voxel proud of whatever is already in rows y0..y1. */
+function band(M, y0, y1, color, pred = null) {
+  const add = [];
+  for (let y = y0; y < y1; y++) {
+    for (let z = 0; z < M.sz; z++) {
+      let lo = -1;
+      let hi = -1;
+      for (let x = 0; x < M.sx; x++) {
+        if (M.has(x, y, z)) {
+          if (lo < 0) lo = x;
+          hi = x;
+        }
+      }
+      if (lo >= 0) add.push([lo - 1, y, z], [hi + 1, y, z]);
+    }
+    for (let x = 0; x < M.sx; x++) {
+      let lo = -1;
+      let hi = -1;
+      for (let z = 0; z < M.sz; z++) {
+        if (M.has(x, y, z)) {
+          if (lo < 0) lo = z;
+          hi = z;
+        }
+      }
+      if (lo >= 0) add.push([x, y, lo - 1], [x, y, hi + 1]);
+    }
   }
-  for (let y = 3; y < 9; y++) {
-    for (let x = 1; x < 13; x++) {
-      for (let z = 2; z < 13; z++) {
-        const dx = x - 7;
-        const dz = z - 7;
-        if (dx * dx + dz * dz < 11) continue;
-        const jag = hash3(x, 4, z, 8);
-        if (y > 4 + jag * 5) continue;
-        M.set(x, y, z, fur(x, y, z));
+  for (const [x, y, z] of add) if (!pred || pred(x, y, z)) M.set(x, y, z, typeof color === 'function' ? color(x, y, z) : color);
+}
+
+function segDist(x, y, x0, y0, x1, y1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const t = clamp(((x + 0.5 - x0) * dx + (y + 0.5 - y0) * dy) / (dx * dx + dy * dy), 0, 1);
+  return Math.hypot(x + 0.5 - (x0 + t * dx), y + 0.5 - (y0 + t * dy));
+}
+
+/* ------------------------------- torso ------------------------------- */
+const OY = 6;
+function paintTorso() {
+  const T = new VoxelModel(44, 44, 26);
+  const CX = 22;
+  const CZ = 13;
+  const ty = (y) => y + OY;
+  muscle(T, CX, ty(2.5), CZ, 9.6, 5.2, 6, 0.92);
+  muscle(T, CX, ty(8.5), CZ + 0.4, 10.2, 6.6, 6.4, 0.97);
+  muscle(T, CX, ty(15.5), CZ + 0.6, 11, 7.6, 7.4, 1.02);
+  for (const s of [-1, 1]) muscle(T, CX + s * 5.4, ty(16.5), CZ + 3.4, 5.6, 4.4, 4.2, 1.1);
+  muscle(T, CX, ty(21), CZ - 0.6, 12, 3.8, 6.4, 0.98);
+  T.box(CX - 3, ty(22), CZ - 3, CX + 3, ty(25), CZ + 3, skin);
+
+  for (let y = ty(5); y < ty(21); y++) {
+    for (let x = 0; x < T.sx; x++) {
+      const fz = frontZ(T, x, y);
+      if (fz < 0) continue;
+      const c = colorAt(T, x, y, fz);
+      const split = Math.abs(x + 0.5 - CX) < 1.1 && y > ty(10);
+      const under = y === ty(12) && Math.abs(x - CX) > 1 && Math.abs(x - CX) < 9;
+      const abs = (y === ty(8) || y === ty(6)) && Math.abs(x - CX) < 7;
+      if (split || under) T.set(x, y, fz, shade(c, 0.74));
+      else if (abs) T.set(x, y, fz, shade(c, 0.86));
+    }
+  }
+
+  const before = T.data.slice();
+
+  const A = [CX - 8.5, ty(22.5), CX + 8, ty(4.5)];
+  const B = [CX + 8.5, ty(22.5), CX - 8, ty(4.5)];
+  for (let y = ty(3); y < ty(23); y++) {
+    for (let x = 0; x < T.sx; x++) {
+      const onA = segDist(x, y, A[0], A[1], A[2], A[3]) < 1.55;
+      const onB = segDist(x, y, B[0], B[1], B[2], B[3]) < 1.55;
+      if (!onA && !onB) continue;
+      const fz = frontZ(T, x, y);
+      if (fz >= 0) T.set(x, y, fz + 1, leather(x, y, fz + 1));
+      const bz = backZ(T, x, y);
+      if (bz >= 0) T.set(x, y, bz - 1, leather(x, y, bz - 1));
+    }
+  }
+  band(T, ty(1), ty(4), leather, (x, y) => !(y === ty(3) && hash3(x, y, 0, 3) < 0.3));
+  band(T, ty(4), ty(5), (x, y, z) => shade(leather(x, y, z), 0.7));
+  const bz = frontZ(T, CX, ty(13)) + 1;
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) {
+      if (Math.abs(dx) + Math.abs(dy) > 3) continue;
+      const rim = Math.abs(dx) + Math.abs(dy) >= 3 || Math.abs(dx) === 2 || Math.abs(dy) === 2;
+      T.set(CX + dx, ty(13) + dy, bz, rim ? jitter(0x8a8e96, 0.06, hash3(dx, dy, 1, 5)) : 0x2a2a30);
+    }
+  T.set(CX, ty(13), bz, 0x16161a);
+  T.set(CX - 1, ty(13) - 1, bz, 0x1c1c22);
+
+  for (const s of [-1, 1]) {
+    furClump(T, CX + s * 12.2, ty(22.4), CZ - 0.4, 5.6, 3.6, 6.8, 211 + s, 4, 0.55);
+    furClump(T, CX + s * 8, ty(23.6), CZ - 1.4, 4.2, 2.2, 5, 221 + s, 3, 0.7);
+  }
+  furClump(T, CX, ty(23.4), CZ - 4.6, 8, 2.6, 3.2, 231, 3, 0.7);
+  furClump(T, CX, ty(23.6), CZ + 3, 6.4, 1.6, 2.2, 232, 2, 0.5);
+
+  relief(T, before);
+  return T;
+}
+
+/* ------------------------------- skirt ------------------------------- */
+function paintSkirt() {
+  const K = new VoxelModel(36, 16, 26);
+  const CX = 18;
+  const CZ = 13;
+  const top = 15;
+  for (let y = 0; y <= top; y++) {
+    const hang = top - y;
+    const rx = 11.2 + hang * 0.16;
+    const rz = 7.6 + hang * 0.12;
+    for (let z = 0; z < K.sz; z++)
+      for (let x = 0; x < K.sx; x++) {
+        const ox = x + 0.5 - CX;
+        const oz = z + 0.5 - CZ;
+        const out = (ox / rx) ** 2 + (oz / rz) ** 2;
+        const inn = (ox / (rx - 2.8)) ** 2 + (oz / (rz - 2.8)) ** 2;
+        if (out > 1 || inn < 1) continue;
+        const hem = 2 + Math.floor(hash3(x, 3, z, 7) * 7);
+        if (y < hem - (hash3(x, y, z, 8) < 0.45 ? 1 : 0) - (hash3(x, y, z, 9) < 0.2 ? 1 : 0)) continue;
+        K.set(x, y, z, fur(x, y, z, y < hem + 2 ? 1 : 0));
+      }
+  }
+  for (let y = 1; y <= top; y++) {
+    const half = 1.4 + (y - 1) * 0.42;
+    for (let x = 0; x < K.sx; x++) {
+      const dx = Math.abs(x + 0.5 - CX);
+      if (dx > half) continue;
+      const fz = frontZ(K, x, Math.max(y, 6));
+      const z = fz >= 0 ? fz : CZ + 6;
+      const edge = dx > half - 1.3;
+      K.set(x, y, z, edge ? shade(leather(x, y, z), 0.62) : leather(x, y, z));
+      K.set(x, y, z + 1, edge ? shade(leather(x, y, z + 1), 0.62) : leather(x, y, z + 1));
+    }
+  }
+  return K;
+}
+
+/* -------------------------------- head -------------------------------- */
+function paintHead() {
+  const H = new VoxelModel(28, 28, 28);
+  const CX = 14;
+  muscle(H, CX, 11.2, 12.6, 7, 6, 6.8, 1.02);
+  muscle(H, CX, 7.4, 14.6, 6.7, 4.4, 5.2, 0.98);
+  muscle(H, CX, 3.8, 15.4, 6.2, 3.4, 5, 0.95);
+  muscle(H, CX, 12.2, 17.2, 6.6, 1.9, 2.4, 0.74);
+  muscle(H, CX, 7.4, 19.6, 2.2, 2.1, 1.9, 1.02);
+  for (const s of [-1, 1]) muscle(H, CX + s * 5.2, 6.4, 16.8, 2.4, 2.3, 2.2, 1.04);
+
+  const before = H.data.slice();
+  for (const s of [-1, 1]) {
+    const ex = (k) => CX + s * k;
+    for (let t = 0; t <= 1.001; t += 0.05) {
+      const x = Math.round(ex(6.4 + t * 6.4));
+      const base = 8.6 + t * 6.2;
+      const h = 3.4 * (1 - t) + 1;
+      for (let y = Math.round(base); y < base + h; y++) for (let z = 11; z <= 13; z++) H.set(x, y, z, skin(x, y, z, 5));
+    }
+    for (let t = 0.1; t < 0.6; t += 0.1) {
+      const x = Math.round(ex(6.4 + t * 6.4));
+      const y = Math.round(8.6 + t * 6.2) + 1;
+      H.set(x, y, 14, 0xa4745a);
+      H.set(x, y + 1, 14, 0xb9866a);
+    }
+    const eye = (dx, color) => {
+      const x = CX + s * dx;
+      const y = 10;
+      const z = frontZ(H, x - (s > 0 ? 0 : 0), y);
+      if (z >= 0) H.set(x, y, z, color);
+    };
+    eye(2.5, 0xeee3a0);
+    eye(3.5, 0xeee3a0);
+    eye(4.5, 0x1a1008);
+    const bx = [2.5, 3.5, 4.5, 5.5, 6.5];
+    bx.forEach((d, i) => {
+      const x = CX + s * Math.floor(d);
+      const y = 11 + Math.round(i * 0.5);
+      const z = frontZ(H, x, y);
+      if (z >= 0) {
+        H.set(x, y, z + 1, shade(skin(x, y, z), 0.5));
+        H.set(x, y + 1, z, shade(skin(x, y, z), 0.6));
+      }
+    });
+    const tuskX = s > 0 ? CX + 4 : CX - 6;
+    for (let k = 0; k < 8; k++) {
+      const wide = k < 5 ? 2 : 1;
+      for (let w = 0; w < wide; w++) {
+        const x = tuskX + w + (k >= 5 ? (s > 0 ? 0 : 1) : 0);
+        const jz = frontZ(H, x, 3) + 1;
+        H.set(x, 2 + k, jz + (k > 5 ? 0 : 0), bone(x, k, jz));
+        H.set(x, 2 + k, jz + 1, k > 5 ? 0xf4ead4 : bone(x, k, jz + 1));
       }
     }
+    const nx = CX + s * 1;
+    const nz = frontZ(H, nx, 7);
+    if (nz >= 0) H.set(s > 0 ? nx : nx - 1, 6, nz, 0x1c2a14);
   }
-  for (let y = 17; y < 26; y++) {
-    for (let x = 1; x < 13; x++) {
-      for (let z = 2; z < 13; z++) {
-        const dx = x - 7;
-        const dz = z - 7;
-        if (dx * dx + dz * dz < 13) continue;
-        const jag = hash3(x, 2, z, 9);
-        if (y < 23 - jag * 6) continue;
-        M.set(x, y, z, fur(x, y, z));
-      }
-    }
+  for (let x = CX - 5; x <= CX + 4; x++) {
+    const z = frontZ(H, x, 4);
+    if (z < 0) continue;
+    H.set(x, 4, z, 0x1c0f0a);
+    if ((x - CX) % 2 === 0 && Math.abs(x - CX) < 4) H.set(x, 3, z + 1, 0xf4ead4);
+    H.set(x, 5, z, shade(colorAt(H, x, 5, z), 0.75));
   }
-  for (let y = 5; y < 13; y++) {
-    if ((y + 1) % 3 === 0) continue;
-    for (let x = 3; x < 11; x++) {
-      for (let z = 4; z < 12; z++) {
-        const dx = x - 7;
-        const dz = z - 7;
-        if (dx * dx + dz * dz < 7) continue;
-        if ((x + y + z) % 5 === 0) continue;
-        M.set(x, y, z, hide(x, y, z));
-      }
-    }
-  }
+  relief(H, before);
+  return H;
 }
 
-function paintCloth(M) {
-  M.box(1, 4, 1, 15, 16, 7, (x, y, z) => {
-    const n = hash3(x, y, z, 6);
-    if (y < 7 && n < 0.35) return null;
-    return n < 0.4 ? 0x5a4030 : n < 0.75 ? 0x6e5240 : 0x3e2c1e;
-  });
-  for (let x = 0; x < 16; x++) {
-    const jag = 2 + Math.floor(hash3(x, 0, 1, 3) * 5);
-    for (let y = 0; y < jag; y++) {
-      M.set(x, y, 2, fur(x, y, 1));
-      if (hash3(x, y, 2, 4) > 0.4) M.set(x, y, 3, fur(x, y, 2));
-    }
+/* -------------------------------- arms -------------------------------- */
+const ARM_PIVOT = 29;
+const ARM_ELBOW = 16;
+function paintArm(seed) {
+  const A = new VoxelModel(20, 36, 20);
+  const CX = 10;
+  const CZ = 10;
+  muscle(A, CX, 26.5, CZ, 6, 4.6, 5.6, 1.06);
+  muscle(A, CX, 21, CZ, 5.2, 6, 5, 1);
+  muscle(A, CX, 21.8, CZ + 2, 3.8, 3.6, 2.6, 1.08);
+  muscle(A, CX, 16.2, CZ, 4.5, 2.8, 4.3, 0.96);
+  muscle(A, CX, 10.8, CZ, 4.8, 6.4, 4.6, 1);
+  muscle(A, CX, 5.4, CZ, 3.6, 2.4, 3.5, 0.94);
+  muscle(A, CX, 2.9, CZ + 0.6, 4.5, 3.3, 4.3, 1.04);
+  for (let x = CX - 3; x <= CX + 3; x += 2) {
+    const z = frontZ(A, x, 3);
+    if (z >= 0) A.set(x, 3, z, shade(colorAt(A, x, 3, z), 0.62));
+    const z2 = frontZ(A, x, 2);
+    if (z2 >= 0) A.set(x, 2, z2, shade(colorAt(A, x, 2, z2), 0.8));
   }
-  for (let y = 8; y < 15; y++) {
-    const inset = Math.floor((y - 8) * 0.4);
-    M.box(6 + inset, y, 6, 10 - inset, y + 1, 8, hide);
-  }
-  M.box(4, 14, 5, 12, 16, 8, (x, y, z) => shade(hide(x, y, z), 0.72));
+  const before = A.data.slice();
+  band(A, 5, 8, (x, y, z) => (y === 6 ? shade(leather(x, y, z), 0.66) : leather(x, y, z)), (x, y, z) => ((x + z + y) & 1) === 0 || y === 7);
+  furClump(A, CX, 11.4, CZ, 5.9, 3, 5.7, seed, 2, -0.3);
+  furClump(A, CX, 28, CZ, 5.6, 1.6, 5.4, seed + 9, 2, 0.6);
+  relief(A, before);
+  return A;
 }
 
-function paintTorso(M) {
-  M.box(7, 2, 5, 21, 15, 14, skin);
-  M.box(3, 11, 4, 25, 18, 15, (x, y, z) => shade(skin(x, y, z), 0.96));
-  M.box(8, 8, 12, 13, 14, 16, (x, y, z) => shade(skin(x, y, z), 1.1));
-  M.box(15, 8, 12, 20, 14, 16, (x, y, z) => shade(skin(x, y, z), 1.1));
-  M.box(11, 15, 7, 17, 21, 13, skin);
-  for (let x = 1; x < 27; x++) {
-    for (let z = 2; z < 17; z++) {
-      const front = z >= 12;
-      const back = z <= 6;
-      const side = x < 6 || x > 21;
-      if (!front && !back && !side) continue;
-      const hang = back ? 9 : side ? 6 : 3;
-      for (let y = 12; y < 19; y++) {
-        const jag = hash3(x, 0, z, 12);
-        if (y < 17 - jag * hang) continue;
-        if (front && y < 15 && x > 8 && x < 20) continue;
-        M.set(x, y, z, fur(x, y, z));
-      }
-    }
+/* -------------------------------- legs -------------------------------- */
+const LEG_PIVOT = 28;
+const LEG_KNEE = 14;
+function paintLeg(seed) {
+  const L = new VoxelModel(22, 34, 26);
+  const CX = 11;
+  const CZ = 10;
+  muscle(L, CX, 22, CZ, 6.5, 7.4, 6.2, 1);
+  muscle(L, CX, 14.6, CZ + 0.6, 5.2, 3, 5, 0.96);
+  muscle(L, CX, 10, CZ - 0.2, 4.9, 5.6, 4.8, 0.98);
+  muscle(L, CX, 11, CZ - 2.2, 3.4, 3.4, 2.4, 1.02);
+  muscle(L, CX, 5.2, CZ, 4, 2.2, 3.8, 0.94);
+  muscle(L, CX, 2.2, CZ + 3.2, 5.3, 2.4, 6.6, 1.02);
+  for (let i = 0; i < 4; i++) {
+    const tx = CX - 3.3 + i * 2.2;
+    muscle(L, tx, 1.5, CZ + 9.4, 1.4, 1.5, 2.2, 1.04);
+    const z = frontZ(L, Math.floor(tx), 1);
+    if (z >= 0) L.set(Math.floor(tx), 1, z, 0xcdbfa0);
   }
-  for (let i = 0; i < 9; i++) {
-    M.box(8 + i, 6 + i, 14, 10 + i, 8 + i, 17, hide);
-    M.box(16 - i, 6 + i, 14, 18 - i, 8 + i, 17, hide);
-  }
-  M.box(6, 2, 5, 22, 5, 15, hide);
-  M.box(12, 3, 14, 16, 5, 17, 0xe8dcc4);
-  M.set(13, 3, 16, 0x1a140e);
-  M.set(14, 3, 16, 0x1a140e);
+  const before = L.data.slice();
+  band(L, 2, 6, leather, (x, y, z) => ((Math.floor(Math.atan2(z - 10, x - 11) * 2.4) + y) & 1) === 0);
+  furClump(L, CX, 8.8, CZ, 6.3, 3.2, 6.1, seed, 2, -0.3);
+  relief(L, before);
+  return L;
 }
 
-function paintHead(M) {
-  M.box(5, 6, 4, 15, 15, 13, skin);
-  M.box(4, 2, 6, 16, 8, 14, skin);
-  M.box(3, 5, 5, 17, 11, 13, skin);
-  M.box(4, 10, 11, 16, 14, 16, (x, y, z) => shade(skin(x, y, z), 0.72));
-  M.box(8, 11, 13, 12, 14, 16, (x, y, z) => shade(skin(x, y, z), 0.58));
-  M.box(6, 8, 13, 9, 10, 16, 0xf4f0e4);
-  M.box(11, 8, 13, 14, 10, 16, 0xf4f0e4);
-  M.box(7, 8, 15, 9, 10, 16, 0x140e0a);
-  M.box(11, 8, 15, 13, 10, 16, 0x140e0a);
-  M.set(6, 9, 15, 0xffffff);
-  M.set(13, 9, 15, 0xffffff);
-  M.box(9, 6, 13, 11, 9, 17, skin);
-  M.set(9, 7, 16, 0x24341a);
-  M.set(10, 7, 16, 0x24341a);
-  M.box(6, 3, 13, 14, 5, 16, 0x1a120e);
-  for (let x = 7; x <= 13; x++) M.set(x, 4, 15, x % 2 ? 0xf7f1e4 : 0xe4d8c0);
-  M.box(4, 3, 14, 7, 9, 17, 0xe8dcc0);
-  M.box(13, 3, 14, 16, 9, 17, 0xe4d6b6);
-  M.box(4, 8, 16, 6, 10, 18, 0xf4ead4);
-  M.box(14, 8, 16, 16, 10, 18, 0xf4ead4);
-  M.box(6, 1, 8, 14, 3, 14, skin);
-  M.box(0, 8, 6, 4, 13, 11, skin);
-  M.box(0, 12, 7, 3, 16, 10, skin);
-  M.box(1, 9, 10, 3, 12, 11, 0x4e7034);
-  M.box(16, 8, 6, 20, 13, 11, skin);
-  M.box(17, 12, 7, 20, 16, 10, skin);
-  M.box(17, 9, 10, 19, 12, 11, 0x4e7034);
-}
-
-function paintArm(M, sword) {
-  const top = sword ? 40 : 22;
-  M.ellipsoid(7, top - 7, 7, 3.7, 5.6, 3.5, skin);
-  M.ellipsoid(7, top - 16, 7.3, 3.2, 5.2, 3.1, skin);
-  const cuff = top - 20;
-  for (let y = cuff; y < cuff + 6; y++) {
-    for (let x = 3; x < 12; x++) {
-      for (let z = 3; z < 12; z++) {
-        const dx = x - 7;
-        const dz = z - 7;
-        if (dx * dx + dz * dz < 8) continue;
-        const jag = hash3(x, 3, z, 15);
-        if (y > cuff + 2 + jag * 4) continue;
-        M.set(x, y, z, fur(x, y, z));
-      }
-    }
-  }
-  const fist = sword ? 18 : 1;
-  M.box(4, fist, 4, 11, fist + 6, 11, skin);
-  M.box(4, fist + 1, 8, 11, fist + 5, 12, skin);
-  M.box(5, fist + 4, 9, 10, fist + 6, 12, (x, y, z) => shade(skin(x, y, z), 0.8));
-  if (!sword) return;
-  M.box(6, 15, 6, 9, 24, 10, (x, y, z) => {
-    const band = y % 2 === 0;
-    return jitter(band ? 0x3a2414 : 0x5a3a22, 0.05, hash3(x, y, z, 40));
-  });
-  M.box(2, 14, 5, 13, 17, 11, (x, y, z) => jitter(0x6a655c, 0.05, hash3(x, y, z, 41)));
-  M.box(1, 15, 6, 3, 17, 10, 0x8c8678);
-  M.box(12, 15, 6, 14, 17, 10, 0x8c8678);
-  M.box(5, 22, 5, 10, 26, 11, (x, y, z) => jitter(0x4e4a44, 0.04, hash3(x, y, z, 42)));
-  M.box(4, 0, 7, 11, 16, 12, (x, y, z) => {
-    if (x <= 4 && y % 4 === 1) return null;
-    const edge = x <= 4 || x >= 10 || z >= 11;
-    const n = hash3(x, y, z, 44);
-    if (edge) return n < 0.5 ? 0xd8dbe2 : 0xb7bcc4;
-    return n < 0.45 ? 0x8b9098 : 0x62686f;
-  });
-  M.box(6, 0, 8, 9, 2, 11, 0xd5d8de);
-}
-
-/** Rigged orc scout. The sword hangs from the right fist, point down. */
+/** Rigged orc scout. The right fist holds a notched blade, point down. */
 export function buildOrcScout() {
-  const mat = toonMaterial({ vertexColors: true });
+  const mat = toonMaterial({ vertexColors: true, emissive: new THREE.Color(0x000000) });
   const root = new THREE.Group();
-  const hips = new THREE.Group();
-  hips.position.y = 26 * S;
-  root.add(hips);
 
-  const legL = meshFrom(paintInto(14, 26, 16, paintLeg), 7, 26, 7, mat);
-  legL.position.set(-0.2, 0, 0);
-  const legR = meshFrom(paintInto(14, 26, 16, paintLeg), 7, 26, 7, mat);
-  legR.position.set(0.2, 0, 0.01);
-  hips.add(legL, legR);
+  const hip = new THREE.Group();
+  hip.position.y = 28 * S;
+  root.add(hip);
+  const upper = new THREE.Group();
+  hip.add(upper);
+  upper.add(meshFrom(paintTorso(), 22, OY, 13, mat, S));
 
-  const cloth = meshFrom(paintInto(16, 16, 10, paintCloth), 8, 16, 2, mat);
-  cloth.position.set(0, 0.02, 0.2);
-  hips.add(cloth);
+  const headG = new THREE.Group();
+  headG.position.set(0, 23.4 * S, 1.6 * S);
+  headG.add(meshFrom(paintHead(), 14, 1, 14, mat, S));
+  upper.add(headG);
 
-  const body = new THREE.Group();
-  hips.add(body);
-  body.add(meshFrom(paintInto(28, 22, 18, paintTorso), 14, 0, 9, mat));
+  const cloth = new THREE.Group();
+  cloth.position.y = 5 * S;
+  cloth.add(meshFrom(paintSkirt(), 18, 15, 13, mat, S));
+  hip.add(cloth);
 
-  const head = meshFrom(paintInto(20, 18, 18, paintHead), 10, 0, 8, mat);
-  head.position.set(0, 16 * S, 0.02);
-  body.add(head);
+  const arms = [];
+  for (const [side, seed] of [[-1, 301], [1, 302]]) {
+    const A = paintArm(seed);
+    const pieces = splitLimb(A, 10, ARM_PIVOT, 10, mat, ARM_ELBOW);
+    const shoulder = new THREE.Group();
+    shoulder.position.set(side * 14.2 * S, 22.4 * S, 0.4 * S);
+    const elbow = new THREE.Group();
+    elbow.position.y = -(ARM_PIVOT - ARM_ELBOW) * S;
+    elbow.add(pieces.lower);
+    shoulder.add(pieces.upper, elbow);
+    upper.add(shoulder);
+    arms.push({ shoulder, elbow });
+  }
+  const [armL, armR] = arms;
 
-  const armL = meshFrom(paintInto(14, 22, 14, (m) => paintArm(m, false)), 7, 22, 7, mat);
-  armL.position.set(-0.42, 14 * S, 0.02);
-  armL.rotation.z = 0.38;
-  armL.rotation.x = 0.15;
-  const armR = meshFrom(paintInto(14, 40, 14, (m) => paintArm(m, true)), 7, 40, 7, mat);
-  armR.position.set(0.46, 14 * S, 0.04);
-  armR.rotation.z = -0.38;
-  armR.rotation.x = -0.28;
-  body.add(armL, armR);
+  const hand = new THREE.Group();
+  hand.position.set(0, -(ARM_ELBOW - 3) * S, 0.3 * S);
+  armR.elbow.add(hand);
+  const blade = buildHeld('orcblade');
+  blade.scale.setScalar(0.82);
+  blade.rotation.x = Math.PI / 2;
+  blade.position.y = 0.02;
+  hand.add(blade);
 
-  return { root, mat, parts: { legL, legR, armL, armR, head, body, cloth } };
-}
+  const legs = [];
+  for (const [side, seed] of [[-1, 401], [1, 402]]) {
+    const L = paintLeg(seed);
+    const pieces = splitLimb(L, 11, LEG_PIVOT, 10, mat, LEG_KNEE);
+    const thigh = new THREE.Group();
+    thigh.position.set(side * 6.2 * S, 0, 0);
+    const knee = new THREE.Group();
+    knee.position.y = -(LEG_PIVOT - LEG_KNEE) * S;
+    knee.add(pieces.lower);
+    thigh.add(pieces.upper, knee);
+    hip.add(thigh);
+    legs.push({ thigh, knee });
+  }
+  const [legL, legR] = legs;
 
-function paintInto(w, h, d, fn) {
-  const M = new VoxelModel(w, h, d);
-  fn(M);
-  return M;
+  root.traverse((o) => {
+    if (o.isMesh) o.frustumCulled = true;
+  });
+  return {
+    root,
+    mat,
+    parts: {
+      body: upper,
+      head: headG,
+      cloth,
+      armL: armL.shoulder,
+      armR: armR.shoulder,
+      elbowL: armL.elbow,
+      elbowR: armR.elbow,
+      legL: legL.thigh,
+      legR: legR.thigh,
+      kneeL: legL.knee,
+      kneeR: legR.knee,
+    },
+  };
 }

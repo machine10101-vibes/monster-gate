@@ -32,7 +32,7 @@ const DEFS = {
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
   budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
   darksycledragon: { name: 'Darksycle Dragon', hp: 110, radius: 0.95, speed: 2.7, dmg: 4, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
-  orcscout: { name: 'Orc Scout', hp: 36, radius: 0.55, speed: 2.7, dmg: 4, gold: [2, 8], aggro: 12, build: buildOrcScout },
+  orcscout: { name: 'Orc Scout', hp: 36, radius: 0.6, speed: 2.7, dmg: 4, gold: [2, 8], aggro: 12, build: buildOrcScout },
 };
 
 export const MONSTER_BUILDERS = Object.fromEntries(Object.entries(DEFS).map(([k, v]) => [k, v.build]));
@@ -950,27 +950,39 @@ export class Monster {
       this.gaitC = (this.gaitC || 0) + dt * (3.2 + spd * 2.1);
       const c = this.gaitC;
       const lk = Math.min(1, dt * 14);
-      const stepL = Math.sin(c) * 0.72 * gait;
-      const stepR = Math.sin(c + Math.PI) * 0.72 * gait;
+      const stepL = Math.sin(c) * 0.62 * gait;
+      const stepR = Math.sin(c + Math.PI) * 0.62 * gait;
       p.legL.rotation.x += (stepL - p.legL.rotation.x) * lk;
       p.legR.rotation.x += (stepR - p.legR.rotation.x) * lk;
-      p.armL.rotation.x += (0.15 - stepL * 0.55 - p.armL.rotation.x) * lk;
-      p.armL.rotation.z += (0.38 - p.armL.rotation.z) * lk;
-      let chop = -0.28 + Math.sin(c) * 0.1 * gait;
-      if (this.state === 'windup') chop = -0.28 + Math.min(1, this.t / 0.42) * 1.6;
-      else if (this.state === 'bite') {
-        const u = clamp(this.t / 0.2, 0, 1);
-        chop = 1.33 + ( -0.95 - 1.33) * ease(u);
-      } else if (this.state === 'recover') chop = -0.95 + Math.min(1, this.t / 0.42) * 0.67;
-      p.armR.rotation.x += (chop - p.armR.rotation.x) * Math.min(1, dt * (this.state === 'bite' ? 22 : 10));
-      p.armR.rotation.z += (-0.38 - p.armR.rotation.z) * lk;
-      const lean = this.state === 'windup' ? -0.12 : this.state === 'bite' ? 0.16 : gait * 0.04;
+      p.kneeL.rotation.x += (Math.max(0, stepL) * 1.25 - p.kneeL.rotation.x) * lk;
+      p.kneeR.rotation.x += (Math.max(0, stepR) * 1.25 - p.kneeR.rotation.x) * lk;
+      p.armL.rotation.x += (0.06 - stepL * 0.5 - p.armL.rotation.x) * lk;
+      p.armL.rotation.z += (0.1 - p.armL.rotation.z) * lk;
+      p.elbowL.rotation.x += (-0.28 - Math.max(0, -stepL) * 0.5 - p.elbowL.rotation.x) * lk;
+      let chop = -0.25 + Math.sin(c) * 0.08 * gait;
+      let flex = -0.38;
+      if (this.state === 'windup') {
+        const w = ease(Math.min(1, this.t / 0.42));
+        chop = -0.25 - w * 2.25;
+        flex = -0.38 - w * 0.5;
+      } else if (this.state === 'bite') {
+        const u = ease(clamp(this.t / 0.2, 0, 1));
+        chop = -2.5 + u * 2.25;
+        flex = -0.88 + u * 0.55;
+      } else if (this.state === 'recover') {
+        chop = -0.25;
+        flex = -0.38;
+      }
+      p.armR.rotation.x += (chop - p.armR.rotation.x) * Math.min(1, dt * (this.state === 'bite' ? 26 : 12));
+      p.armR.rotation.z += (-0.1 - p.armR.rotation.z) * lk;
+      p.elbowR.rotation.x += (flex - p.elbowR.rotation.x) * Math.min(1, dt * (this.state === 'bite' ? 26 : 12));
+      const lean = (this.state === 'windup' ? 0.02 : this.state === 'bite' ? 0.3 : 0.12) + gait * 0.05;
       p.body.rotation.x += (lean - p.body.rotation.x) * lk;
-      p.body.rotation.z = Math.sin(c) * 0.03 * gait;
+      p.body.rotation.z = Math.sin(c) * 0.035 * gait;
       p.head.rotation.y += (this.lookSm * 0.7 - p.head.rotation.y) * Math.min(1, dt * 8);
-      p.head.rotation.x += ((this.state === 'chase' ? 0.08 : 0) - p.head.rotation.x) * lk;
-      p.cloth.rotation.x = Math.sin(c * 2) * 0.06 * gait + Math.sin(t * 2) * 0.03;
-      rootY = Math.abs(Math.sin(c)) * 0.05 * gait;
+      p.head.rotation.x += ((this.state === 'chase' ? 0.04 : -0.1) - p.head.rotation.x) * lk;
+      p.cloth.rotation.x = Math.sin(c * 2) * 0.05 * gait + Math.sin(t * 2) * 0.02;
+      rootY = Math.abs(Math.sin(c)) * 0.04 * gait;
       o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'budgedragon') {
       const p = m.parts;
@@ -1112,7 +1124,7 @@ export class Monster {
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup')) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 2.3 : this.type === 'orcscout' ? 2.2 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 2.3 : this.type === 'orcscout' ? 2.55 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
@@ -1207,6 +1219,7 @@ export class Monster {
       p.legR.rotation.x = -0.2 * k;
       p.armR.rotation.x = -0.4 + k * 0.6;
       p.armL.rotation.z = 0.9 * k;
+      p.kneeL.rotation.x = 0.5 * k;
       p.head.rotation.x = 0.4 * k;
       const k2 = dissolve(0.7, 0.5, [0x6a9a48, 0x5a4030, 0xe6dcc4]);
       o.scale.setScalar(bs * (1 - k2 * k2));

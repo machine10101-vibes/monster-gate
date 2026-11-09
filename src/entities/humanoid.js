@@ -21,7 +21,7 @@ function slice(model, y0, y1) {
 }
 
 /** Splits a limb at a joint row: an upper piece pivoting at the root and a lower piece pivoting at the joint. */
-function splitLimb(model, ox, oy, oz, mat, joint) {
+export function splitLimb(model, ox, oy, oz, mat, joint) {
   const upper = meshFrom(slice(model, joint, model.sy), ox, oy, oz, mat);
   const lower = meshFrom(slice(model, 0, joint + 1), ox, joint, oz, mat);
   lower.scale.set(0.975, 1, 0.975);
@@ -50,7 +50,7 @@ const GLOW_BIT = 1 << 25;
  * Relief pass for armor: voxels a painter added or recoloured get lit tops,
  * crisp convex edges and shadowed undersides so plates read as raised shapes.
  */
-function relief(M, before) {
+export function relief(M, before) {
   const { sx, sy, sz, data } = M;
   const empty = (x, y, z) => x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz || data[x + sx * (y + sy * z)] === 0;
   for (let z = 0; z < sz; z++)

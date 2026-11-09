@@ -73,7 +73,7 @@ const THEMES = {
     membrane: 0x8a3a2a, membraneHi: 0xb04a36, claw: 0xdfe2e8, horn: 0xb4b8c0, hornDark: 0x7a7e88,
   },
   orc: {
-    wrap: 0x4a3018, wrapLo: 0x2c1c10, wrapHi: 0x6a4830, blade: 0x8e939c, edge: 0xd5d8de, dark: 0x5c6168,
+    wrap: 0x4a3018, wrapLo: 0x2a1a0e, wrapHi: 0x6a4830, blade: 0x7a7f88, edge: 0xb4b9c1, dark: 0x4e5258,
     guard: 0x6a655c, guardHi: 0x9a9488, glow: 0xc8ccd2, glow2: 0xe6dcc4, wood: 0x4a3018, string: 0xe8e0c8,
     membrane: 0x6a4030, membraneHi: 0x8a6848, claw: 0xd5d8de, horn: 0xe6dcc4, hornDark: 0xb7a88e,
   },
@@ -305,19 +305,32 @@ function pommelAt(c, T, z, kind, gem) {
 
 function sword(T, o) {
   const c = ctx();
-  const { g0 = -6, g1 = 10, gr = 2, guardHalf = 8, sweep = 0, cap = 'ball', pommel = 'ball', gem = null, pgem = null, b } = o;
+  const { g0 = -6, g1 = 10, gr = 2, guardHalf = 8, sweep = 0, cap = 'ball', pommel = 'ball', gem = null, pgem = null, b, after = null } = o;
   wrapRod(c, T, g0, g1, gr);
   ringAt(c, g0 + 1, gr, T.guard, 1);
   ringAt(c, g1, gr, T.guard, 2);
   pommelAt(c, T, g0 - 1, pommel, pgem);
   crossguard(c, T, g1 + 2, guardHalf, { sweep, cap, gem });
   blade(c, T, { z0: g1 + 5, ...b });
+  if (after) after(c);
   return c.done();
 }
 
 const SWORDS = {
   blade: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 82, w0: 8, tip: 0.84 } }),
-  orcblade: () => sword(THEMES.orc, { guardHalf: 7, cap: 'fang', pommel: 'ball', b: { z1: 76, w0: 9, serr: 5, tip: 0.68 } }),
+  orcblade: () =>
+    sword(THEMES.orc, {
+      g0: -8, g1: 12, gr: 2.2, guardHalf: 11, cap: 'ball', pommel: 'ball',
+      b: { z1: 74, w0: 15, tip: 0.8, fuller: 'groove' },
+      after: (c) => {
+        for (let z = 24; z < 82; z++) {
+          const h = hash3(z, 1, 0, 61);
+          if (h < 0.2) for (let y = -3; y <= 2; y++) { c.clear(-6, y, z); if (h < 0.08) c.clear(-5, y, z); }
+          const h2 = hash3(z, 2, 0, 62);
+          if (h2 < 0.2) for (let y = -3; y <= 2; y++) { c.clear(5, y, z); if (h2 < 0.08) c.clear(4, y, z); }
+        }
+      },
+    }),
   darksword: () =>
     sword(THEMES.dark, { guardHalf: 11, sweep: 5, cap: 'fang', gem: THEMES.dark.glow2, pgem: THEMES.dark.glow2, b: { z1: 93, w0: 10, curve: 10, exp: 2.2, fuller: 'glow', glowEvery: 5, runes: 7, tip: 0.74 } }),
   budgeblade: () =>
