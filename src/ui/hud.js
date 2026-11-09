@@ -537,6 +537,7 @@ export class HUD {
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
+        ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
       if (game.wallet?.address) {

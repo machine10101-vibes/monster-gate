@@ -158,7 +158,7 @@ export async function pushHunt(session, data, keepalive = false) {
 
 /**
  * Keep every character. A hunt stays with whichever copy was saved later.
- * `push` reads `progress.data` when it runs, after a newer stamp is applied.
+ * `push` reads `progress.data` when it runs.
  * `abandoned` means the player signed out before the write, so the local copy stands.
  */
 export async function reconcileHunt(progress, remote, push) {
@@ -172,18 +172,24 @@ export async function reconcileHunt(progress, remote, push) {
       };
     if (remote?.revision) progress.revision = remote.revision || 0;
     if (!outcome.push) return { state: 'on', replaced: !!outcome.replaced };
-    if (typeof progress.touch === 'function') progress.touch(Date.now());
     let pushed = await push();
     if (pushed?.abandoned) return { state: 'on', replaced: !!outcome.replaced, abandoned: true };
+    if (pushed?.error) throw new Error('The guild record could not be saved.');
+    if (pushed?.progress && typeof progress.mergeFrom === 'function') {
+      const again = progress.mergeFrom(pushed.progress);
+      progress.revision = pushed.revision || progress.revision || 0;
+      if (again.push && !pushed.conflict) {
+        pushed = await push();
+        if (pushed?.abandoned) return { state: 'on', replaced: !!(outcome.replaced || again.replaced), abandoned: true };
+        if (pushed?.error) throw new Error('The guild record could not be saved.');
+        if (pushed?.progress) progress.mergeFrom(pushed.progress);
+      }
+      progress.revision = pushed?.revision || progress.revision || 0;
+      return { state: 'on', replaced: !!(outcome.replaced || again.replaced) };
+    }
     if (pushed?.conflict && pushed.progress) {
       const again = progress.mergeFrom(pushed.progress);
       progress.revision = pushed.revision || progress.revision || 0;
-      if (again.push) {
-        if (typeof progress.touch === 'function') progress.touch(Date.now());
-        pushed = await push();
-        if (pushed?.abandoned) return { state: 'on', replaced: true, abandoned: true };
-        if (!pushed?.conflict) progress.revision = pushed?.revision || progress.revision || 0;
-      }
       return { state: 'on', replaced: !!(outcome.replaced || again.replaced) };
     }
     progress.revision = pushed?.revision || progress.revision || 0;
@@ -200,6 +206,7 @@ export async function reconcileHunt(progress, remote, push) {
   }
   const pushed = await push();
   if (pushed?.abandoned) return { state: 'on', replaced: false, abandoned: true };
+  if (pushed?.error) throw new Error('The guild record could not be saved.');
   if (pushed?.conflict && pushed.progress) {
     progress.loadRaw(pushed.progress);
     progress.revision = pushed.revision || 0;

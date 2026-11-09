@@ -73,6 +73,13 @@ function sameBytes(a, b) {
   return diff === 0;
 }
 
+/** The browser-only user id for this email, if an account was created here before the database. */
+export function legacyUserId(email) {
+  const row = readBook()[normalizeEmail(email)];
+  if (!row || !UUID_RE.test(row.userId || '')) return '';
+  return row.userId;
+}
+
 function readBook() {
   try {
     const raw = JSON.parse(localStorage.getItem(BOOK_KEY) || 'null');
@@ -352,11 +359,24 @@ function adoptSession(session, next) {
   return session;
 }
 
+const refreshJobs = new Map();
+
+function refreshOnce(session, cfg) {
+  const key = session.userId || session.refreshToken;
+  let job = refreshJobs.get(key);
+  if (!job) {
+    job = refreshSession(session, cfg).finally(() => refreshJobs.delete(key));
+    refreshJobs.set(key, job);
+  }
+  return job;
+}
+
 async function freshSession(session) {
   const cfg = await cloudConfig();
-  if (!cfg.url || !cfg.key || !session.accessToken) return null;
-  if (Date.parse(session.expiresAt) > Date.now() + 60_000) return session;
-  return adoptSession(session, await refreshSession(session, cfg));
+  if (!cfg.url || !cfg.key) return null;
+  if (session.accessToken && Date.parse(session.expiresAt) > Date.now() + 60_000) return session;
+  if (!session.refreshToken) return session.accessToken ? session : null;
+  return adoptSession(session, await refreshOnce(session, cfg));
 }
 
 async function accountOp(session, body, keepalive = false) {
@@ -374,7 +394,7 @@ async function accountOp(session, body, keepalive = false) {
 /** Pull the hunt saved to this email account and fold it into the local roster. */
 export async function syncEmailHunt(session, progress, gate = { open: true }) {
   const cfg = await cloudConfig();
-  if (!cfg.url || !cfg.key || !session.accessToken) return { state: 'off', replaced: false };
+  if (!cfg.url || !cfg.key || (!session.accessToken && !session.refreshToken)) return { state: 'error', replaced: false };
   const res = await accountOp(session, { op: 'account-load' });
   if (res?.state === 'off') return { state: 'off', replaced: false };
   if (!res || res.status !== 200) throw new Error(res?.json?.error || 'The guild record could not be opened.');
@@ -396,7 +416,7 @@ export async function pushEmailHunt(session, data, keepalive = false) {
   const progress = { ...data };
   if (!Number.isFinite(Number(progress.savedAt))) progress.savedAt = Date.now();
   const res = await accountOp(session, { op: 'account-save', progress }, keepalive);
-  if (res?.state === 'off') return { revision: 0, savedAt: progress.savedAt };
+  if (res?.state === 'off') return { error: true };
   if (res?.status === 409) {
     return {
       conflict: true,
@@ -406,5 +426,9 @@ export async function pushEmailHunt(session, data, keepalive = false) {
     };
   }
   if (!res || res.status !== 200) throw new Error(res?.json?.error || 'The guild record could not be saved.');
-  return { revision: Number(res.json.revision) || 0, savedAt: Number(res.json.savedAt) || 0 };
+  return {
+    revision: Number(res.json.revision) || 0,
+    savedAt: Number(res.json.savedAt) || 0,
+    progress: res.json.progress && typeof res.json.progress === 'object' ? res.json.progress : null,
+  };
 }

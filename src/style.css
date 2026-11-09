@@ -2743,6 +2743,14 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   font-size: 13px;
   color: #aeb8cf;
 }
+.cs-save {
+  display: block;
+  margin-top: -2px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #d7c27a;
+  text-shadow: 0 1px 0 #000;
+}
 
 .cs-panel {
   position: absolute;
