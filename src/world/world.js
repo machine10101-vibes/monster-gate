@@ -10,6 +10,7 @@ import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH }
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
 import * as M from './models.js';
+import { buildArcticModels } from './arcticModels.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
@@ -391,6 +392,8 @@ export class World {
       orcRack: M.buildOrcRack(1),
       orcHide: M.buildOrcHideFrame(1),
       orcBones: [1, 2].map((s) => M.buildOrcBones(s)),
+      tentFrost: M.buildTent(9, 0x9ec3e6, 0xf2ead3),
+      arctic: buildArcticModels(),
     };
     void q;
   }
@@ -970,6 +973,8 @@ export class World {
       let b = 70;
       if (h < WATER_Y) [r, g, b] = [60, 130, 190];
       else if (t === TILE.SNOW) [r, g, b] = [240, 245, 255];
+      else if (t === TILE.ICE) [r, g, b] = [165, 215, 245];
+      else if (t === TILE.FROST_GRASS) [r, g, b] = [185, 215, 190];
       else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [130, 135, 142];
       else if (t === TILE.COBBLE) [r, g, b] = [170, 170, 176];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];

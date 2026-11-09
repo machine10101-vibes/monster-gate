@@ -87,6 +87,8 @@ export const TILE = {
   FLOWER_GRASS: 12,
   PATH: 13,
   DARK_STONE: 14,
+  ICE: 15,
+  FROST_GRASS: 16,
 };
 
 const TILE_PX = 16;
@@ -219,6 +221,23 @@ export function buildAtlas() {
     const depth = 3 + Math.floor(wrapNoise(x, 0, 83) * 4);
     if (y < depth) return pick(SNOW, wrapNoise(x, y, 81));
     return stoneFn(x, y, 41);
+  });
+
+  const ICEPAL = [0xa9dcff, 0xb9e4ff, 0x9bd2f6, 0xc8ecff, 0x8fc8ee];
+  fill(TILE.ICE, (x, y) => {
+    let c = pick(ICEPAL, wrapNoise(x >> 1, y >> 1, 131) * 0.6 + wrapNoise(x, y, 132) * 0.4);
+    const d1 = (x + y * 2) % 11;
+    const d2 = (x * 2 - y + 40) % 13;
+    if (d1 === 0 && wrapNoise(x, y, 133) > 0.35) c = 0xe6f8ff;
+    if (d2 === 0 && wrapNoise(x, y, 134) > 0.5) c = 0x6fb4e4;
+    if (wrapNoise(x, y, 135) > 0.95) c = 0xffffff;
+    return c;
+  });
+  fill(TILE.FROST_GRASS, (x, y) => {
+    const g = grassFn(x, y, 11);
+    const flake = wrapNoise(x >> 1, y >> 1, 141) * 0.6 + wrapNoise(x, y, 142) * 0.4;
+    if (flake > 0.52) return pick(SNOW, wrapNoise(x, y, 143));
+    return g;
   });
 
   const SAND = [0xe5d29a, 0xdcc78c, 0xefdca6, 0xd3bd80];

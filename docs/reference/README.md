@@ -8,3 +8,4 @@ Images supplied as visual targets for models and UI. Match these when changing t
 - `art-style-village.jpg`: overall art style target (village scene and HUD).
 - `skill-tree-layout.jpg`: skill tree layout target.
 - `ref-68e999ea.png`: earlier supplied image, kept for reference.
+- `ravenous-snow-yeti.jpg`: ravenous snow yeti (icy blue-white shaggy fur and ice crystal spikes, glowing blue eyes, fangs, leather X strap and tattered hide loincloth, huge clawed hands and feet, frost breath).
