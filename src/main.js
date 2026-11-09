@@ -722,7 +722,7 @@ class Game {
           if (mon.dead || p.hit.has(mon)) continue;
           const dx = mon.x - m.position.x;
           const dz = mon.z - m.position.z;
-          if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + (mon.hover || 0) + 0.8)) < 1.6) {
+          if (Math.hypot(dx, dz) < mon.radius + p.r && Math.abs(m.position.y - (mon.y + (mon.hover || 0) + 0.8)) < 1.6 + ((mon.hover || 0) > 2.5 ? mon.hover : 0)) {
             p.hit.add(mon);
             const d = Math.hypot(p.vx, p.vz) || 1;
             const mods = skillMods(this);

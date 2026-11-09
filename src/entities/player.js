@@ -656,7 +656,7 @@ export class Player {
       meleeSwing(g, this, it, this.combo, reach);
       let hits = 0;
       for (const m of g.monsters) {
-        if (m.dead) continue;
+        if (m.dead || (m.hover || 0) > 2.5) continue;
         const dx = m.x - this.pos.x;
         const dz = m.z - this.pos.z;
         const d = Math.hypot(dx, dz);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildDarksycleDragon } from './creatures.js';
+import { buildSlime, buildBoar, buildWraith, buildBudgeDragon } from './creatures.js';
+import { buildDarksycleDragon } from './darksycle.js';
 import { buildOrcScout } from './orc.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
 import { statusFx } from '../systems/skillfx.js';
@@ -24,6 +25,20 @@ function easeOutBack(x) {
 
 const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1, orcscout: 1.25 };
 const TELE_COL = { boar: 0xff5a3a, budgedragon: 0xff7a2a, darksycledragon: 0xb25cff, wraith: 0xc27bff, orcscout: 0xc45a2a };
+
+const DRAGON_HOVER = 1.0;
+const DRAGON_AIR_H = 5.2;
+const DRAGON_ASCEND = 0.95;
+const DRAGON_AIR = 4.0;
+const DRAGON_DESCEND = 0.75;
+const DRAGON_AIR_PLAN = [
+  { at: 0.12, k: 'fan' },
+  { at: 1.0, k: 'rain' },
+  { at: 1.9, k: 'gloom' },
+  { at: 2.65, k: 'fan' },
+  { at: 3.2, k: 'rain' },
+];
+const AIR_STATES = new Set(['ascend', 'air', 'descend']);
 
 const DEFS = {
   slime: { name: 'Gate Slime', hp: 18, radius: 0.5, speed: 2.6, dmg: 2, gold: [2, 5], aggro: 9, build: () => buildSlime('green') },
@@ -79,6 +94,12 @@ export class Monster {
     this.id = 'm' + Math.random().toString(36).slice(2, 8);
     this.hover = type === 'wraith' ? 1.15 : type === 'darksycledragon' ? 1.0 : 0;
     this.realm = 'over';
+    this.skyCd = 3.5 + Math.random() * 2.5;
+    this.strikes = [];
+    this.airCharge = null;
+    this.airChargeT = 0;
+    this.airEv = 0;
+    this.orbitDir = Math.random() < 0.5 ? -1 : 1;
 
     const built = d.build();
     this.model = built;
@@ -128,7 +149,7 @@ export class Monster {
 
   placeWarn() {
     const sl = this.teleSlot;
-    if (!sl || sl.owner !== this || !sl.active) return;
+    if (!sl || sl.owner !== this || !sl.active || this.teleKind === 'dive') return;
     const m = sl.mesh;
     const gy = this.game.world.heightAt(this.x, this.z);
     if (this.teleKind === 'line') {
@@ -194,7 +215,7 @@ export class Monster {
     const drake = this.type === 'budgedragon';
     const dusk = this.type === 'darksycledragon';
     const heavy = drake || dusk;
-    this.stun = this.type === 'boar' && this.state === 'charge' ? 0.05 : heavy ? (this.state === 'windup' || this.state === 'bite' ? 0 : 0.12) : 0.28;
+    this.stun = this.type === 'boar' && this.state === 'charge' ? 0.05 : heavy ? (this.state === 'windup' || this.state === 'bite' || AIR_STATES.has(this.state) ? 0 : 0.12) : 0.28;
     if (this.state === 'windup' && !heavy) {
       this.state = 'chase';
       this.clearWarn();
@@ -233,6 +254,7 @@ export class Monster {
     this.enraged = true;
     this.cd = Math.min(this.cd, 0.3);
     const dusk = this.type === 'darksycledragon';
+    if (dusk) this.skyCd = Math.min(this.skyCd, 1.5);
     g.audio.tone(dusk ? 160 : 90, 0.55, 'sawtooth', 0.16, -30);
     g.fx.ring(this.x, this.y + 0.3 + this.hover, this.z, dusk ? 0xb25cff : 0xff6a2a, 10, 2.6, 0.1, 0.5);
     g.hud.floatText(...g.screenOf(this.x, this.y + this.hover + 2.2, this.z), dusk ? 'Dusk Frenzy!' : 'Enraged!', 'crit');
@@ -247,6 +269,7 @@ export class Monster {
     g.audio.pop();
     g.hud.removePlate(this.id);
     this.clearWarn();
+    this.clearStrikes();
     this.pend = null;
     this.state = 'dead';
     this.vy = Math.max(this.vy, this.type === 'slime' || this.type === 'voidslime' ? 3.5 : 1.5);
@@ -258,6 +281,117 @@ export class Monster {
     } else if (this.type === 'boar') {
       g.slowmo(0.3, 0.4);
       g.punch(0.25);
+    }
+  }
+
+  clearStrikes() {
+    for (const s of this.strikes) this.game.fx.cancelTelegraph(s.slot);
+    this.strikes.length = 0;
+  }
+
+  beginFlight() {
+    const g = this.game;
+    this.state = 'ascend';
+    this.t = 0;
+    this.airEv = 0;
+    this.airCharge = null;
+    this.orbitDir = Math.random() < 0.5 ? -1 : 1;
+    this.clearWarn();
+    g.audio.tone(140, 0.55, 'sawtooth', 0.12, 140);
+    g.fx.ring(this.x, this.y + 0.3, this.z, 0xb25cff, 18, 5, 0.1, 0.5);
+    g.fx.shockwave(this.x, this.y, this.z, 0xb9a6e0, 2.6);
+    g.shake(0.25);
+    g.hud.floatText(...g.screenOf(this.x, this.y + this.hover + 2.4, this.z), 'Takes flight!', 'gold');
+  }
+
+  beginDescend(P) {
+    const g = this.game;
+    this.state = 'descend';
+    this.t = 0;
+    this.airCharge = null;
+    const tx = P.pos.x;
+    const tz = P.pos.z;
+    this.dive = { x: tx, z: tz };
+    const gy = g.world.heightAt(tx, tz);
+    this.teleSlot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 4.4, 0, 0xb25cff, DRAGON_DESCEND);
+    this.teleSlot.owner = this;
+    this.teleKind = 'dive';
+    g.audio.tone(380, DRAGON_DESCEND, 'sawtooth', 0.1, -280);
+  }
+
+  slam(P) {
+    const g = this.game;
+    this.hover = DRAGON_HOVER;
+    this.clearWarn();
+    g.fx.shockwave(this.x, this.y, this.z, 0xb9a6e0, 3);
+    g.fx.ring(this.x, this.y + 0.3, this.z, 0xb25cff, 24, 6, 0.12, 0.55);
+    g.vfx.glow(this.x, this.y + 0.6, this.z, 0xb25cff, 5, 0.35, { grow: 0.8, gain: 0.8 });
+    g.shake(0.45);
+    g.punch(0.3);
+    g.audio.tone(90, 0.35, 'square', 0.14, -40);
+    if (Math.hypot(P.pos.x - this.x, P.pos.z - this.z) < 4.4 && P.pos.y < this.y + 1.2) {
+      if (P.hurt(this.def.dmg + 1, this.x, this.z, 9)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0xb25cff], 8, 3, 0.09, 0.35);
+    }
+    this.state = 'recover';
+    this.t = -0.45;
+    this.cd = 1.1;
+    this.skyCd = (this.enraged ? 7 : 11) + Math.random() * 4;
+  }
+
+  airFire(kind, P, dist) {
+    const g = this.game;
+    const frenzy = !!this.enraged;
+    const a = Math.atan2(P.pos.x - this.x, P.pos.z - this.z);
+    const mx = this.x + Math.sin(a) * 2.2;
+    const mz = this.z + Math.cos(a) * 2.2;
+    const my = this.y + this.hover + 1.6;
+    const aim = (speed) => clamp((P.pos.y + 1.0 - my) / Math.max(0.5, Math.max(dist - 1.5, 1) / speed), -9, 9);
+    if (kind === 'fan') {
+      const fan = frenzy ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.26, 0, 0.26];
+      for (const spread of fan) g.spawnProjectile({ owner: 'enemy', kind: 'crescent', x: mx, y: my, z: mz, vx: Math.sin(a + spread) * 9.5, vz: Math.cos(a + spread) * 9.5, vy: aim(9.5), dmg: this.def.dmg, life: 2.2, r: 0.5 });
+      g.fx.burst(mx, my, mz, [0xb25cff, 0xd8d3ee, 0xffffff], 10, 3.2, 0.1, 0.4);
+      g.audio.tone(520, 0.16, 'sawtooth', 0.09, -300);
+    } else if (kind === 'gloom') {
+      g.spawnProjectile({ owner: 'enemy', kind: 'gloom', x: mx, y: my, z: mz, vx: Math.sin(a) * 5.4, vz: Math.cos(a) * 5.4, vy: aim(5.4), dmg: this.def.dmg + 1, life: 4.4, r: 0.55, homing: 2.4 });
+      g.fx.ring(mx, my, mz, 0xb25cff, 8, 1.8, 0.08, 0.4);
+      g.audio.tone(210, 0.3, 'sine', 0.12, 120);
+    } else {
+      const n = frenzy ? 4 : 3;
+      for (let i = 0; i < n; i++) {
+        const off = i === 0 ? 0 : (i % 2 ? 1 : -1) * (2.6 + Math.floor((i - 1) / 2) * 1.6);
+        const sx = P.pos.x + Math.cos(a) * off + (Math.random() - 0.5) * 0.8;
+        const sz = P.pos.z - Math.sin(a) * off + (Math.random() - 0.5) * 0.8;
+        const gy = g.world.heightAt(sx, sz);
+        const dur = 0.95 + i * 0.12;
+        const slot = g.fx.telegraph(sx, gy, sz, 0, 'circle', 2.1, 0, 0x7a5cff, dur);
+        this.strikes.push({ x: sx, z: sz, gy, t: 0, dur, slot, r: 2.1 });
+      }
+      g.fx.burst(mx, my, mz, [0x7a5cff, 0x9ad4ff, 0xffffff], 12, 3, 0.1, 0.4);
+      g.audio.tone(260, 0.3, 'triangle', 0.1, 200);
+    }
+    this.kick = 1;
+  }
+
+  tickStrikes(dt, P) {
+    if (!this.strikes.length) return;
+    const g = this.game;
+    for (let i = this.strikes.length - 1; i >= 0; i--) {
+      const s = this.strikes[i];
+      s.t += dt;
+      const u = clamp(s.t / s.dur, 0, 1);
+      const h = (1 - u) * 7;
+      for (let k = 0; k < 2; k++) g.fx.emit(s.x + (Math.random() - 0.5) * 0.35, s.gy + h + k * 0.5, s.z + (Math.random() - 0.5) * 0.35, 0, -9, 0, k ? 0x9ad4ff : 0x7a5cff, 0.14, 0.18, 0);
+      if (s.t < s.dur) continue;
+      this.strikes.splice(i, 1);
+      g.fx.shockwave(s.x, s.gy, s.z, 0x9a8cff, 1.8);
+      g.fx.ring(s.x, s.gy + 0.2, s.z, 0x7a5cff, 16, 4.2, 0.1, 0.45);
+      g.fx.burst(s.x, s.gy + 0.4, s.z, [0x7a5cff, 0x9ad4ff, 0xffffff], 12, 3.2, 0.1, 0.5);
+      g.vfx.glow(s.x, s.gy + 0.8, s.z, 0x7a5cff, 3.2, 0.3, { grow: 0.7, gain: 0.8 });
+      g.shake(0.12);
+      g.audio.tone(150, 0.18, 'square', 0.08, -60);
+      if (!P.dead && Math.hypot(P.pos.x - s.x, P.pos.z - s.z) < s.r + 0.2 && P.pos.y < s.gy + 1.4) {
+        if (P.hurt(this.def.dmg, s.x, s.z, 7)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0x7a5cff], 8, 3, 0.09, 0.35);
+      }
     }
   }
 
@@ -348,6 +482,11 @@ export class Monster {
       this.flash = Math.max(0, this.flash - dt);
       this.hitT = Math.max(0, this.hitT - dt);
       this.kick = Math.max(0, this.kick - dt * 4.5);
+      if (this.type === 'darksycledragon') {
+        const up = this.state === 'ascend' || this.state === 'air';
+        const goal = up ? DRAGON_AIR_H : DRAGON_HOVER;
+        this.hover += (goal - this.hover) * Math.min(1, dt * (up ? 3 : 5));
+      }
       this.animate(dt, 99);
       return;
     }
@@ -607,6 +746,9 @@ export class Monster {
         case 'darksycledragon': {
           const frenzy = !!this.enraged;
           const preferred = 8.5;
+          this.skyCd -= dt;
+          this.tickStrikes(dt, P);
+          if (!AIR_STATES.has(this.state) && Math.abs(this.hover - DRAGON_HOVER) > 0.01) this.hover += (DRAGON_HOVER - this.hover) * Math.min(1, dt * 10);
           if (this.state === 'idle' || this.state === 'wander') {
             if (sees) {
               this.state = 'chase';
@@ -636,7 +778,9 @@ export class Monster {
             const sp = this.def.speed * (frenzy ? 1.25 : 1);
             mvx = (dx / dist) * sp * away * (away < 0 ? 1.25 : 1) + (dz / dist) * orbit * sp * 0.75;
             mvz = (dz / dist) * sp * away * (away < 0 ? 1.25 : 1) - (dx / dist) * orbit * sp * 0.75;
-            if (this.cd <= 0 && sees) {
+            if (this.cd <= 0.2 && this.skyCd <= 0 && sees && dist < 16) {
+              this.beginFlight();
+            } else if (this.cd <= 0 && sees) {
               if (dist < 3.6) this.atk = 'slash';
               else if (dist < 16) this.atk = Math.random() < (frenzy ? 0.45 : 0.3) ? 'gloom' : 'sickle';
               else this.atk = null;
@@ -658,9 +802,9 @@ export class Monster {
               this.clearWarn();
               this.kick = 1;
               const a = Math.atan2(dx, dz);
-              const mx = this.x + Math.sin(a) * 1.7;
-              const mz = this.z + Math.cos(a) * 1.7;
-              const my = this.y + this.hover + 1.25;
+              const mx = this.x + Math.sin(a) * 2.2;
+              const mz = this.z + Math.cos(a) * 2.2;
+              const my = this.y + this.hover + 1.6;
               const aim = (speed) => clamp(((P.pos.y + 1.0 - my) / Math.max(0.5, dist / speed)), -5, 5);
               if (this.atk === 'sickle') {
                 const fan = frenzy ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.24, 0, 0.24];
@@ -691,6 +835,46 @@ export class Monster {
             mvx = -(dx / dist) * 0.8;
             mvz = -(dz / dist) * 0.8;
             if (this.t > 0.5) this.state = 'chase';
+          } else if (this.state === 'ascend') {
+            this.yaw += angDiff(this.yaw, toP) * Math.min(1, dt * 6);
+            this.hover = DRAGON_HOVER + (DRAGON_AIR_H - DRAGON_HOVER) * ease(clamp(this.t / DRAGON_ASCEND, 0, 1));
+            mvx = -(dx / dist) * 1.2;
+            mvz = -(dz / dist) * 1.2;
+            if (Math.random() < dt * 45) g.fx.dust(this.x + (Math.random() - 0.5) * 2, this.y, this.z + (Math.random() - 0.5) * 2, 1, 2.2, 0xb9a6e0);
+            if (this.t >= DRAGON_ASCEND) {
+              this.state = 'air';
+              this.t = 0;
+              this.airEv = 0;
+            }
+          } else if (this.state === 'air') {
+            this.hover = DRAGON_AIR_H;
+            this.yaw += angDiff(this.yaw, toP) * Math.min(1, dt * 8);
+            const away = dist < 6 ? -1 : dist > 10.5 ? 1 : 0;
+            const sp = this.def.speed * (frenzy ? 1.35 : 1.15);
+            mvx = (dx / dist) * sp * away + (dz / dist) * sp * 0.85 * this.orbitDir;
+            mvz = (dz / dist) * sp * away - (dx / dist) * sp * 0.85 * this.orbitDir;
+            const ev = DRAGON_AIR_PLAN[this.airEv];
+            if (ev && !this.airCharge && this.t >= ev.at) {
+              this.airCharge = ev.k;
+              this.airChargeT = 0;
+            }
+            if (this.airCharge) {
+              this.airChargeT += dt;
+              if (this.airChargeT >= 0.38) {
+                this.airFire(this.airCharge, P, dist);
+                this.airCharge = null;
+                this.airEv++;
+              }
+            }
+            if (this.t >= DRAGON_AIR && !this.airCharge) this.beginDescend(P);
+          } else if (this.state === 'descend') {
+            const d = this.dive;
+            this.yaw += angDiff(this.yaw, Math.atan2(d.x - this.x, d.z - this.z)) * Math.min(1, dt * 8);
+            const u = clamp(this.t / DRAGON_DESCEND, 0, 1);
+            this.hover = DRAGON_AIR_H + (DRAGON_HOVER - DRAGON_AIR_H) * u * u;
+            const k = Math.min(1, dt * 4.5);
+            this.moveBy((d.x - this.x) * k, (d.z - this.z) * k);
+            if (this.t >= DRAGON_DESCEND) this.slam(P);
           }
           if (frenzy && Math.random() < dt * 5) g.fx.burst(this.x, this.y + this.hover + 0.9, this.z, [0xb25cff, 0x2b2450], 1, 0.8, 0.12, 0.7, -0.5, 0.5);
           break;
@@ -845,12 +1029,13 @@ export class Monster {
     const spawnS = easeOutBack(1 - clamp(this.spawnT / 0.6, 0, 1));
     const hk = this.hitT > 0 ? this.hitT / 0.34 : 0;
     const winding = this.state === 'windup';
-    if (!winding && this.teleSlot) this.clearWarn();
-    else if (winding) this.placeWarn();
+    const keepWarn = winding || (this.type === 'darksycledragon' && this.state === 'descend');
+    if (!keepWarn && this.teleSlot) this.clearWarn();
+    else if (keepWarn) this.placeWarn();
 
     let hoverY = 0;
     if (this.type === 'wraith') hoverY = Math.sin(t * 2.2) * 0.12 + (winding ? 0.18 * Math.min(1, this.t / 0.6) : 0);
-    else if (this.type === 'darksycledragon') hoverY = Math.sin(t * 2.4) * 0.08 + Math.sin(t * (winding ? 4 : 7.5) - 0.5) * 0.05;
+    else if (this.type === 'darksycledragon') hoverY = this.state === 'air' ? Math.sin(t * 5) * 0.16 + Math.sin(t * 11) * 0.05 : Math.sin(t * 2.4) * 0.08 + Math.sin(t * (winding ? 4 : 7.5) - 0.5) * 0.05;
     o.position.set(this.x, this.y + this.hover + hoverY, this.z);
     const bankT = this.type === 'darksycledragon' ? -lat * 0.05 - this.yawRate * 0.012 : this.type === 'wraith' ? -lat * 0.07 : -this.yawRate * 0.008;
     this.bank += (clamp(bankT, -0.32, 0.32) - (this.bank || 0)) * Math.min(1, dt * 7);
@@ -1052,51 +1237,111 @@ export class Monster {
     } else if (this.type === 'darksycledragon') {
       const p = m.parts;
       const moving = this.puppet ? 1 : Math.min(1, spd / 2);
-      const flapRate = winding ? 4 : 7.5 + moving * 2.5;
-      p.legs.forEach((l, i) => (l.rotation.x = (i < 2 ? -0.55 : 0.6) + Math.sin(t * 2 + i * 1.3) * 0.1 + (i < 2 ? -1 : 1) * moving * 0.15));
+      const ascending = this.state === 'ascend';
+      const inAir = this.state === 'air';
+      const diving = this.state === 'descend';
+      const flying = ascending || inAir || diving;
+      const chargeK = this.airCharge ? clamp(this.airChargeT / 0.38, 0, 1) : 0;
+      const dive = diving ? clamp(this.t / DRAGON_DESCEND, 0, 1) : 0;
+      const flapRate = ascending ? 8.5 : inAir ? 6 : diving ? 3 : winding ? 4 : 7.5 + moving * 2.5;
+      const lk = Math.min(1, dt * 9);
+      p.legs.forEach((l, i) => {
+        const front = i < 2;
+        let thigh = front ? -0.55 : 0.45;
+        let knee = front ? 0.85 : -0.7;
+        if (flying && !diving) {
+          thigh = front ? -0.95 : 0.85;
+          knee = front ? 1.55 : -1.45;
+        } else if (diving) {
+          thigh = front ? -1.15 : -0.35;
+          knee = front ? -0.1 : -0.5;
+        }
+        thigh += Math.sin(t * 2 + i * 1.3) * 0.08 + (front ? -1 : 1) * moving * 0.12 * (flying ? 0 : 1);
+        l.rotation.x += (thigh - l.rotation.x) * lk;
+        p.knees[i].rotation.x += (knee - p.knees[i].rotation.x) * lk;
+      });
+      const last = p.tail.length - 1;
       p.tail.forEach((sg, i) => {
-        const sway = Math.sin(t * (winding ? 6 : 2.6) - i * 0.8) * (0.2 + i * 0.07);
+        const sway = Math.sin(t * (winding || chargeK > 0 ? 6 : 2.6) - i * 0.8) * (0.2 + i * 0.06);
         let slash = 0;
         if (winding && this.atk === 'slash') slash = (this.t / 0.38) * 2.2 - 1.1;
         const follow = this.state === 'recover' && this.atk === 'slash' ? Math.max(0, 1 - this.t * 3) * 1.1 : 0;
         sg.rotation.y = sway + (i === 0 ? (slash + follow) * 0.7 : (slash + follow) * 0.45) + clamp(-lat * 0.06, -0.5, 0.5) * (i + 1) * 0.3;
-        sg.rotation.x = i === 0 ? -0.1 : i === 3 ? -0.05 : 0.04;
+        const trail = flying ? (diving ? -0.18 : 0.1) : 0;
+        sg.rotation.x = (i === 0 ? -0.1 : i === last ? -0.05 : 0.04) + trail;
       });
-      const flap = winding ? 0.2 : 0.55 + moving * 0.12;
       p.wings.forEach((w, i) => {
         const sgn = i === 0 ? -1 : 1;
-        w.rotation.z = sgn * ((winding ? 0.8 : 0.3) + Math.sin(t * flapRate) * flap);
-        w.rotation.y = sgn * ((winding ? 0.25 : 0.05) - Math.cos(t * flapRate) * 0.12 * (winding ? 0 : 1));
+        let base = winding ? 0.8 : 0.3;
+        let amp = winding ? 0.2 : 0.55 + moving * 0.12;
+        let sweep = winding ? 0.25 : 0.05;
+        let sweepAmp = winding ? 0 : 0.12;
+        if (ascending) {
+          base = 0.12;
+          amp = 0.95;
+          sweep = 0.05;
+        } else if (inAir) {
+          base = 0.2 + chargeK * 0.45;
+          amp = 0.72 - chargeK * 0.55;
+          sweep = 0.05;
+        } else if (diving) {
+          base = 0.55 + dive * 0.7;
+          amp = 0.1;
+          sweep = 0.3 + dive * 0.45;
+          sweepAmp = 0;
+        }
+        w.rotation.z = sgn * (base + Math.sin(t * flapRate) * amp);
+        w.rotation.y = sgn * (sweep - Math.cos(t * flapRate) * sweepAmp);
+        const og = p.wingsOuter[i];
+        og.rotation.z = sgn * (Math.sin(t * flapRate - 1.1) * amp * 0.8 - (diving ? 0.5 : 0.12));
+        og.rotation.y = sgn * (-0.08 - Math.cos(t * flapRate - 1.1) * sweepAmp * 0.8 - (diving ? 0.3 : 0));
       });
       let headX = 0.08 + Math.sin(t * 1.6) * 0.04;
       let jawX = 0.05;
       let lean = 0.06 * moving + Math.sin(t * flapRate) * 0.025 + clamp(spd * 0.01, 0, 0.06);
-      if (winding) {
+      if (ascending) {
+        const k = clamp(this.t / DRAGON_ASCEND, 0, 1);
+        headX = -0.25 * k;
+        jawX = 0.2 + 0.35 * k;
+        lean = -0.34 * Math.sin(k * Math.PI * 0.8) - 0.04;
+      } else if (inAir) {
+        headX = 0.12 - 0.5 * chargeK;
+        jawX = 0.12 + 0.6 * chargeK;
+        lean = -0.1 - 0.12 * chargeK + Math.sin(t * flapRate) * 0.04;
+      } else if (diving) {
+        headX = 0.35 + 0.2 * dive;
+        jawX = 0.7;
+        lean = 0.25 + 0.55 * dive;
+      } else if (winding) {
         const wind = { slash: 0.38, sickle: 0.65, gloom: 0.95 }[this.atk] || 0.6;
         const k = Math.min(1, this.t / wind);
         headX = this.atk === 'slash' ? 0.1 : -0.4 * k;
         jawX = 0.1 + 0.55 * k;
         lean = -0.24 * k;
-        const pulse = 0.18 + k * 0.25 + Math.sin(t * 30) * 0.06;
-        this.model.mat.emissive.setRGB(pulse * 0.8, 0.02, pulse);
-        if (this.atk !== 'slash') g.vfx.glowNow(this.x + Math.sin(this.yaw) * 1.7, this.y + this.hover + 1.25, this.z + Math.cos(this.yaw) * 1.7, 0xb25cff, 0.6 + k * 2.2, 0.9);
-        if (this.atk !== 'slash' && Math.random() < dt * 40 * k) {
-          const a = Math.random() * TAU;
-          const mx = this.x + Math.sin(this.yaw) * 1.7;
-          const mz = this.z + Math.cos(this.yaw) * 1.7;
-          const my = this.y + this.hover + 1.25;
-          g.fx.emit(mx + Math.cos(a) * 0.7, my + Math.sin(a) * 0.7, mz, -Math.cos(a) * 1.8, -Math.sin(a) * 1.8, 0, [0xb25cff, 0xd8d3ee][Math.random() < 0.5 ? 0 : 1], 0.08, 0.38, 0);
-        }
       } else if (this.state === 'recover') {
         headX = 0.2;
         jawX = 0.3 * Math.max(0, 1 - this.t * 3);
       }
+      const gather = winding && this.atk !== 'slash' ? Math.min(1, this.t / ({ sickle: 0.65, gloom: 0.95 }[this.atk] || 0.6)) : chargeK;
+      if (gather > 0) {
+        const pulse = 0.18 + gather * 0.25 + Math.sin(t * 30) * 0.06;
+        this.model.mat.emissive.setRGB(pulse * 0.6, pulse * 0.2, pulse);
+        const mx = this.x + Math.sin(this.yaw) * 2.2;
+        const mz = this.z + Math.cos(this.yaw) * 2.2;
+        const my = this.y + this.hover + 1.6;
+        g.vfx.glowNow(mx, my, mz, 0x5aa8ff, 0.6 + gather * 2.2, 0.9);
+        if (Math.random() < dt * 40 * gather) {
+          const a = Math.random() * TAU;
+          g.fx.emit(mx + Math.cos(a) * 0.7, my + Math.sin(a) * 0.7, mz, -Math.cos(a) * 1.8, -Math.sin(a) * 1.8, 0, [0x5aa8ff, 0xc6e6ff][Math.random() < 0.5 ? 0 : 1], 0.08, 0.38, 0);
+        }
+      }
+      if (inAir && Math.random() < dt * 16) g.fx.emit(this.x + (Math.random() - 0.5) * 2.2, this.y + this.hover + 0.8, this.z + (Math.random() - 0.5) * 2.2, 0, -1.2, 0, [0x4c97e8, 0x9258e4][Math.random() < 0.5 ? 0 : 1], 0.08, 0.5, 0);
       headX += this.kick * 0.3;
-      lean += this.kick * 0.28;
+      lean += this.kick * 0.2;
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);
       p.head.rotation.y += (this.lookSm * 0.9 - p.head.rotation.y) * Math.min(1, dt * 6);
       p.jaw.rotation.x += (jawX - p.jaw.rotation.x) * Math.min(1, dt * 18);
-      p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * 8);
+      p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * (diving ? 14 : 8));
       p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04;
       o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'wraith') {
@@ -1121,10 +1366,10 @@ export class Monster {
     m.root.position.y = rootY;
     m.root.scale.set(rootSXY, rootSXY, rootSZ);
     if (this.flash > 0) this.model.mat.emissive.setRGB(0.8, 0.8, 0.8);
-    else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup')) this.model.mat.emissive.setRGB(0, 0, 0);
+    else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'darksycledragon' && this.airCharge)) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 2.3 : this.type === 'orcscout' ? 2.55 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 3.0 : this.type === 'orcscout' ? 2.55 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);

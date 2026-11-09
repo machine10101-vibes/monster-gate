@@ -64,7 +64,7 @@ export const MONSTERS = [
   },
   {
     id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
-    desc: 'A dusk-scaled dragon with sickle blades for horns, wings and tail. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Corner it and it blinks back with a tail slash. Hit its wind-up hard to stagger it.',
+    desc: 'A graphite-scaled dragon with violet wings, a blue crystal crest and a glowing chest core. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Every so often it beats its wings and climbs high for about four seconds, raining crescents, gloom and crystal strikes from the air before diving at your position. Melee cannot reach it up there, so dodge the marked circles and use ranged attacks. Hit its wind-up hard to stagger it.',
   },
 ];
 
