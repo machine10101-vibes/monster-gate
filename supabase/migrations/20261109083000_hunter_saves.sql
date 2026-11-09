@@ -1,7 +1,7 @@
 -- Klever wallet hunts. The browser cannot read or write these tables.
 -- The hunter edge function checks the wallet signature, then uses the service role.
 
-create table public.hunters (
+create table if not exists public.hunters (
   address text primary key,
   progress jsonb not null,
   revision bigint not null default 1,
@@ -12,7 +12,7 @@ create table public.hunters (
   constraint hunters_progress_chk check (jsonb_typeof(progress) = 'object')
 );
 
-create table public.hunter_sessions (
+create table if not exists public.hunter_sessions (
   token_hash text primary key,
   address text not null,
   expires_at timestamptz not null,
@@ -21,7 +21,7 @@ create table public.hunter_sessions (
   constraint hunter_sessions_hash_chk check (token_hash ~ '^[0-9a-f]{64}$')
 );
 
-create index hunter_sessions_expires_idx on public.hunter_sessions (expires_at);
+create index if not exists hunter_sessions_expires_idx on public.hunter_sessions (expires_at);
 
 alter table public.hunters enable row level security;
 alter table public.hunter_sessions enable row level security;

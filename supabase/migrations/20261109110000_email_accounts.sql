@@ -1,7 +1,7 @@
 -- Email accounts. Passwords stay in Supabase Auth. This table only keeps the hunt.
 -- The browser cannot read or write it. The hunter function checks the auth user, then uses the service role.
 
-create table public.hunter_accounts (
+create table if not exists public.hunter_accounts (
   user_id uuid primary key,
   email text not null,
   progress jsonb not null,
