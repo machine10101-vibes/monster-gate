@@ -958,7 +958,10 @@ class Game {
       this.hud.toast(it.kind === 'light' ? 'Torch lit - hold it up in the dark' : 'Nothing equipped', 900);
       return;
     }
-    if (it.kind !== 'use') this.faceForAction();
+    if (it.kind !== 'use') {
+      this.faceForAction();
+      P.drawWeapon();
+    }
     P.tryAttack(it);
   }
 

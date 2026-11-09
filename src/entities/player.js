@@ -70,6 +70,7 @@ export class Player {
     this.aimYaw = 0;
     this.heldKind = null;
     this.sheathKind = null;
+    this.idleArm = 0;
     this.torchLight = new THREE.PointLight(0xffa850, 0, 10, 1.6);
     this.torchLight.position.set(0, 1.6, 0.4);
     this.obj.add(this.torchLight);
@@ -139,9 +140,38 @@ export class Player {
     slot.add(g);
   }
 
+  /** Put the equipped weapon back in the hand and restart the sheath timer. */
+  drawWeapon() {
+    if (!this.wantHeld || !this.sheathKind || this.wantHeld !== this.sheathKind) return;
+    this.idleArm = 0;
+    if (this.heldKind !== this.wantHeld) this.showHeld(this.wantHeld);
+  }
+
+  /** After five quiet seconds the equipped weapon returns to the back. */
+  tickSheath(dt) {
+    const weapon = this.wantHeld;
+    if (!this.sheathKind || weapon !== this.sheathKind) {
+      this.idleArm = 0;
+      return;
+    }
+    if (this.state === 'attack') {
+      this.idleArm = 0;
+      if (this.heldKind !== weapon) this.showHeld(weapon);
+      return;
+    }
+    if (this.shielding) return;
+    this.idleArm += dt;
+    if (this.idleArm >= 5 && this.heldKind) this.showHeld(null);
+  }
+
   setHeld(kind) {
     if (kind === 'blade' && this.sheathKind && this.sheathKind !== 'blade') kind = this.sheathKind;
     this.wantHeld = kind;
+    this.idleArm = 0;
+    this.showHeld(kind);
+  }
+
+  showHeld(kind) {
     if (this.heldKind === kind) {
       this.syncSheath();
       return;
@@ -325,6 +355,7 @@ export class Player {
     }
     if (item.kind === 'light' || item.kind === 'none') return false;
     if (this.stamina < 3) return false;
+    this.drawWeapon();
     this.attackItem = item;
     this.combo = this.comboT > 0 ? (this.combo + 1) % 3 : 0;
     this.attackHit = false;
@@ -546,6 +577,7 @@ export class Player {
       }
     }
 
+    this.tickSheath(dt);
     this.pose(dt);
     this.syncObj();
     this.updateTrail(dt);
@@ -693,6 +725,7 @@ export class Player {
 
   playCast(kind, dur = 0.34) {
     if (this.dead) return;
+    this.drawWeapon();
     this.castAnim = kind || 'cast';
     this.castT = dur;
     if (this.state !== 'roll' && this.state !== 'attack' && this.state !== 'dead' && this.state !== 'stagger') {
