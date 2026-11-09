@@ -450,7 +450,9 @@ class Game {
     p.reduction = pr.reduction;
     this.syncVitals();
     const w = pr.weaponItem;
-    this.items[7] = w ? { ...w } : { ...ITEMS[7] };
+    // The equipped weapon replaces the starter blade in the main hand slot.
+    this.items[0] = w ? { ...w } : { ...ITEMS[0] };
+    this.items[7] = { ...ITEMS[7] };
     p.setSheath(w?.held || 'blade');
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
@@ -550,10 +552,7 @@ class Game {
     const was = this.progress.worn(id);
     this.progress.toggleWear(id);
     this.applyGear();
-    if (g.type === 'weapon') {
-      if (!was) this.selectSlot(7, true);
-      else if (this.sel === 7) this.selectSlot(0, true);
-    }
+    if (g.type === 'weapon') this.selectSlot(0, true);
     this.audio.select();
     this.hud.toast(was ? `${g.name} unequipped` : `${g.name} equipped`, 1200);
     return true;

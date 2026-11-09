@@ -1201,7 +1201,7 @@ export class Player {
       const tt = clamp(this.stateT / Math.max(0.0001, this.stateDur), 0, 1);
       const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
       const cut = tt < hitT ? ease(tt / hitT) : 1 - ease(clamp((tt - hitT) / (1 - hitT), 0, 1));
-      roll = lerp(roll, 0, cut);
+      roll = lerp(roll, roll - Math.PI / 2, cut);
     }
     m.heldSlot.rotation.z = roll;
     if (m.offhand) m.offhand.rotation.z = DUAL_KINDS.has(this.heldKind) ? roll : 0;

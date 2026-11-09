@@ -23,9 +23,9 @@ const EDGE_HOLD = new Set([
   'darksword', 'darkgreatsword', 'darkdual',
 ]);
 
-/** Resting roll of a weapon in the hand, around the grip. */
+/** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
 export function gripRoll(kind) {
-  return EDGE_HOLD.has(kind) ? Math.PI / 2 : 0;
+  return EDGE_HOLD.has(kind) ? -Math.PI / 2 : 0;
 }
 
 /**
@@ -34,8 +34,8 @@ export function gripRoll(kind) {
  */
 export function sheathMount(kind) {
   if (TALL_KINDS.has(kind)) return { x: 0.1, y: 0.02, z: 0, rx: 0.12, ry: 0, rz: -0.2 };
-  // Hilt by the right hip, blade running up the back toward the left shoulder.
-  return { x: 0.1, y: -0.14, z: 0, rx: -Math.PI / 2, ry: 0, rz: 0.48 };
+  // Hilt over the right shoulder, tip down the back.
+  return { x: 0.08, y: 0.2, z: 0, rx: Math.PI / 2, ry: 0, rz: -0.42 };
 }
 
 const THEMES = {

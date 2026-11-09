@@ -611,6 +611,7 @@ export class Catalog {
       b.onclick = () => {
         if (!this.forge || !pr.craft(g.id)) return;
         this.game.applyGear();
+        if (g.type === 'weapon') this.game.selectSlot(0, true);
         if (g.type === 'weapon') this.game.selectSlot(7, true);
         this.game.audio.quest();
         this.game.hud.toast(`Forged ${g.name}`, 1800);
@@ -625,7 +626,7 @@ export class Catalog {
       if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the Forge next to Bram the Blacksmith in Oakhollow.'));
     } else {
       const worn = pr.worn(g.id);
-      const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip (hotbar 8)' : 'Wear');
+      const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip' : 'Wear');
       b.type = 'button';
       b.onclick = () => {
         this.game.wearPiece(g.id);
