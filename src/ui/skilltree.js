@@ -57,6 +57,25 @@ export function paintSkillIcon(canvas, shape, tint) {
 const KIND_LABEL = { passive: 'Passive', active: 'Active', special: 'Special' };
 const BUBBLE_EMPTY = ['Spirit Bolt', 'Empty', 'Fury'];
 
+const TIER_POS = [[1, 0], [0, 1], [1, 2], [2, 3], [1, 4]];
+
+const ATTR_SHAPE = {
+  vitality: 'heart', might: 'axe', guard: 'shield', wrath: 'drop',
+  endurance: 'leap', precision: 'eye', agility: 'arrow', toxin: 'poison',
+  spiritwell: 'nova', arcana: 'spark', focus: 'mark', potency: 'fire',
+};
+const WEAPON_SHAPE = {
+  swordshield: 'bash', twohand: 'axe', dual: 'execute',
+  shortbow: 'arrow', longbow: 'shot', crossbow: 'mark',
+  staff: 'wave', wand: 'spark', tome: 'eye',
+};
+
+function spentIn(pr, path) {
+  let n = 0;
+  for (const s of path.skills) if (pr.hasSkill(s.id)) n += s.cost;
+  return n;
+}
+
 function equippedBubbles(game) {
   const row = document.createElement('div');
   row.className = 'sk-bubbles';
@@ -130,14 +149,21 @@ export function mountSkillTree(body, game) {
     }
   };
 
+  let sel = null;
+
   const paintTree = () => {
     const cls = CLASSES[game.progress.classId];
-    const pts = game.progress.skillPoints();
+    const pr = game.progress;
+    const pts = pr.skillPoints();
+    const eq = pr.equipped();
+    const card = root.closest('.panel-card');
+    const keep = card ? card.scrollTop : 0;
+
     const head = document.createElement('div');
     head.className = 'sk-head';
-    const learned = Object.keys(game.progress.data.skills.learned).length;
-    const attrRanks = game.progress.data.skills.attrs || {};
-    const weaponRanks = game.progress.data.skills.weapons || {};
+    const learned = Object.keys(pr.data.skills.learned).length;
+    const attrRanks = pr.data.skills.attrs || {};
+    const weaponRanks = pr.data.skills.weapons || {};
     const invested = learned || Object.values(attrRanks).some((n) => n > 0) || Object.values(weaponRanks).some((n) => n > 0);
     head.innerHTML = `<div><b style="color:${cls.color}">${cls.name}</b><span>${pts.left} point${pts.left === 1 ? '' : 's'} ready · ${pts.spent} spent · ${game.gold} gold</span></div>`;
     const actions = document.createElement('div');
@@ -163,162 +189,227 @@ export function mountSkillTree(body, game) {
     root.appendChild(head);
     root.appendChild(equippedBubbles(game));
 
-    const note = document.createElement('p');
-    note.className = 'sk-note';
-    note.textContent = `Passives are always on. Attributes and weapon masteries take the same points, one per rank. A mastery applies while that weapon is in your hand. ${cls.name} skills spend ${RESOURCE_NAME[cls.resource]}.`;
-    root.appendChild(note);
+    const state = (s) => {
+      const on = pr.hasSkill(s.id);
+      const reqOk = !s.req || pr.hasSkill(s.req);
+      return on ? 'learned' : reqOk && pts.left >= s.cost ? 'ready' : reqOk ? 'afford' : 'locked';
+    };
 
-    const attrs = document.createElement('section');
-    attrs.className = 'sk-attrs';
-    const attrHead = document.createElement('h3');
-    attrHead.textContent = 'Attributes';
-    attrs.appendChild(attrHead);
-    for (const attr of cls.attributes || []) {
-      const rank = game.progress.attrRank(attr.id);
-      const row = document.createElement('div');
-      row.className = 'sk-attr';
-      const name = document.createElement('b');
-      name.textContent = attr.name;
-      const desc = document.createElement('span');
-      desc.textContent = rank ? attr.rankText(rank) : attr.blurb;
-      const pips = document.createElement('div');
-      pips.className = 'sk-pips';
-      for (let i = 0; i < attr.max; i++) {
-        const pip = document.createElement('i');
-        if (i < rank) pip.className = 'on';
-        pips.appendChild(pip);
-      }
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'sk-btn';
-      btn.textContent = rank >= attr.max ? 'Max' : '+1';
-      btn.disabled = rank >= attr.max || pts.left < 1;
-      btn.onclick = () => {
-        if (game.raiseAttr(attr.id)) paint();
-      };
-      row.append(name, desc, pips, btn);
-      attrs.appendChild(row);
+    if (!sel) {
+      const first = cls.paths.flatMap((p) => p.skills.map((raw) => SKILLS[raw.id])).find((s) => state(s) === 'ready');
+      sel = { type: 'skill', id: (first || SKILLS[cls.paths[0].skills[0].id]).id };
     }
-    const weapons = document.createElement('section');
-    weapons.className = 'sk-attrs';
-    const weaponHead = document.createElement('h3');
-    weaponHead.textContent = 'Weapons';
-    weapons.appendChild(weaponHead);
-    const heldStyle = game.items[game.sel]?.style;
-    for (const weapon of cls.weapons || []) {
-      const rank = game.progress.weaponRank(weapon.id);
-      const row = document.createElement('div');
-      row.className = 'sk-attr' + (heldStyle === weapon.id ? ' held' : '');
-      const name = document.createElement('b');
-      name.textContent = weapon.name;
-      const desc = document.createElement('span');
-      desc.textContent = rank ? weapon.rankText(rank) : weapon.blurb;
-      const pips = document.createElement('div');
-      pips.className = 'sk-pips';
-      for (let i = 0; i < weapon.max; i++) {
-        const pip = document.createElement('i');
-        if (i < rank) pip.className = 'on';
-        pips.appendChild(pip);
-      }
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'sk-btn';
-      btn.textContent = rank >= weapon.max ? 'Max' : '+1';
-      btn.disabled = rank >= weapon.max || pts.left < 1;
-      btn.onclick = () => {
-        if (game.raiseWeapon(weapon.id)) paint();
-      };
-      row.append(name, desc, pips, btn);
-      weapons.appendChild(row);
-    }
-    const split = document.createElement('div');
-    split.className = 'sk-split';
-    split.append(attrs, weapons);
-    root.appendChild(split);
 
-    const cols = document.createElement('div');
-    cols.className = 'sk-cols';
-    const eq = game.progress.equipped();
+    const trees = document.createElement('div');
+    trees.className = 'tt-trees';
+    const best = Math.max(0, ...cls.paths.map((p) => spentIn(pr, p)));
     for (const path of cls.paths) {
+      const spent = spentIn(pr, path);
       const col = document.createElement('section');
-      col.className = 'sk-col';
-      const h = document.createElement('h3');
-      h.textContent = path.name;
-      h.style.color = path.color;
-      col.appendChild(h);
-      path.skills.forEach((raw, index) => {
+      col.className = 'tt-tree' + (spent && spent === best ? ' lead' : '');
+      col.style.setProperty('--pc', path.color);
+
+      const top = document.createElement('header');
+      top.className = 'tt-head';
+      const hico = document.createElement('canvas');
+      hico.className = 'tt-hico';
+      paintSkillIcon(hico, SKILLS[path.skills[0].id].shape, path.color);
+      const pip = document.createElement('i');
+      pip.textContent = String(spent);
+      const name = document.createElement('b');
+      name.textContent = path.name;
+      top.append(hico, pip, name);
+      col.appendChild(top);
+
+      const grid = document.createElement('div');
+      grid.className = 'tt-grid';
+      const NODE = 52;
+      const PX = 76;
+      const PY = 62;
+      grid.style.width = PX * 2 + NODE + 'px';
+      grid.style.height = PY * (TIER_POS.length - 1) + NODE + 'px';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'tt-lines');
+      svg.setAttribute('width', String(PX * 2 + NODE));
+      svg.setAttribute('height', String(PY * (TIER_POS.length - 1) + NODE));
+      grid.appendChild(svg);
+
+      path.skills.forEach((raw, i) => {
         const s = SKILLS[raw.id];
-        const on = game.progress.hasSkill(s.id);
-        const reqOk = !s.req || game.progress.hasSkill(s.req);
-        const card = document.createElement('article');
-        card.className = 'sk-card' + (on ? ' learned' : reqOk ? ' ready' : ' locked');
-        card.style.borderColor = on ? path.color : '';
+        const [cx, cy] = TIER_POS[i];
+        const x = cx * PX;
+        const y = cy * PY;
+        if (i > 0) {
+          const [px, py] = TIER_POS[i - 1];
+          const x1 = px * PX + NODE / 2;
+          const y1 = py * PY + NODE;
+          const x2 = x + NODE / 2;
+          const y2 = y;
+          const mid = (y1 + y2) / 2;
+          const link = pr.hasSkill(s.id) ? 'on' : pr.hasSkill(path.skills[i - 1].id) ? 'ready' : 'off';
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          line.setAttribute('d', `M${x1} ${y1} V${mid} H${x2} V${y2 - 7}`);
+          line.setAttribute('class', 'tt-line ' + link);
+          svg.appendChild(line);
+          const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+          arrow.setAttribute('points', `${x2 - 6},${y2 - 8} ${x2 + 6},${y2 - 8} ${x2},${y2}`);
+          arrow.setAttribute('class', 'tt-arrow ' + link);
+          svg.appendChild(arrow);
+        }
+        const st = state(s);
+        const node = document.createElement('button');
+        node.type = 'button';
+        node.className = `tt-node ${st}${sel.type === 'skill' && sel.id === s.id ? ' sel' : ''}${s.kind === 'special' ? ' special' : ''}${s.kind === 'passive' ? ' passive' : ''}`;
+        node.style.left = x + 'px';
+        node.style.top = y + 'px';
+        node.title = s.name;
         const cv = document.createElement('canvas');
-        cv.className = 'sk-ico';
-        cv.width = 16;
-        cv.height = 16;
         paintSkillIcon(cv, s.shape, path.color);
-        card.appendChild(cv);
-        const info = document.createElement('div');
-        const title = document.createElement('div');
-        title.className = 'sk-name';
-        const tag = document.createElement('i');
-        tag.className = 'sk-tag ' + s.kind;
-        tag.textContent = KIND_LABEL[s.kind];
-        title.append(document.createTextNode(s.name + ' '), tag);
-        const meta = document.createElement('small');
-        const bits = [`${s.cost} pt${s.cost > 1 ? 's' : ''}`];
-        if (s.resource) bits.push(`${resourceCost(game, s)} ${RESOURCE_NAME[s.res]}`, `${s.cd}s`);
+        node.appendChild(cv);
+        const rank = document.createElement('em');
+        rank.textContent = pr.hasSkill(s.id) ? '1' : '0';
+        node.appendChild(rank);
+        const slot = eq.indexOf(s.id);
+        if (slot >= 0) {
+          const key = document.createElement('u');
+          key.textContent = String(slot + 1);
+          node.appendChild(key);
+        }
+        node.onclick = () => {
+          sel = { type: 'skill', id: s.id };
+          paint();
+        };
+        grid.appendChild(node);
+      });
+      col.appendChild(grid);
+      trees.appendChild(col);
+    }
+    root.appendChild(trees);
+
+    const extra = document.createElement('div');
+    extra.className = 'tt-extra';
+    extra.appendChild(rankBand('Attributes', 'attr', cls.attributes || [], ATTR_SHAPE, (id) => pr.attrRank(id), cls.color));
+    extra.appendChild(rankBand('Weapon mastery', 'weapon', cls.weapons || [], WEAPON_SHAPE, (id) => pr.weaponRank(id), '#ffd23f', game.items[game.sel]?.style));
+    root.appendChild(extra);
+
+    root.appendChild(detail());
+    if (card) card.scrollTop = keep;
+
+    function rankBand(title, type, list, shapes, rankOf, tint, heldStyle) {
+      const sec = document.createElement('section');
+      sec.className = 'tt-band';
+      sec.style.setProperty('--pc', tint);
+      const h = document.createElement('h3');
+      h.textContent = title;
+      sec.appendChild(h);
+      const row = document.createElement('div');
+      row.className = 'tt-row';
+      for (const def of list) {
+        const rank = rankOf(def.id);
+        const node = document.createElement('button');
+        node.type = 'button';
+        const open = pts.left > 0 && rank < def.max;
+        node.className = `tt-node ${rank > 0 ? 'learned' : open ? 'ready' : 'afford'}${sel.type === type && sel.id === def.id ? ' sel' : ''}${heldStyle === def.id ? ' held' : ''}`;
+        node.title = def.name;
+        const cv = document.createElement('canvas');
+        paintSkillIcon(cv, shapes[def.id] || 'spark', tint);
+        node.appendChild(cv);
+        const r = document.createElement('em');
+        r.textContent = `${rank}/${def.max}`;
+        node.appendChild(r);
+        node.onclick = () => {
+          sel = { type, id: def.id };
+          paint();
+        };
+        row.appendChild(node);
+      }
+      sec.appendChild(row);
+      return sec;
+    }
+
+    function detail() {
+      const box = document.createElement('aside');
+      box.className = 'tt-detail';
+      const cv = document.createElement('canvas');
+      cv.className = 'tt-dico';
+      const info = document.createElement('div');
+      info.className = 'tt-info';
+      const acts = document.createElement('div');
+      acts.className = 'tt-acts';
+      const title = document.createElement('b');
+      const meta = document.createElement('small');
+      const text = document.createElement('p');
+
+      if (sel.type === 'skill') {
+        const s = SKILLS[sel.id];
+        const st = state(s);
+        box.style.setProperty('--pc', s.color);
+        paintSkillIcon(cv, s.shape, s.color);
+        title.textContent = s.name;
+        const bits = [KIND_LABEL[s.kind], `${s.cost} point${s.cost > 1 ? 's' : ''}`];
+        if (s.resource) bits.push(`${resourceCost(game, s)} ${RESOURCE_NAME[s.res]}`, `${s.cd}s cooldown`);
         meta.textContent = bits.join(' · ');
-        const desc = document.createElement('p');
-        desc.textContent = s.desc;
-        info.append(title, meta, desc);
-        if (on && s.kind !== 'passive') {
-          const keys = document.createElement('div');
-          keys.className = 'sk-keys';
+        text.textContent = s.desc;
+        if (st === 'learned' && s.kind !== 'passive') {
           ['1', '2', '3'].forEach((key, slot) => {
-            const hot = 'ZXV'[slot];
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'sk-key' + (eq[slot] === s.id ? ' on' : '');
             b.textContent = key;
-            b.title = eq[slot] === s.id ? `Take off action button ${key}` : `Place on action button ${key} (${hot})`;
+            b.title = eq[slot] === s.id ? `Take off action button ${key}` : `Place on action button ${key} (${'ZXV'[slot]})`;
             b.onclick = () => {
               game.equipSkill(slot, eq[slot] === s.id ? null : s.id);
               paint();
             };
-            keys.appendChild(b);
+            acts.appendChild(b);
           });
-          info.appendChild(keys);
-        } else if (on) {
-          const always = document.createElement('small');
-          always.className = 'sk-always';
-          always.textContent = 'Always on';
-          info.appendChild(always);
-        } else if (reqOk) {
+          const hint = document.createElement('span');
+          hint.textContent = 'Place on a round button';
+          acts.appendChild(hint);
+        } else if (st === 'learned') {
+          const on = document.createElement('span');
+          on.className = 'tt-ok';
+          on.textContent = 'Learned. Always on.';
+          acts.appendChild(on);
+        } else if (st === 'locked') {
+          const lock = document.createElement('span');
+          lock.className = 'tt-lock';
+          lock.textContent = `Learn ${SKILLS[s.req].name} first.`;
+          acts.appendChild(lock);
+        } else {
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'sk-btn sk-learn';
-          const afford = pts.left >= s.cost;
-          b.textContent = afford ? `Learn · ${s.cost}` : 'Need points';
-          b.disabled = !afford;
+          b.textContent = st === 'ready' ? `Learn · ${s.cost}` : 'Need points';
+          b.disabled = st !== 'ready';
           b.onclick = () => {
             if (game.learnSkill(s.id)) paint();
           };
-          info.appendChild(b);
-        } else {
-          const lock = document.createElement('small');
-          lock.className = 'sk-lock';
-          lock.textContent = index === 0 ? 'Locked' : 'Learn the skill above first';
-          info.appendChild(lock);
+          acts.appendChild(b);
         }
-        card.appendChild(info);
-        col.appendChild(card);
-      });
-      cols.appendChild(col);
+      } else {
+        const list = sel.type === 'attr' ? cls.attributes : cls.weapons;
+        const def = list.find((d) => d.id === sel.id);
+        const rank = sel.type === 'attr' ? pr.attrRank(def.id) : pr.weaponRank(def.id);
+        box.style.setProperty('--pc', sel.type === 'attr' ? cls.color : '#ffd23f');
+        paintSkillIcon(cv, (sel.type === 'attr' ? ATTR_SHAPE : WEAPON_SHAPE)[def.id] || 'spark', sel.type === 'attr' ? cls.color : '#ffd23f');
+        title.textContent = def.name;
+        meta.textContent = `${sel.type === 'attr' ? 'Attribute' : 'Weapon mastery'} · rank ${rank}/${def.max}`;
+        text.textContent = rank ? `${def.rankText(rank)}. ${def.blurb}` : def.blurb;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sk-btn sk-learn';
+        b.textContent = rank >= def.max ? 'Max rank' : pts.left < 1 ? 'Need points' : 'Add rank · 1';
+        b.disabled = rank >= def.max || pts.left < 1;
+        b.onclick = () => {
+          if (sel.type === 'attr' ? game.raiseAttr(def.id) : game.raiseWeapon(def.id)) paint();
+        };
+        acts.appendChild(b);
+      }
+      info.append(title, meta, text, acts);
+      box.append(cv, info);
+      return box;
     }
-    root.appendChild(cols);
-
   };
 
   paint();
