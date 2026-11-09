@@ -381,6 +381,16 @@ export class World {
       wheat: [1, 2, 3, 4].map((s) => M.buildWheat(s, true)),
       wheatGreen: [1, 2].map((s) => M.buildWheat(s + 8, false)),
       crystals: [1, 2, 3].map((s) => M.buildCrystal(s)),
+      orcHuts: [M.buildOrcHut(1, 'long'), M.buildOrcHut(2, 'hut'), M.buildOrcHut(3, 'hut'), M.buildOrcHut(4, 'lean')],
+      orcSpikes: [1, 2, 3].map((s) => M.buildOrcSpike(s)),
+      orcCross: M.buildOrcCross(1),
+      orcLintel: M.buildOrcLintel(1),
+      orcBanner: M.buildOrcBanner(1),
+      orcFire: M.buildOrcFire(1),
+      orcTotem: M.buildOrcTotem(1),
+      orcRack: M.buildOrcRack(1),
+      orcHide: M.buildOrcHideFrame(1),
+      orcBones: [1, 2].map((s) => M.buildOrcBones(s)),
     };
     void q;
   }

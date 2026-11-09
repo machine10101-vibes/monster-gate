@@ -599,11 +599,18 @@ export class Catalog {
     info.innerHTML = `<h3>${esc(g.name)}</h3>
       <div class="cat-tags"><span>${g.type === 'weapon' ? WEAPON_LABEL[g.wtype] : `${TIER_LABEL[setById(g.set).tier]} ${SLOT_LABEL[g.slot]}`}</span><span>From ${esc(m.name)}</span></div>
       <p>${esc(g.desc)}</p>
-      <div class="cat-stats">${stats}</div>
-      <h4>Parts needed</h4>`;
-    info.appendChild(this.recipeChips(g));
+      <div class="cat-stats">${stats}</div>`;
+    if (g.found) info.appendChild(el('p', 'cat-muted', 'Orc Scouts drop this. It is not forged at the smithy.'));
+    else {
+      info.appendChild(el('h4', null, 'Parts needed'));
+      info.appendChild(this.recipeChips(g));
+    }
     const actions = el('div', 'cat-actions');
     if (!pr.crafted(g.id)) {
+      if (g.found) {
+        info.appendChild(actions);
+        return;
+      }
       const can = this.forge && pr.canCraft(g);
       const b = el('button', 'cat-btn' + (can ? ' go' : ''), !this.forge ? 'Forge at the smithy' : pr.canCraft(g) ? 'Forge it' : 'Missing parts');
       b.type = 'button';

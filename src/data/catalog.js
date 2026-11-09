@@ -59,6 +59,10 @@ export const MONSTERS = [
     desc: 'A stocky, short-fused young dragon with more attitude than altitude. It snaps at anything that moves, spits embers when you back off, and flies into a rage when hurt.',
   },
   {
+    id: 'orcscout', name: 'Orc Scout', level: 4, temper: 'Mean', style: 'Melee', habitat: 'The spiked camp in northwest Brookside, west of Oakhollow',
+    desc: 'A tusked scout in hide and fur. They keep to their camp and the ground around it, and they swing a notched blade.',
+  },
+  {
     id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
     desc: 'A dusk-scaled dragon with sickle blades for horns, wings and tail. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Corner it and it blinks back with a tail slash. Hit its wind-up hard to stagger it.',
   },
@@ -76,6 +80,13 @@ export const WEAPON_LABEL = {
 export const TIER_LABEL = { metal: 'Metal', leather: 'Leather', cloth: 'Cloth' };
 
 export const GEAR = [
+  {
+    id: 'orcblade', type: 'weapon', wtype: 'onesword', name: 'Orc Scout Blade', monster: 'orcscout', held: 'orcblade', found: true,
+    desc: 'A notched iron blade on a hide-wrapped grip. Orc scouts carry them point-down. Rough, heavy, and sharp enough.',
+    recipe: {},
+    item: { id: 'orcblade', icon: 'orcblade', name: 'Orc Scout Blade', kind: 'melee', style: 'swordshield', dmg: 11, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.16, stam: 8, knock: 4, held: 'orcblade', desc: 'Sword and shield. A notched orc blade.' },
+    stats: [['Damage', 11], ['Reach', '2.4'], ['Style', 'Sword & Shield']],
+  },
   {
     id: 'budgeblade', type: 'weapon', wtype: 'onesword', name: 'Budgefang Blade', monster: 'budgedragon', held: 'budgeblade',
     desc: 'A sword grown from a single dragon fang, veined with ember-green light. Quick, balanced, and it never dulls.',

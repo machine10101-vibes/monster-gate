@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildDarksycleDragon } from './creatures.js';
+import { buildOrcScout } from './orc.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
 import { statusFx } from '../systems/skillfx.js';
 import { ZONE, GATE, TOWN, WATER_Y, CENTER, MINE, LAKE } from '../world/terrain.js';
@@ -21,8 +22,8 @@ function easeOutBack(x) {
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
-const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1 };
-const TELE_COL = { boar: 0xff5a3a, budgedragon: 0xff7a2a, darksycledragon: 0xb25cff, wraith: 0xc27bff };
+const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1, orcscout: 1.25 };
+const TELE_COL = { boar: 0xff5a3a, budgedragon: 0xff7a2a, darksycledragon: 0xb25cff, wraith: 0xc27bff, orcscout: 0xc45a2a };
 
 const DEFS = {
   slime: { name: 'Gate Slime', hp: 18, radius: 0.5, speed: 2.6, dmg: 2, gold: [2, 5], aggro: 9, build: () => buildSlime('green') },
@@ -31,6 +32,7 @@ const DEFS = {
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
   budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
   darksycledragon: { name: 'Darksycle Dragon', hp: 110, radius: 0.95, speed: 2.7, dmg: 4, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
+  orcscout: { name: 'Orc Scout', hp: 36, radius: 0.6, speed: 2.7, dmg: 4, gold: [2, 8], aggro: 12, build: buildOrcScout },
 };
 
 export const MONSTER_BUILDERS = Object.fromEntries(Object.entries(DEFS).map(([k, v]) => [k, v.build]));
@@ -693,6 +695,69 @@ export class Monster {
           if (frenzy && Math.random() < dt * 5) g.fx.burst(this.x, this.y + this.hover + 0.9, this.z, [0xb25cff, 0x2b2450], 1, 0.8, 0.12, 0.7, -0.5, 0.5);
           break;
         }
+        case 'orcscout': {
+          const campD = Math.hypot(this.x - this.home.x, this.z - this.home.z);
+          const leashed = campD > 18;
+          if (this.state === 'idle' || this.state === 'wander') {
+            if (sees && !leashed) this.state = 'chase';
+            else {
+              this.wanderT -= dt;
+              if (this.wanderT <= 0) {
+                this.wanderT = 2 + Math.random() * 2.4;
+                const a = Math.random() * TAU;
+                const rr = 2 + Math.random() * 7;
+                this.target = { x: this.home.x + Math.cos(a) * rr, z: this.home.z + Math.sin(a) * rr };
+              }
+              const tx = this.target.x - this.x;
+              const tz = this.target.z - this.z;
+              const td = Math.hypot(tx, tz);
+              if (td > 0.6) {
+                mvx = (tx / td) * 1.05;
+                mvz = (tz / td) * 1.05;
+                this.yaw += angDiff(this.yaw, Math.atan2(tx, tz)) * Math.min(1, dt * 5);
+              }
+            }
+          } else if (this.state === 'chase') {
+            if ((!sees && dist > this.def.aggro * 1.4) || leashed) this.state = 'idle';
+            this.yaw += angDiff(this.yaw, toP) * Math.min(1, dt * 7);
+            if (dist > 1.65) {
+              mvx = (dx / dist) * this.def.speed;
+              mvz = (dz / dist) * this.def.speed;
+            }
+            if (dist < 2.35 && this.cd <= 0) {
+              this.state = 'windup';
+              this.t = 0;
+              this.warn('line', 1.2, 2.6, 0.42);
+              g.audio.tone(90, 0.18, 'sawtooth', 0.08, -40);
+            }
+          } else if (this.state === 'windup') {
+            this.yaw += angDiff(this.yaw, toP) * Math.min(1, dt * 8);
+            if (this.t > 0.42) {
+              this.clearWarn();
+              this.state = 'bite';
+              this.t = 0;
+              this.hitDone = false;
+              this.kick = 1;
+              g.audio.tone(70, 0.16, 'square', 0.1, -20);
+            }
+          } else if (this.state === 'bite') {
+            if (!this.hitDone && this.t > 0.1 && this.t < 0.22 && dist < this.radius + 1.15) {
+              this.hitDone = true;
+              P.hurt(this.def.dmg, this.x, this.z, 5);
+              g.fx.burst(this.x + Math.sin(this.yaw) * 0.8, this.y + 1.1, this.z + Math.cos(this.yaw) * 0.8, [0xd5d8de, 0x6a9a48, 0xffffff], 8, 2.4, 0.08, 0.35);
+            }
+            if (this.t > 0.48) {
+              this.state = 'recover';
+              this.t = 0;
+            }
+          } else if (this.state === 'recover') {
+            if (this.t > 0.42) {
+              this.state = 'chase';
+              this.cd = 0.85 + Math.random() * 0.4;
+            }
+          }
+          break;
+        }
         default:
       }
     }
@@ -705,7 +770,7 @@ export class Monster {
       mvx *= slow;
       mvz *= slow;
     }
-    const accel = this.type === 'boar' ? (this.state === 'charge' ? 24 : 9) : this.type === 'budgedragon' ? 8 : this.type === 'darksycledragon' ? 5 : this.type === 'wraith' ? 4 : 30;
+    const accel = this.type === 'boar' ? (this.state === 'charge' ? 24 : 9) : this.type === 'budgedragon' ? 8 : this.type === 'darksycledragon' ? 5 : this.type === 'wraith' ? 4 : this.type === 'orcscout' ? 11 : 30;
     const ak = 1 - Math.exp(-accel * dt);
     this.smx = (this.smx || 0) + (mvx - (this.smx || 0)) * ak;
     this.smz = (this.smz || 0) + (mvz - (this.smz || 0)) * ak;
@@ -879,6 +944,46 @@ export class Monster {
       rootSXY = 1 - 0.06 * this.kick;
       o.scale.setScalar(spawnS * this.baseScale);
       if (winding) this.model.mat.emissive.setRGB(0.35 + Math.sin(t * 30) * 0.15, 0.03, 0.0);
+    } else if (this.type === 'orcscout') {
+      const p = m.parts;
+      const gait = Math.min(1, spd / 2.3);
+      this.gaitC = (this.gaitC || 0) + dt * (3.2 + spd * 2.1);
+      const c = this.gaitC;
+      const lk = Math.min(1, dt * 14);
+      const stepL = Math.sin(c) * 0.62 * gait;
+      const stepR = Math.sin(c + Math.PI) * 0.62 * gait;
+      p.legL.rotation.x += (stepL - p.legL.rotation.x) * lk;
+      p.legR.rotation.x += (stepR - p.legR.rotation.x) * lk;
+      p.kneeL.rotation.x += (Math.max(0, stepL) * 1.25 - p.kneeL.rotation.x) * lk;
+      p.kneeR.rotation.x += (Math.max(0, stepR) * 1.25 - p.kneeR.rotation.x) * lk;
+      p.armL.rotation.x += (0.06 - stepL * 0.5 - p.armL.rotation.x) * lk;
+      p.armL.rotation.z += (0.1 - p.armL.rotation.z) * lk;
+      p.elbowL.rotation.x += (-0.28 - Math.max(0, -stepL) * 0.5 - p.elbowL.rotation.x) * lk;
+      let chop = -0.25 + Math.sin(c) * 0.08 * gait;
+      let flex = -0.38;
+      if (this.state === 'windup') {
+        const w = ease(Math.min(1, this.t / 0.42));
+        chop = -0.25 - w * 2.25;
+        flex = -0.38 - w * 0.5;
+      } else if (this.state === 'bite') {
+        const u = ease(clamp(this.t / 0.2, 0, 1));
+        chop = -2.5 + u * 2.25;
+        flex = -0.88 + u * 0.55;
+      } else if (this.state === 'recover') {
+        chop = -0.25;
+        flex = -0.38;
+      }
+      p.armR.rotation.x += (chop - p.armR.rotation.x) * Math.min(1, dt * (this.state === 'bite' ? 26 : 12));
+      p.armR.rotation.z += (-0.1 - p.armR.rotation.z) * lk;
+      p.elbowR.rotation.x += (flex - p.elbowR.rotation.x) * Math.min(1, dt * (this.state === 'bite' ? 26 : 12));
+      const lean = (this.state === 'windup' ? 0.02 : this.state === 'bite' ? 0.3 : 0.12) + gait * 0.05;
+      p.body.rotation.x += (lean - p.body.rotation.x) * lk;
+      p.body.rotation.z = Math.sin(c) * 0.035 * gait;
+      p.head.rotation.y += (this.lookSm * 0.7 - p.head.rotation.y) * Math.min(1, dt * 8);
+      p.head.rotation.x += ((this.state === 'chase' ? 0.04 : -0.1) - p.head.rotation.x) * lk;
+      p.cloth.rotation.x = Math.sin(c * 2) * 0.05 * gait + Math.sin(t * 2) * 0.02;
+      rootY = Math.abs(Math.sin(c)) * 0.04 * gait;
+      o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'budgedragon') {
       const p = m.parts;
       const walk = this.puppet ? 0.6 : Math.min(1, spd / 2.4);
@@ -1019,7 +1124,7 @@ export class Monster {
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup')) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 2.3 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 2.3 : this.type === 'orcscout' ? 2.55 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
@@ -1103,6 +1208,20 @@ export class Monster {
         g.shake(0.14);
       }
       const k2 = dissolve(0.85, 0.45, [0xc9967a, 0xffffff, 0x9bd06a]);
+      o.scale.setScalar(bs * (1 - k2 * k2));
+    } else if (this.type === 'orcscout') {
+      const p = m.parts;
+      const k = ease(clamp(u / 0.28, 0, 1));
+      o.position.set(this.x, this.y, this.z);
+      o.rotation.set(0, this.yaw, side * (k * 1.45));
+      m.root.position.y = 0.15 * k;
+      p.legL.rotation.x = 0.4 * k;
+      p.legR.rotation.x = -0.2 * k;
+      p.armR.rotation.x = -0.4 + k * 0.6;
+      p.armL.rotation.z = 0.9 * k;
+      p.kneeL.rotation.x = 0.5 * k;
+      p.head.rotation.x = 0.4 * k;
+      const k2 = dissolve(0.7, 0.5, [0x6a9a48, 0x5a4030, 0xe6dcc4]);
       o.scale.setScalar(bs * (1 - k2 * k2));
     } else if (this.type === 'budgedragon') {
       const p = m.parts;
@@ -1201,6 +1320,11 @@ export class Spawner {
       ['budgedragon', 120, 74],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
+    const camp = w.orcCamp;
+    if (camp) {
+      const pack = [[-2.2, 0.6], [1.8, -1.1], [0.3, 2.5], [8.2, 4.8], [-6.4, 6.6], [2.4, -9.2]];
+      for (const [ox, oz] of pack) this.spawn('orcscout', camp.x + ox, camp.z + oz, false);
+    }
     if (w.cave) {
       const den = this.spawn('darksycledragon', w.cave.nest.x, w.cave.nest.z, false);
       den.realm = 'cave';
@@ -1256,7 +1380,8 @@ export class Spawner {
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = 3.5;
-    const alive = g.monsters.filter((m) => !m.dead).length;
+    this.fillOrcs();
+    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'orcscout').length;
     if (alive >= this.max) return;
     const spot = this.pickSpot();
     if (!spot) return;
@@ -1269,6 +1394,23 @@ export class Spawner {
     if (!spot.nearGate && drakes < 2 && this.rng.next() < 0.3) type = 'budgedragon';
     this.spawn(type, spot.x, spot.z);
     if (spot.nearGate) g.audio.portal();
+  }
+
+  fillOrcs() {
+    const camp = this.game.world.orcCamp;
+    if (!camp) return;
+    const g = this.game;
+    const n = g.monsters.filter((m) => !m.dead && m.type === 'orcscout').length;
+    if (n >= 6) return;
+    const w = g.world;
+    const P = g.player.pos;
+    const a = this.rng.range(0, TAU);
+    const rr = this.rng.range(2, 12);
+    const x = camp.x + Math.cos(a) * rr;
+    const z = camp.z + Math.sin(a) * rr;
+    if (!w.playable(x, z) || w.heightAt(x, z) > 6) return;
+    if (Math.hypot(x - P.x, z - P.z) < 12) return;
+    this.spawn('orcscout', x, z);
   }
 }
 

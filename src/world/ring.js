@@ -275,6 +275,7 @@ const SPECS = {
     banner: ['The Brook', 'Brookside'], shade: 0.08, forest: 0.26, amp: 2.8, base: 3.1, seed: 54,
     rim: { w: true },
     knolls: [[50, 40, 8, 4], [36, 110, 9, 5], [80, 30, 6, -1.2], [24, 70, 5, 2]],
+    camp: [38, 24, 18],
     brook: true,
     pond: [34, 86, 6.5, 5],
     roads: [[[143, 64], [90, 64], [55, 78]]],
@@ -304,6 +305,16 @@ const SPECS = {
 const HAY = 6;
 
 function applyFeature(h, x, z, spec) {
+  if (spec.camp) {
+    const [cx, cz, r] = spec.camp;
+    const dx = (x - cx) / (r * 0.78);
+    const dz = (z - cz) / (r * 0.62);
+    const d = Math.hypot(dx, dz);
+    if (d < 1.08) {
+      const pad = 1 - smoothstep(0.62, 1.08, d);
+      return { h: lerp(h, 3.05, pad), kind: d < 0.7 ? PATH : AUTO };
+    }
+  }
   if (spec.clearing) {
     const [cx, cz, r] = spec.clearing;
     const d = Math.hypot(x - cx, z - cz);
@@ -497,12 +508,110 @@ export function sampleLands(lands, x, z) {
   return null;
 }
 
+function campClear(spec, lx, lz) {
+  if (!spec.camp) return false;
+  const [cx, cz] = spec.camp;
+  const dx = (lx - cx) / 16;
+  const dz = (lz - cz) / 13;
+  return dx * dx + dz * dz < 1;
+}
+
+/** Orc camp in the northwest of Brookside: spiked logs, hide huts, a standard. */
+function dressOrcCamp(world, land) {
+  const m = world.models;
+  const spec = SPECS[land.kind];
+  const [cx, cz] = spec.camp;
+  const rx = 11.4;
+  const rz = 8.6;
+  const gate = Math.atan2(0.9, 0.55);
+  const wx = land.x0 + cx + 0.5;
+  const wz = land.z0 + cz + 0.5;
+  world.orcCamp = { x: wx, z: wz, r: 16 };
+
+  const drop = (parts, ox, oz, rot, scale, opts = {}) => {
+    const x = land.x0 + cx + ox + 0.5;
+    const z = land.z0 + cz + oz + 0.5;
+    world.putAt(parts, x, z, rot, scale, opts);
+    return { x, z };
+  };
+
+  const ring = (count, radX, radZ, scaleLo, scaleHi, collide) => {
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const da = Math.atan2(Math.sin(a - gate), Math.cos(a - gate));
+      if (Math.abs(da) < 0.2) continue;
+      const ox = Math.sin(a) * radX;
+      const oz = Math.cos(a) * radZ;
+      const n = hash2(i, Math.round(radX), 54);
+      const p = drop(m.orcSpikes[i % m.orcSpikes.length], ox, oz, a + (n - 0.5) * 0.4, 1, { scaleY: scaleLo + n * (scaleHi - scaleLo) });
+      if (collide) {
+        world.circle(p.x, p.z, 0.4);
+        world.occupy(p.x, p.z, 0.55);
+      }
+    }
+  };
+  ring(52, rx, rz, 0.85, 1.45, true);
+  ring(36, rx + 1.35, rz + 1.15, 0.5, 0.85, false);
+
+  for (const s of [-1, 1]) {
+    const a = gate + s * 0.22;
+    const p = drop(m.orcSpikes[0], Math.sin(a) * rx, Math.cos(a) * rz, a, 1, { scaleY: 1.55 });
+    world.circle(p.x, p.z, 0.42);
+  }
+  const lx = land.x0 + cx + Math.sin(gate) * rx + 0.5;
+  const lz = land.z0 + cz + Math.cos(gate) * rz + 0.5;
+  world.putAt(m.orcLintel, lx, lz, gate, 1.05, { y: world.heightAt(lx, lz) + 1.05 });
+
+  const huts = [
+    { parts: m.orcHuts[0], ox: -3.5, oz: -2.2, r: 1.85 },
+    { parts: m.orcHuts[1], ox: 4.0, oz: -1.4, r: 1.45 },
+    { parts: m.orcHuts[2], ox: -2.2, oz: 3.3, r: 1.45 },
+    { parts: m.orcHuts[3], ox: 3.4, oz: 2.6, r: 1.25 },
+  ];
+  for (const h of huts) {
+    const rot = Math.atan2(-h.ox, -h.oz);
+    const p = drop(h.parts, h.ox, h.oz, rot, 1);
+    world.circle(p.x, p.z, h.r);
+    world.occupy(p.x, p.z, h.r + 0.3);
+  }
+
+  const fire = drop(m.orcFire, 0.2, 0.3, 0.4, 1.05);
+  world.lightSpots.push({ x: fire.x, y: world.heightAt(fire.x, fire.z) + 0.9, z: fire.z, color: 0xff7a22 });
+  world.occupy(fire.x, fire.z, 0.8);
+
+  const banner = drop(m.orcBanner, -0.4, -5.6, gate, 1);
+  world.circle(banner.x, banner.z, 0.35);
+  world.occupy(banner.x, banner.z, 0.6);
+
+  const totem = drop(m.orcTotem, Math.sin(gate) * (rx - 2.2), Math.cos(gate) * (rz - 1.8), gate + 0.4, 1);
+  world.circle(totem.x, totem.z, 0.35);
+
+  drop(m.orcRack, -5.2, 0.4, 0.6, 1);
+  drop(m.orcHide, 5.4, 0.2, -0.8, 1);
+  drop(m.orcBones[0], 1.4, -1.6, 0.2, 1.1);
+  drop(m.orcBones[1], -1.2, 1.8, 1.1, 1);
+  drop(m.crate[0], 4.6, -3.2, 0.5, 1.1);
+  drop(m.barrel[0], -4.8, -4.2, 0.3, 1);
+
+  for (let i = 0; i < 5; i++) {
+    const a = gate + 2.2 + i * 0.7;
+    const rad = 1.6 + (i % 2);
+    drop(m.orcCross, Math.sin(a) * (rx + rad), Math.cos(a) * (rz + rad * 0.8), a, 0.9 + (i % 3) * 0.08);
+  }
+
+  for (const [ox, oz] of [[-6.2, -4.4], [6.4, -3.6], [-5.8, 4.6], [6.2, 4.2]]) {
+    const p = drop(m.orcFire, ox, oz, ox, 0.55);
+    world.lightSpots.push({ x: p.x, y: world.heightAt(p.x, p.z) + 0.55, z: p.z, color: 0xff8a3a });
+  }
+}
+
 function dressLand(world, land) {
   const m = world.models;
   const spec = SPECS[land.kind];
   const seed = spec.seed;
   const data = land.data;
   const trees = [];
+  if (land.kind === 'brookside') dressOrcCamp(world, land);
   const place = (parts, lx, lz, rot, scale, opts) => {
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
@@ -516,6 +625,7 @@ function dressLand(world, land) {
     const i = lz * W + lx;
     const h = data.H[i];
     if (data.pathMask[i] || h < 1.3 || h > 7.2) continue;
+    if (campClear(spec, lx, lz)) continue;
     if (data.zone[i] === ZONE.WATER || data.zone[i] === ZONE.FARM) continue;
     if (hash2(n, 9, seed) > 0.38 + spec.forest) continue;
     const x = land.x0 + lx + 0.5;
@@ -541,6 +651,7 @@ function dressLand(world, land) {
     const i = lz * W + lx;
     const h = data.H[i];
     if (data.pathMask[i] || h < 2.2 || h > 9) continue;
+    if (campClear(spec, lx, lz)) continue;
     if (!place(h > 6 ? m.boulders[n % m.boulders.length] : m.rocks[n % m.rocks.length], lx, lz, n, h > 6 ? 0.9 : 0.7, { r: 1 })) continue;
     world.circle(land.x0 + lx + 0.5, land.z0 + lz + 0.5, h > 6 ? 0.7 : 0.4);
     world.occupy(land.x0 + lx + 0.5, land.z0 + lz + 0.5, 0.8);
@@ -551,6 +662,7 @@ function dressLand(world, land) {
     const i = lz * W + lx;
     const h = data.H[i];
     if (data.pathMask[i] || h < 1.2 || h > 6.5) continue;
+    if (campClear(spec, lx, lz)) continue;
     if (data.zone[i] === ZONE.WATER || data.zone[i] === ZONE.MOUNTAIN) continue;
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
