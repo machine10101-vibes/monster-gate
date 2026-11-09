@@ -175,7 +175,6 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
-    if (!session && new URLSearchParams(location.search).get('klever') === '1') this.onWallet();
     progress(1, 'Ready');
     this.renderer.compile(this.scene, this.camera);
 
@@ -184,6 +183,10 @@ class Game {
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+    if (!session && new URLSearchParams(location.search).get('klever') === '1') {
+      // Let the wallet finish opening this page before the confirm sheet appears.
+      setTimeout(() => this.onWallet(), 600);
+    }
   }
 
   start() {
@@ -482,7 +485,7 @@ class Game {
     window.addEventListener(
       'pointerdown',
       (e) => {
-        if (!this.input.touch || e.target.closest?.('#btn-fs')) return;
+        if (!this.started || this.walletBusy || !this.input.touch || e.target.closest?.('#btn-fs, #title, #wallet-help, #loading')) return;
         if (this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
         else if (e.target.closest?.('#rotate-overlay')) requestGameFullscreen(true);
       },
@@ -496,7 +499,7 @@ class Game {
   }
 
   syncImmersive() {
-    if (!this.input.touch) {
+    if (!this.input.touch || !this.started || this.walletBusy) {
       this.resize();
       return;
     }

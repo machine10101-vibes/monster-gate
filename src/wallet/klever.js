@@ -31,6 +31,32 @@ function fail(code, message) {
   return err;
 }
 
+function signatureText(signed) {
+  if (signed == null) return '';
+  if (typeof signed === 'string') return signed.trim();
+  const value = signed.signature || signed.hex || signed.data?.signature || (typeof signed.toHex === 'function' ? signed.toHex() : '');
+  return String(value || '').trim();
+}
+
+/**
+ * The in-app browser's kleverWeb.signMessage sends SIGN_TRANSACTION. A login
+ * message is not a transaction, so the app opens the confirm sheet and then
+ * closes it. SIGN_IN_MESSAGE keeps that sheet up until the hunter taps confirm.
+ */
+async function requestSignature(kw, message) {
+  const bridge = window.__kleverBrowser__?.bridge;
+  if (typeof bridge === 'function') {
+    return bridge({
+      type: 'SIGN_IN_MESSAGE',
+      network: 'KLV',
+      chainId: '38',
+      data: message,
+      url: location.href,
+    });
+  }
+  return kw.signMessage(message);
+}
+
 export function waitForProvider(ms = 2000) {
   const start = performance.now();
   return new Promise((resolve) => {
@@ -95,11 +121,11 @@ export async function signIn() {
   ].join('\n');
   let signed;
   try {
-    signed = await kw.signMessage(message);
+    signed = await requestSignature(kw, message);
   } catch {
     throw fail('rejected', mobile ? 'The Klever app closed the sign-in request.' : 'The Klever extension closed the sign-in request.');
   }
-  const signature = signed == null ? '' : String(signed.signature || signed.hex || (typeof signed.toHex === 'function' ? signed.toHex() : signed)).trim();
+  const signature = signatureText(signed);
   let ok = verifyKleverSignature(message, signature, address);
   // The extension can also check the signature itself. Trust that only when it names this same address.
   if (!ok && typeof kw.validateSignature === 'function') {
