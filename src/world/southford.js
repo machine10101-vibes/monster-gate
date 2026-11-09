@@ -320,6 +320,7 @@ export function dressSouthford(world) {
   for (let z = SOUTH_Z + 4; z < SOUTH_Z + 100; z += 3) {
     for (const x of [32, 44]) {
       if (world.heightAt(x, z) > 1.4) continue;
+      if ((world.fishSpots || []).some((f) => f.site === 'river' && Math.hypot(f.standX - x, f.standZ - z) < 2.4)) continue;
       world.putAt(m.reeds[z % m.reeds.length], x, z, z * 0.2, 1);
     }
   }

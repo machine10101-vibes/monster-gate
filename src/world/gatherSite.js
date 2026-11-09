@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DOCK, LAKE, MINE, TOWN, WATER_Y, ZONE } from './terrain.js';
+import { FISH } from '../data/gathering.js';
 import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock, buildWoodStump } from './gatherModels.js';
 import { buildOak } from './models.js';
 import { goodsVoxels } from './gatherModels.js';
@@ -16,11 +17,42 @@ const ROCK_SPOTS = [
 ];
 
 export const FISH_SPOTS = [
-  { kind: 'net', x: 56.6, z: 98.6 },
-  { kind: 'net', x: 60.4, z: 103.4 },
-  { kind: 'rod', x: 51.9, z: 101 },
-  { kind: 'rod', x: 57.6, z: 105.6 },
+  { kind: 'net', site: 'lake', title: 'Net fishing spot', catches: ['shrimp'], x: 56.6, z: 98.6 },
+  { kind: 'net', site: 'lake', title: 'Net fishing spot', catches: ['shrimp'], x: 60.4, z: 103.4 },
+  { kind: 'rod', site: 'lake', title: 'Pole fishing spot', catches: ['trout'], x: 51.9, z: 101 },
+  { kind: 'rod', site: 'lake', title: 'Pole fishing spot', catches: ['trout'], x: 57.6, z: 105.6 },
 ];
+
+/** Southford (world map tile 65): the Silverrun runs north to south down x 34..43, fished from its east bank. */
+const RIVER_BANK_X = 44.9;
+export const RIVER_SPOTS = [
+  { kind: 'net', z: 190 },
+  { kind: 'rod', z: 207 },
+  { kind: 'net', z: 224 },
+  { kind: 'rod', z: 241 },
+  { kind: 'net', z: 258 },
+  { kind: 'rod', z: 272 },
+].map((r) => ({
+  kind: r.kind,
+  site: 'river',
+  title: r.kind === 'net' ? 'River net spot' : 'River pole spot',
+  catches: [r.kind === 'net' ? 'pikeminnow' : 'salmon'],
+  x: r.kind === 'net' ? 42.9 : 41.2,
+  z: r.z + 0.5,
+  standX: RIVER_BANK_X,
+  standZ: r.z + 0.5,
+  reach: 3,
+}));
+
+/** Glimmerfrost (world map tile 38): two holes cut into the frozen lake at the top of the tile. */
+export const ICE_HOLES = [
+  { lx: 87.5, lz: 55.5 },
+  { lx: 97.5, lz: 57.5 },
+];
+const GLIMMER_TILE = 't7-3';
+
+/** Which way each fish model faces along its local x. The shrimp head is at +x, every fish head at -x. */
+const HEAD_DIR = { shrimp: 1 };
 
 const spotFrag = `
 uniform float uTime; uniform vec3 uColA; uniform vec3 uColB; varying vec2 vUv;
@@ -171,9 +203,10 @@ function buildLake(world) {
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: spotFrag,
     });
-  const mats = { net: mkMat(0xff8a5a, 0xffe2c8), rod: mkMat(0x3fb8ff, 0xd8f4ff) };
+  const mats = { net: mkMat(0xff8a5a, 0xffe2c8), rod: mkMat(0x3fb8ff, 0xd8f4ff), ice: mkMat(0x1a5a86, 0x9fe2ff) };
   const geo = new THREE.PlaneGeometry(2.3, 2.3);
   geo.rotateX(-Math.PI / 2);
+  world.fishGeo = geo;
   const spots = FISH_SPOTS.map((s, i) => {
     const mesh = new THREE.Mesh(geo, mats[s.kind]);
     mesh.position.set(s.x, WATER_Y + 0.05, s.z);
@@ -181,14 +214,14 @@ function buildLake(world) {
     world.group.add(mesh);
     const sx = Math.min(DOCK.x1 - 0.6, Math.max(DOCK.x0 + 0.55, s.x));
     const sz = Math.min(DOCK.z + DOCK.hw - 0.45, Math.max(DOCK.z - DOCK.hw + 0.45, s.z));
-    return { ...s, id: `${s.kind}${i}`, y: WATER_Y, standX: sx, standZ: sz, mesh, jump: null, nextJump: 2 + i * 1.7 };
+    return { ...s, id: `${s.kind}${i}`, y: WATER_Y, standX: sx, standZ: sz, standY: DOCK.y, mesh, jump: null, nextJump: 2 + i * 1.7, run: 0.9, from: 0 };
   });
   world.fishSpots = spots;
   world.fishMats = mats;
 
-  const fishMats = { trout: null, shrimp: null };
+  const fishMats = {};
   const tm = toonMaterial({ vertexColors: true });
-  for (const id of Object.keys(fishMats)) {
+  for (const id of Object.keys(FISH)) {
     const [fm, size, ox, oy, oz] = goodsVoxels(id);
     const g = meshFrom(fm, ox, oy, oz, tm, size);
     g.visible = false;
@@ -196,6 +229,60 @@ function buildLake(world) {
     fishMats[id] = g;
   }
   world.jumpers = fishMats;
+}
+
+function addFishSpot(world, def, y) {
+  const mesh = new THREE.Mesh(world.fishGeo, world.fishMats[def.look || def.kind]);
+  mesh.position.set(def.x, y + 0.05, def.z);
+  if (def.site === 'ice') mesh.scale.setScalar(0.78);
+  mesh.renderOrder = 3;
+  world.group.add(mesh);
+  const n = world.fishSpots.length;
+  const spot = { ...def, id: `${def.site}${n}`, y, standY: world.heightAt(def.standX, def.standZ), mesh, jump: null, nextJump: 2 + (n % 5) * 1.3 };
+  world.fishSpots.push(spot);
+  return spot;
+}
+
+function buildRiver(world) {
+  for (const def of RIVER_SPOTS) {
+    const spot = addFishSpot(world, { ...def, run: 0.9, from: 0 }, WATER_Y);
+    world.occupy(def.standX, def.standZ, 1.4);
+    world.occupy(spot.x, spot.z, 0.8);
+  }
+}
+
+function buildIceHoles(world) {
+  const land = (world.lands || []).find((l) => l.tileId === GLIMMER_TILE);
+  if (!land) return;
+  const parts = world.models.arctic.iceHoles;
+  ICE_HOLES.forEach((h, i) => {
+    const x = land.x0 + h.lx + 0.5;
+    const z = land.z0 + h.lz + 0.5;
+    const top = world.heightAt(x, z);
+    world.putAt(parts[i % parts.length], x, z, i * 1.9, 1, { y: top });
+    world.circle(x, z, 0.9);
+    world.occupy(x, z, 2.4);
+    const standZ = z + 1.75;
+    world.occupy(x, standZ, 1.2);
+    addFishSpot(
+      world,
+      {
+        kind: 'rod',
+        site: 'ice',
+        look: 'ice',
+        title: 'Ice fishing hole',
+        catches: ['pike', 'sturgeon'],
+        x,
+        z,
+        standX: x,
+        standZ,
+        reach: 2.6,
+        run: 0.45,
+        from: -0.22,
+      },
+      top + 0.12
+    );
+  });
 }
 
 /** Groves west of Oakhollow. Decorative trees stay out of these circles. */
@@ -293,14 +380,15 @@ function buildWoods(world) {
 export function buildGatherSites(world) {
   buildMine(world);
   buildLake(world);
+  buildRiver(world);
+  buildIceHoles(world);
   buildWoods(world);
 }
 
 /** Per-frame life for the sites: fish spot shaders, leaping fish, rock pop-in. */
 export function updateGatherSites(world, dt, t, game) {
   if (world.fishMats) {
-    world.fishMats.net.uniforms.uTime.value = t;
-    world.fishMats.rod.uniforms.uTime.value = t;
+    for (const mat of Object.values(world.fishMats)) mat.uniforms.uTime.value = t;
   }
   if (world.fishSpots && game?.player) {
     const P = game.player.pos;
@@ -316,26 +404,48 @@ export function updateGatherSites(world, dt, t, game) {
       s.nextJump -= dt;
       if (!s.jump && s.nextJump <= 0) {
         s.nextJump = 4 + Math.random() * 6;
-        const model = s.kind === 'rod' ? world.jumpers.trout : world.jumpers.shrimp;
+        const id = s.catches[Math.floor(Math.random() * s.catches.length)];
+        const model = world.jumpers[id];
+        if (model.visible) {
+          s.nextJump = 0.6;
+          continue;
+        }
         const ang = Math.random() * Math.PI * 2;
-        s.jump = { t: 0, dur: 0.85, dx: Math.cos(ang), dz: Math.sin(ang), model, spin: s.kind === 'rod' ? 0 : 6 };
+        const dx = Math.cos(ang);
+        const dz = Math.sin(ang);
+        s.jump = {
+          t: 0,
+          dur: 0.85,
+          dx,
+          dz,
+          model,
+          head: HEAD_DIR[id] ?? -1,
+          spin: id === 'shrimp' ? 6 : 0,
+          lift: s.site === 'ice' ? 1.15 : 0.95,
+          scale: id === 'sturgeon' ? 0.7 : 0.85,
+        };
         model.visible = true;
-        game.fx.burst(s.x, WATER_Y + 0.1, s.z, [0xbfeaff, 0xffffff], 5, 1.6, 0.06, 0.4, -4, 0.5);
+        game.fx.burst(s.x + dx * s.from, s.y + 0.1, s.z + dz * s.from, [0xbfeaff, 0xffffff], 5, 1.6, 0.06, 0.4, -4, 0.5);
       }
       const j = s.jump;
       if (j) {
         j.t += dt;
         const u = j.t / j.dur;
+        const off = s.run * u + s.from;
+        const ox = s.x + j.dx * off;
+        const oz = s.z + j.dz * off;
         if (u >= 1) {
           j.model.visible = false;
-          game.fx.ring(s.x + j.dx * 0.9, WATER_Y + 0.06, s.z + j.dz * 0.9, 0xbfeaff, 8, 1.6, 0.07, 0.5);
-          game.fx.burst(s.x + j.dx * 0.9, WATER_Y + 0.1, s.z + j.dz * 0.9, [0xbfeaff, 0xffffff], 5, 1.4, 0.06, 0.4, -4, 0.5);
+          game.fx.ring(ox, s.y + 0.06, oz, 0xbfeaff, 8, 1.6, 0.07, 0.5);
+          game.fx.burst(ox, s.y + 0.1, oz, [0xbfeaff, 0xffffff], 5, 1.4, 0.06, 0.4, -4, 0.5);
           s.jump = null;
         } else {
-          const h = Math.sin(u * Math.PI) * 0.95;
-          j.model.position.set(s.x + j.dx * 0.9 * u, WATER_Y + h, s.z + j.dz * 0.9 * u);
-          j.model.rotation.set(0, Math.atan2(j.dx, j.dz) - Math.PI / 2, Math.cos(u * Math.PI) * 0.9 + j.spin * u);
-          j.model.scale.setScalar(0.85);
+          const h = Math.sin(u * Math.PI) * j.lift;
+          j.model.position.set(ox, s.y + h, oz);
+          // The head leads: yaw it onto the travel direction, then nose up on the way out and down on the way in.
+          const yaw = Math.atan2(j.dx, j.dz) - Math.PI / 2 + (j.head < 0 ? Math.PI : 0);
+          j.model.rotation.set(0, yaw, j.head * Math.cos(u * Math.PI) * 0.9 + j.spin * u);
+          j.model.scale.setScalar(j.scale);
         }
       }
     }
