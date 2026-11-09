@@ -11,6 +11,7 @@ import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
 import { hideUniforms } from './engine/materials.js';
 import { Player } from './entities/player.js';
+import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
@@ -765,11 +766,21 @@ class Game {
 
   onMonsterKilled(m) {
     this.kills++;
-    const [a, b] = m.def.gold;
-    const n = Math.round(a + Math.random() * (b - a));
-    const coins = Math.max(1, Math.min(4, Math.round(n / 2)));
-    const each = Math.ceil(n / coins);
-    for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
+    if (m.type === 'orcscout') {
+      if (Math.random() < 0.72) {
+        const n = m.def.gold[0] + Math.floor(Math.random() * (m.def.gold[1] - m.def.gold[0] + 1));
+        const coins = 1 + Math.floor(Math.random() * 3);
+        const each = Math.max(1, Math.ceil(n / coins));
+        for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
+      }
+      if (Math.random() < 0.4 && !this.progress.crafted('orcblade')) this.dropBlade(m.x, m.y + 0.8, m.z);
+    } else {
+      const [a, b] = m.def.gold;
+      const n = Math.round(a + Math.random() * (b - a));
+      const coins = Math.max(1, Math.min(4, Math.round(n / 2)));
+      const each = Math.ceil(n / coins);
+      for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
+    }
     if (Math.random() < 0.18) this.dropCoin(m.x, m.y + 0.6, m.z, 0, 'heart');
     const hadPoints = this.progress.classId ? this.progress.skillPoints().earned : 0;
     const fresh = !this.progress.seen(m.type);
@@ -820,6 +831,18 @@ class Game {
     this.pickups.push({ holder, mesh, kind, value, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4 + Math.random() * 2, age: 0, grounded: false });
   }
 
+  dropBlade(x, y, z) {
+    const model = buildHeld('orcblade');
+    model.scale.setScalar(0.85);
+    const holder = new THREE.Group();
+    holder.add(model);
+    holder.position.set(x, y, z);
+    this.scene.add(holder);
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.2 + Math.random();
+    this.pickups.push({ holder, mesh: model, kind: 'orcblade', value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.2, age: 0, grounded: false });
+  }
+
   updatePickups(dt) {
     const P = this.player.pos;
     for (const k of this.pickups) {
@@ -859,16 +882,28 @@ class Game {
           this.player.heal(4);
           this.audio.potion();
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), '+2', 'heal');
+        } else if (k.kind === 'orcblade') {
+          const got = this.progress.grantFound('orcblade');
+          this.audio.quest();
+          this.hud.toast(got ? 'Orc Scout Blade' : 'You already carry that blade', 1800);
+          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), 'Orc Blade', 'gold');
+          if (got && this.progress.data.weapon === 'orcblade') {
+            this.applyGear();
+            this.selectSlot(0, true);
+          }
         } else {
           this.addGold(k.value);
           this.audio.coin();
         }
-        this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
+        this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : k.kind === 'orcblade' ? [0xb0b4bc, 0xe6dcc4, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
       } else if (k.age > 40) k.done = true;
       if (k.done) {
         this.scene.remove(k.holder);
-        k.mesh.geometry.dispose();
-        k.mesh.material.dispose();
+        if (k.kind === 'orcblade') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+        else {
+          k.mesh.geometry.dispose();
+          k.mesh.material.dispose();
+        }
       }
     }
     this.pickups = this.pickups.filter((k) => !k.done);

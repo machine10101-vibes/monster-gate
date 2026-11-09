@@ -1119,6 +1119,284 @@ export function buildForge(seed = 3) {
   return bundle([[M, 0.0625, 16, 0, 11]]);
 }
 
+const orcLog = (seed) => (x, y, z) => {
+  const n = hash3(x, y, z, seed);
+  const c = n < 0.22 ? 0x2e1c10 : n < 0.5 ? 0x4a301c : n < 0.78 ? 0x5c3c24 : 0x6e4a30;
+  return jitter(c, 0.08, n);
+};
+const orcHide = (seed) => (x, y, z) => {
+  const n = hash3(x, y, z, seed + 9);
+  const c = n < 0.28 ? 0x4a3424 : n < 0.58 ? 0x6e5040 : n < 0.82 ? 0x8a684c : 0x3e2a1c;
+  return jitter(c, 0.07, n);
+};
+const orcFur = (x, y, z) => {
+  const n = hash3(x, y, z, 21);
+  return jitter(n < 0.4 ? 0x5a5046 : n < 0.75 ? 0x7a6e60 : 0x3e3832, 0.06, n);
+};
+
+/** Crude orc hut: uneven logs, a sagging hide roof, a skull over the door. */
+export function buildOrcHut(seed = 1, kind = 'hut') {
+  const long = kind === 'long';
+  const lean = kind === 'lean';
+  const W = long ? 54 : lean ? 32 : 38;
+  const D = long ? 38 : lean ? 24 : 30;
+  const wallH = lean ? 14 : long ? 20 : 17;
+  const M = new VoxelModel(W + 10, wallH + 24, D + 10);
+  const ox = 5;
+  const oz = 5;
+  const log = orcLog(seed);
+  const skin = orcHide(seed);
+  for (let x = ox - 1; x < ox + W + 1; x++) {
+    for (let z = oz - 1; z < oz + D + 1; z++) {
+      const h = 2 + Math.floor(hash3(x, 0, z, seed) * 3);
+      for (let y = 0; y < h; y++) {
+        const n = hash3(x, y, z, seed + 2);
+        M.set(x, y, z, jitter(n < 0.5 ? 0x5c5954 : 0x3a3836, 0.07, n));
+      }
+    }
+  }
+  const doorX0 = ox + Math.floor(W / 2) - (long ? 4 : 3);
+  const doorX1 = doorX0 + (long ? 8 : 6);
+  const doorTop = lean ? 9 : 12;
+  for (let y = 2; y < wallH; y++) {
+    const jog = y & 1;
+    for (let x = ox + jog; x < ox + W - jog; x++) {
+      for (let z = oz; z < oz + D; z++) {
+        const edgeX = x <= ox + 1 + jog || x >= ox + W - 2 - jog;
+        const edgeZ = z <= oz + 1 || z >= oz + D - 2;
+        if (!edgeX && !edgeZ) continue;
+        if (z >= oz + D - 2 && x >= doorX0 && x < doorX1 && y < doorTop) continue;
+        if (y % 3 === 2 && hash3(x, y, z, seed) > 0.55) continue;
+        M.set(x, y, z, log(x, y, z));
+      }
+    }
+  }
+  for (const [px, pz] of [
+    [ox - 1, oz - 1],
+    [ox + W - 2, oz - 1],
+    [ox - 1, oz + D - 2],
+    [ox + W - 2, oz + D - 2],
+  ]) {
+    M.box(px, 1, pz, px + 3, wallH + 3, pz + 3, log);
+  }
+  const xc = ox + W / 2;
+  for (let z = oz - 3; z < oz + D + 3; z++) {
+    const along = (z - oz) / D;
+    const sag = Math.sin(along * Math.PI) * (lean ? 1.2 : 3.2);
+    for (let x = ox - 3; x < ox + W + 3; x++) {
+      const dx = Math.abs(x + 0.5 - xc);
+      const rise = (lean ? 5 : 11) - dx * (lean ? 0.28 : 0.4) + sag;
+      const top = wallH + Math.max(1, Math.round(rise));
+      for (let y = top - 2; y <= top; y++) {
+        if (hash3(x, y, z, seed + 5) < 0.07) continue;
+        M.set(x, y, z, y === top ? skin(x, y, z) : shade(0x3a2a1c, 0.9));
+      }
+      if (dx > W * 0.38 && hash3(x, 1, z, seed) > 0.35) M.set(x, top - 3, z, orcFur(x, top, z));
+    }
+  }
+  for (let z = oz + 2; z < oz + D - 2; z += long ? 5 : 6) {
+    const top = wallH + (lean ? 6 : 11);
+    M.box(Math.floor(xc) - 1, top, z, Math.floor(xc) + 2, top + 4, z + 2, (x, y, z2) => jitter(0xe4d8c0, 0.04, hash3(x, y, z2, seed)));
+  }
+  const hx = doorX0 + 3;
+  M.ellipsoid(hx + 0.5, doorTop + 2, oz + D - 0.2, 2.4, 2.1, 1.8, (x, y, z) => jitter(0xe6dcc4, 0.04, hash3(x, y, z, seed)));
+  M.set(hx, doorTop + 2, oz + D, 0x16120e);
+  M.set(hx + 2, doorTop + 2, oz + D, 0x16120e);
+  M.set(hx + 1, doorTop + 1, oz + D, 0x16120e);
+  M.box(doorX0, 3, oz + D - 1, doorX1, doorTop - 1, oz + D + 1, (x, y, z) => (hash3(x, y, z, seed) < 0.15 ? null : skin(x, y, z)));
+  M.box(doorX0 - 1, doorTop, oz + D - 2, doorX1 + 1, doorTop + 2, oz + D + 1, log);
+  if (long) {
+    M.box(ox + 4, 6, oz - 1, ox + 8, 10, oz + 1, 0x1a1612);
+    M.box(ox + W - 9, 6, oz - 1, ox + W - 5, 10, oz + 1, 0x1a1612);
+  }
+  return bundle([[M, 0.0625, ox + W / 2, 0, oz + D / 2]]);
+}
+
+/** One sharpened palisade log. The tip is the top of the model. */
+export function buildOrcSpike(seed = 1) {
+  const M = new VoxelModel(10, 40, 10);
+  const log = orcLog(seed);
+  for (let y = 0; y < 28; y++) {
+    const r = y < 3 ? 4.2 : 3.15;
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        const dx = x + 0.5 - 5;
+        const dz = z + 0.5 - 5;
+        if (dx * dx + dz * dz > r * r) continue;
+        M.set(x, y, z, log(x, y, z));
+      }
+    }
+  }
+  for (let y = 28; y < 40; y++) {
+    const r = 3.1 * (1 - (y - 28) / 12);
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        const dx = x + 0.5 - 5;
+        const dz = z + 0.5 - 5;
+        if (dx * dx + dz * dz > r * r) continue;
+        M.set(x, y, z, shade(log(x, y, z), 1.08));
+      }
+    }
+  }
+  for (const y of [6, 16]) {
+    for (let x = 1; x < 9; x++) {
+      for (let z = 1; z < 9; z++) {
+        const dx = x - 5;
+        const dz = z - 5;
+        if (dx * dx + dz * dz < 7 || dx * dx + dz * dz > 16) continue;
+        M.set(x, y, z, jitter(0x8a7048, 0.05, hash3(x, y, z, seed)));
+      }
+    }
+  }
+  return bundle([[M, 0.0625, 5, 0, 5]]);
+}
+
+/** Two lashed stakes crossed into a standing X. */
+export function buildOrcCross(seed = 1) {
+  const M = new VoxelModel(26, 30, 8);
+  const log = orcLog(seed);
+  M.line(2, 1, 3, 23, 27, 3, log, 2);
+  M.line(23, 1, 4, 2, 27, 4, log, 2);
+  M.box(10, 12, 1, 16, 17, 7, (x, y, z) => jitter(0x8a7048, 0.06, hash3(x, y, z, seed)));
+  return bundle([[M, 0.0625, 13, 0, 4]]);
+}
+
+/** Gate header: a log with a short ragged banner hanging under it. */
+export function buildOrcLintel(seed = 1) {
+  const M = new VoxelModel(36, 18, 8);
+  const log = orcLog(seed);
+  M.box(0, 12, 2, 36, 16, 6, log);
+  M.box(2, 16, 3, 6, 18, 5, log);
+  M.box(30, 16, 3, 34, 18, 5, log);
+  for (let y = 2; y < 13; y++) {
+    for (let x = 8; x < 28; x++) {
+      const n = hash3(x, y, 1, seed);
+      if (y < 5 && n < 0.45) continue;
+      if (n < 0.08) continue;
+      const c = n < 0.5 ? 0x8a2a22 : n < 0.8 ? 0x6e1c16 : 0xa04432;
+      M.set(x, y, 5, jitter(c, 0.05, n));
+      if (n > 0.35) M.set(x, y, 6, jitter(shade(c, 0.8), 0.04, n));
+    }
+  }
+  M.box(16, 6, 6, 20, 10, 7, 0x1a120e);
+  M.box(17, 8, 6, 19, 9, 7, 0xe6dcc4);
+  return bundle([[M, 0.0625, 18, 0, 4]]);
+}
+
+/** Camp standard. The cloth is painted as if the wind has it. */
+export function buildOrcBanner(seed = 1) {
+  const M = new VoxelModel(26, 62, 14);
+  const log = orcLog(seed);
+  M.box(11, 0, 4, 15, 58, 8, log);
+  M.box(9, 0, 2, 17, 3, 10, (x, y, z) => jitter(0x5a5854, 0.06, hash3(x, y, z, seed)));
+  M.ellipsoid(13, 4, 6, 3.2, 2.6, 2.4, (x, y, z) => jitter(0xe6dcc4, 0.04, hash3(x, y, z, seed)));
+  M.set(12, 4, 8, 0x16120e);
+  M.set(14, 4, 8, 0x16120e);
+  M.box(4, 50, 4, 22, 54, 8, log);
+  for (let y = 28; y < 51; y++) {
+    const billow = Math.round((50 - y) * 0.12);
+    for (let x = 3; x < 23; x++) {
+      const n = hash3(x, y, 2, seed + 4);
+      const hem = 30 + Math.floor(hash3(x, 0, 3, seed) * 6);
+      if (y < hem) continue;
+      if (n < 0.06) continue;
+      const mark = Math.abs(x - 13) < 2 && y > 36 && y < 46;
+      const c = mark ? 0x1a120e : n < 0.55 ? 0x92281e : n < 0.82 ? 0x6a1a14 : 0xb04430;
+      const z = 8 + billow;
+      M.set(x, y, z, jitter(c, 0.05, n));
+      if (n > 0.4) M.set(x, y, z + 1, jitter(shade(c, 0.78), 0.04, n));
+    }
+  }
+  for (let x = 5; x < 21; x++) {
+    if (hash3(x, 9, 1, seed) < 0.4) continue;
+    M.set(x, 54, 6, orcFur(x, 54, 6));
+    M.set(x, 55, 6, orcFur(x, 55, 6));
+  }
+  M.box(12, 56, 5, 14, 62, 7, log);
+  M.box(11, 60, 4, 15, 62, 8, (x, y, z) => jitter(0xe6dcc4, 0.04, hash3(x, y, z, seed)));
+  return bundle([[M, 0.0625, 13, 0, 6]]);
+}
+
+/** Stone ring, stacked logs, and a glow that lights the yard. */
+export function buildOrcFire(seed = 1) {
+  const M = new VoxelModel(22, 16, 22);
+  for (let a = 0; a < 12; a++) {
+    const x = 11 + Math.round(Math.cos((a / 12) * Math.PI * 2) * 7);
+    const z = 11 + Math.round(Math.sin((a / 12) * Math.PI * 2) * 7);
+    const h = 3 + (a % 3);
+    M.box(x - 1, 0, z - 1, x + 2, h, z + 2, (px, py, pz) => jitter(0x5a5854, 0.08, hash3(px, py, pz, seed + a)));
+  }
+  M.box(7, 1, 8, 16, 3, 11, orcLog(seed));
+  M.box(8, 2, 6, 12, 4, 16, orcLog(seed + 1));
+  M.box(9, 3, 9, 14, 5, 13, (x, y, z) => ((x + z) % 2 ? 0xffb347 : 0xff5a1a), true);
+  for (let i = 0; i < 7; i++) {
+    const x = 9 + (i % 4);
+    const z = 9 + ((i * 2) % 4);
+    const h = 4 + (i % 4);
+    M.box(x, 5, z, x + 2, 5 + h, z + 2, (px, py) => (py > 7 ? 0xffe27a : 0xff8a1a), true);
+  }
+  return bundle([[M, 0.0625, 11, 0, 11]]);
+}
+
+/** Skulls stacked on a stake. */
+export function buildOrcTotem(seed = 1) {
+  const M = new VoxelModel(14, 36, 14);
+  const log = orcLog(seed);
+  M.box(6, 0, 6, 9, 22, 9, log);
+  const skull = (cy, s) => {
+    M.ellipsoid(7, cy, 7, 3.3, 2.8, 3.1, (x, y, z) => jitter(0xe6dcc4, 0.05, hash3(x, y, z, seed + s)));
+    M.set(6, cy, 10, 0x16120e);
+    M.set(8, cy, 10, 0x16120e);
+    M.set(7, cy - 1, 10, 0x16120e);
+    M.box(5, cy - 2, 9, 6, cy, 11, 0xf0e6d0);
+    M.box(8, cy - 2, 9, 9, cy, 11, 0xf0e6d0);
+  };
+  skull(24, 1);
+  skull(30, 2);
+  M.box(4, 18, 6, 10, 20, 8, (x, y, z) => jitter(0x8a7048, 0.05, hash3(x, y, z, seed)));
+  return bundle([[M, 0.0625, 7, 0, 7]]);
+}
+
+/** A rack of crude blades and a hide shield. */
+export function buildOrcRack(seed = 1) {
+  const M = new VoxelModel(28, 26, 10);
+  const log = orcLog(seed);
+  M.box(2, 0, 3, 5, 22, 7, log);
+  M.box(23, 0, 3, 26, 22, 7, log);
+  M.box(2, 18, 3, 26, 21, 7, log);
+  M.box(6, 4, 4, 8, 20, 6, (x, y, z) => jitter(y > 14 ? 0x5a3a22 : 0x9aa0a8, 0.05, hash3(x, y, z, seed)));
+  M.box(5, 16, 3, 10, 18, 7, 0x6a655c);
+  M.box(12, 6, 4, 14, 20, 6, (x, y, z) => jitter(y > 15 ? 0x4a301c : 0xb0b4bc, 0.04, hash3(x, y, z, seed)));
+  M.box(18, 8, 2, 23, 18, 8, orcHide(seed));
+  M.box(20, 12, 7, 22, 15, 9, 0x8a2a22);
+  return bundle([[M, 0.0625, 14, 0, 5]]);
+}
+
+/** A hide stretched on a crooked frame. */
+export function buildOrcHideFrame(seed = 1) {
+  const M = new VoxelModel(22, 24, 6);
+  const log = orcLog(seed);
+  M.box(1, 0, 1, 4, 22, 4, log);
+  M.box(18, 0, 1, 21, 20, 4, log);
+  M.box(1, 18, 1, 21, 21, 4, log);
+  M.box(3, 4, 3, 19, 18, 5, orcHide(seed));
+  for (let y = 6; y < 16; y += 3) M.box(4, y, 4, 18, y + 1, 5, 0x8a7048);
+  return bundle([[M, 0.0625, 11, 0, 3]]);
+}
+
+/** Loose bones and a skull for the yard. */
+export function buildOrcBones(seed = 1) {
+  const M = new VoxelModel(16, 8, 14);
+  const bone = (x, y, z) => jitter(0xe6dcc4, 0.05, hash3(x, y, z, seed));
+  M.line(1, 1, 2, 12, 2, 6, bone, 1);
+  M.line(3, 1, 10, 14, 2, 4, bone, 1);
+  M.line(2, 1, 6, 8, 3, 12, bone, 1);
+  M.ellipsoid(11, 3, 8, 2.4, 2, 2.2, bone);
+  M.set(10, 3, 10, 0x16120e);
+  M.set(12, 3, 10, 0x16120e);
+  return bundle([[M, 0.0625, 8, 0, 7]]);
+}
+
 export function buildAnvil(seed = 4) {
   const M = new VoxelModel(18, 16, 10);
   const iron = (x, y, z) => J(0x474b54, x, y, z, seed, 0.07);

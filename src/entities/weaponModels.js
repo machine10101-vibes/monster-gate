@@ -22,6 +22,7 @@ const EDGE_HOLD = new Set([
   'blade', 'dual',
   'budgeblade', 'budgegreatsword', 'budgedual',
   'darksword', 'darkgreatsword', 'darkdual',
+  'orcblade',
 ]);
 
 /** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
@@ -70,6 +71,11 @@ const THEMES = {
     wrap: 0x6a4325, wrapLo: 0x4a2c16, wrapHi: 0x8a5a30, blade: 0xb4b8c0, edge: 0xe8eaf0, dark: 0x7a7e88,
     guard: 0xb8923a, guardHi: 0xe0bb52, glow: 0xffc94a, glow2: 0xfff0b0, wood: 0x7a4e2c, string: 0xe8e0c8,
     membrane: 0x8a3a2a, membraneHi: 0xb04a36, claw: 0xdfe2e8, horn: 0xb4b8c0, hornDark: 0x7a7e88,
+  },
+  orc: {
+    wrap: 0x4a3018, wrapLo: 0x2c1c10, wrapHi: 0x6a4830, blade: 0x8e939c, edge: 0xd5d8de, dark: 0x5c6168,
+    guard: 0x6a655c, guardHi: 0x9a9488, glow: 0xc8ccd2, glow2: 0xe6dcc4, wood: 0x4a3018, string: 0xe8e0c8,
+    membrane: 0x6a4030, membraneHi: 0x8a6848, claw: 0xd5d8de, horn: 0xe6dcc4, hornDark: 0xb7a88e,
   },
 };
 
@@ -311,6 +317,7 @@ function sword(T, o) {
 
 const SWORDS = {
   blade: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 82, w0: 8, tip: 0.84 } }),
+  orcblade: () => sword(THEMES.orc, { guardHalf: 7, cap: 'fang', pommel: 'ball', b: { z1: 76, w0: 9, serr: 5, tip: 0.68 } }),
   darksword: () =>
     sword(THEMES.dark, { guardHalf: 11, sweep: 5, cap: 'fang', gem: THEMES.dark.glow2, pgem: THEMES.dark.glow2, b: { z1: 93, w0: 10, curve: 10, exp: 2.2, fuller: 'glow', glowEvery: 5, runes: 7, tip: 0.74 } }),
   budgeblade: () =>

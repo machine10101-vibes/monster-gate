@@ -106,7 +106,18 @@ export class Progress {
   }
 
   canCraft(gear) {
+    if (gear.found) return false;
     return !this.crafted(gear.id) && Object.entries(gear.recipe).every(([m, n]) => this.count(m) >= n);
+  }
+
+  /** A dropped weapon joins the bag. The first one is equipped when the hunter has none. */
+  grantFound(id) {
+    const g = gearById(id);
+    if (!g || this.crafted(id)) return false;
+    this.data.crafted[id] = true;
+    if (g.type === 'weapon' && !this.data.weapon) this.data.weapon = id;
+    this.save();
+    return true;
   }
 
   craft(id) {
