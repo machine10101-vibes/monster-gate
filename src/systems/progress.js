@@ -179,6 +179,7 @@ export class Progress {
     if (!g || this.crafted(id)) return false;
     this.data.crafted[id] = true;
     if (g.type === 'weapon' && !this.data.weapon) this.data.weapon = id;
+    if (g.type === 'armor' && !this.data.armor[g.slot]) this.data.armor[g.slot] = id;
     this.save();
     return true;
   }

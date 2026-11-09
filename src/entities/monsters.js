@@ -3,6 +3,9 @@ import { buildSlime, buildBoar, buildWraith, buildBudgeDragon } from './creature
 import { buildDarksycleDragon } from './darksycle.js';
 import { buildOrcScout } from './orc.js';
 import { buildSnowYeti } from './yeti.js';
+import { buildHolyKnight, buildDemonKnight } from './knights.js';
+import { knightThink, animateKnight, knightHoldsWarn, KNIGHT_BUSY } from './knightAI.js';
+import { KNIGHT_TYPES } from '../data/knights.js';
 import { yetiThink, animateYeti, yetiHoldsWarn, YETI_BUSY, YETI_WIND } from './yetiAI.js';
 import { clamp, lerp, RNG } from '../engine/voxel.js';
 import { statusFx } from '../systems/skillfx.js';
@@ -25,8 +28,8 @@ function easeOutBack(x) {
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
-const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1, orcscout: 1.25, snowyeti: 2.3 };
-const TELE_COL = { boar: 0xff5a3a, budgedragon: 0xff7a2a, darksycledragon: 0xb25cff, wraith: 0xc27bff, orcscout: 0xc45a2a, snowyeti: 0x7fd0ff };
+const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1, orcscout: 1.25, snowyeti: 2.3, demonknight: 2.2, holyknight: 2.2 };
+const TELE_COL = { boar: 0xff5a3a, budgedragon: 0xff7a2a, darksycledragon: 0xb25cff, wraith: 0xc27bff, orcscout: 0xc45a2a, snowyeti: 0x7fd0ff, demonknight: 0xff3a1a, holyknight: 0x6fb8ff };
 
 const DRAGON_HOVER = 1.0;
 const DRAGON_AIR_H = 5.2;
@@ -50,6 +53,8 @@ const DEFS = {
   budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
   darksycledragon: { name: 'Darksycle Dragon', hp: 110, radius: 0.95, speed: 2.7, dmg: 4, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
   snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
+  demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 7, gold: [90, 140], aggro: 17, build: buildDemonKnight },
+  holyknight: { name: 'Holy Knight', hp: 300, radius: 1.05, speed: 3.0, dmg: 7, gold: [90, 140], aggro: 17, build: buildHolyKnight },
   orcscout: { name: 'Orc Scout', hp: 36, radius: 0.6, speed: 2.7, dmg: 4, gold: [2, 8], aggro: 12, build: buildOrcScout },
 };
 
@@ -218,8 +223,9 @@ export class Monster {
     const drake = this.type === 'budgedragon';
     const dusk = this.type === 'darksycledragon';
     const yeti = this.type === 'snowyeti';
-    const heavy = drake || dusk || yeti;
-    this.stun = yeti ? (YETI_BUSY.has(this.state) ? 0 : 0.1) : this.type === 'boar' && this.state === 'charge' ? 0.05 : heavy ? (this.state === 'windup' || this.state === 'bite' || AIR_STATES.has(this.state) ? 0 : 0.12) : 0.28;
+    const knight = KNIGHT_TYPES.has(this.type);
+    const heavy = drake || dusk || yeti || knight;
+    this.stun = knight ? (KNIGHT_BUSY.has(this.state) ? 0 : 0.1) : yeti ? (YETI_BUSY.has(this.state) ? 0 : 0.1) : this.type === 'boar' && this.state === 'charge' ? 0.05 : heavy ? (this.state === 'windup' || this.state === 'bite' || AIR_STATES.has(this.state) ? 0 : 0.12) : 0.28;
     if (this.state === 'windup' && !heavy) {
       this.state = 'chase';
       this.clearWarn();
@@ -244,19 +250,19 @@ export class Monster {
       g.hud.floatText(...g.screenOf(this.x, this.y + 4.2, this.z), 'Staggered', 'gold');
     }
     const inLeap = yeti && (this.state === 'leap' || this.state === 'slamwind');
-    const k = knock / (this.type === 'boar' ? 1.6 : drake ? 2.4 : dusk ? 3.4 : yeti ? 5.5 : 1);
+    const k = knock / (this.type === 'boar' ? 1.6 : drake ? 2.4 : dusk ? 3.4 : yeti ? 5.5 : knight ? 6 : 1);
     this.vx = inLeap ? this.vx : dx * k * 1.7;
     this.vz = inLeap ? this.vz : dz * k * 1.7;
-    if (!inLeap) this.vy = this.type === 'wraith' || dusk || yeti ? 0 : drake ? 1.2 : 2.6;
+    if (!inLeap) this.vy = this.type === 'wraith' || dusk || yeti || knight ? 0 : drake ? 1.2 : 2.6;
     if (drake && !this.enraged && this.hp > 0 && this.hp < this.maxHp * 0.4) this.enrage();
-    if ((dusk || yeti) && !this.enraged && this.hp > 0 && this.hp < this.maxHp * 0.5) this.enrage();
+    if ((dusk || yeti || knight) && !this.enraged && this.hp > 0 && this.hp < this.maxHp * 0.5) this.enrage();
     this.air = this.type === 'slime' || this.type === 'voidslime' || inLeap ? this.air : false;
     const hx = this.x;
     const hy = this.y + 0.7 + this.hover;
     const hz = this.z;
-    const sparkCol = this.type === 'slime' ? [0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xdcb4ff, 0xffffff] : dusk ? [0xd8b0ff, 0xffffff] : yeti ? [0xe6f9ff, 0x9fdcff, 0xffffff] : [0xfff2c0, 0xffb347, 0xffffff];
+    const sparkCol = this.type === 'slime' ? [0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xdcb4ff, 0xffffff] : dusk ? [0xd8b0ff, 0xffffff] : yeti ? [0xe6f9ff, 0x9fdcff, 0xffffff] : this.type === 'demonknight' ? [0xff8a4a, 0xff3a1a, 0xffffff] : this.type === 'holyknight' ? [0xfff0b0, 0x9fd0ff, 0xffffff] : [0xfff2c0, 0xffb347, 0xffffff];
     g.fx.impact(hx - dx * this.radius * 0.6, hy + 0.2, hz - dz * this.radius * 0.6, dx, dz, sparkCol, (crit ? 1.7 : 1) * Math.min(1.8, 0.6 + dmg / 18));
-    g.fx.burst(hx, hy, hz, this.type === 'slime' ? [0x57d46c, 0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xc27bff, 0x8c52da, 0xffffff] : dusk ? [0xb25cff, 0x4b3f8c, 0xffffff] : yeti ? [0xb4d0e6, 0xdcecf8, 0xffffff] : [0xc9967a, 0xff5a46, 0xffffff], crit ? 12 : 6, 3.8, 0.1, 0.5);
+    g.fx.burst(hx, hy, hz, this.type === 'slime' ? [0x57d46c, 0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xc27bff, 0x8c52da, 0xffffff] : dusk ? [0xb25cff, 0x4b3f8c, 0xffffff] : yeti ? [0xb4d0e6, 0xdcecf8, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0x6a6a74, 0xff3a1a] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0xffffff] : [0xc9967a, 0xff5a46, 0xffffff], crit ? 12 : 6, 3.8, 0.1, 0.5);
     g.hud.floatText(...g.screenOf(hx, hy + 0.9, hz), String(dmg) + (crit ? '!' : ''), crit ? 'crit' : '');
     if (this.state === 'idle' || this.state === 'wander') this.state = 'chase';
     if (this.hp <= 0) this.die();
@@ -276,9 +282,10 @@ export class Monster {
       this.clearWarn();
       g.shake(0.3);
     }
+    const knight = KNIGHT_TYPES.has(this.type);
     g.audio.tone(dusk ? 160 : 90, 0.55, 'sawtooth', 0.16, -30);
-    g.fx.ring(this.x, this.y + 0.3 + this.hover, this.z, dusk ? 0xb25cff : yeti ? 0x7fd0ff : 0xff6a2a, 10, 2.6, 0.1, 0.5);
-    g.hud.floatText(...g.screenOf(this.x, this.y + this.hover + (yeti ? 4.3 : 2.2), this.z), dusk ? 'Dusk Frenzy!' : yeti ? 'Ravenous Frenzy!' : 'Enraged!', 'crit');
+    g.fx.ring(this.x, this.y + 0.3 + this.hover, this.z, dusk ? 0xb25cff : yeti ? 0x7fd0ff : this.type === 'holyknight' ? 0x6fb8ff : this.type === 'demonknight' ? 0xff3a1a : 0xff6a2a, 10, 2.6, 0.1, 0.5);
+    g.hud.floatText(...g.screenOf(this.x, this.y + this.hover + (yeti ? 4.3 : knight ? 3.8 : 2.2), this.z), dusk ? 'Dusk Frenzy!' : yeti ? 'Ravenous Frenzy!' : knight ? 'The Eternal War!' : 'Enraged!', 'crit');
   }
 
   die() {
@@ -286,7 +293,7 @@ export class Monster {
     this.dead = true;
     this.deadT = 0;
     g.onMonsterKilled(this);
-    g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : this.type === 'darksycledragon' ? [0xb25cff, 0xd8d3ee, 0x2b2450] : this.type === 'snowyeti' ? [0xb4d0e6, 0xe6f9ff, 0x7fd0ff, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
+    g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : this.type === 'darksycledragon' ? [0xb25cff, 0xd8d3ee, 0x2b2450] : this.type === 'snowyeti' ? [0xb4d0e6, 0xe6f9ff, 0x7fd0ff, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0xff3a1a, 0xff8a2a, 0xffffff] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0x6fb8ff, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
     g.audio.pop();
     g.hud.removePlate(this.id);
     this.clearWarn();
@@ -295,7 +302,7 @@ export class Monster {
     this.state = 'dead';
     this.vy = Math.max(this.vy, this.type === 'slime' || this.type === 'voidslime' ? 3.5 : 1.5);
     g.fx.impact(this.x, this.y + 0.9 + this.hover, this.z, this.flashDir.x, this.flashDir.z, [0xffffff, 0xfff2c0], 2.2);
-    if (this.type === 'budgedragon' || this.type === 'darksycledragon' || this.type === 'snowyeti') {
+    if (this.type === 'budgedragon' || this.type === 'darksycledragon' || this.type === 'snowyeti' || KNIGHT_TYPES.has(this.type)) {
       g.slowmo(0.55, 0.3);
       g.shake(0.35);
       g.punch(0.5);
@@ -904,6 +911,11 @@ export class Monster {
           [mvx, mvz] = yetiThink(this, dt, { g, P, dx, dz, dist, sees, toP });
           break;
         }
+        case 'demonknight':
+        case 'holyknight': {
+          [mvx, mvz] = knightThink(this, dt, { g, P, dx, dz, dist, sees, toP });
+          break;
+        }
         case 'orcscout': {
           const campD = Math.hypot(this.x - this.home.x, this.z - this.home.z);
           const leashed = campD > 18;
@@ -979,7 +991,7 @@ export class Monster {
       mvx *= slow;
       mvz *= slow;
     }
-    const accel = this.type === 'boar' ? (this.state === 'charge' ? 24 : 9) : this.type === 'budgedragon' ? 8 : this.type === 'darksycledragon' ? 5 : this.type === 'wraith' ? 4 : this.type === 'orcscout' ? 11 : this.type === 'snowyeti' ? 7 : 30;
+    const accel = this.type === 'boar' ? (this.state === 'charge' ? 24 : 9) : this.type === 'budgedragon' ? 8 : this.type === 'darksycledragon' ? 5 : this.type === 'wraith' ? 4 : this.type === 'orcscout' ? 11 : this.type === 'snowyeti' ? 7 : KNIGHT_TYPES.has(this.type) ? (this.state === 'dash' ? 30 : 8) : 30;
     const ak = 1 - Math.exp(-accel * dt);
     this.smx = (this.smx || 0) + (mvx - (this.smx || 0)) * ak;
     this.smz = (this.smz || 0) + (mvz - (this.smz || 0)) * ak;
@@ -1056,7 +1068,8 @@ export class Monster {
     const hk = this.hitT > 0 ? this.hitT / 0.34 : 0;
     const yeti = this.type === 'snowyeti';
     const winding = this.state === 'windup' || (yeti && YETI_WIND.has(this.state));
-    const keepWarn = winding || (this.type === 'darksycledragon' && this.state === 'descend') || (yeti && (yetiHoldsWarn(this.state) || this.state === 'rake3'));
+    const knight = KNIGHT_TYPES.has(this.type);
+    const keepWarn = (knight && knightHoldsWarn(this.state)) || winding || (this.type === 'darksycledragon' && this.state === 'descend') || (yeti && (yetiHoldsWarn(this.state) || this.state === 'rake3'));
     if (!keepWarn && this.teleSlot) this.clearWarn();
     else if (keepWarn) this.placeWarn();
 
@@ -1073,11 +1086,11 @@ export class Monster {
     if (dt > 1e-4) this.accAlong = (this.accAlong || 0) + (((along - (this.prevAlong || 0)) / dt) - (this.accAlong || 0)) * Math.min(1, dt * 6);
     this.prevAlong = along;
     const pl = g.player.pos;
-    const lookYaw = this.dead ? 0 : clamp(angDiff(this.yaw, Math.atan2(pl.x - this.x, pl.z - this.z)), -0.75, 0.75) * (dist < 15 && this.state !== 'windup' && this.state !== 'charge' && !(yeti && YETI_BUSY.has(this.state)) ? 0.7 : 0);
+    const lookYaw = this.dead ? 0 : clamp(angDiff(this.yaw, Math.atan2(pl.x - this.x, pl.z - this.z)), -0.75, 0.75) * (dist < 15 && this.state !== 'windup' && this.state !== 'charge' && !(yeti && YETI_BUSY.has(this.state)) && !(knight && KNIGHT_BUSY.has(this.state)) ? 0.7 : 0);
     this.lookSm = (this.lookSm || 0) + (lookYaw - (this.lookSm || 0)) * Math.min(1, dt * 5);
     o.rotation.set(0, this.vyaw, this.type === 'slime' || this.type === 'voidslime' ? 0 : this.bank);
 
-    const heavy = this.type === 'budgedragon' || this.type === 'darksycledragon' || yeti;
+    const heavy = this.type === 'budgedragon' || this.type === 'darksycledragon' || yeti || knight;
     let rootX = -hk * (heavy ? 0.1 : 0.3) + (this.type === 'slime' || this.type === 'voidslime' ? 0 : clamp(-(this.accAlong || 0) * (heavy ? 0.004 : 0.007), -0.12, 0.12));
     const rootZ = Math.sin(this.t * 70) * 0.05 * hk * (heavy ? 0.5 : 1);
     let rootY = 0;
@@ -1156,6 +1169,10 @@ export class Monster {
       rootSXY = 1 - 0.06 * this.kick;
       o.scale.setScalar(spawnS * this.baseScale);
       if (winding) this.model.mat.emissive.setRGB(0.35 + Math.sin(t * 30) * 0.15, 0.03, 0.0);
+    } else if (knight) {
+      const r = animateKnight(this, dt, { spd, t, hk, spawnS, dist, lookSm: this.lookSm });
+      rootY = r.rootY;
+      o.scale.setScalar(spawnS * this.baseScale);
     } else if (yeti) {
       const r = animateYeti(this, dt, { spd, t, hk, spawnS, dist, lookSm: this.lookSm });
       rootY = r.rootY;
@@ -1400,7 +1417,7 @@ export class Monster {
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'darksycledragon' && this.airCharge) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 3.0 : this.type === 'orcscout' ? 2.55 : yeti ? 4.4 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 3.0 : this.type === 'orcscout' ? 2.55 : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
@@ -1522,6 +1539,31 @@ export class Monster {
         fx.burst(this.x, this.y + 0.8, this.z, [0xe6f9ff, 0x7fd0ff, 0xffffff], 26, 4.5, 0.14, 0.9, 6, 3);
       }
       o.scale.setScalar(bs * (1 - k2 * k2));
+    } else if (KNIGHT_TYPES.has(this.type)) {
+      const p = m.parts;
+      const demon = this.type === 'demonknight';
+      const k = ease(clamp(u / 0.6, 0, 1));
+      const bn = u > 0.6 ? Math.exp(-(u - 0.6) * 7) * Math.sin((u - 0.6) * 24) * 0.04 : 0;
+      o.position.set(this.x, this.y, this.z);
+      o.rotation.set(0, this.yaw, 0);
+      m.root.rotation.x = -1.35 * k + bn;
+      m.root.position.y = 0.22 * k;
+      p.legL.rotation.x = -0.5 * k;
+      p.legR.rotation.x = 0.3 * k;
+      p.kneeL.rotation.x = 0.7 * k;
+      p.kneeR.rotation.x = 0.2 * k;
+      p.armL.rotation.x = -0.3 * (1 - k) - 0.2 * k;
+      p.armR.rotation.x = -0.3 * (1 - k) - 0.2 * k;
+      p.head.rotation.x = 0.5 * k;
+      if (!fl.land && u > 0.58) {
+        fl.land = true;
+        fx.shockwave(this.x, this.y, this.z, demon ? 0x6a5a58 : 0xfff0d0, 3);
+        fx.ring(this.x, this.y + 0.3, this.z, demon ? 0xff3a1a : 0x6fb8ff, 20, 5, 0.12, 0.5);
+        g.shake(0.4);
+        g.punch(0.3);
+      }
+      const k2 = dissolve(1.2, 0.9, demon ? [0x3a3a42, 0xff3a1a, 0xff8a2a, 0xffffff] : [0xdfe1e6, 0xffd27a, 0x6fb8ff, 0xffffff], 5);
+      o.scale.setScalar(bs * (1 - k2 * k2));
     } else if (this.type === 'orcscout') {
       const p = m.parts;
       const k = ease(clamp(u / 0.28, 0, 1));
@@ -1641,6 +1683,10 @@ export class Spawner {
     if (w.yetiPeak) {
       for (const [ox, oz] of [[0, 0], [-7.5, 5.5], [8, -4.5], [-3, -9.5]]) this.spawn('snowyeti', w.yetiPeak.x + ox, w.yetiPeak.z + oz, false);
     }
+    for (const [key, type] of [['demonKeep', 'demonknight'], ['holyKeep', 'holyknight']]) {
+      const keep = w[key];
+      if (keep) for (const [ox, oz] of keep.posts) this.spawn(type, keep.x + ox, keep.z + oz, false);
+    }
     if (w.cave) {
       const den = this.spawn('darksycledragon', w.cave.nest.x, w.cave.nest.z, false);
       den.realm = 'cave';
@@ -1698,7 +1744,8 @@ export class Spawner {
     this.timer = 3.5;
     this.fillOrcs();
     this.fillYetis();
-    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'orcscout' && m.type !== 'snowyeti').length;
+    this.fillKnights();
+    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'orcscout' && m.type !== 'snowyeti' && !KNIGHT_TYPES.has(m.type)).length;
     if (alive >= this.max) return;
     const spot = this.pickSpot();
     if (!spot) return;
@@ -1730,6 +1777,25 @@ export class Spawner {
     if (!w.playable(x, z) || Math.hypot(x - P.x, z - P.z) < 18) return;
     this.yetiT = 0;
     this.spawn('snowyeti', x, z);
+  }
+
+  fillKnights() {
+    const g = this.game;
+    const w = g.world;
+    this.knightT = (this.knightT || 0) + 1;
+    if (this.knightT < 40) return;
+    for (const [key, type] of [['demonKeep', 'demonknight'], ['holyKeep', 'holyknight']]) {
+      const keep = w[key];
+      if (!keep) continue;
+      const n = g.monsters.filter((m) => !m.dead && m.type === type).length;
+      if (n >= keep.posts.length) continue;
+      const [ox, oz] = keep.posts[this.rng.int(0, keep.posts.length - 1)];
+      const x = keep.x + ox;
+      const z = keep.z + oz;
+      if (!w.playable(x, z) || Math.hypot(x - g.player.pos.x, z - g.player.pos.z) < 22) continue;
+      this.knightT = 0;
+      this.spawn(type, x, z);
+    }
   }
 
   fillOrcs() {

@@ -28,7 +28,7 @@ import { Catalog } from './ui/catalog.js';
 import { Gathering } from './systems/gather.js';
 import { GOODS } from './data/gathering.js';
 import { updateGatherSites } from './world/gatherSite.js';
-import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
+import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { clearAccount, createAccount, readAccount, signInAccount } from './wallet/account.js';
@@ -1316,6 +1316,7 @@ class Game {
       for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
     }
     if (Math.random() < 0.18) this.dropCoin(m.x, m.y + 0.6, m.z, 0, 'heart');
+    for (const d of GEAR_DROPS[m.type] || []) if (Math.random() < d.chance) this.dropGear(d.id, m.x, m.y + 0.9, m.z);
     const hadPoints = this.progress.classId ? this.progress.skillPoints().earned : 0;
     const fresh = !this.progress.seen(m.type);
     const parts = this.progress.harvest(m.type);
@@ -1378,6 +1379,34 @@ class Game {
     this.pickups.push({ holder, mesh: model, kind: 'orcblade', value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.2, age: 0, grounded: false });
   }
 
+  dropGear(id, x, y, z) {
+    const gear = gearById(id);
+    if (!gear) return;
+    const holy = gear.monster === 'holyknight';
+    const holder = new THREE.Group();
+    let mesh;
+    if (gear.type === 'weapon') {
+      mesh = buildHeld(gear.held);
+      mesh.scale.setScalar(0.85);
+    } else {
+      mesh = new THREE.Group();
+      const col = holy ? 0xffd27a : 0xff3a1a;
+      const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.34), new THREE.MeshBasicMaterial({ color: holy ? 0xffffff : 0x2a2a30 }));
+      const halo = new THREE.Mesh(new THREE.OctahedronGeometry(0.46), new THREE.MeshBasicMaterial({ color: col, wireframe: true }));
+      mesh.add(core, halo);
+    }
+    holder.add(mesh);
+    holder.position.set(x, y, z);
+    this.scene.add(holder);
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.2 + Math.random();
+    this.pickups.push({ holder, mesh, kind: 'gear', gearId: id, value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 5, age: 0, grounded: false });
+    this.fx.ring(x, y, z, holy ? 0xffd27a : 0xff3a1a, 16, 3.2, 0.1, 0.6);
+    this.fx.burst(x, y, z, holy ? [0xfff0b0, 0x9fd0ff, 0xffffff] : [0xff3a1a, 0xff8a2a, 0xffffff], 18, 4, 0.1, 0.9, 6, 2);
+    this.hud.floatText(...this.screenOf(x, y + 1.2, z), 'Rare drop!', 'crit');
+    this.audio.quest();
+  }
+
   updatePickups(dt) {
     const P = this.player.pos;
     for (const k of this.pickups) {
@@ -1417,6 +1446,16 @@ class Game {
           this.player.heal(4);
           this.audio.potion();
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), '+2', 'heal');
+        } else if (k.kind === 'gear') {
+          const gg = gearById(k.gearId);
+          const got = this.progress.grantFound(k.gearId);
+          this.audio.quest();
+          this.hud.toast(got ? `Found: ${gg.name}` : `You already carry ${gg.name}`, 2800);
+          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), gg.name, 'gold');
+          if (got) {
+            this.applyGear();
+            if (gg.type === 'weapon' && this.progress.data.weapon === gg.id) this.selectSlot(0, true);
+          }
         } else if (k.kind === 'orcblade') {
           const got = this.progress.grantFound('orcblade');
           this.audio.quest();
@@ -1430,11 +1469,11 @@ class Game {
           this.addGold(k.value);
           this.audio.coin();
         }
-        this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : k.kind === 'orcblade' ? [0xb0b4bc, 0xe6dcc4, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
-      } else if (k.age > 40) k.done = true;
+        this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : k.kind === 'gear' ? [0xffd27a, 0xff6a3a, 0xffffff] : k.kind === 'orcblade' ? [0xb0b4bc, 0xe6dcc4, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
+      } else if (k.age > (k.kind === 'gear' ? 180 : 40)) k.done = true;
       if (k.done) {
         this.scene.remove(k.holder);
-        if (k.kind === 'orcblade') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+        if (k.kind === 'orcblade' || k.kind === 'gear') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
         else {
           k.mesh.geometry.dispose();
           k.mesh.material.dispose();
