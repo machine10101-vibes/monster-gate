@@ -1,5 +1,5 @@
 import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
-import { GOODS, GOODS_ORDER, TOOLS } from '../data/gathering.js';
+import { FISH, GOODS, GOODS_ORDER, TOOLS, burnChance } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 const TABS = [
@@ -88,13 +88,19 @@ export function mountBag(body, game) {
       const sub = document.createElement('span');
       sub.textContent = current.sub;
       detail.append(name, sub);
-      if (current.action) {
-        const act = document.createElement('button');
-        act.type = 'button';
-        act.className = 'bag-act';
-        act.textContent = current.action;
-        act.onclick = () => current.run(paint);
-        detail.appendChild(act);
+      const actions = current.actions || (current.action ? [{ label: current.action, run: current.run }] : []);
+      if (actions.length) {
+        const row = document.createElement('div');
+        row.className = 'bag-acts';
+        for (const act of actions) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'bag-act';
+          b.textContent = act.label;
+          b.onclick = () => act.run(paint);
+          row.appendChild(b);
+        }
+        detail.appendChild(row);
       }
     }
     stage.appendChild(detail);
@@ -153,22 +159,37 @@ function collect(game) {
     const n = game.progress.good(id);
     if (!n) continue;
     const g = GOODS[id];
-    const sub = g.heal ? `Eat to restore ${g.heal} health. You have ${n}.` : g.kind === 'log' ? `Light with the tinderbox. You have ${n}.` : `Sells for ${g.price} gold each. You have ${n}.`;
+    const fish = FISH[id];
+    let sub;
+    let actions = null;
+    let action = null;
+    let run = null;
+    if (fish) {
+      const cooked = GOODS[fish.cooked];
+      const burn = Math.round(burnChance(fish, game.progress.level('fishing')) * 100);
+      sub = `Eat for ${g.heal} health. Cook on a fire for ${cooked.heal} health, with a ${burn}% chance to burn. You have ${n}.`;
+      actions = [
+        { label: 'Eat', run: (paint) => { if (game.eatGood(id)) paint(); } },
+        { label: 'Cook', run: (paint) => { if (game.cookFish(id)) game.hud.closePanel(); else paint(); } },
+      ];
+    } else if (g.heal) {
+      sub = `Eat to restore ${g.heal} health. You have ${n}.`;
+      action = 'Eat';
+      run = (paint) => { if (game.eatGood(id)) paint(); };
+    } else if (g.kind === 'log') {
+      sub = `Light with the tinderbox. You have ${n}.`;
+      action = 'Light';
+      run = (paint) => { if (game.lightLog(id)) game.hud.closePanel(); else paint(); };
+    } else sub = `Sells for ${g.price} gold each. You have ${n}.`;
     goods.push({
       key: 'g' + id,
       name: g.name,
       sub,
       badge: String(n),
       canvas: () => renderThumb({ kind: 'good', id }, 96),
-      action: g.heal ? 'Eat' : g.kind === 'log' ? 'Light' : null,
-      run: (paint) => {
-        if (g.heal) {
-          if (game.eatGood(id)) paint();
-        } else if (g.kind === 'log') {
-          if (game.lightLog(id)) game.hud.closePanel();
-          else paint();
-        }
-      },
+      action,
+      actions,
+      run,
     });
   }
 

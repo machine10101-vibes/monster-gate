@@ -84,10 +84,11 @@ export const LEVEL_SKILLS = {
     id: 'fishing',
     name: 'Fishing',
     color: '#4ec8ff',
-    blurb: 'Fish Mirrormere from the dock and work the Silverrun river with a net or pole. Ice holes on the Glimmerfrost lake give up pike and sturgeon.',
+    blurb: 'Fish Mirrormere from the dock and work the Silverrun river with a net or pole. Ice holes on the Glimmerfrost lake give up pike and sturgeon. Cook a catch on a campfire for more healing. Higher Fishing burns less, and lower-level fish burn least, though a little chance always remains.',
     effect: (lvl) => `${Math.round(fishChance(FISH.shrimp, lvl) * 100)}% shrimp catch chance`,
     unlocks: [
       [1, 'Shrimp (small net)'],
+      [1, 'Cook fish on a fire'],
       [3, 'Trout (fishing pole)'],
       [8, 'Pike minnow (small net, river)'],
       [12, 'Salmon (fishing pole, river)'],
@@ -166,6 +167,10 @@ export const FISH = {
     base: 0.45,
     odds: 1,
     catchText: 'You catch some shrimp.',
+    cooked: 'cooked_shrimp',
+    cookHeal: 5,
+    cookPrice: 7,
+    cookXp: 8,
   },
   trout: {
     id: 'trout',
@@ -177,6 +182,10 @@ export const FISH = {
     base: 0.32,
     odds: 1,
     catchText: 'You catch a trout.',
+    cooked: 'cooked_trout',
+    cookHeal: 12,
+    cookPrice: 18,
+    cookXp: 20,
   },
   pikeminnow: {
     id: 'pikeminnow',
@@ -188,6 +197,10 @@ export const FISH = {
     base: 0.42,
     odds: 1,
     catchText: 'You scoop up a pike minnow.',
+    cooked: 'cooked_pikeminnow',
+    cookHeal: 9,
+    cookPrice: 14,
+    cookXp: 14,
   },
   salmon: {
     id: 'salmon',
@@ -199,6 +212,10 @@ export const FISH = {
     base: 0.3,
     odds: 1,
     catchText: 'You land a salmon.',
+    cooked: 'cooked_salmon',
+    cookHeal: 18,
+    cookPrice: 34,
+    cookXp: 35,
   },
   pike: {
     id: 'pike',
@@ -210,6 +227,10 @@ export const FISH = {
     base: 0.28,
     odds: 0.68,
     catchText: 'You haul a pike out of the hole.',
+    cooked: 'cooked_pike',
+    cookHeal: 24,
+    cookPrice: 48,
+    cookXp: 55,
   },
   sturgeon: {
     id: 'sturgeon',
@@ -221,6 +242,10 @@ export const FISH = {
     base: 0.2,
     odds: 0.32,
     catchText: 'You haul a sturgeon out of the hole!',
+    cooked: 'cooked_sturgeon',
+    cookHeal: 36,
+    cookPrice: 90,
+    cookXp: 90,
   },
 };
 
@@ -269,17 +294,24 @@ export const TREES = {
 export const GOODS = {
   copper_ore: { id: 'copper_ore', name: 'Copper ore', desc: 'Orange-veined ore from the Greyrock Pit.', price: 4, kind: 'ore' },
   tin_ore: { id: 'tin_ore', name: 'Tin ore', desc: 'Silvery ore from the Greyrock Pit.', price: 4, kind: 'ore' },
-  shrimp: { id: 'shrimp', name: 'Shrimp', desc: 'Netted in Mirrormere. Eat to restore 2 health.', price: 3, heal: 2, kind: 'fish' },
-  trout: { id: 'trout', name: 'Trout', desc: 'Pole-caught in Mirrormere. Eat to restore 6 health.', price: 9, heal: 6, kind: 'fish' },
-  pikeminnow: { id: 'pikeminnow', name: 'Pike minnow', desc: 'Netted in the Silverrun river. Eat to restore 4 health.', price: 7, heal: 4, kind: 'fish' },
-  salmon: { id: 'salmon', name: 'Salmon', desc: 'Pole-caught in the Silverrun river. Eat to restore 10 health.', price: 18, heal: 10, kind: 'fish' },
-  pike: { id: 'pike', name: 'Pike', desc: 'Hauled through the Glimmerfrost ice. Eat to restore 14 health.', price: 28, heal: 14, kind: 'fish' },
-  sturgeon: { id: 'sturgeon', name: 'Sturgeon', desc: 'An armoured giant from under the Glimmerfrost ice. Eat to restore 20 health.', price: 52, heal: 20, kind: 'fish' },
+  shrimp: { id: 'shrimp', name: 'Shrimp', desc: 'Netted in Mirrormere. Eat for 2 health, or cook it on a fire.', price: 3, heal: 2, kind: 'fish' },
+  trout: { id: 'trout', name: 'Trout', desc: 'Pole-caught in Mirrormere. Eat for 6 health, or cook it on a fire.', price: 9, heal: 6, kind: 'fish' },
+  pikeminnow: { id: 'pikeminnow', name: 'Pike minnow', desc: 'Netted in the Silverrun river. Eat for 4 health, or cook it on a fire.', price: 7, heal: 4, kind: 'fish' },
+  salmon: { id: 'salmon', name: 'Salmon', desc: 'Pole-caught in the Silverrun river. Eat for 10 health, or cook it on a fire.', price: 18, heal: 10, kind: 'fish' },
+  pike: { id: 'pike', name: 'Pike', desc: 'Hauled through the Glimmerfrost ice. Eat for 14 health, or cook it on a fire.', price: 28, heal: 14, kind: 'fish' },
+  sturgeon: { id: 'sturgeon', name: 'Sturgeon', desc: 'An armoured giant from under the Glimmerfrost ice. Eat for 20 health, or cook it on a fire.', price: 52, heal: 20, kind: 'fish' },
+  cooked_shrimp: { id: 'cooked_shrimp', name: 'Cooked shrimp', desc: 'Grilled over a campfire. Eat to restore 5 health.', price: 7, heal: 5, kind: 'fish' },
+  cooked_trout: { id: 'cooked_trout', name: 'Cooked trout', desc: 'Grilled over a campfire. Eat to restore 12 health.', price: 18, heal: 12, kind: 'fish' },
+  cooked_pikeminnow: { id: 'cooked_pikeminnow', name: 'Cooked pike minnow', desc: 'Grilled over a campfire. Eat to restore 9 health.', price: 14, heal: 9, kind: 'fish' },
+  cooked_salmon: { id: 'cooked_salmon', name: 'Cooked salmon', desc: 'Grilled over a campfire. Eat to restore 18 health.', price: 34, heal: 18, kind: 'fish' },
+  cooked_pike: { id: 'cooked_pike', name: 'Cooked pike', desc: 'Grilled over a campfire. Eat to restore 24 health.', price: 48, heal: 24, kind: 'fish' },
+  cooked_sturgeon: { id: 'cooked_sturgeon', name: 'Cooked sturgeon', desc: 'Grilled over a campfire. Eat to restore 36 health.', price: 90, heal: 36, kind: 'fish' },
+  burnt_fish: { id: 'burnt_fish', name: 'Burnt fish', desc: 'Left on the fire too long. It sells for a coin, and nobody will eat it.', price: 1, kind: 'fish' },
   birch_logs: { id: 'birch_logs', name: 'Birch logs', desc: 'Pale wood from the meadow west of Oakhollow. Light it with a tinderbox.', price: 4, kind: 'log', tree: 'birch' },
   oak_logs: { id: 'oak_logs', name: 'Oak logs', desc: 'Heavy timber from the oak grove. Light it with a tinderbox.', price: 8, kind: 'log', tree: 'oak' },
   maple_logs: { id: 'maple_logs', name: 'Maple logs', desc: 'Red maple wood. Light it with a tinderbox once Firemaking is 10.', price: 16, kind: 'log', tree: 'maple' },
 };
-export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'shrimp', 'trout', 'pikeminnow', 'salmon', 'pike', 'sturgeon', 'birch_logs', 'oak_logs', 'maple_logs'];
+export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'shrimp', 'cooked_shrimp', 'trout', 'cooked_trout', 'pikeminnow', 'cooked_pikeminnow', 'salmon', 'cooked_salmon', 'pike', 'cooked_pike', 'sturgeon', 'cooked_sturgeon', 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs'];
 
 export const TOOLS = [
   { id: 'pickaxe', held: 'pick', name: 'Iron Pickaxe', desc: 'Used on rocks in the Greyrock Pit.' },
@@ -297,6 +329,20 @@ export function mineChance(base, level) {
 
 export function mineSwingTime(level) {
   return Math.max(1.3, MINING_SWING - (level - 1) * 0.012);
+}
+
+/**
+ * Chance one fish burns on the fire. It is highest when Fishing is at or under
+ * the fish's own level, and it falls by 1.1% for every Fishing level above that.
+ * It never drops under 4%, so there is always a chance to burn.
+ */
+export function burnChance(fish, fishingLevel) {
+  const gap = fishingLevel - fish.level;
+  return Math.max(0.04, Math.min(0.7, 0.5 - gap * 0.011));
+}
+
+export function cookTime(level) {
+  return Math.max(1.4, 2.6 - (level - 1) * 0.014);
 }
 
 export function fishChance(fish, level) {
