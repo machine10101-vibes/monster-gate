@@ -37,18 +37,18 @@ const sheathBasis = new THREE.Matrix4();
 
 /**
  * Hang a carried weapon on the back slot.
- * Hafted models run along +z. The grip leans up over the right shoulder
- * and the tip runs down across the back at a shallow angle.
+ * Hafted models run along +z. Seen from behind, the grip clears the
+ * shoulder and the blade angles down toward the right.
  */
 export function placeSheath(group, kind) {
   if (TALL_KINDS.has(kind)) {
-    group.position.set(0.14, 0.22, -0.02);
-    group.rotation.set(0.08, 0.2, -0.48);
+    group.position.set(0.08, 0.36, -0.02);
+    group.rotation.set(0.08, 0.15, -0.48);
     return;
   }
-  const lean = 0.4;
-  group.position.set(0.1, 0.16, -0.06);
-  sheathTip.set(-Math.sin(lean), -Math.cos(lean), -0.05).normalize();
+  const lean = 0.42;
+  group.position.set(0.08, 0.32, -0.05);
+  sheathTip.set(-Math.sin(lean), -Math.cos(lean), -0.04).normalize();
   sheathX.crossVectors(sheathBack, sheathTip).normalize();
   sheathY.crossVectors(sheathTip, sheathX).normalize();
   sheathBasis.makeBasis(sheathX, sheathY, sheathTip);
