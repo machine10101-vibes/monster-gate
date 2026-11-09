@@ -1377,8 +1377,26 @@ body.touch .how {
   }
 }
 @media (orientation: portrait) {
-  body.touch #rotate-overlay {
+  /* The title screen stays upright so Klever can show fingerprint and confirm.
+     Landscape is asked for only after the hunt has started. */
+  body.touch.hunting #rotate-overlay {
     display: flex;
+  }
+  body.touch #title .title-inner {
+    width: min(440px, 100%);
+    padding: calc(32px + var(--safe-t)) 20px calc(36px + var(--safe-b));
+  }
+  body.touch #title h1 {
+    font-size: clamp(26px, 10vw, 42px);
+    margin: 8px 0 14px;
+  }
+  body.touch #title .start {
+    width: min(280px, 100%);
+    font-size: 11px;
+  }
+  body.touch #title .wallet-status,
+  body.touch #title .wallet-help {
+    max-width: 100%;
   }
 }
 

@@ -32,7 +32,7 @@ import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from '.
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
-import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
+import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, releaseOrientation, requestGameFullscreen } from './engine/immersive.js';
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
@@ -180,6 +180,8 @@ class Game {
 
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('title').classList.remove('hidden');
+    // Sign-in stays in whatever way the phone is held. Landscape starts with the hunt.
+    releaseOrientation();
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -192,6 +194,7 @@ class Game {
   start() {
     if (this.started) return;
     if (!this.wallet?.address || this.cloudSyncing) return;
+    document.body.classList.add('hunting');
     if (this.input.touch && this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
     this.started = true;
     this.audio.unlock();

@@ -13,6 +13,16 @@ function lockLandscape() {
   pending?.catch?.(() => {});
 }
 
+/** Drop a landscape lock left over from an earlier visit, before sign-in. */
+export function releaseOrientation() {
+  try {
+    const pending = screen.orientation?.unlock?.();
+    pending?.catch?.(() => {});
+  } catch {
+    /* nothing is locked */
+  }
+}
+
 /** Ask the browser to drop its toolbar. Requires a user gesture on most phones. */
 export function requestGameFullscreen(lock = false) {
   if (isFullscreen()) {
