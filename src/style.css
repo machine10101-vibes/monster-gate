@@ -18,6 +18,15 @@
   -webkit-touch-callout: none;
 }
 
+/* A Klever confirm sheet must not shrink the page. A resize dismisses that sheet. */
+html.wallet-signing,
+html.wallet-signing body,
+html.wallet-signing #app {
+  height: var(--sign-lock-h, 100%) !important;
+  min-height: var(--sign-lock-h, 100%) !important;
+  max-height: var(--sign-lock-h, 100%) !important;
+}
+
 html,
 body {
   margin: 0;

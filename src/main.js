@@ -278,7 +278,7 @@ class Game {
       const where = window.kleverWeb ? (isMobile() ? 'Klever Wallet' : 'the Klever extension') : 'your Klever wallet';
       sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
       status.textContent = window.kleverWeb
-        ? 'Tap Sign in, then approve the signature. Klever keeps that window open until you do.'
+        ? 'Tap Sign in. On the Klever screen, tap Confirm and leave that window open until it accepts.'
         : 'Sign in with your Klever wallet. Your hunt is saved to that address.';
       return;
     }

@@ -73,11 +73,53 @@ export function markPrompt() {
 }
 
 /**
- * The in-app browser's kleverWeb.signMessage sends SIGN_TRANSACTION. A login
- * message is not a transaction, so the app opens the confirm sheet and then
- * closes it. SIGN_IN_MESSAGE keeps that sheet up until the hunter taps confirm.
+ * Klever closes a confirm sheet when the page under it changes size. Pin the
+ * layout to the height it had before the sheet opened, and release it after.
  */
+function holdPageStill() {
+  const h = `${Math.round(window.innerHeight)}px`;
+  document.documentElement.style.setProperty('--sign-lock-h', h);
+  document.documentElement.classList.add('wallet-signing');
+}
+
+function releasePageHold() {
+  document.documentElement.classList.remove('wallet-signing');
+  document.documentElement.style.removeProperty('--sign-lock-h');
+}
+
+/**
+ * The installed app's own signMessage opens a message sheet inside the browser
+ * and leaves it up until Confirm. The newer page bridge opens a separate PIN
+ * screen that the app dismisses as soon as fingerprint starts, so that bridge
+ * is only used when the message sheet is not there.
+ */
+function legacySignMessage(message) {
+  const wallet = window.kleverWallet;
+  const events = window.kleverWalletEvents;
+  if (typeof wallet?.handleTransaction !== 'function') return null;
+  if (typeof events?.createEvent !== 'function' || typeof events.addEventListener !== 'function') return null;
+  return new Promise((resolve, reject) => {
+    const event = events.createEvent({
+      chain: 'KLEVER',
+      type: 'SIGN_MESSAGE',
+      transactionInfo: {
+        siteUrl: location.href,
+        hostname: location.hostname,
+      },
+      preTransaction: message,
+    });
+    events.addEventListener(event.id, (result) => {
+      const data = result?.data;
+      if (data?.status === 'ACCEPTED') resolve(data.data?.message ?? data.data ?? data);
+      else reject(fail('rejected', 'The Klever app closed the sign-in request.'));
+    });
+    wallet.handleTransaction(JSON.stringify(event));
+  });
+}
+
 async function requestSignature(kw, message) {
+  const legacy = legacySignMessage(message);
+  if (legacy) return legacy;
   const bridge = window.__kleverBrowser__?.bridge;
   if (typeof bridge === 'function') {
     return bridge({
@@ -144,6 +186,7 @@ export async function signIn() {
     );
   }
   const address = await connectProvider(kw, mobile);
+  holdPageStill();
   const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
   const nonce = [...nonceBytes].map((b) => b.toString(16).padStart(2, '0')).join('');
   const message = [
@@ -155,9 +198,13 @@ export async function signIn() {
   ].join('\n');
   let signed;
   try {
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     signed = await requestSignature(kw, message);
-  } catch {
+  } catch (err) {
+    if (err?.code === 'rejected') throw err;
     throw fail('rejected', mobile ? 'The Klever app closed the sign-in request.' : 'The Klever extension closed the sign-in request.');
+  } finally {
+    releasePageHold();
   }
   const signature = signatureText(signed);
   let ok = verifyKleverSignature(message, signature, address);
