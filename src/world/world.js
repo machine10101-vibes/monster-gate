@@ -3,8 +3,9 @@ import { GeometryBatch, RNG, hash2, fbm, smoothstep, clamp } from '../engine/vox
 import { buildAtlas, toonMaterial, patchHide, TILE } from '../engine/materials.js';
 import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
-  generateWorld, buildTerrainMeshes,
+  generateTile, buildTerrainMeshes,
 } from './terrain.js';
+import { STARTER, TILES } from './tiles.js';
 import * as M from './models.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { FISH_SPOTS, buildGatherSites } from './gatherSite.js';
@@ -218,7 +219,10 @@ export class World {
     const q = this.quality;
     progress(0.02, 'Shaping the land');
     await nextFrame();
-    this.data = generateWorld();
+    this.tiles = TILES;
+    this.activeTile = STARTER;
+    this.data = generateTile(STARTER);
+    if (!this.data) throw new Error('The Oakhollow tile failed to generate');
     const atlas = buildAtlas();
     this.atlas = atlas;
     this.mats = {
