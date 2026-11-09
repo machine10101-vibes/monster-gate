@@ -29,7 +29,7 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
-import { clearSession, isMobile, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
+import { clearSession, inKleverHandoff, isMobile, launchKleverApp, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
@@ -175,6 +175,7 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
+    if (!session && new URLSearchParams(location.search).get('klever') === '1') this.onWallet();
     progress(1, 'Ready');
     this.renderer.compile(this.scene, this.camera);
 
@@ -298,8 +299,46 @@ class Game {
     status.append(lead, who, tail);
   }
 
+  handOffToWallet() {
+    const sign = document.getElementById('btn-wallet');
+    const status = document.getElementById('wallet-status');
+    if (sign) sign.disabled = true;
+    if (status) status.textContent = 'Opening Klever Wallet…';
+    launchKleverApp();
+    const finish = () => {
+      if (window.kleverWeb) {
+        this.walletBusy = false;
+        if (sign) sign.disabled = false;
+        this.onWallet();
+        return;
+      }
+      const help = document.getElementById('wallet-help');
+      if (help) showWalletHelp(help, 'mobile-app');
+      if (status) status.textContent = 'Klever Wallet did not open. Use the button below to open the app installed on this phone.';
+      this.walletBusy = false;
+      if (sign) sign.disabled = false;
+    };
+    window.setTimeout(() => {
+      if (!document.hidden) {
+        finish();
+        return;
+      }
+      const onBack = () => {
+        if (document.hidden) return;
+        document.removeEventListener('visibilitychange', onBack);
+        finish();
+      };
+      document.addEventListener('visibilitychange', onBack);
+    }, 1500);
+  }
+
   async onWallet() {
     if (this.walletBusy) return;
+    if (isMobile() && !window.kleverWeb && !inKleverHandoff()) {
+      this.walletBusy = true;
+      this.handOffToWallet();
+      return;
+    }
     this.walletBusy = true;
     const sign = document.getElementById('btn-wallet');
     const status = document.getElementById('wallet-status');

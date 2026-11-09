@@ -74,7 +74,7 @@ async function connectProvider(kw, mobile) {
  */
 export async function signIn() {
   const mobile = isMobile();
-  const kw = await waitForProvider(mobile ? 900 : 2500);
+  const kw = await waitForProvider(mobile ? (inKleverHandoff() ? 4000 : 900) : 2500);
   if (!kw) {
     throw fail(
       mobile ? 'mobile-app' : 'extension',
@@ -143,12 +143,39 @@ export function clearSession() {
   }
 }
 
-/** Android can hand the page to the installed Klever Wallet app. iOS has no public link for an arbitrary page, so the hunter copies this URL into the app's browser. */
+const KLEVER_PACKAGE = 'finance.klever.bitcoin.wallet';
+
+/**
+ * Link the installed Klever Wallet opens in its own browser.
+ * Wallet 5.x registers scheme `klever-wallet` with host `dp`, and its browser
+ * handler reads the `link` query. A scheme the app does not register makes
+ * Chrome on Android open the Play Store listing even when the app is installed.
+ */
+export function kleverLaunchUrl(page, android) {
+  const link = encodeURIComponent(page);
+  if (!android) return `klever-wallet://dp/browser?link=${link}`;
+  return `intent://dp/browser?link=${link}#Intent;scheme=klever-wallet;package=${KLEVER_PACKAGE};end`;
+}
+
+/** Hands this page to the Klever Wallet app so it can ask for the signature. */
 export function launchKleverApp() {
-  if (!/Android/i.test(navigator.userAgent)) return false;
-  const page = pageUrl();
-  location.href = `intent://browser?url=${encodeURIComponent(page)}#Intent;scheme=klever;package=finance.klever.bitcoin.wallet;end`;
+  const android = /Android/i.test(navigator.userAgent);
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!android && !ios) return false;
+  location.href = kleverLaunchUrl(pageUrl(), android);
   return true;
+}
+
+/** True once this visit was opened from the wallet handoff, or is already inside it. */
+export function inKleverHandoff() {
+  if (window.kleverWeb) return true;
+  if (/Klever/i.test(navigator.userAgent || '')) return true;
+  try {
+    return new URLSearchParams(location.search).get('klever') === '1';
+  } catch {
+    return false;
+  }
 }
 
 export async function copyPageUrl() {
@@ -199,8 +226,8 @@ export function showWalletHelp(el, kind) {
   const actions = document.createElement('div');
   actions.className = 'wallet-actions';
   if (kind === 'mobile-app') {
-    p.textContent = 'On a phone, open this page in the Klever Wallet browser. Tap Browser in the app, paste the link, then sign in. The app asks you to approve the signature.';
-    if (/Android/i.test(navigator.userAgent)) actions.append(actionButton('Open Klever Wallet', () => launchKleverApp()));
+    p.textContent = 'Sign in opens the Klever Wallet installed on this phone and asks you to approve the signature there. Install the app below only if it is not on this phone.';
+    if (isMobile()) actions.append(actionButton('Open Klever Wallet', () => launchKleverApp()));
     actions.append(
       actionButton('Copy page link', async (ev) => {
         const ok = await copyPageUrl();
