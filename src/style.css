@@ -1206,7 +1206,7 @@ h1 em {
   font-family: var(--font-body);
   font-size: inherit;
   letter-spacing: 0;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .account-choices {
   display: flex;

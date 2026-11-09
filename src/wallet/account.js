@@ -257,7 +257,7 @@ async function createRemote(cfg, email, password) {
   }
   const session = sessionFromAuth(parsed.json, email);
   if (session) return session;
-  throw fail('confirm', 'Account created. Confirm it from the email, then sign in.');
+  throw fail('confirm', 'Account created. Open the confirmation email, then sign in. The same email works on any device.');
 }
 
 async function signInRemote(cfg, email, password) {
