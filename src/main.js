@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { World } from './world/world.js';
 import { Sky } from './world/sky.js';
 import { Snowfall } from './world/snowfall.js';
+import { Ashfall } from './world/ashfall.js';
 import { FX } from './engine/fx.js';
 import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
@@ -160,7 +161,9 @@ class Game {
     if (this.world.cave) this.scene.add(this.world.cave.group);
     this.sky = new Sky(this.scene, this.quality);
     this.snowfall = new Snowfall(this.scene);
+    this.ashfall = new Ashfall(this.scene);
     this.chill = 0;
+    this.ember = 0;
     this.fx = new FX(this.scene, this.quality);
     this.vfx = new VFX(this);
     this.fx.vfx = this.vfx;
@@ -2032,6 +2035,7 @@ class Game {
       }
       this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
       this.chill += (0 - this.chill) * Math.min(1, dt * 2);
+      this.ember += (0 - this.ember) * Math.min(1, dt * 2);
       return;
     }
     const land = this.world.landAt(P.x, P.z);
@@ -2046,9 +2050,12 @@ class Game {
       this.forestAmt += (shade - this.forestAmt) * Math.min(1, dt * 1.5);
       const goal = land.chillAt ? land.chillAt(Math.floor(P.x) - land.x0, Math.floor(P.z) - land.z0) : 0;
       this.chill += (goal - this.chill) * Math.min(1, dt * 1.2);
+      const emberGoal = land.emberAt ? land.emberAt(Math.floor(P.x) - land.x0, Math.floor(P.z) - land.z0) : 0;
+      this.ember += (emberGoal - this.ember) * Math.min(1, dt * 1.2);
       return;
     }
     this.chill += (0 - this.chill) * Math.min(1, dt * 1.2);
+    this.ember += (0 - this.ember) * Math.min(1, dt * 1.2);
     const z = this.world.zoneAt(P.x, P.z);
     const dg = Math.hypot(P.x - GATE.x, P.z - GATE.z);
     const zone = dg < 11 ? ZONE.GATE : z;
@@ -2127,8 +2134,10 @@ class Game {
 
     const P = this.player;
     this.sky.chill = this.chill;
+    this.sky.ember = this.ember;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
     this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.chill);
+    this.ashfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.ember);
     const camp = this.charSelect?.active ? this.charSelect.stage : null;
     const lights = camp ? camp.lightSpots : this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
     if (camp) this.sky.assignTorchLights(lights, camp.origin.x, camp.origin.z);

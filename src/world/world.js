@@ -11,6 +11,8 @@ import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } f
 import { buildCave } from './cave.js';
 import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
+import { buildVolcanicModels } from './volcanicModels.js';
+import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
@@ -394,6 +396,8 @@ export class World {
       orcBones: [1, 2].map((s) => M.buildOrcBones(s)),
       tentFrost: M.buildTent(9, 0x9ec3e6, 0xf2ead3),
       arctic: buildArcticModels(),
+      volcanic: buildVolcanicModels(),
+      keeps: buildKeepModels(),
     };
     void q;
   }
@@ -975,6 +979,11 @@ export class World {
       else if (t === TILE.SNOW) [r, g, b] = [240, 245, 255];
       else if (t === TILE.ICE) [r, g, b] = [165, 215, 245];
       else if (t === TILE.FROST_GRASS) [r, g, b] = [185, 215, 190];
+      else if (t === TILE.BASALT || t === TILE.OBSIDIAN) [r, g, b] = [52, 50, 58];
+      else if (t === TILE.ASH) [r, g, b] = [96, 94, 100];
+      else if (t === TILE.LAVA) [r, g, b] = [255, 110, 30];
+      else if (t === TILE.CINDER) [r, g, b] = [86, 52, 40];
+      else if (t === TILE.FLAGSTONE) [r, g, b] = [214, 210, 202];
       else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [130, 135, 142];
       else if (t === TILE.COBBLE) [r, g, b] = [170, 170, 176];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];

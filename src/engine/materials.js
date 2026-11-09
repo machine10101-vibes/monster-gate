@@ -89,6 +89,12 @@ export const TILE = {
   DARK_STONE: 14,
   ICE: 15,
   FROST_GRASS: 16,
+  BASALT: 49,
+  ASH: 52,
+  CINDER: 55,
+  LAVA: 58,
+  OBSIDIAN: 61,
+  FLAGSTONE: 97,
 };
 
 const TILE_PX = 16;
@@ -115,6 +121,9 @@ export function buildAtlas() {
   const fill = (tile, fn) => {
     for (let y = 0; y < TILE_PX; y++)
       for (let x = 0; x < TILE_PX; x++) px(tile, x, y, fn(x, y));
+  };
+  const fill9 = (center, fn) => {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) fill(center + dr * ATLAS_TILES + dc, fn);
   };
   const pick = (arr, seed) => arr[Math.floor(seed * arr.length) % arr.length];
   const wrapNoise = (x, y, s) => hash2(((x % TILE_PX) + TILE_PX) % TILE_PX, ((y % TILE_PX) + TILE_PX) % TILE_PX, s);
@@ -264,6 +273,46 @@ export function buildAtlas() {
     let c = pick([0xb08a5c, 0xa57f53, 0xbd9868, 0x9c774c, 0xc4a070], wrapNoise(x, y, 121) * 0.5 + wrapNoise(x >> 1, y >> 1, 122) * 0.5);
     if (wrapNoise(x, y, 123) > 0.93) c = 0x7a7c80;
     if (wrapNoise(x, y, 124) > 0.95) c = shade(c, 0.78);
+    return c;
+  });
+
+  const BASALT = [0x2b2b31, 0x34343b, 0x25252b, 0x3d3d45, 0x1f1f24];
+  const basaltFn = (x, y, s) => {
+    let c = pick(BASALT, wrapNoise(x, y, s) * 0.45 + wrapNoise(x >> 1, y >> 1, s + 3) * 0.55);
+    if (wrapNoise(x, y, s + 5) > 0.94) c = 0x4a4a54;
+    return c;
+  };
+  fill9(TILE.BASALT, (x, y) => basaltFn(x, y, 151));
+  const ASHC = [0x58585e, 0x4d4d53, 0x65656b, 0x424248, 0x6f6f75];
+  fill9(TILE.ASH, (x, y) => {
+    let c = pick(ASHC, wrapNoise(x, y, 161) * 0.5 + wrapNoise(x >> 1, y >> 1, 162) * 0.5);
+    if (wrapNoise(x, y, 163) > 0.92) c = shade(c, 0.74);
+    return c;
+  });
+  const LAVAC = [0xff6a1a, 0xff8a24, 0xe04a0a, 0xffb236, 0xff4e10];
+  fill9(TILE.LAVA, (x, y) => {
+    let c = pick(LAVAC, wrapNoise(x, y, 171) * 0.5 + wrapNoise(x >> 1, y >> 1, 172) * 0.5);
+    if (wrapNoise(x, y, 173) > 0.9) c = 0xffd870;
+    if (wrapNoise(x >> 1, y >> 1, 174) > 0.86) c = shade(c, 0.55);
+    return c;
+  });
+  fill9(TILE.CINDER, (x, y) => {
+    let c = basaltFn(x, y, 181);
+    const d1 = (x * 3 + y * 2) % 13;
+    const d2 = (x * 2 - y * 3 + 52) % 11;
+    if ((d1 === 0 && wrapNoise(x, y, 182) > 0.3) || (d2 === 0 && wrapNoise(x, y, 183) > 0.45)) c = wrapNoise(x, y, 184) > 0.5 ? 0xff7a1c : 0xd8420a;
+    return c;
+  });
+  fill9(TILE.OBSIDIAN, (x, y) => {
+    let c = pick([0x16161b, 0x1d1d24, 0x121216, 0x24242c], wrapNoise(x >> 1, y >> 1, 191) * 0.6 + wrapNoise(x, y, 192) * 0.4);
+    if ((x + y * 2) % 9 === 0 && wrapNoise(x, y, 193) > 0.5) c = 0x4a4a68;
+    return c;
+  });
+  const FLAG = [0xd9d6cf, 0xcfccc4, 0xe4e1da, 0xc4c1ba, 0xd2cfc8];
+  fill9(TILE.FLAGSTONE, (x, y) => {
+    let c = pick(FLAG, wrapNoise(x, y, 201) * 0.4 + wrapNoise(x >> 2, y >> 2, 202) * 0.6);
+    if (x % 8 === 0 || y % 8 === 0) c = shade(c, 0.82);
+    if (wrapNoise(x, y, 203) > 0.96) c = 0xb8a65e;
     return c;
   });
 

@@ -3,6 +3,7 @@ import { TILE } from '../engine/materials.js';
 import { W, ZONE } from './terrain.js';
 import { TILES } from './tiles.js';
 import { ARCTIC_SPECS, arcticFeature, paintArcticCell, frostGoldmead, dressArctic } from './arctic.js';
+import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount } from './volcanic.js';
 
 /**
  * The seven tiles around Oakhollow (44, 45, 46, 54, 56, 64, 66).
@@ -156,6 +157,24 @@ export function openRingPasses(data) {
   paintChanged(data, before, mark);
 }
 
+/** A pass through Harefield's north rim, so the road reaches Ashen Road. */
+function openHarefieldNorth(data) {
+  const H = data.H;
+  const before = Float32Array.from(H);
+  const mark = new Uint8Array(W * W);
+  digBand(H, mark, (x, z, h) => {
+    if (z > 34) return null;
+    const fade = 1 - smoothstep(24, 34, z);
+    if (fade <= 0) return null;
+    const bank = Math.abs(x - 72);
+    if (bank > 38) return null;
+    const floor = lerp(4.5, 3.6, clamp(z / 22, 0, 1));
+    const want = bank <= 5 ? floor : floor + (bank - 5) * 0.85;
+    return { h: lerp(h, Math.min(h, want), fade), tag: bank <= 5 && z <= 26 ? PATH : 0 };
+  });
+  paintChanged(data, before, mark);
+}
+
 /** Lanes out of Southford into Longacre and Hayfield. The north row stays on Oakhollow. */
 export function openValeSides(data) {
   const H = data.H;
@@ -302,12 +321,14 @@ const SPECS = {
     roads: [[[0, 92], [36, 86], [70, 60]]],
   },
   ...ARCTIC_SPECS,
+  ...VOLCANIC_SPECS,
 };
 
 const HAY = 6;
 
 function applyFeature(h, x, z, spec) {
   if (spec.arctic) return arcticFeature(h, x, z, spec);
+  if (spec.volcanic) return volcanicFeature(h, x, z, spec);
   if (spec.camp) {
     const [cx, cz, r] = spec.camp;
     const dx = (x - cx) / (r * 0.78);
@@ -409,6 +430,10 @@ function makeTile(spec, edges) {
         paintArcticCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
         continue;
       }
+      if (spec.volcanic) {
+        paintVolcanicCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
+        continue;
+      }
       forest[i] = k === PATH || k === WATER || k === FARM ? 0 : spec.forest * (0.55 + n * 0.7);
       if (k === WATER || h < 0.35) {
         zone[i] = ZONE.WATER;
@@ -477,12 +502,17 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'icewind') return { w: colOf(made.snowfall, W - 1) };
   if (kind === 'rimefang') return { s: rowOf(made.snowfall, 0) };
   if (kind === 'glimmerfrost') return { w: colOf(made.rimefang, W - 1), s: rowOf(made.icewind, 0) };
+  if (kind === 'ashroad') return { s: rowOf(made.harefield, 0) };
+  if (kind === 'warfield') return { s: rowOf(made.ashroad, 0) };
+  if (kind === 'dawnspire') return { e: colOf(made.warfield, 0) };
+  if (kind === 'hellspire') return { s: rowOf(made.warfield, 0) };
+  if (kind === 'cinderfall') return { e: colOf(made.hellspire, 0), s: rowOf(made.dawnspire, 0) };
   return {};
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -490,9 +520,12 @@ export function generateRing(oak, south) {
     const tile = TILES.find((t) => t.kind === kind);
     const edges = specEdges(kind, oak, south, made);
     for (const key of Object.keys(edges)) if (!edges[key]) edges[key] = null;
-    const data = makeTile(spec, edges);
-    made[kind] = data;
     const origin = { x: (tile.tx - 4) * W, z: (tile.tz - 5) * W };
+    spec.ox = origin.x;
+    spec.oz = origin.z;
+    const data = makeTile(spec, edges);
+    if (kind === 'harefield') openHarefieldNorth(data);
+    made[kind] = data;
     lands.push({
       role: 'ring',
       kind,
@@ -504,6 +537,8 @@ export function generateRing(oak, south) {
       shade: spec.shade,
       rim: spec.rim,
       arctic: !!spec.arctic,
+      volcanic: !!spec.volcanic,
+      emberAt: spec.volcanic ? emberAmount(spec) : () => 0,
       chillAt: spec.arctic
         ? spec.blend
           ? (lx) => smoothstep(0, spec.blend.w, lx)
@@ -634,6 +669,10 @@ function dressLand(world, land) {
   if (land.kind === 'brookside') dressOrcCamp(world, land);
   if (spec.arctic) {
     dressArctic(world, land, spec);
+    return;
+  }
+  if (spec.volcanic) {
+    dressVolcanic(world, land, spec);
     return;
   }
   const place = (parts, lx, lz, rot, scale, opts) => {
