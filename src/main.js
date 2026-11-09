@@ -26,7 +26,7 @@ import { GOODS } from './data/gathering.js';
 import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
-import { updateCaveTravel, tendCaveDragon } from './world/cave.js';
+import { updateCaveTravel, tendCaveDragon, restoreOverworld } from './world/cave.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
 
@@ -872,7 +872,10 @@ class Game {
 
   respawnPlayer() {
     document.getElementById('faint').classList.add('hidden');
+    if (this.world.realm === 'cave') restoreOverworld(this);
     this.player.respawn(72, 73);
+    this.zone = this.world.zoneAt(72, 73);
+    this.hud.setArea('Oakhollow');
     for (const m of this.monsters) if (!m.dead && Math.hypot(m.x - 72, m.z - 73) < 12) m.state = 'wander';
     this.snapCamera();
     this.hud.banner('Village', 'Oakhollow', 2400);

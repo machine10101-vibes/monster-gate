@@ -201,13 +201,24 @@ export function enterCave(game) {
   game.hud.toast('The Darksycle Dragon lairs here. Walk back out to leave.', 3200);
 }
 
+/** Put the overworld and the daylight sky back. Safe to call when already outside. */
+export function restoreOverworld(game) {
+  const w = game.world;
+  const c = w.cave;
+  w.realm = 'over';
+  w.group.visible = true;
+  if (c) {
+    c.group.visible = false;
+    c.cool = 1.6;
+  }
+  if (game.sky) game.sky.indoors = false;
+}
+
 export function leaveCave(game) {
   const w = game.world;
   const c = w.cave;
   const P = game.player.pos;
-  w.realm = 'over';
-  w.group.visible = true;
-  c.group.visible = false;
+  restoreOverworld(game);
   const o = c.outside;
   P.set(o.x, w.heightAt(o.x, o.z), o.z);
   game.player.yaw = Math.PI / 2;
