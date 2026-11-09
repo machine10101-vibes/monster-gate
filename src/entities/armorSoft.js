@@ -1,6 +1,7 @@
 import { hash3, jitter } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { YETI } from '../data/yeti.js';
 
 const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
 
@@ -17,6 +18,14 @@ export const SOFT_PALETTES = {
   darkleather: {
     main: 0x3b3268, lo: 0x251f48, hi: 0x574c9c, strap: 0x1d1736, strapHi: 0x372d62, trim: DARK.trim, trimLo: DARK.bladeDark,
     bone: DARK.blade, boneLo: DARK.bladeDark, scale: DARK.scale, scaleLo: DARK.scaleLo, glow: DARK.glow, accent: DARK.glowHi,
+  },
+  yetileather: {
+    main: 0xaecbe3, lo: 0x7fa6c8, hi: 0xdcecf8, strap: YETI.leather, strapHi: YETI.leatherHi, trim: YETI.trim, trimLo: YETI.trimLo,
+    bone: YETI.claw, boneLo: YETI.furLo, scale: 0x9ab8d4, scaleLo: 0x5d84ac, glow: null, accent: YETI.glow,
+  },
+  yeticloth: {
+    main: 0xcfe2f1, lo: 0x9dbfdc, hi: 0xeef7ff, strap: 0x6fa0cf, strapHi: 0xa9dcff, trim: YETI.trim, trimLo: YETI.trimLo,
+    bone: YETI.claw, boneLo: YETI.furLo, scale: 0x9ab8d4, scaleLo: 0x5d84ac, glow: YETI.glow, accent: YETI.glowHi,
   },
   darkcloth: {
     main: 0x4a3a9c, lo: 0x33296a, hi: 0x7a64d0, strap: 0x8a7ad0, strapHi: 0xb8aae8, trim: DARK.trim, trimLo: DARK.bladeDark,

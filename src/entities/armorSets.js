@@ -1,5 +1,6 @@
 import * as budgeMetal from './armor.js';
 import * as darkMetal from './armorDark.js';
+import * as frostMetal from './armorFrost.js';
 import { makeSoftArmor } from './armorSoft.js';
 import { withDetail } from './armorDetail.js';
 
@@ -7,10 +8,13 @@ const CACHE = {};
 const BUILD = {
   budgeset: () => budgeMetal,
   darksyceset: () => darkMetal,
+  yetiset: () => frostMetal,
   budgeleather: () => makeSoftArmor('budgeleather'),
   budgecloth: () => makeSoftArmor('budgecloth'),
   darkleather: () => makeSoftArmor('darkleather'),
   darkcloth: () => makeSoftArmor('darkcloth'),
+  yetileather: () => makeSoftArmor('yetileather'),
+  yeticloth: () => makeSoftArmor('yeticloth'),
 };
 
 /** Painter module {paintHelm, paintChest, paintArm, paintLeg} for a set id. */

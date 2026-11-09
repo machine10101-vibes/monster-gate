@@ -4,6 +4,7 @@ const PAL = {
   o: '#ff8f1f', O: '#c9570a', e: '#52d06a', E: '#2a8f48', c: '#6fd6ff', C: '#2f8fc0',
   p: '#c27bff', P: '#7a45c8', s: '#9aa0a8', S: '#6c727c', t: '#f2dfb0', h: '#ffe9a0',
   v: '#8a7ad0', V: '#4b3f8c', m: '#b25cff', n: '#2b2450', q: '#f0c8ff',
+  i: '#dff4ff', I: '#8fd0ff', j: '#4f8fc8', J: '#2d5a8c', u: '#f6fbff', f: '#b4d0e6', F: '#7fa6c8',
 };
 
 function make(rows) {
@@ -731,6 +732,17 @@ ART.budgeshortbow = shortbow('t', 'e', 'w', 'B', 'h');
 ART.darkshortbow = shortbow('v', 'n', 'm', 'V', 'q');
 ART.budgecrossbow = recolor(ART.crossbow, { l: 'h', b: 'E', y: 'y' });
 ART.darkcrossbow = recolor(ART.crossbow, { l: 'q', b: 'V', y: 'm' });
+ART.yetisword = recolor(ART.blade, { l: 'u', g: 'i', d: 'j', y: 'I', b: 'F' });
+ART.yetigreatsword = greatsword('i', 'u', 'j', 'F');
+ART.yetidual = recolor(ART.dual, { l: 'u', g: 'i', d: 'j', y: 'I', b: 'F' });
+ART.yetihammer = recolor(ART.budgemaul, { t: 'u', e: 'i', E: 'I', b: 'F', h: 'j' });
+ART.yetispear = spear('i', 'u', 'j', 'F', 'I');
+ART.yetistaff = recolor(ART.darkstaff, { l: 'i', g: 'I', q: 'u', m: 'i', v: 'f', V: 'F', n: 'j' });
+ART.yetiwand = recolor(ART.wand, { c: 'I', h: 'u', b: 'F', y: 'j' });
+ART.yetishortbow = shortbow('i', 'F', 'I', 'F', 'u');
+ART.yetilongbow = recolor(ART.bow, { b: 'F', t: 'u', h: 'I' });
+ART.yeticrossbow = recolor(ART.crossbow, { l: 'i', b: 'F', y: 'I' });
+ART.yetiscythe = recolor(ART.darkscythe, { l: 'u', g: 'i', G: 'I', V: 'j', n: 'J', m: 'I', v: 'F' });
 
 ART.stats = draw((p, line) => {
   for (let y = 11; y <= 13; y++) for (let x = 2; x <= 4; x++) p(x, y, y === 11 ? 'h' : 'y');

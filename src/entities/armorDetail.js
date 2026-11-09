@@ -1,12 +1,14 @@
 import { hash3, jitter, shade } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { YETI } from '../data/yeti.js';
 import { SOFT_PALETTES } from './armorSoft.js';
 
 const J = (c, x, y, z, s = 0, a = 0.04) => jitter(c, a, hash3(x, y, z, s));
 
 const METAL = {
   budgeset: { a: BUDGE.horn, b: BUDGE.hornDark, g: BUDGE.belly, gd: BUDGE.bellyDark, glow: null, hot: BUDGE.vein, edge: BUDGE.claw, base: BUDGE.scale },
+  yetiset: { a: YETI.iceHi, b: YETI.ice, g: YETI.leather, gd: YETI.leatherLo, glow: YETI.glow, hot: YETI.glowHi, edge: YETI.furWhite, base: 0x95b6d3 },
   darksyceset: { a: DARK.blade, b: DARK.bladeDark, g: DARK.trim, gd: DARK.bladeDark, glow: DARK.glow, hot: DARK.glowHi, edge: DARK.edge, base: DARK.scale },
 };
 

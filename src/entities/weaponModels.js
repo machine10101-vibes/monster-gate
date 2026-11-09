@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { YETI } from '../data/yeti.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
 export const WEAPON_SIZE = 0.015;
@@ -10,9 +11,9 @@ const J = (c, x, y, z, s = 0, a = 0.04) => jitter(c, a, hash3(x, y, z, s));
 const lerp = (a, b, t) => a + (b - a) * t;
 
 /** Held kinds that wield a matching blade in each hand. */
-export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual']);
+export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual', 'yetidual']);
 /** Held kinds whose model is taller than wide (bows). */
-export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow']);
+export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow']);
 
 /**
  * Swords are sculpted flat in the horizontal plane. Rolled a quarter turn,
@@ -23,6 +24,7 @@ const EDGE_HOLD = new Set([
   'budgeblade', 'budgegreatsword', 'budgedual',
   'darksword', 'darkgreatsword', 'darkdual',
   'orcblade',
+  'yetisword', 'yetigreatsword', 'yetidual',
 ]);
 
 /** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
@@ -66,6 +68,11 @@ const THEMES = {
     wrap: 0x3d3378, wrapLo: 0x2b2450, wrapHi: 0x6a5cb8, blade: DARK.blade, edge: DARK.edge, dark: DARK.bladeDark,
     guard: DARK.trim, guardHi: DARK.blade, glow: DARK.glow, glow2: DARK.glowHi, wood: 0x3d3378, string: DARK.glow,
     membrane: DARK.membrane, membraneHi: DARK.membraneHi, claw: DARK.claw, horn: DARK.blade, hornDark: DARK.bladeDark,
+  },
+  frost: {
+    wrap: 0x8fb0cf, wrapLo: 0x5d84ac, wrapHi: 0xcfe6f6, blade: 0xa9dcff, edge: 0xf2fbff, dark: 0x5d84ac,
+    guard: YETI.skin, guardHi: YETI.claw, glow: YETI.glow, glow2: YETI.glowHi, wood: YETI.leather, string: 0xdfeaf4,
+    membrane: YETI.fur, membraneHi: YETI.furWhite, claw: YETI.clawTip, horn: YETI.claw, hornDark: YETI.furLo,
   },
   iron: {
     wrap: 0x6a4325, wrapLo: 0x4a2c16, wrapHi: 0x8a5a30, blade: 0xb4b8c0, edge: 0xe8eaf0, dark: 0x7a7e88,
@@ -333,6 +340,12 @@ const SWORDS = {
     }),
   darksword: () =>
     sword(THEMES.dark, { guardHalf: 11, sweep: 5, cap: 'fang', gem: THEMES.dark.glow2, pgem: THEMES.dark.glow2, b: { z1: 93, w0: 10, curve: 10, exp: 2.2, fuller: 'glow', glowEvery: 5, runes: 7, tip: 0.74 } }),
+  yetisword: () =>
+    sword(THEMES.frost, { guardHalf: 11, sweep: 4, cap: 'fang', pommel: 'claw', gem: THEMES.frost.glow2, pgem: THEMES.frost.glow2, b: { z1: 94, w0: 11, curve: 8, exp: 2, fuller: 'glow', glowEvery: 4, serr: 6, tip: 0.76 } }),
+  yetigreatsword: () =>
+    sword(THEMES.frost, { g0: -10, g1: 28, gr: 2.4, guardHalf: 16, sweep: 5, cap: 'fang', pommel: 'claw', gem: THEMES.frost.glow2, pgem: THEMES.frost.glow2, b: { z1: 122, w0: 15, curve: 6, exp: 2.2, fuller: 'glow', glowEvery: 5, serr: 6, tip: 0.8 } }),
+  yetidual: () =>
+    sword(THEMES.frost, { g0: -4, g1: 8, gr: 1.8, guardHalf: 8, sweep: 3, cap: 'fang', pommel: 'claw', pgem: THEMES.frost.glow2, b: { z1: 64, w0: 7, curve: 14, exp: 1.7, tip: 0.5, thick: 2, fuller: 'glow', glowEvery: 5, serr: 5 } }),
   budgeblade: () =>
     sword(THEMES.budge, { g1: 12, guardHalf: 10, cap: 'fang', pommel: 'horn', gem: THEMES.budge.glow, pgem: THEMES.budge.glow, b: { z1: 92, w0: 10, fuller: 'glow', glowEvery: 6, serr: 7, tip: 0.8 } }),
   budgegreatsword: () =>
@@ -373,7 +386,7 @@ function blockHead(c, T, o) {
 
 function maul(T, o) {
   const c = ctx();
-  const dark = T === THEMES.dark;
+  const dark = T === THEMES.dark || T === THEMES.frost;
   haft(c, T, -14, 62, 2, T.wood, 0);
   wrapRod(c, T, -12, 26, 2.2);
   for (const z of [-12, 26, 40]) ringAt(c, z, 2.2, T.guard, z & 3);
@@ -505,8 +518,7 @@ function fishingNet() {
   return c.done();
 }
 
-function scythe() {
-  const T = THEMES.dark;
+function scythe(T = THEMES.dark) {
   const c = ctx();
   haft(c, T, -14, 88, 2, T.wrapLo, 0);
   wrapRod(c, T, -10, 22, 2.2);
@@ -675,6 +687,55 @@ function darkWand() {
   return c.done();
 }
 
+/** Octahedral ice crystal stretched along z, hot core and pale edges. */
+function crystalAt(c, T, cx, cy, cz, r, stretch = 1.6) {
+  ball(c, cx, cy, cz, r * 1.1, (x, y, z, d) => {
+    const m = (Math.abs(x + 0.5 - cx) + Math.abs(y + 0.5 - cy) + Math.abs(z + 0.5 - cz) / stretch) / r;
+    if (m > 1) return null;
+    return m < 0.4 ? T.glow2 : m < 0.78 ? T.glow : J(T.blade, x, y, z, 80, 0.03);
+  }, true, stretch, 1);
+}
+
+function frostStaff() {
+  const T = THEMES.frost;
+  const c = ctx();
+  haft(c, T, -14, 82, 2, T.wood, 0);
+  wrapRod(c, T, -6, 26, 2.2);
+  for (const z of [-6, 26, 46, 64, 80]) ringAt(c, z, 2.2, T.guard, z & 3);
+  pommelAt(c, T, -14, 'claw', T.glow2);
+  rod(c, 80, 88, 3.4, (x, y, z) => J(z === 84 ? T.guardHi : T.guard, x, y, z, 56, 0.04));
+  for (let a = 0; a < 3; a++) {
+    const ang = a * 2.094 + 0.5;
+    for (let k = 0; k < 34; k++) {
+      const t = k / 33;
+      const rad = 3 + Math.sin(t * 1.5) * 9.5;
+      const pz = 88 + (1 - Math.cos(t * 1.7)) * 22 + t * 14;
+      ball(c, Math.cos(ang) * rad, Math.sin(ang) * rad, pz, lerp(2.5, 0.6, t ** 0.8), (x, y, z) => J(k > 30 ? T.edge : k % 4 === 3 ? T.hornDark : T.horn, x, y, z, 57, 0.03));
+    }
+  }
+  crystalAt(c, T, 0, 0, 110, 9, 1.7);
+  for (let a = 0; a < 6; a++) crystalAt(c, T, Math.cos(a * 1.05) * 12, Math.sin(a * 1.05) * 12, 106 + Math.sin(a * 2.3) * 7, 2.4, 1.8);
+  return c.done();
+}
+
+function frostWand() {
+  const T = THEMES.frost;
+  const c = ctx();
+  wrapRod(c, T, -6, 20, 1.8);
+  ringAt(c, -6, 1.8, T.guard, 1);
+  ringAt(c, 20, 1.8, T.guard, 2);
+  pommelAt(c, T, -7, 'claw', T.glow2);
+  rod(c, 21, 26, 2.6, (x, y, z) => J(z === 23 ? T.guardHi : T.guard, x, y, z, 60, 0.04));
+  for (let a = 0; a < 3; a++) {
+    const ang = a * 2.094 + 1.1;
+    for (let k = 0; k < 11; k++) ball(c, Math.cos(ang) * (3 + k * 0.7), Math.sin(ang) * (3 + k * 0.7), 22 + k * 1.3, lerp(1.6, 0.5, k / 10), (x, y, z) => J(k > 8 ? T.edge : T.horn, x, y, z, 61, 0.03));
+  }
+  rod(c, 27, 40, 1.5, (x, y, z) => J(z % 5 === 4 ? T.guard : T.wrapHi, x, y, z, 62, 0.04));
+  crystalAt(c, T, 0, 0, 50, 6.4, 1.7);
+  for (let a = 0; a < 4; a++) crystalAt(c, T, Math.cos(a * 1.57 + 0.4) * 8.5, Math.sin(a * 1.57 + 0.4) * 8.5, 48 + (a % 2) * 6, 1.4, 1.6);
+  return c.done();
+}
+
 function ashWand() {
   const T = THEMES.iron;
   const c = ctx();
@@ -762,6 +823,8 @@ const BOWS = {
   darkbow: () => bow(THEMES.dark, { L: 44, D: 22, recurve: 7, style: 'dark' }),
   budgeshortbow: () => bow(THEMES.budge, { L: 32, D: 14, recurve: 5, style: 'horn', grip: 5 }),
   darkshortbow: () => bow(THEMES.dark, { L: 32, D: 14, recurve: 5, style: 'dark', grip: 5 }),
+  yetilongbow: () => bow(THEMES.frost, { L: 44, D: 21, recurve: 7, style: 'horn' }),
+  yetishortbow: () => bow(THEMES.frost, { L: 32, D: 14, recurve: 5, style: 'horn', grip: 5 }),
 };
 
 /* ----------------------------- crossbows ---------------------------- */
@@ -883,6 +946,12 @@ const BUILDERS = {
   darkwand: darkWand,
   budgecrossbow: () => crossbow(THEMES.budge, 'budge'),
   darkcrossbow: () => crossbow(THEMES.dark, 'dark'),
+  yetihammer: () => maul(THEMES.frost),
+  yetiscythe: () => scythe(THEMES.frost),
+  yetispear: () => spear(THEMES.frost, false),
+  yetistaff: frostStaff,
+  yetiwand: frostWand,
+  yeticrossbow: () => crossbow(THEMES.frost, 'dark'),
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */
@@ -892,12 +961,12 @@ export function buildWeaponVoxels(kind) {
 
 /* ----------------------------- shields/books ------------------------ */
 
-const themeOf = (setId) => (setId === 'iron' ? THEMES.iron : setId.startsWith('dark') ? THEMES.dark : THEMES.budge);
+const themeOf = (setId) => (setId === 'iron' ? THEMES.iron : setId.startsWith('dark') ? THEMES.dark : setId.startsWith('yeti') ? THEMES.frost : THEMES.budge);
 
 /** Flat shield (face up on +y), 48 wide and deep with raised rim, boss and relief. */
 export function buildShieldModel(setId) {
   const T = themeOf(setId);
-  const dark = T === THEMES.dark;
+  const dark = T === THEMES.dark || T === THEMES.frost;
   const c = ctx();
   const R = 24;
   for (let z = 0; z < 48; z++)
@@ -944,7 +1013,7 @@ export function buildShieldModel(setId) {
 /** Closed spell book lying flat; spine on -x, length along +z. */
 export function buildBookModel(setId) {
   const T = themeOf(setId);
-  const dark = T === THEMES.dark;
+  const dark = T === THEMES.dark || T === THEMES.frost;
   const c = ctx();
   const W = 11;
   const Ln = 32;

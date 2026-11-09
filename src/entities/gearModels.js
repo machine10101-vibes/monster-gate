@@ -3,6 +3,7 @@ import { toonMaterial } from '../engine/materials.js';
 import { meshFrom } from './humanoid.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { YETI } from '../data/yeti.js';
 
 const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
 const SZ = 0.06;
@@ -207,11 +208,115 @@ function gloomCoreModel(mat) {
   return meshFrom(M, 9, 11, 9, mat, SZ);
 }
 
+function furModel(mat) {
+  const M = new VoxelModel(24, 22, 8);
+  const cols = [YETI.furLo, YETI.fur, YETI.furHi, YETI.furWhite];
+  for (let x = 1; x < 23; x++) {
+    const base = 3 + Math.round(Math.sin(x * 0.55) * 1.2);
+    const spike = hash3(x, 1, 0, 61) > 0.45 ? 2 + Math.floor(hash3(x, 2, 0, 62) * 9) : 1 + Math.floor(hash3(x, 3, 0, 63) * 3);
+    const top = base + spike + Math.round(Math.sin(x * 0.28) * 3 + 4);
+    for (let y = 1; y < top; y++)
+      for (let z = 1; z < 6; z++) {
+        const tip = y / top;
+        const edge = z === 1 || z === 5;
+        if (z !== 3 && Math.abs(z - 3) + (tip > 0.8 ? 1 : 0) > 2) continue;
+        const c = tip > 0.82 ? YETI.furWhite : tip > 0.55 ? YETI.furHi : edge ? YETI.furLo : cols[1 + ((x + y) % 2)];
+        M.set(x, y, z, J(c, x, y, z, 61, 0.04));
+      }
+  }
+  for (let x = 3; x < 21; x += 4) for (let y = 2; y < 5; y++) M.set(x, y, 3, YETI.ice, true);
+  return meshFrom(M, 12, 8, 3, mat, SZ);
+}
+
+function yetiClawModel(mat) {
+  const M = new VoxelModel(26, 24, 8);
+  for (let i = 0; i < 28; i++) {
+    const t = i / 27;
+    const a = t * 1.5;
+    const x = Math.round(5 + Math.sin(a) * 16);
+    const y = Math.round(2 + (1 - Math.cos(a)) * 17);
+    const w = Math.max(0.6, 3.8 * (1 - t) + 0.5);
+    for (let dx = -3; dx <= 3; dx++)
+      for (let dy = -3; dy <= 3; dy++)
+        for (let z = 0; z < 6; z++) {
+          const d = Math.hypot(dx, dy, (z - 2.5) * 1.1);
+          if (d > w * 0.9) continue;
+          const col = t < 0.14 ? YETI.furLo : t > 0.7 ? YETI.clawTip : z < 2 ? YETI.clawDark : YETI.claw;
+          M.set(x + dx, y + dy, z + 1, J(col, x + dx, y + dy, z, 62, 0.03));
+        }
+  }
+  return meshFrom(M, 13, 12, 4, mat, SZ);
+}
+
+function yetiFangModel(mat) {
+  const M = new VoxelModel(14, 28, 14);
+  for (let y = 0; y < 26; y++) {
+    const t = y / 25;
+    const r = 4.6 * (1 - t) ** 0.8 + 0.5;
+    const bend = Math.round(t * t * 3);
+    for (let x = 0; x < 14; x++)
+      for (let z = 0; z < 14; z++) {
+        const d = Math.hypot(x + 0.5 - 7, z + 0.5 - 7 - bend);
+        if (d > r) continue;
+        const col = y < 5 ? YETI.furHi : d > r - 0.9 && y > 4 ? YETI.fangLo : YETI.fang;
+        M.set(x, y + 1, z, J(col, x, y, z, 63, 0.035));
+      }
+  }
+  for (let y = 0; y < 5; y++)
+    for (let x = 0; x < 14; x++)
+      for (let z = 0; z < 14; z++) {
+        const d = Math.hypot(x + 0.5 - 7, z + 0.5 - 7);
+        if (d < 5.3 && d > 4.2) M.set(x, y + 1, z, J(hash3(x, y, z, 64) > 0.5 ? YETI.furWhite : YETI.fur, x, y, z, 64, 0.04));
+      }
+  return meshFrom(M, 7, 13, 7, mat, SZ);
+}
+
+function frostShardModel(mat) {
+  const M = new VoxelModel(18, 32, 18);
+  for (let y = 0; y < 30; y++) {
+    const t = y / 29;
+    const r = (y < 4 ? 3.2 + y * 0.5 : 5.2 * (1 - (t - 0.14) / 0.86)) + 0.4;
+    const lean = Math.round(t * t * 2);
+    for (let x = 0; x < 18; x++)
+      for (let z = 0; z < 18; z++) {
+        const dx = x + 0.5 - 9 - lean;
+        const dz = z + 0.5 - 9;
+        if (Math.abs(dx) + Math.abs(dz) > r * 1.25) continue;
+        const rim = Math.abs(dx) + Math.abs(dz) > r * 1.25 - 1.3;
+        const core = Math.abs(dx) + Math.abs(dz) < r * 0.45;
+        M.set(x, y + 1, z, core && y > 3 ? J(YETI.glow, x, y, z, 65, 0.03) : J(rim ? YETI.iceHi : y % 5 < 2 ? YETI.ice : YETI.iceDeep, x, y, z, 66, 0.04), core && y > 3);
+      }
+  }
+  return meshFrom(M, 9, 15, 9, mat, SZ);
+}
+
+function frostHeartModel(mat) {
+  const M = new VoxelModel(20, 24, 20);
+  for (let y = 0; y < 22; y++)
+    for (let x = 0; x < 20; x++)
+      for (let z = 0; z < 20; z++) {
+        const dx = (x + 0.5 - 10) / 7;
+        const dz = (z + 0.5 - 10) / 7;
+        const dy = (y - 11) / (10 - Math.abs(y - 11) * 0.15);
+        const d = Math.abs(dx) + Math.abs(dz) + Math.abs(dy) * 0.75;
+        if (d > 1.15) continue;
+        const rim = d > 0.8;
+        M.set(x, y + 1, z, J(rim ? YETI.glow : YETI.glowHi, x, y, z, 67, 0.04), !rim);
+      }
+  for (let y = 0; y < 4; y++) for (let x = 5; x < 15; x++) for (let z = 5; z < 15; z++) if ((x + z + y) % 3 !== 0 && Math.hypot(x - 9.5, z - 9.5) < 5.2 - y) M.set(x, y, z, J(hash3(x, y, z, 68) > 0.5 ? YETI.furHi : YETI.fur, x, y, z, 68, 0.04));
+  for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]) M.set(10 + dx, 12 + dy, 10 + dz, 0xffffff, true);
+  return meshFrom(M, 10, 12, 10, mat, SZ);
+}
+
+const YETI_HIDE = { scale: 0x9ab8d4, scaleLo: 0x5d84ac, scaleHi: 0xdcecf8, horn: YETI.leather, hornDark: YETI.leatherLo };
+
 const DUSK_HIDE = { scale: 0x3b3268, scaleLo: 0x251f48, scaleHi: 0x574c9c, horn: DARK.trim, hornDark: DARK.bladeDark };
 const BUDGE_MEMBRANE = { membrane: BUDGE.membrane, membraneHi: BUDGE.membraneHi, glow: BUDGE.vein, scaleHi: BUDGE.scaleHi };
 
 const BUILDERS = {
   budgemembrane: (mat) => membraneModel(mat, BUDGE_MEMBRANE),
+  yetihide: (mat) => hideModel(mat, YETI_HIDE),
+  rimefur: furModel, glacierclaw: yetiClawModel, yetifang: yetiFangModel, frostshard: frostShardModel, frostheart: frostHeartModel,
   duskhide: (mat) => hideModel(mat, DUSK_HIDE), budgescale: scaleModel, budgefang: fangModel, budgeclaw: clawModel, budgehorn: hornModel, budgehide: hideModel, duskscale: duskScaleModel, duskclaw: duskClawModel, scythehorn: scytheHornModel, gloommembrane: membraneModel, gloomcore: gloomCoreModel };
 const cache = {};
 
