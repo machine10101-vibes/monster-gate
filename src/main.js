@@ -29,6 +29,7 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
+import { clearAccount, createAccount, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
@@ -169,7 +170,11 @@ class Game {
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
     this.bindUI();
     this.applyQuality();
-    const session = readSession();
+    const account = readAccount();
+    const klever = readSession();
+    const session = account && klever
+      ? ((account.at || 0) >= (klever.at || 0) ? account : klever)
+      : (account || klever);
     if (session) {
       await this.applyWallet(session);
       this.watchAccount();
@@ -197,7 +202,7 @@ class Game {
     document.getElementById('hud').classList.remove('hidden');
     const returning = this.restoreHunter();
     if (this.world.realm === 'cave') this.hud.banner('Dragon Cave', 'Darksycle Den', 3200);
-    else if (returning) this.hud.banner('Welcome back', shortAddress(this.wallet.address), 3200);
+    else if (returning) this.hud.banner('Welcome back', this.wallet.email || shortAddress(this.wallet.address), 3200);
     else {
       this.hud.banner('Village', 'Oakhollow', 3600);
       setTimeout(() => this.hud.toast('A Monster Gate has opened in the northern forest!', 4200), 3700);
@@ -224,7 +229,8 @@ class Game {
         if (result.conflict && !this.cloudConflict) {
           this.cloudConflict = true;
           this.progress.onCloud = null;
-          this.hud?.toast('A newer hunt is saved to this wallet. Reload to use it.', 4200);
+          const noun = this.wallet?.kind === 'email' ? 'account' : 'wallet';
+          this.hud?.toast(`A newer hunt is saved to this ${noun}. Reload to use it.`, 4200);
         }
       });
     };
@@ -268,37 +274,124 @@ class Game {
     const swap = document.getElementById('btn-wallet-switch');
     const help = document.getElementById('wallet-help');
     if (!status || !sign || !start || !swap) return;
+    const choices = document.getElementById('account-choices');
+    const panel = document.getElementById('account-panel');
+    const forming = !!panel && !panel.classList.contains('hidden');
     const signed = !!this.wallet?.address;
-    sign.classList.toggle('hidden', signed);
+    const email = this.wallet?.kind === 'email';
+    choices?.classList.toggle('hidden', signed || forming);
+    sign.classList.toggle('hidden', signed || forming);
     start.classList.toggle('hidden', !signed);
     start.disabled = !!this.cloudSyncing;
     swap.classList.toggle('hidden', !signed);
     if (!signed) {
       help?.classList.add('hidden');
-      const where = window.kleverWeb ? (isMobile() ? 'Klever Wallet' : 'the Klever extension') : 'your Klever wallet';
-      sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
-      status.textContent = window.kleverWeb
-        ? 'Tap Sign in. On the Klever screen, tap Confirm and leave that window open until it accepts.'
-        : 'Sign in with your Klever wallet. Your hunt is saved to that address.';
+      if (!forming) {
+        const where = window.kleverWeb ? (isMobile() ? 'Klever Wallet' : 'the Klever extension') : 'your Klever wallet';
+        sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
+        status.textContent = window.kleverWeb
+          ? 'Tap Sign in. On the Klever screen, tap Confirm and leave that window open until it accepts.'
+          : 'Create an account with your email and password. Your hunt is saved to that account.';
+      }
       return;
     }
+    panel?.classList.add('hidden');
     help?.classList.add('hidden');
+    swap.textContent = email ? 'Sign out' : 'Use a different wallet';
     status.replaceChildren();
     const who = document.createElement('b');
-    who.textContent = shortAddress(this.wallet.address);
+    if (email) who.className = 'account-email';
+    who.textContent = this.wallet.email || shortAddress(this.wallet.address);
+    const noun = email ? 'account' : 'wallet';
     const lead = this.walletNote === 'new'
       ? 'New hunt saved to '
       : this.walletNote === 'claimed'
         ? 'Your hunt is now saved to '
         : 'Welcome back. This hunt belongs to ';
     const tail = this.cloudSyncing
-      ? '. Opening the hunt saved to this wallet…'
+      ? `. Opening the hunt saved to this ${noun}…`
       : this.cloudState === 'on'
-        ? '. It is saved to this wallet.'
+        ? `. It is saved to this ${noun}.`
         : this.cloudState === 'error'
           ? '. Saved on this browser. The guild record could not be reached.'
-          : '. It stays on this browser under that wallet.';
+          : `. It stays on this browser under that ${noun}.`;
     status.append(lead, who, tail);
+  }
+
+  openAccount(mode) {
+    const panel = document.getElementById('account-panel');
+    const status = document.getElementById('wallet-status');
+    const confirm = document.getElementById('account-confirm');
+    const confirmLabel = document.getElementById('account-confirm-label');
+    const submit = document.getElementById('account-submit');
+    const password = document.getElementById('account-password');
+    const error = document.getElementById('account-error');
+    if (!panel) return;
+    panel.dataset.mode = mode;
+    panel.classList.remove('hidden');
+    confirm?.classList.toggle('hidden', mode !== 'create');
+    confirmLabel?.classList.toggle('hidden', mode !== 'create');
+    if (submit) submit.textContent = mode === 'create' ? 'Create account' : 'Sign in';
+    if (password) password.setAttribute('autocomplete', mode === 'create' ? 'new-password' : 'current-password');
+    if (error) error.textContent = '';
+    if (status) {
+      status.textContent = mode === 'create'
+        ? 'Choose an email and a password. This account keeps your hunt.'
+        : 'Sign in with the email and password for your account.';
+    }
+    this.refreshWalletUi();
+    document.getElementById('account-email')?.focus();
+  }
+
+  closeAccount() {
+    const panel = document.getElementById('account-panel');
+    panel?.reset();
+    panel?.classList.add('hidden');
+    const error = document.getElementById('account-error');
+    if (error) error.textContent = '';
+  }
+
+  async onAccountSubmit(event) {
+    event.preventDefault();
+    if (this.walletBusy) return;
+    const panel = document.getElementById('account-panel');
+    const mode = panel?.dataset.mode || 'create';
+    const email = document.getElementById('account-email')?.value || '';
+    const password = document.getElementById('account-password')?.value || '';
+    const confirm = document.getElementById('account-confirm')?.value || '';
+    const error = document.getElementById('account-error');
+    const submit = document.getElementById('account-submit');
+    this.walletBusy = true;
+    if (submit) submit.disabled = true;
+    if (error) error.textContent = '';
+    try {
+      const session = mode === 'create'
+        ? await createAccount(email, password, confirm)
+        : await signInAccount(email, password);
+      this.closeAccount();
+      await this.applyWallet(session);
+      this.watchAccount();
+    } catch (err) {
+      if (error) error.textContent = err.message || 'The account could not be created.';
+    } finally {
+      this.walletBusy = false;
+      if (submit) submit.disabled = false;
+    }
+  }
+
+  signOut(repromptKlever) {
+    this.captureHunter();
+    flushCloud();
+    clearSession();
+    clearAccount();
+    clearCloudToken();
+    this.progress.onCloud = null;
+    this.wallet = null;
+    this.walletNote = '';
+    this.cloudState = 'off';
+    this.closeAccount();
+    this.refreshWalletUi();
+    if (repromptKlever) this.onWallet();
   }
 
   handOffToWallet() {
@@ -307,10 +400,12 @@ class Game {
     if (sign) sign.disabled = true;
     if (status) status.textContent = 'Opening Klever Wallet…';
     launchKleverApp();
+    document.getElementById('account-choices')?.classList.add('hidden');
     const finish = () => {
       this.walletBusy = false;
       if (sign) sign.disabled = false;
       if (this.wallet?.address) return;
+      document.getElementById('account-choices')?.classList.remove('hidden');
       // Coming back from the wallet must not open it again. The hunter taps Sign in to retry.
       const help = document.getElementById('wallet-help');
       if (help) showWalletHelp(help, 'mobile-app');
@@ -341,6 +436,8 @@ class Game {
     }
     markPrompt();
     this.walletBusy = true;
+    document.getElementById('account-choices')?.classList.add('hidden');
+    this.closeAccount();
     const sign = document.getElementById('btn-wallet');
     const status = document.getElementById('wallet-status');
     if (sign) sign.disabled = true;
@@ -358,6 +455,7 @@ class Game {
     } finally {
       this.walletBusy = false;
       if (sign) sign.disabled = false;
+      if (!this.wallet?.address) document.getElementById('account-choices')?.classList.remove('hidden');
     }
   }
 
@@ -422,22 +520,19 @@ class Game {
     const swap = document.getElementById('btn-wallet-switch');
     start.addEventListener('click', () => this.start());
     sign.addEventListener('click', () => this.onWallet());
-    swap.addEventListener('click', () => {
-      this.captureHunter();
-      flushCloud();
-      clearSession();
-      clearCloudToken();
-      this.progress.onCloud = null;
-      this.wallet = null;
-      this.walletNote = '';
-      this.cloudState = 'off';
+    document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
+    document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
+    document.getElementById('account-cancel')?.addEventListener('click', () => {
+      this.closeAccount();
       this.refreshWalletUi();
-      this.onWallet();
     });
+    document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
+    swap.addEventListener('click', () => this.signOut(this.wallet?.kind !== 'email'));
     window.addEventListener('keydown', (e) => {
       if (this.started || (e.code !== 'Enter' && e.code !== 'Space')) return;
+      if (e.target?.closest?.('input, textarea, #account-panel')) return;
+      if (!document.getElementById('account-panel')?.classList.contains('hidden')) return;
       if (this.wallet) this.start();
-      else this.onWallet();
       e.preventDefault();
     });
     document.getElementById('panel-close').addEventListener('click', () => this.hud.closePanel());

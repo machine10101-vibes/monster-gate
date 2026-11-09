@@ -73,7 +73,7 @@ export function clearCloudToken() {
   }
 }
 
-async function call(body, keepalive = false) {
+export async function guildPost(body, keepalive = false) {
   const cfg = await loadCloudConfig();
   if (!cfg.url || !cfg.key) return null;
   const res = await fetch(`${cfg.url}/functions/v1/hunter`, {
@@ -93,7 +93,7 @@ async function call(body, keepalive = false) {
 async function ensureToken(session) {
   const existing = readToken(session.address);
   if (existing) return existing;
-  const res = await call({
+  const res = await guildPost({
     op: 'auth',
     address: session.address,
     message: session.message,
@@ -108,11 +108,11 @@ async function ensureToken(session) {
 
 async function withToken(session, body, keepalive) {
   const token = await ensureToken(session);
-  let res = await call({ ...body, token }, keepalive);
+  let res = await guildPost({ ...body, token }, keepalive);
   if (res?.status === 401) {
     clearCloudToken();
     const again = await ensureToken(session);
-    res = await call({ ...body, token: again }, keepalive);
+    res = await guildPost({ ...body, token: again }, keepalive);
   }
   return res;
 }
@@ -137,6 +137,10 @@ export async function pullHunt(session) {
 
 /** Push this hunt. A 409 means another device saved a newer one. */
 export async function pushHunt(session, data, keepalive = false) {
+  if (session?.kind === 'email') {
+    const { pushEmailHunt } = await import('./account.js');
+    return pushEmailHunt(session, data, keepalive);
+  }
   const progress = stamp(data);
   if (progress !== data) data.savedAt = progress.savedAt;
   const res = await withToken(session, { op: 'save', progress }, keepalive);
@@ -158,6 +162,10 @@ export async function pushHunt(session, data, keepalive = false) {
  * `gate.open` lets the title screen abandon a slow record without it landing mid-hunt.
  */
 export async function syncHunt(session, progress, gate = { open: true }) {
+  if (session?.kind === 'email') {
+    const { syncEmailHunt } = await import('./account.js');
+    return syncEmailHunt(session, progress, gate);
+  }
   const cfg = await loadCloudConfig();
   if (!cfg.url || !cfg.key) return { state: 'off', replaced: false };
   const remote = await pullHunt(session);
