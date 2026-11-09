@@ -14,6 +14,9 @@ const KEYS = [
   { h: 22, top: 0x0a1030, hor: 0x1a2250, fog: 0x151d40, sun: 0x7f95ff, si: 0.55, hs: 0x2c3c86, hg: 0x161a38, hi: 0.95, exp: 1.0 },
   { h: 24, top: 0x070b24, hor: 0x16204a, fog: 0x121a3a, sun: 0x7f95ff, si: 0.55, hs: 0x2c3c86, hg: 0x161a38, hi: 0.95, exp: 1.0 },
 ];
+const COLD_FOG = new THREE.Color(0xdcebf6);
+const COLD_HEMI = new THREE.Color(0xb8d4f2);
+const COLD_SUN = new THREE.Color(0xe4efff);
 KEYS.forEach((k) => {
   for (const f of ['top', 'hor', 'fog', 'sun', 'hs', 'hg']) k[f] = new THREE.Color(k[f]);
 });
@@ -174,7 +177,14 @@ export class Sky {
     this.hemi.intensity = s.hi;
 
     this.fog.color.copy(s.fog);
-    this.scene.background.copy(s.fog);
+    const chill = this.chill || 0;
+    if (chill > 0.01) {
+      this.fog.color.lerp(COLD_FOG, chill * 0.5 * (1 - night * 0.7));
+      this.hemi.color.lerp(COLD_HEMI, chill * 0.35);
+      this.sun.color.lerp(COLD_SUN, chill * 0.3);
+      this.sun.intensity *= 1 - chill * 0.08;
+    }
+    this.scene.background.copy(this.fog.color);
     if (this.indoors) {
       this.fog.color.setHex(0x16101f);
       this.scene.background.setHex(0x100c16);
@@ -185,8 +195,8 @@ export class Sky {
       this.skyMesh.visible = false;
       this.clouds.visible = false;
     } else {
-      this.fog.near = 34;
-      this.fog.far = 150;
+      this.fog.near = 34 - chill * 8;
+      this.fog.far = 150 - chill * 36;
       this.skyMesh.visible = true;
       this.clouds.visible = true;
     }

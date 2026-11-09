@@ -5,6 +5,7 @@ import './style.css';
 import * as THREE from 'three';
 import { World } from './world/world.js';
 import { Sky } from './world/sky.js';
+import { Snowfall } from './world/snowfall.js';
 import { FX } from './engine/fx.js';
 import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
@@ -136,6 +137,8 @@ class Game {
     this.scene.add(this.world.group);
     if (this.world.cave) this.scene.add(this.world.cave.group);
     this.sky = new Sky(this.scene, this.quality);
+    this.snowfall = new Snowfall(this.scene);
+    this.chill = 0;
     this.fx = new FX(this.scene, this.quality);
     this.vfx = new VFX(this);
     this.fx.vfx = this.vfx;
@@ -734,6 +737,7 @@ class Game {
               dealt = Math.round(dealt * 1.8);
             }
             this.strikeMonster(mon, dealt, p.vx / d, p.vz / d, p.kind === 'bolt' || p.kind === 'frost' ? 3 : 2, crit);
+            if (!p.skill && (p.kind === 'icicle' || p.kind === 'frost') && !mon.dead) mon.afflict('slow', 1.6, 0.7);
             skillOnHit(this, p, mon);
             this.audio.hit();
             P.fury = Math.min(100, P.fury + Math.round(3 * (mods.furyGain || 1)));
@@ -746,7 +750,11 @@ class Game {
       } else {
         let struck = false;
         if (Math.hypot(P.pos.x - m.position.x, P.pos.z - m.position.z) < 0.55 + p.r && Math.abs(m.position.y - (P.pos.y + 1)) < 1.2) {
-          if (P.hurt(p.dmg, m.position.x - p.vx * 0.1, m.position.z - p.vz * 0.1, 3)) this.audio.hurt();
+          if (P.hurt(p.dmg, m.position.x - p.vx * 0.1, m.position.z - p.vz * 0.1, 3)) {
+            this.audio.hurt();
+            if (p.kind === 'icebreath') P.chill(2.2);
+            else if (p.kind === 'iceboulder') P.chill(2.6);
+          }
           struck = true;
         }
         if (this.net?.role === 'host') {
@@ -1444,6 +1452,7 @@ class Game {
         this.hud.setArea('Darksycle Den');
       }
       this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
+      this.chill += (0 - this.chill) * Math.min(1, dt * 2);
       return;
     }
     const land = this.world.landAt(P.x, P.z);
@@ -1456,8 +1465,11 @@ class Game {
       }
       const shade = land.shade || 0;
       this.forestAmt += (shade - this.forestAmt) * Math.min(1, dt * 1.5);
+      const goal = land.chillAt ? land.chillAt(Math.floor(P.x) - land.x0, Math.floor(P.z) - land.z0) : 0;
+      this.chill += (goal - this.chill) * Math.min(1, dt * 1.2);
       return;
     }
+    this.chill += (0 - this.chill) * Math.min(1, dt * 1.2);
     const z = this.world.zoneAt(P.x, P.z);
     const dg = Math.hypot(P.x - GATE.x, P.z - GATE.z);
     const zone = dg < 11 ? ZONE.GATE : z;
@@ -1524,7 +1536,9 @@ class Game {
     this.updateZone(dt);
 
     const P = this.player;
+    this.sky.chill = this.chill;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
+    this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.chill);
     const lights = this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
     this.sky.assignTorchLights(lights, P.pos.x, P.pos.z);
     const night = this.sky.night;

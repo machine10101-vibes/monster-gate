@@ -2,6 +2,7 @@ import { fbm, hash2, lerp, clamp, smoothstep } from '../engine/voxel.js';
 import { TILE } from '../engine/materials.js';
 import { W, ZONE } from './terrain.js';
 import { TILES } from './tiles.js';
+import { ARCTIC_SPECS, arcticFeature, paintArcticCell, frostGoldmead, dressArctic } from './arctic.js';
 
 /**
  * The seven tiles around Oakhollow (44, 45, 46, 54, 56, 64, 66).
@@ -266,10 +267,10 @@ const SPECS = {
   },
   goldmead: {
     banner: ['Gold Wood', 'Goldmead'], shade: 0.4, forest: 0.7, amp: 3.4, base: 4, seed: 46,
-    rim: { n: true, e: true },
+    rim: { n: true },
     knolls: [[40, 36, 9, 5], [70, 90, 8, 4], [28, 100, 7, 3.2]],
     clearing: [96, 58, 16],
-    roads: [[[0, 80], [46, 72], [84, 58]]],
+    roads: [[[0, 80], [46, 72], [84, 58], [143, 64]]],
   },
   brookside: {
     banner: ['The Brook', 'Brookside'], shade: 0.08, forest: 0.26, amp: 2.8, base: 3.1, seed: 54,
@@ -300,11 +301,13 @@ const SPECS = {
     knolls: [[80, 50, 8, 3], [40, 90, 6, 2], [100, 80, 5, -1]],
     roads: [[[0, 92], [36, 86], [70, 60]]],
   },
+  ...ARCTIC_SPECS,
 };
 
 const HAY = 6;
 
 function applyFeature(h, x, z, spec) {
+  if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.camp) {
     const [cx, cz, r] = spec.camp;
     const dx = (x - cx) / (r * 0.78);
@@ -402,6 +405,10 @@ function makeTile(spec, edges) {
       const n = fbm(x * 0.05, z * 0.05, spec.seed + 2, 2);
       const k = kind[i];
       if (k === PATH) mask[i] = 1;
+      if (spec.arctic) {
+        paintArcticCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
+        continue;
+      }
       forest[i] = k === PATH || k === WATER || k === FARM ? 0 : spec.forest * (0.55 + n * 0.7);
       if (k === WATER || h < 0.35) {
         zone[i] = ZONE.WATER;
@@ -466,12 +473,16 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'goldmead') return { w: colOf(north, W - 1), s: rowOf(e, 0) };
   if (kind === 'longacre') return { n: rowOf(b, W - 1), e: colOf(south, 0) };
   if (kind === 'hayfield') return { n: rowOf(e, W - 1), w: colOf(south, W - 1) };
+  if (kind === 'snowfall') return { w: colOf(made.goldmead, W - 1) };
+  if (kind === 'icewind') return { w: colOf(made.snowfall, W - 1) };
+  if (kind === 'rimefang') return { s: rowOf(made.snowfall, 0) };
+  if (kind === 'glimmerfrost') return { w: colOf(made.rimefang, W - 1), s: rowOf(made.icewind, 0) };
   return {};
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -492,8 +503,17 @@ export function generateRing(oak, south) {
       banner: spec.banner,
       shade: spec.shade,
       rim: spec.rim,
+      arctic: !!spec.arctic,
+      chillAt: spec.arctic
+        ? spec.blend
+          ? (lx) => smoothstep(0, spec.blend.w, lx)
+          : () => 1
+        : kind === 'goldmead'
+          ? (lx) => 0.35 * smoothstep(W - 34, W - 1, lx)
+          : () => 0,
     });
   }
+  frostGoldmead(made.goldmead);
   return lands;
 }
 
@@ -612,6 +632,10 @@ function dressLand(world, land) {
   const data = land.data;
   const trees = [];
   if (land.kind === 'brookside') dressOrcCamp(world, land);
+  if (spec.arctic) {
+    dressArctic(world, land, spec);
+    return;
+  }
   const place = (parts, lx, lz, rot, scale, opts) => {
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;

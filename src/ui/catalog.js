@@ -165,7 +165,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 
@@ -307,6 +307,7 @@ function el(tag, cls, html) {
 
 const SET_HELD = {
   budgeset: 'budgeblade', darksyceset: 'darkscythe', budgeleather: 'budgecrossbow', darkleather: 'darkcrossbow', budgecloth: 'budgestaff', darkcloth: 'darkstaff',
+  yetiset: 'yetigreatsword', yetileather: 'yeticrossbow', yeticloth: 'yetistaff',
 };
 
 const SET_BLURB = {
@@ -316,6 +317,9 @@ const SET_BLURB = {
   budgecloth: 'Wing-silk robes in budge green and gold: a pointed hood, sashed robe, flared cuffs, tied trousers and curled slippers, plus a fang-clasped grimoire. The mage set.',
   darkleather: 'Indigo hide stitched with violet thread: a finned cowl, jerkin, talon bracers, strapped leggings and talon-capped boots. Built for shadows. The ranger set.',
   darkcloth: 'Dusk-silk robes with glowing hems: a gem-browed hood, core-clasped robe, flared cuffs, sashed trousers and silent slippers, plus a humming grimoire. The mage set.',
+  yetiset: 'Frost-shard plate under rime fur and brown leather straps: a crystal-crested yeti helm with glowing eyes, a frostheart cuirass, claw-knuckled gauntlets, heavy greaves and ice-clawed boots, with a glacier shield. The warrior set.',
+  yetileather: 'Frost-stiff yeti hide with shaggy collars and crossed straps: a fur hood, jerkin, claw-bracer gloves, banded leggings and deep-furred boots. Built for the long cold. The ranger set.',
+  yeticloth: 'Layered rime-fur robes with frost-silk sashes and a hem of icicles: a shard-browed hood, frostheart-clasped robe, flared cuffs, sashed trousers and silent slippers, plus a frost-rimed grimoire. The mage set.',
 };
 
 function bonusText(b) {

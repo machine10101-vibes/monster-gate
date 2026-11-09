@@ -60,6 +60,7 @@ export class Player {
     this.moveAmt = 0;
     this.speed = 0;
     this.invuln = 0;
+    this.chillT = 0;
     this.hurtT = 0;
     this.knock = new THREE.Vector3();
     this.stamDelay = 0;
@@ -204,6 +205,13 @@ export class Player {
   syncObj() {
     this.obj.position.copy(this.pos);
     this.obj.rotation.y = this.yaw;
+  }
+
+  /** Frost slows the hunter for a few seconds. */
+  chill(t) {
+    if (this.dead) return;
+    if (!(this.chillT > 0)) this.game.hud.floatText(...this.game.screenOf(this.pos.x, this.pos.y + 2.3, this.pos.z), 'Chilled', 'gold');
+    this.chillT = Math.max(this.chillT || 0, t);
   }
 
   heal(n) {
@@ -389,6 +397,10 @@ export class Player {
     const world = g.world;
     this.stateT += dt;
     this.invuln = Math.max(0, this.invuln - dt);
+    if (this.chillT > 0) {
+      this.chillT = Math.max(0, this.chillT - dt);
+      if (Math.random() < dt * 14) this.game.fx.emit(this.pos.x + (Math.random() - 0.5) * 0.7, this.pos.y + 0.3 + Math.random() * 1.4, this.pos.z + (Math.random() - 0.5) * 0.7, 0, 0.5, 0, Math.random() < 0.5 ? 0xbfeaff : 0xffffff, 0.07, 0.5, -0.3);
+    }
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.comboT = Math.max(0, this.comboT - dt);
     this.stamDelay = Math.max(0, this.stamDelay - dt);
@@ -512,6 +524,7 @@ export class Player {
     }
 
     if (this.wading && this.state !== 'roll') speed *= 0.65;
+    if (this.chillT > 0 && this.state !== 'roll') speed *= 0.6;
     if (this.leapT > 0) {
       this.leapT -= dt;
       speed = 13;
@@ -1273,9 +1286,9 @@ export class Player {
 }
 
 /** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
-const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow']);
+const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow']);
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear']);
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -1293,4 +1306,10 @@ const TRAIL_SPEC = {
   darkhammer: { b: [0, 0, 0.8], t: [0, 0, 1.45], col: 0xc78bff, hot: 0xe6c8ff },
   budgespear: { b: [0, 0, 1.6], t: [0, 0, 2.2], col: 0xb8ff8a, hot: 0xfff09a },
   darkspear: { b: [0, 0, 1.6], t: [0, 0, 2.25], col: 0xc78bff, hot: 0xe6c8ff },
+  yetisword: { b: [0, 0, 0.35], t: [-0.1, 0, 1.4], col: 0x9fdcff, hot: 0xf2fbff },
+  yetigreatsword: { b: [0, 0, 0.5], t: [-0.1, 0, 1.85], col: 0x9fdcff, hot: 0xf2fbff },
+  yetidual: { b: [0, 0, 0.25], t: [-0.1, 0, 0.98], col: 0x9fdcff, hot: 0xf2fbff },
+  yetihammer: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0x9fdcff, hot: 0xf2fbff },
+  yetispear: { b: [0, 0, 1.6], t: [0, 0, 2.3], col: 0x9fdcff, hot: 0xf2fbff },
+  yetiscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0x9fdcff, hot: 0xf2fbff },
 };

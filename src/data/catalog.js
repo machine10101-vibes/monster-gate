@@ -13,9 +13,15 @@ export const MATERIALS = {
   gloommembrane: { name: 'Gloom Membrane', desc: 'Wing skin the colour of dusk, laced with violet veins.' },
   duskhide: { name: 'Dusk Hide', desc: 'Supple indigo hide with a faint violet sheen. It takes a stitch well.' },
   gloomcore: { name: 'Gloom Core', desc: 'A fist-sized crystal of condensed dusk. It hums when it is near its owner.' },
+  rimefur: { name: 'Rime Fur', desc: 'Shaggy blue-white fur stiff with frost. It crackles when you bend it.' },
+  yetihide: { name: 'Yeti Hide', desc: 'Thick hide matted with ice. Warm on the inside, tough as a drum on the outside.' },
+  glacierclaw: { name: 'Glacier Claw', desc: 'A curved claw the length of a forearm, cold enough to numb the hand that holds it.' },
+  yetifang: { name: 'Yeti Fang', desc: 'A cream-white fang with a rime of frost along the root.' },
+  frostshard: { name: 'Frost Shard', desc: 'A spike of living ice from a yeti\'s back. It never melts.' },
+  frostheart: { name: 'Frostheart', desc: 'A palm-sized crystal that beats once a minute, long after its owner is gone.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -34,6 +40,14 @@ export const DROPS = {
     { id: 'duskclaw', chance: 0.6, qty: [1, 2], rate: 'Uncommon' },
     { id: 'scythehorn', chance: 0.45, qty: [1, 2], rate: 'Uncommon' },
     { id: 'gloomcore', chance: 0.3, qty: [1, 1], rate: 'Rare' },
+  ],
+  snowyeti: [
+    { id: 'rimefur', chance: 1, qty: [3, 5], rate: 'Common' },
+    { id: 'yetihide', chance: 0.65, qty: [1, 2], rate: 'Common' },
+    { id: 'frostshard', chance: 0.6, qty: [1, 3], rate: 'Common' },
+    { id: 'glacierclaw', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'yetifang', chance: 0.5, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'frostheart', chance: 0.25, qty: [1, 1], rate: 'Rare' },
   ],
 };
 
@@ -65,6 +79,10 @@ export const MONSTERS = [
   {
     id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
     desc: 'A graphite-scaled dragon with violet wings, a blue crystal crest and a glowing chest core. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Every so often it beats its wings and climbs high for about four seconds, raining crescents, gloom and crystal strikes from the air before diving at your position. Melee cannot reach it up there, so dodge the marked circles and use ranged attacks. Hit its wind-up hard to stagger it.',
+  },
+  {
+    id: 'snowyeti', name: 'Ravenous Snow Yeti', level: 9, temper: 'Ravenous', style: 'Brawler', habitat: 'The flat-topped mountain of Rimecrown, high in the Arctic north',
+    desc: 'A hulking beast of ice-crystal fur with glowing blue eyes and a mouth full of fangs. It rakes in a fast double swipe, exhales a cone of frost that slows you, leaps and slams the ground so ice spikes burst up around you, and hurls boulders of ice from range. Below half health it bellows and goes into a feeding frenzy, chaining attacks with barely a breath between them. Roll out of the marked ground and strike during its recovery.',
   },
 ];
 
@@ -215,10 +233,23 @@ GEAR.push(
   weapon('darkwand', 'wand', 'Gloomshard Wand', 'darksycledragon', 'A scale-wrapped grip holding a shard of gloom core that spits violet orbs.', { gloomcore: 1, duskclaw: 1, gloommembrane: 1 }, R('wand', 9, 0.32, 4, 'A wand. Rapid gloom orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' })),
   weapon('darkshortbow', 'shortbow', 'Crescent Shortbow', 'darksycledragon', 'A compact horn bow that throws small piercing crescents in quick succession.', { gloommembrane: 2, duskclaw: 1, duskscale: 1 }, R('shortbow', 10, 0.36, 5, 'A short bow. Piercing crescents.', { proj: 'crescent', shotLabel: 'Piercing' })),
   weapon('darkcrossbow', 'crossbow', 'Gloomlock Crossbow', 'darksycledragon', 'Blade-tipped prod arms, a dusk-scale stock and a rune that lights the bolt as it leaves.', { scythehorn: 1, duskscale: 3, gloommembrane: 2, duskclaw: 1 }, R('crossbow', 16, 0.64, 8, 'A crossbow. Rune-lit bolts.')),
+
+  weapon('yetisword', 'onesword', 'Frostfang Saber', 'snowyeti', 'A curved saber of yeti fang, rimed white along the spine, with a claw-hooked guard and a fur-wrapped grip.', { yetifang: 3, rimefur: 2, glacierclaw: 1 }, M('swordshield', 19, 2.6, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. Frostbitten fang steel.')),
+  weapon('yetigreatsword', 'twosword', 'Glacierfall Greatsword', 'snowyeti', 'A slab of blue ice-steel with a serrated fang edge and a pair of claw quillons. It leaves a trail of frost.', { yetifang: 4, frostshard: 2, rimefur: 3, yetihide: 1 }, M('twohand', 27, 3.0, 2.6, 0.6, 0.27, 14, 9, 'Two-handed. A glacier of a blade.')),
+  weapon('yetidual', 'dual', 'Twin Icefangs', 'snowyeti', 'Two hooked fang blades crusted with frost. Each swing sheds a spray of ice crystals.', { yetifang: 3, glacierclaw: 2, rimefur: 1 }, M('dual', 12, 2.3, 1.9, 0.27, 0.11, 6, 4, 'Dual swords. Hooked icefang blades.')),
+  weapon('yetihammer', 'hammer', 'Avalanche Maul', 'snowyeti', 'A lump of packed rime fur and ice with frost spikes on every face. It lands like a falling slope.', { frostshard: 3, rimefur: 5, frostheart: 1 }, M('twohand', 30, 2.6, 2.4, 0.76, 0.36, 17, 12, 'Two-handed. Buries what it hits.')),
+  weapon('yetispear', 'spear', 'Icicle Lance', 'snowyeti', 'A long frost-shard head with fang barbs and a tuft of rime fur at the collar.', { frostshard: 2, yetifang: 1, rimefur: 2, yetihide: 1 }, M('twohand', 20, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, cold reach.')),
+  weapon('yetistaff', 'staff', 'Frostheart War Staff', 'snowyeti', 'Claws cradle a frostheart crystal ringed by floating ice shards. It fires chilling bolts that slow what they hit.', { frostheart: 1, frostshard: 2, rimefur: 3, glacierclaw: 1 }, R('staff', 12, 0.6, 6, 'A war staff. Chilling frost bolts.', { spell: true, proj: 'frost', shotLabel: 'Frost' })),
+  weapon('yetiwand', 'wand', 'Rimeshard Wand', 'snowyeti', 'A fur-wrapped grip holding a shard of frost that spits ice bolts.', { frostshard: 2, glacierclaw: 1, rimefur: 1 }, R('wand', 10, 0.32, 4, 'A wand. Rapid frost bolts.', { spell: true, proj: 'frost', shotLabel: 'Frost' })),
+  weapon('yetishortbow', 'shortbow', 'Hoarfrost Shortbow', 'snowyeti', 'A compact claw-and-hide bow strung with frozen sinew. It throws small shards of ice.', { yetihide: 2, glacierclaw: 1, frostshard: 1 }, R('shortbow', 11, 0.36, 5, 'A short bow. Quick ice shards.', { proj: 'icicle', shotLabel: 'Icicle' })),
+  weapon('yetilongbow', 'longbow', 'Glacierhorn Longbow', 'snowyeti', 'Two great claws lashed to a hide-wrapped grip, strung with frozen sinew. Its shafts are frost shards and they hit like hail.', { frostshard: 2, yetihide: 2, glacierclaw: 1 }, R('longbow', 15, 0.5, 8, 'A longbow. Icicles that chill.', { proj: 'icicle', shotLabel: 'Icicle' })),
+  weapon('yeticrossbow', 'crossbow', 'Rimelock Crossbow', 'snowyeti', 'A fur-stocked crossbow with claw prod arms. Each bolt is a frost shard that bursts on impact.', { frostshard: 1, rimefur: 3, yetihide: 2, glacierclaw: 1 }, R('crossbow', 18, 0.64, 8, 'A crossbow. Frost-shard bolts.')),
+  weapon('yetiscythe', 'scythe', 'Whiteout Scythe', 'snowyeti', 'A great ice-claw blade on a fur-bound haft, with a frostheart-blue glow where the blade meets the shaft. It sweeps wide.', { frostshard: 3, rimefur: 2, glacierclaw: 1 }, M('twohand', 21, 2.9, 2.7, 0.56, 0.24, 12, 7, 'Two-handed. Long reach, wide sweep.')),
 );
 
 const BUDGE_ARMOR = 'budgedragon';
 const DARK_ARMOR = 'darksycledragon';
+const YETI_ARMOR = 'snowyeti';
 function armorSet(monster, set, defs) {
   for (const [slot, id, name, def, desc, recipe, bonus] of defs) {
     GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe, ...(bonus ? { bonus } : {}) });
@@ -228,6 +259,7 @@ function armorSet(monster, set, defs) {
 GEAR.push(
   { id: 'budgeshield', type: 'armor', slot: 'shield', name: 'Budgescale Shield', monster: BUDGE_ARMOR, set: 'budgeset', def: 2, desc: 'A scale-faced kite shield with a horn boss and a gold-banded rim.', recipe: { budgescale: 5, budgehorn: 1, budgehide: 1 } },
   { id: 'darkshield', type: 'armor', slot: 'shield', name: 'Duskscale Shield', monster: DARK_ARMOR, set: 'darksyceset', def: 2, desc: 'An indigo scale shield with a gloom gem and a silver blade fin on each side.', recipe: { duskscale: 5, scythehorn: 1, gloommembrane: 1 } },
+  { id: 'yetishield', type: 'armor', slot: 'shield', name: 'Glacierplate Shield', monster: YETI_ARMOR, set: 'yetiset', def: 3, desc: 'A slab of frost-shard plate in a rime-fur rim, with a frostheart blue boss and a claw fin on each side.', recipe: { frostshard: 4, rimefur: 3, frostheart: 1 } },
 );
 
 armorSet(BUDGE_ARMOR, 'budgeleather', [
@@ -261,6 +293,29 @@ armorSet(DARK_ARMOR, 'darkcloth', [
   ['book', 'darkbook', 'Gloomcore Grimoire', 0, 'A membrane-bound tome that hums with a caged gloom core.', { gloomcore: 1, gloommembrane: 2, scythehorn: 1, duskhide: 1 }, { mana: 20, spell: 0.06 }],
 ]);
 
+armorSet(YETI_ARMOR, 'yetiset', [
+  ['helm', 'yetihelm', 'Glacierplate Helm', 2, 'A snarling yeti-skull helm of frost-shard plate with a fang-lined maw, swept ice crests and glowing blue eyes.', { frostshard: 3, rimefur: 2, yetifang: 1 }],
+  ['chest', 'yetichest', 'Glacierplate Cuirass', 4, 'Blue ice plate under a collar of rime fur, strapped across with brown leather and a frostheart burning at the sternum.', { frostshard: 6, rimefur: 4, yetihide: 2, frostheart: 1 }],
+  ['arms', 'yetiarms', 'Glacierplate Gauntlets', 2, 'Fur-cuffed ice vambraces under crystal-spiked pauldrons. The knuckles come with glacier claws.', { frostshard: 3, glacierclaw: 2, rimefur: 2 }],
+  ['legs', 'yetilegs', 'Glacierplate Greaves', 3, 'Heavy frost-plate thighs, rime-fur knee guards and a hanging hide faulds with ice shards.', { frostshard: 4, rimefur: 3, yetihide: 1 }],
+  ['boots', 'yetiboots', 'Glacierplate Boots', 2, 'Great furred boots with ice-claw toes that bite into the snow.', { frostshard: 2, rimefur: 2, glacierclaw: 2 }],
+]);
+armorSet(YETI_ARMOR, 'yetileather', [
+  ['helm', 'yetileatherhelm', 'Rimehide Hood', 1, 'A fur-trimmed hide hood with frost-bright tufts and a fang clasp.', { yetihide: 3, rimefur: 1 }],
+  ['chest', 'yetileatherchest', 'Rimehide Jerkin', 3, 'Frost-stiff yeti hide with a shaggy collar and crossed leather straps.', { yetihide: 5, rimefur: 4 }],
+  ['arms', 'yetileathergloves', 'Rimehide Gloves', 1, 'Fur-backed hide gloves with a glacier-claw bracer on each wrist.', { yetihide: 2, glacierclaw: 1 }],
+  ['legs', 'yetileatherlegs', 'Rimehide Leggings', 2, 'Thick fur-banded leggings that shrug off the cold.', { yetihide: 4, rimefur: 2 }],
+  ['boots', 'yetileatherboots', 'Rimehide Boots', 1, 'Deep-furred boots with claw-bone toe caps.', { yetihide: 2, rimefur: 1 }],
+]);
+armorSet(YETI_ARMOR, 'yeticloth', [
+  ['helm', 'yeticlothhood', 'Frostweave Hood', 1, 'A deep frost-white hood edged in rime fur with a floating ice-shard brow.', { rimefur: 3, yetihide: 1 }],
+  ['chest', 'yeticlothrobe', 'Frostweave Robe', 3, 'Layered rime-fur robes with a frostheart clasp and a hem of tiny hanging icicles.', { rimefur: 6, yetihide: 2, frostheart: 1 }],
+  ['arms', 'yeticlothgloves', 'Frostweave Gloves', 0, 'Soft fur mitts under flared cuffs of frosted thread.', { rimefur: 3, glacierclaw: 1 }],
+  ['legs', 'yeticlothlegs', 'Frostweave Trousers', 1, 'Fur-lined trousers tied with a blue frost-silk sash at each knee.', { rimefur: 4, yetihide: 1 }],
+  ['boots', 'yeticlothboots', 'Frostweave Slippers', 0, 'Fur slippers that never leave a footprint in the snow.', { rimefur: 3, yetihide: 1 }],
+  ['book', 'yetibook', 'Frostheart Grimoire', 0, 'A hide-bound tome rimed with frost and clasped with a fang. A caged frostheart pulses on its cover.', { frostheart: 1, rimefur: 3, yetifang: 1, yetihide: 1 }, { mana: 24, spell: 0.07 }],
+]);
+
 const set = (id, name, monster, tier, role, stats, bonus) => ({ id, name, monster, tier, role, hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0, ...stats, bonus });
 export const SETS = [
   set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 4 }, 'Full set: +4 max health (2 hearts).'),
@@ -269,6 +324,9 @@ export const SETS = [
   set('darksyceset', 'Duskscale Plate', DARK_ARMOR, 'metal', 'Warrior', { hp: 2, mana: 20 }, 'Full set: +2 max health (1 heart) and +20 max mana.'),
   set('darkleather', 'Duskhide Leathers', DARK_ARMOR, 'leather', 'Ranger', { stamina: 20, crit: 0.04 }, 'Full set: +20 max stamina and +4% critical chance.'),
   set('darkcloth', 'Gloomweave Robes', DARK_ARMOR, 'cloth', 'Mage', { mana: 30, spell: 0.08 }, 'Full set: +30 max mana and +8% spell damage.'),
+  set('yetiset', 'Glacierplate', YETI_ARMOR, 'metal', 'Warrior', { hp: 4, stamina: 10 }, 'Full set: +4 max health (2 hearts) and +10 max stamina.'),
+  set('yetileather', 'Rimehide Leathers', YETI_ARMOR, 'leather', 'Ranger', { stamina: 30, ranged: 0.08 }, 'Full set: +30 max stamina and +8% ranged damage.'),
+  set('yeticloth', 'Frostweave Robes', YETI_ARMOR, 'cloth', 'Mage', { mana: 36, spell: 0.1 }, 'Full set: +36 max mana and +10% spell damage.'),
 ];
 
 export const DEF_PER_POINT = 0.04;

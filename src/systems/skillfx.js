@@ -21,6 +21,9 @@ const STYLES = {
   bolt: { core: 0xffffff, c1: 0x4ad0ff, size: 1.9, trail: [0x6fd8ff, 0.3, 0.26], sparks: ZAP, rate: 55, coreSize: 0.26, zap: true },
   ember: { core: 0xfff4c0, c1: 0xff8a1e, size: 2.2, trail: [0xff6a1a, 0.45, 0.32], sparks: FIRE, rate: 50, smoke: true, coreSize: 0.3 },
   frost: { core: 0xffffff, c1: 0x7fd0ff, size: 1.9, trail: [0x9fdcff, 0.34, 0.3], sparks: ICE, rate: 40, coreSize: 0.26 },
+  icicle: { c1: 0x9fdcff, size: 1.5, trail: [0xbfeaff, 0.22, 0.28], sparks: ICE, rate: 34, arrow: { tip: 0xe6f9ff, fletch: 0x8fd4ff, thick: 1.15 } },
+  iceboulder: { core: 0xe6f9ff, c1: 0x7fd0ff, size: 3.2, trail: [0x9fdcff, 0.7, 0.4], sparks: ICE, rate: 70, coreSize: 0.78, shard: true },
+  icebreath: { core: 0xffffff, c1: 0xaee4ff, size: 2.6, trail: [0xcdeeff, 0.5, 0.26], sparks: ICE, rate: 60, coreSize: 0.34 },
   orb: { core: 0xf3d6ff, c1: 0xb04dff, size: 2.1, trail: [0xb04dff, 0.36, 0.3], sparks: VOID, rate: 45, coreSize: 0.28 },
   gloom: { core: 0xf0c8ff, c1: 0x7a34e0, size: 2.7, trail: [0x6a2cc8, 0.5, 0.45], sparks: VOID, rate: 55, smoke: true, smokeCol: 0x2a1c44, coreSize: 0.32, homing: true },
   crescent: { core: 0xe9e4ff, c1: 0xb25cff, size: 2.2, trail: [0xb25cff, 0.6, 0.3], sparks: VOID, rate: 50, coreSize: 0 },
@@ -143,7 +146,12 @@ export function endProjectile(game, p, ground) {
   switch (key) {
     case 'frostbolt':
     case 'frost':
-      iceBurst(game, x, y, z, 1);
+    case 'icicle':
+    case 'icebreath':
+      iceBurst(game, x, y, z, key === 'icebreath' ? 0.7 : 1);
+      break;
+    case 'iceboulder':
+      iceBurst(game, x, y, z, 2.1);
       break;
     case 'spark':
     case 'bolt':
@@ -305,6 +313,12 @@ const SWING = {
   axe: { c: 0xffe0b0, h: 0xffffff },
   hammer: { c: 0xffd9a0, h: 0xffffff },
   darkscythe: { c: 0xb25cff, h: 0xf0e0ff },
+  yetisword: { c: 0x9fdcff, h: 0xffffff },
+  yetigreatsword: { c: 0x9fdcff, h: 0xffffff },
+  yetidual: { c: 0xbfeaff, h: 0xffffff },
+  yetihammer: { c: 0xbfeaff, h: 0xffffff },
+  yetispear: { c: 0xbfeaff, h: 0xffffff },
+  yetiscythe: { c: 0x9fdcff, h: 0xffffff },
 };
 
 export function meleeSwing(game, p, it, combo, reach) {
