@@ -34,6 +34,17 @@ const CODES = [
   'SSSCSCSSSS',
 ];
 
+/** Tiles that share an edge or a corner with Oakhollow and are built in the world. */
+const RING = {
+  '3,4': ['harefield', 'Northwest of Oakhollow. Harefield is open meadow, knolls and wildflowers, meeting Brookside and Northleas.'],
+  '4,4': ['northleas', 'North of Oakhollow. A pass through the peaks opens into Northleas, with pasture, knolls and a pond.'],
+  '5,4': ['goldmead', 'Northeast of Oakhollow. Goldmead is a bright wood of oaks and pines around a sunny clearing.'],
+  '3,5': ['brookside', 'West of Oakhollow. A ford crosses the river and a brook runs out through the mountains.'],
+  '5,5': ['eastleas', 'East of Oakhollow. The road past the farm opens into meadows and wildflowers.'],
+  '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Long fenced fields and a lane from the vale.'],
+  '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
+};
+
 const NAMES = [
   ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Glasscrag', 'Pale Spire', 'Frostspire', 'Last Snow'],
   ['Greymarch', 'Pinehollow', 'Deerwood', 'Mossdeep', 'Northwood', 'Hartwood', 'Ashgrove', 'Elmshade', 'Coldridge', 'Windcrag'],
@@ -57,7 +68,8 @@ function buildTiles() {
       const biome = BIOMES[code];
       if (!biome) throw new Error('Unknown biome ' + code);
       const southford = tz === 6 && tx === 4;
-      const built = code === 'O' || southford;
+      const ring = RING[tx + ',' + tz];
+      const built = code === 'O' || southford || !!ring;
       tiles.push({
         id: `t${tx}-${tz}`,
         tx,
@@ -69,12 +81,14 @@ function buildTiles() {
         color: biome.color,
         name: NAMES[tz][tx],
         blurb: code === 'O'
-          ? 'The starter tile. Oakhollow, the fairy forest, Greyrock Pit, Mirrormere and the farm all sit on this one tile. The south road continues into Southford.'
+          ? 'The starter tile. Oakhollow, the fairy forest, Greyrock Pit, Mirrormere and the farm all sit on this one tile. Passes leave north, west, east and south into the neighboring tiles.'
           : southford
-            ? 'South of Oakhollow. The south road drops through a pass beside the river and opens into Southford. A cave in the eastern bluff is the Darksycle Dragon\'s den.'
-            : `${biome.blurb} Mapped, not built yet.`,
+            ? 'South of Oakhollow. The south road drops through a pass beside the river and opens into Southford. A cave in the eastern bluff is the Darksycle Dragon\'s den. Lanes leave west into Longacre and east into Hayfield.'
+            : ring
+              ? ring[1]
+              : `${biome.blurb} Mapped, not built yet.`,
         built,
-        kind: code === 'O' ? 'oakhollow' : southford ? 'southford' : 'planned',
+        kind: code === 'O' ? 'oakhollow' : southford ? 'southford' : ring ? ring[0] : 'planned',
         seed: 400 + tz * 17 + tx * 13,
       });
     }

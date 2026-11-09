@@ -7,6 +7,7 @@ import {
 } from './terrain.js';
 import { STARTER, TILES } from './tiles.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
+import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
 import * as M from './models.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
@@ -36,16 +37,25 @@ export class World {
   idx(x, z) {
     return clamp(Math.floor(z), 0, W - 1) * W + clamp(Math.floor(x), 0, W - 1);
   }
+  landAt(x, z) {
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    for (const land of this.lands || []) {
+      if (ix >= land.x0 && iz >= land.z0 && ix < land.x0 + W && iz < land.z0 + W) return land;
+    }
+    return null;
+  }
   heightAt(x, z) {
     if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
     const d = this.dock;
     if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
-    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W) {
-      const lx = clamp(Math.floor(x), 0, W - 1);
-      const lz = Math.floor(z) - SOUTH_Z;
-      return this.south.H[lz * W + lx];
+    const land = this.landAt(x, z);
+    if (land) {
+      const lx = Math.floor(x) - land.x0;
+      const lz = Math.floor(z) - land.z0;
+      return land.data.H[lz * W + lx];
     }
-    return this.data.H[this.idx(x, z)];
+    return 12;
   }
   onDock(x, z, pad = 0) {
     const d = this.dock;
@@ -56,12 +66,11 @@ export class World {
   }
   zoneAt(x, z) {
     if (this.cave?.contains(x, z)) return ZONE.FIELD;
-    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W) {
-      const lx = clamp(Math.floor(x), 0, W - 1);
-      const lz = Math.floor(z) - SOUTH_Z;
-      return this.south.zone[lz * W + lx];
-    }
-    return this.data.zone[this.idx(x, z)];
+    const land = this.landAt(x, z);
+    if (!land) return ZONE.MOUNTAIN;
+    const lx = Math.floor(x) - land.x0;
+    const lz = Math.floor(z) - land.z0;
+    return land.data.zone[lz * W + lx];
   }
   nearPath(x, z, r = 1) {
     for (let dz = -r; dz <= r; dz++)
@@ -70,10 +79,25 @@ export class World {
   }
   playable(x, z) {
     if (this.cave?.contains(x, z)) return this.cave.walkable(x, z);
+    const h = this.heightAt(x, z);
     if (Math.hypot(x - CENTER.x, z - CENTER.z) < PLAY_RADIUS) return true;
     if (z >= 108 && z < SOUTH_Z && x >= 50 && x <= 72) return true;
-    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W - 8 && x >= 14 && x <= 130) return this.heightAt(x, z) < 8.6;
-    return false;
+    if (z >= 0 && z <= 30 && x >= 58 && x <= 86 && h > 0.4 && h < 8.6) return true;
+    if (x >= 0 && x <= 46 && z >= 48 && z <= 80 && h > 0.4 && h < 8.6) return true;
+    if (x >= 108 && x < W && z >= 82 && z <= 108 && h > 0.4 && h < 8.6) return true;
+    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W - 8 && x >= 14 && x <= 130) return h < 8.6;
+    const lz = z - SOUTH_Z;
+    if (this.south && x >= 0 && x <= 22 && lz >= 64 && lz <= 108 && h > 0.4 && h < 8.6) return true;
+    if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
+    const land = this.landAt(x, z);
+    if (!land || land.role !== 'ring') return false;
+    const lx = Math.floor(x) - land.x0;
+    const lzw = Math.floor(z) - land.z0;
+    if (land.rim?.n && lzw < 5) return false;
+    if (land.rim?.s && lzw > W - 6) return false;
+    if (land.rim?.w && lx < 5) return false;
+    if (land.rim?.e && lx > W - 6) return false;
+    return h < 8.6 && h > 0.45;
   }
 
   /** can a body walk from height `fromY` to (x,z)? */
@@ -243,9 +267,17 @@ export class World {
     this.data = generateTile(STARTER);
     if (!this.data) throw new Error('The Oakhollow tile failed to generate');
     openSouthPass(this.data);
+    openRingPasses(this.data);
     const northEdge = new Float32Array(W);
     for (let x = 0; x < W; x++) northEdge[x] = this.data.H[(W - 1) * W + x];
     this.south = generateSouthford(northEdge);
+    openValeSides(this.south);
+    const southTile = TILES.find((t) => t.kind === 'southford');
+    this.lands = [
+      { role: 'oak', x0: 0, z0: 0, data: this.data, tileId: STARTER.id, rim: {} },
+      { role: 'south', x0: 0, z0: SOUTH_Z, data: this.south, tileId: southTile.id, banner: ['River Vale', 'Southford'], shade: 0, rim: { s: true } },
+      ...generateRing(this.data, this.south),
+    ];
     const atlas = buildAtlas();
     this.atlas = atlas;
     this.mats = {
@@ -259,15 +291,16 @@ export class World {
 
     progress(0.12, 'Raising the mountains');
     await nextFrame();
-    this.terrain = buildTerrainMeshes(this.data, this.mats.terrain, {
-      outside: (x, z) => (z === W && x >= 0 && x < W ? this.south.H[x] : null),
-    });
-    this.group.add(this.terrain);
-    this.southTerrain = buildTerrainMeshes(this.south, this.mats.terrain, {
-      oz: SOUTH_Z,
-      outside: (x, z) => (z === -1 && x >= 0 && x < W ? this.data.H[(W - 1) * W + x] : null),
-    });
-    this.group.add(this.southTerrain);
+    for (const land of this.lands) {
+      const mesh = buildTerrainMeshes(land.data, this.mats.terrain, {
+        ox: land.x0,
+        oz: land.z0,
+        outside: (x, z) => sampleLands(this.lands, land.x0 + x, land.z0 + z),
+      });
+      this.group.add(mesh);
+      if (land.role === 'oak') this.terrain = mesh;
+      if (land.role === 'south') this.southTerrain = mesh;
+    }
     this.buildWater();
 
     progress(0.3, 'Growing the fairy forest');
@@ -289,6 +322,7 @@ export class World {
     this.scatterCover();
     this.placeWaygate();
     dressSouthford(this);
+    dressRing(this);
     this.cave = buildCave(this);
 
     progress(0.85, 'Painting the final touches');
@@ -406,10 +440,16 @@ export class World {
         }`,
     });
     this.waterMat = mat;
-    for (const oz of [0, SOUTH_Z]) {
+    const seen = new Set();
+    for (const land of this.lands || [{ x0: 0, z0: 0 }, { x0: 0, z0: SOUTH_Z }]) {
+      const key = land.x0 + ',' + land.z0;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const oz = land.z0;
+      const ox = land.x0;
       const geo = new THREE.PlaneGeometry(W, W, 1, 1);
       geo.rotateX(-Math.PI / 2);
-      geo.translate(W / 2, WATER_Y, oz + W / 2);
+      geo.translate(ox + W / 2, WATER_Y, oz + W / 2);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.renderOrder = 2;
       mesh.frustumCulled = false;
@@ -942,47 +982,63 @@ export class World {
   }
 
   buildMinimap() {
-    const c = this.paintLandCanvas(this.data);
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = 'rgba(20,70,30,0.9)';
-    for (const t of this.treeDots) ctx.fillRect(Math.floor(t.x), Math.floor(t.z), 1, 1);
+    this.tileCanvas = {};
+    let minX = 0;
+    let minZ = 0;
+    let maxX = W;
+    let maxZ = W;
+    for (const land of this.lands) {
+      const c = this.paintLandCanvas(land.data);
+      this.tileCanvas[land.tileId] = c;
+      minX = Math.min(minX, land.x0);
+      minZ = Math.min(minZ, land.z0);
+      maxX = Math.max(maxX, land.x0 + W);
+      maxZ = Math.max(maxZ, land.z0 + W);
+    }
+    for (const t of this.treeDots) {
+      const land = this.landAt(t.x, t.z);
+      const canvas = land && this.tileCanvas[land.tileId];
+      if (!canvas) continue;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'rgba(20,70,30,0.9)';
+      ctx.fillRect(Math.floor(t.x - land.x0), Math.floor(t.z - land.z0), 1, 1);
+    }
+    const oak = this.tileCanvas[STARTER.id];
+    const octx = oak.getContext('2d');
     const woodInk = { birch: '#f4efe4', oak: '#3f9f47', maple: '#e24a22' };
     for (const n of this.treeNodes || []) {
-      ctx.fillStyle = woodInk[n.type] || '#7dcc4a';
-      ctx.fillRect(Math.floor(n.x) - 1, Math.floor(n.z) - 1, 3, 3);
+      octx.fillStyle = woodInk[n.type] || '#7dcc4a';
+      octx.fillRect(Math.floor(n.x) - 1, Math.floor(n.z) - 1, 3, 3);
     }
     if (this.waygate) {
-      ctx.fillStyle = '#7ef6ff';
-      ctx.fillRect(Math.floor(this.waygate.x) - 2, Math.floor(this.waygate.z) - 2, 4, 4);
+      octx.fillStyle = '#7ef6ff';
+      octx.fillRect(Math.floor(this.waygate.x) - 2, Math.floor(this.waygate.z) - 2, 4, 4);
     }
-    ctx.fillStyle = '#6a3d86';
-    ctx.fillRect(70, 84, 4, 3);
+    octx.fillStyle = '#6a3d86';
+    octx.fillRect(70, 84, 4, 3);
     if (this.dock) {
-      ctx.fillStyle = '#7a5230';
-      ctx.fillRect(Math.floor(this.dock.x0), Math.floor(this.dock.z - this.dock.hw), Math.ceil(this.dock.x1 - this.dock.x0), 2);
+      octx.fillStyle = '#7a5230';
+      octx.fillRect(Math.floor(this.dock.x0), Math.floor(this.dock.z - this.dock.hw), Math.ceil(this.dock.x1 - this.dock.x0), 2);
     }
-    ctx.fillStyle = '#6b4a2b';
+    octx.fillStyle = '#6b4a2b';
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
-      ctx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);
+      octx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);
     }
-    const south = this.paintLandCanvas(this.south);
+    const south = this.tileCanvas[TILES.find((t) => t.kind === 'southford').id];
     const sctx = south.getContext('2d');
     sctx.fillStyle = '#b25cff';
     sctx.fillRect(CAVE_MOUTH.x - 2, CAVE_MOUTH.z - SOUTH_Z - 2, 5, 5);
-    for (const t of this.treeDots) {
-      if (t.z < SOUTH_Z) continue;
-      sctx.fillStyle = 'rgba(20,70,30,0.9)';
-      sctx.fillRect(Math.floor(t.x), Math.floor(t.z - SOUTH_Z), 1, 1);
-    }
     const map = document.createElement('canvas');
-    map.width = W;
-    map.height = W * 2;
+    map.width = maxX - minX;
+    map.height = maxZ - minZ;
     const mctx = map.getContext('2d');
-    mctx.drawImage(c, 0, 0);
-    mctx.drawImage(south, 0, W);
+    mctx.fillStyle = '#1a140e';
+    mctx.fillRect(0, 0, map.width, map.height);
+    for (const land of this.lands) {
+      mctx.drawImage(this.tileCanvas[land.tileId], land.x0 - minX, land.z0 - minZ);
+    }
     this.minimapCanvas = map;
-    const southTile = TILES.find((t) => t.kind === 'southford');
-    this.tileCanvas = { [STARTER.id]: c, [southTile.id]: south };
+    this.minimapOrigin = { x: minX, z: minZ };
   }
 
   update(dt, t) {

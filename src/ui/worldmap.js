@@ -35,7 +35,7 @@ export function mountWorldMap(body, game) {
     left.className = 'wm-left';
     const note = document.createElement('p');
     note.className = 'wm-note';
-    note.textContent = `${TILE_COUNT} tiles. North is up. Gold rings mark the built tiles: Oakhollow and Southford.`;
+    note.textContent = `${TILE_COUNT} tiles. North is up. Gold rings mark the built tiles around Oakhollow.`;
     left.appendChild(note);
     const grid = document.createElement('div');
     grid.className = 'wm-grid';

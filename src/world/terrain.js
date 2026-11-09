@@ -73,8 +73,8 @@ export const SMOOTH_RIVER = smoothPath(RIVER, 8);
 
 /**
  * Build the height data for one world tile.
- * Oakhollow is the only built tile. The other 99 are mapped in tiles.js and
- * viewed from the world creator until they are built the same way.
+ * Oakhollow is the starter tile. Southford and the ring around Oakhollow
+ * are built beside it. The other tiles stay mapped until they are built.
  */
 export function generateTile(tile = STARTER) {
   if (tile?.kind === 'oakhollow') return generateWorld();
