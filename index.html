@@ -15,8 +15,8 @@
     <meta name="description" content="Monster Gate - a 3D pixel monster hunting adventure." />
     <title>Monster Gate</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23181a22'/%3E%3Cpath d='M3 15V6l5-4 5 4v9h-3V8L8 5 6 8v7z' fill='%23b86bff'/%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./assets/index-Bm8ugy34.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BHYVPyIV.css">
+    <script type="module" crossorigin src="./assets/index-CFdSv5bg.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CQjV--LN.css">
   </head>
   <body>
     <div id="app">
@@ -140,8 +140,23 @@
         <div class="title-inner">
           <small>A 3D pixel monster hunting adventure</small>
           <h1>MONSTER <em>GATE</em></h1>
-          <p id="wallet-status" class="wallet-status" aria-live="polite">Sign in with your Klever wallet. Your hunt is saved to that address.</p>
-          <button id="btn-wallet" class="start" type="button">Sign in with Klever</button>
+          <p id="wallet-status" class="wallet-status" aria-live="polite">Create an account with your email and password. Your hunt is saved to that account.</p>
+          <div id="account-choices" class="account-choices">
+            <button id="btn-account-create" class="start" type="button">Create an account</button>
+            <button id="btn-account-signin" class="wallet-link" type="button">Sign in with email</button>
+          </div>
+          <form id="account-panel" class="account-panel hidden" novalidate>
+            <label class="wg-label" for="account-email">Email</label>
+            <input id="account-email" class="account-input" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" required />
+            <label class="wg-label" for="account-password">Password</label>
+            <input id="account-password" class="account-input" name="password" type="password" autocomplete="new-password" maxlength="72" required />
+            <label class="wg-label" id="account-confirm-label" for="account-confirm">Confirm password</label>
+            <input id="account-confirm" class="account-input" name="confirm" type="password" autocomplete="new-password" maxlength="72" />
+            <p id="account-error" class="account-error" role="alert"></p>
+            <button id="account-submit" class="start quiet" type="submit">Create account</button>
+            <button id="account-cancel" class="wallet-link" type="button">Back</button>
+          </form>
+          <button id="btn-wallet" class="start quiet" type="button">Sign in with Klever</button>
           <button id="btn-start" class="start hidden" type="button">Begin the hunt</button>
           <button id="btn-wallet-switch" class="wallet-link hidden" type="button">Use a different wallet</button>
           <div id="wallet-help" class="wallet-help hidden"></div>
