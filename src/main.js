@@ -28,7 +28,8 @@ import { GOODS } from './data/gathering.js';
 import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
-import { updateCaveTravel, tendCaveDragon, restoreOverworld } from './world/cave.js';
+import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
+import { clearSession, isMobile, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
 
@@ -104,6 +105,11 @@ class Game {
     this.waygateNear = false;
     this.waygateHinted = false;
     this.guestBound = false;
+    this.wallet = null;
+    this.walletBusy = false;
+    this.walletNote = '';
+    this.saveAcc = 0;
+    this.accountWatch = false;
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
     this.uiBlocking = false;
 
@@ -159,6 +165,12 @@ class Game {
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
     this.bindUI();
     this.applyQuality();
+    const session = readSession();
+    if (session) {
+      this.applyWallet(session);
+      this.watchAccount();
+    }
+    this.refreshWalletUi();
     progress(1, 'Ready');
     this.renderer.compile(this.scene, this.camera);
 
@@ -171,25 +183,164 @@ class Game {
 
   start() {
     if (this.started) return;
+    if (!this.wallet?.address) return;
     if (this.input.touch && this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
     this.started = true;
     this.audio.unlock();
     this.cam.targetDist = 16;
     document.getElementById('title').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
-    this.hud.banner('Village', 'Oakhollow', 3600);
-    setTimeout(() => this.hud.toast('A Monster Gate has opened in the northern forest!', 4200), 3700);
+    const returning = this.restoreHunter();
+    if (this.world.realm === 'cave') this.hud.banner('Dragon Cave', 'Darksycle Den', 3200);
+    else if (returning) this.hud.banner('Welcome back', shortAddress(this.wallet.address), 3200);
+    else {
+      this.hud.banner('Village', 'Oakhollow', 3600);
+      setTimeout(() => this.hud.toast('A Monster Gate has opened in the northern forest!', 4200), 3700);
+    }
     this.audio.select();
+    this.watchAccount();
+  }
+
+  applyWallet(session) {
+    this.wallet = session;
+    this.walletNote = this.progress.useAddress(session.address);
+    this.gold = this.progress.gold;
+    this.items = ITEMS.map((i) => ({ ...i }));
+    for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
+    this.applyGear(true);
+    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
+    this.selectSlot(0, true);
+    this.refreshHud(true);
+  }
+
+  refreshWalletUi() {
+    const status = document.getElementById('wallet-status');
+    const sign = document.getElementById('btn-wallet');
+    const start = document.getElementById('btn-start');
+    const swap = document.getElementById('btn-wallet-switch');
+    const help = document.getElementById('wallet-help');
+    if (!status || !sign || !start || !swap) return;
+    const signed = !!this.wallet?.address;
+    sign.classList.toggle('hidden', signed);
+    start.classList.toggle('hidden', !signed);
+    swap.classList.toggle('hidden', !signed);
+    if (!signed) {
+      help?.classList.add('hidden');
+      const where = window.kleverWeb ? (isMobile() ? 'Klever Wallet' : 'the Klever extension') : 'your Klever wallet';
+      sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
+      status.textContent = 'Sign in with your Klever wallet. Your hunt is saved to that address.';
+      return;
+    }
+    help?.classList.add('hidden');
+    status.replaceChildren();
+    const who = document.createElement('b');
+    who.textContent = shortAddress(this.wallet.address);
+    const lead = this.walletNote === 'new'
+      ? 'New hunt saved to '
+      : this.walletNote === 'claimed'
+        ? 'Your hunt is now saved to '
+        : 'Welcome back. This hunt belongs to ';
+    status.append(lead, who, '. It stays on this browser under that wallet.');
+  }
+
+  async onWallet() {
+    if (this.walletBusy) return;
+    this.walletBusy = true;
+    const sign = document.getElementById('btn-wallet');
+    const status = document.getElementById('wallet-status');
+    if (sign) sign.disabled = true;
+    if (status) status.textContent = isMobile()
+      ? 'Confirm the signature in the Klever Wallet app…'
+      : 'Confirm the signature in the Klever extension…';
+    try {
+      const session = await signIn();
+      this.applyWallet(session);
+      this.refreshWalletUi();
+      this.watchAccount();
+    } catch (err) {
+      const help = document.getElementById('wallet-help');
+      if (help && (err.code === 'mobile-app' || err.code === 'extension')) showWalletHelp(help, err.code);
+      if (status) status.textContent = err.message || 'Klever sign-in failed.';
+    } finally {
+      this.walletBusy = false;
+      if (sign) sign.disabled = false;
+    }
+  }
+
+  watchAccount() {
+    const hub = window.kleverHub;
+    if (this.accountWatch || !hub || typeof hub.onAccountChanged !== 'function') return;
+    this.accountWatch = true;
+    hub.onAccountChanged((event) => {
+      const next = event?.address;
+      if (!next || next === this.wallet?.address) return;
+      this.captureHunter();
+      clearSession();
+      this.wallet = null;
+      if (this.started) location.reload();
+      else this.refreshWalletUi();
+    });
+  }
+
+  captureHunter() {
+    if (!this.started || !this.wallet || !this.player) return;
+    const p = this.player;
+    this.progress.rememberHunter({
+      x: p.pos.x,
+      z: p.pos.z,
+      yaw: p.yaw,
+      hp: p.hp,
+      mana: p.mana,
+      stamina: p.stamina,
+      rank: this.rank,
+      quest: this.quest,
+      realm: this.world?.realm,
+    });
+  }
+
+  restoreHunter() {
+    const h = this.progress.data.hunter;
+    if (!h) return false;
+    this.rank = h.rank;
+    if (h.quest?.text) this.quest = { text: h.quest.text, n: h.quest.n, total: h.quest.total };
+    if (h.realm === 'cave' && this.world.cave) enterCave(this);
+    else if (this.world.playable(h.x, h.z)) {
+      const y = this.world.heightAt(h.x, h.z);
+      this.player.pos.set(h.x, y, h.z);
+      this.player.yaw = h.yaw;
+      this.cam.yaw = h.yaw;
+      this.cam.targetYaw = h.yaw;
+      this.player.syncObj();
+    }
+    this.syncVitals();
+    const p = this.player;
+    if (h.hp > 0) p.hp = Math.min(p.maxHp, h.hp);
+    p.mana = Math.min(p.maxMana, h.mana);
+    p.stamina = Math.min(p.maxStamina, h.stamina);
+    this.refreshHud(true);
+    this.snapCamera();
+    return true;
   }
 
   bindUI() {
     const start = document.getElementById('btn-start');
+    const sign = document.getElementById('btn-wallet');
+    const swap = document.getElementById('btn-wallet-switch');
     start.addEventListener('click', () => this.start());
+    sign.addEventListener('click', () => this.onWallet());
+    swap.addEventListener('click', () => {
+      this.captureHunter();
+      clearSession();
+      this.wallet = null;
+      this.walletNote = '';
+      this.refreshWalletUi();
+      this.onWallet();
+    });
     window.addEventListener('keydown', (e) => {
-      if (!this.started && (e.code === 'Enter' || e.code === 'Space')) {
-        this.start();
-        e.preventDefault();
-      }
+      if (this.started || (e.code !== 'Enter' && e.code !== 'Space')) return;
+      if (this.wallet) this.start();
+      else this.onWallet();
+      e.preventDefault();
     });
     document.getElementById('panel-close').addEventListener('click', () => this.hud.closePanel());
     document.getElementById('btn-fs').addEventListener('click', () => this.toggleFullscreen());
@@ -199,7 +350,9 @@ class Game {
     });
     document.addEventListener('visibilitychange', () => {
       this.last = performance.now();
+      if (document.hidden) this.captureHunter();
     });
+    window.addEventListener('pagehide', () => this.captureHunter());
     document.addEventListener('pointerdown', () => this.audio.unlock(), { once: true });
   }
 
@@ -821,6 +974,7 @@ class Game {
     this.hud.setRank(RANKS[this.rank]);
     this.hud.banner('Hunt complete', `Rank ${RANKS[this.rank]}  +${reward}g`, 3800);
     this.audio.quest();
+    this.captureHunter();
     this.fx.ring(p.pos.x, p.pos.y + 0.3, p.pos.z, 0xffd23f, 22, 5, 0.12, 0.7);
     this.fx.burst(p.pos.x, p.pos.y + 1, p.pos.z, [0xffd23f, 0xffffff, 0xffa030], 24, 5, 0.12, 0.9);
   }
@@ -1525,6 +1679,13 @@ class Game {
       this.monsters = this.monsters.filter((m) => !m.remove);
     }
     if (this.started) this.spawner.update(dt);
+    if (this.started && this.wallet) {
+      this.saveAcc += dt;
+      if (this.saveAcc > 5) {
+        this.saveAcc = 0;
+        this.captureHunter();
+      }
+    }
     for (const n of this.ambient.npcs) n.update(dt, t);
     for (const f of this.ambient.fowl) f.update(dt, t);
     for (const b of this.ambient.butterflies) b.update(dt);

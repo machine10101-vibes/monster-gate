@@ -1169,12 +1169,73 @@ h1 em {
   font-style: normal;
   color: #c27bff;
 }
+.title-inner {
+  max-height: 100%;
+  overflow: auto;
+}
 .title-inner small {
   font-family: var(--font-px);
   font-size: clamp(7px, 1.4vw, 10px);
   letter-spacing: 2px;
   color: #ffd23f;
 }
+.wallet-status {
+  max-width: 460px;
+  margin: 0 auto 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #d5dced;
+}
+.wallet-status b {
+  font-family: var(--font-px);
+  font-size: 10px;
+  font-weight: normal;
+  letter-spacing: 0.4px;
+  color: #9be7ff;
+}
+.wallet-link {
+  display: block;
+  margin: 12px auto 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #c9a0ff;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.wallet-help {
+  max-width: 480px;
+  margin: 14px auto 0;
+  padding: 12px 14px;
+  text-align: left;
+  background: rgba(8, 10, 16, 0.78);
+  border: 2px solid #3b3d44;
+  border-radius: 6px;
+  color: #d5dced;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.wallet-help p { margin: 0; }
+.wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.wallet-mini {
+  padding: 8px 10px;
+  color: #e8f6ff;
+  background: #1a2433;
+  border: 2px solid #3d5f86;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.start.hidden { display: none; }
 .load-bar {
   width: min(320px, 70vw);
   height: 10px;

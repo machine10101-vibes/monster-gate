@@ -138,7 +138,11 @@
         <div class="title-inner">
           <small>A 3D pixel monster hunting adventure</small>
           <h1>MONSTER <em>GATE</em></h1>
-          <button id="btn-start" class="start">Begin the hunt</button>
+          <p id="wallet-status" class="wallet-status" aria-live="polite">Sign in with your Klever wallet. Your hunt is saved to that address.</p>
+          <button id="btn-wallet" class="start" type="button">Sign in with Klever</button>
+          <button id="btn-start" class="start hidden" type="button">Begin the hunt</button>
+          <button id="btn-wallet-switch" class="wallet-link hidden" type="button">Use a different wallet</button>
+          <div id="wallet-help" class="wallet-help hidden"></div>
           <div class="how">
             <span><kbd>WASD</kbd> Move</span>
             <span><kbd>Click</kbd> Attack</span>
