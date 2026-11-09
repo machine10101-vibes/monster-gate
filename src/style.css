@@ -2403,8 +2403,9 @@ body.touch .how {
 .bag-detail canvas { width: 84px; height: 84px; background: #0e1210; border-radius: 8px; }
 .bag-detail b { font-size: 15px; }
 .bag-detail span, .bag-detail small { color: #b7c0b4; font-size: 13px; }
+.bag-acts { display: flex; gap: 6px; margin-top: 4px; }
 .bag-act {
-  margin-top: 4px;
+  margin-top: 0;
   padding: 7px 12px;
   font-family: var(--font-px);
   font-size: 8px;

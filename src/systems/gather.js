@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, chopChance, chopSwingTime, fishChance, fishTickTime, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
+import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, burnChance, chopChance, chopSwingTime, cookTime, fishChance, fishTickTime, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
 import { buildCampfire, goodsVoxels } from '../world/gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
@@ -260,8 +260,17 @@ export class Gathering {
     } else if (this.session) {
       const s = this.session;
       const [sx, sy, vis] = g.screenOf(s.node.x, (s.node.y || WATER_Y) + 1.6, s.node.z, true);
-      const what = s.kind === 'mine' ? `Mining ${s.node.type}` : s.kind === 'chop' ? `Chopping ${s.tree.name.toLowerCase()}` : s.kind === 'light' ? `Lighting ${GOODS[s.log].name.toLowerCase()}` : s.node.catches.length > 1 ? 'Ice fishing' : s.kind === 'net' ? `Netting ${s.fish.name.toLowerCase()}` : `Fishing for ${s.fish.name.toLowerCase()}`;
-      g.hud.plate('gather', `${what}<small>${s.ready ? 'Move to stop' : 'Walking over…'}</small>`);
+      let what;
+      let note = s.ready ? 'Move to stop' : 'Walking over…';
+      if (s.kind === 'mine') what = `Mining ${s.node.type}`;
+      else if (s.kind === 'chop') what = `Chopping ${s.tree.name.toLowerCase()}`;
+      else if (s.kind === 'light') what = `Lighting ${GOODS[s.log].name.toLowerCase()}`;
+      else if (s.kind === 'cook') {
+        what = `Cooking ${s.fish.name.toLowerCase()}`;
+        if (s.ready) note = `${Math.round(burnChance(s.fish, g.progress.level('fishing')) * 100)}% chance to burn · move to stop`;
+        else note = 'Walking to the fire…';
+      } else what = s.node.catches.length > 1 ? 'Ice fishing' : s.kind === 'net' ? `Netting ${s.fish.name.toLowerCase()}` : `Fishing for ${s.fish.name.toLowerCase()}`;
+      g.hud.plate('gather', `${what}<small>${note}</small>`);
       g.hud.placePlate('gather', sx, sy, vis);
     } else g.hud.removePlate('gather');
   }
@@ -295,6 +304,7 @@ export class Gathering {
     else if (s.kind === 'chop') this.runChop(s, dt, lvl);
     else if (s.kind === 'light') this.runLight(s, dt, lvl);
     else if (s.kind === 'net') this.runNet(s, dt, lvl);
+    else if (s.kind === 'cook') this.runCook(s, dt, lvl);
     else this.runRod(s, dt, lvl);
   }
 
@@ -618,6 +628,126 @@ export class Gathering {
     }
   }
 
+  /* -------------------------------- cooking -------------------------------- */
+  nearestFire(max = 3.8) {
+    const p = this.game.player.pos;
+    let best = null;
+    let bd = max;
+    for (const f of this.fires) {
+      if (f.life < 2) continue;
+      const d = Math.hypot(f.x - p.x, f.z - p.z);
+      if (d < bd) {
+        bd = d;
+        best = f;
+      }
+    }
+    return best;
+  }
+
+  standByFire(fire) {
+    const g = this.game;
+    const p = g.player;
+    const base = Math.atan2(p.pos.z - fire.z, p.pos.x - fire.x);
+    for (let i = 0; i < 8; i++) {
+      const a = base + (i * Math.PI) / 4;
+      const x = fire.x + Math.cos(a) * 1.35;
+      const z = fire.z + Math.sin(a) * 1.35;
+      if (!g.world.canStep(x, z, p.pos.y) || g.world.isWater(x, z)) continue;
+      return { x, z, face: Math.atan2(fire.x - x, fire.z - z) };
+    }
+    return null;
+  }
+
+  /** Cook a raw fish on the nearest campfire. Keeps going until the fish, or the fire, runs out. */
+  cook(id) {
+    const g = this.game;
+    const p = g.player;
+    const fish = FISH[id];
+    if (!fish?.cooked || this.session) return false;
+    if (p.dead || ['roll', 'stagger', 'attack', 'use', 'dead'].includes(p.state)) return false;
+    if (g.progress.good(id) < 1) {
+      g.hud.toast(`You have no ${fish.name.toLowerCase()} to cook.`, 1600);
+      return false;
+    }
+    const fire = this.nearestFire();
+    if (!fire) {
+      g.hud.toast('Light a campfire, then cook beside it.', 2200);
+      return false;
+    }
+    const stand = this.standByFire(fire);
+    if (!stand) {
+      g.hud.toast('There is no room beside the fire.', 1600);
+      return false;
+    }
+    this.session = {
+      kind: 'cook',
+      fish,
+      raw: id,
+      fire,
+      node: { x: fire.x, y: fire.y + 0.9, z: fire.z },
+      go: { x: stand.x, z: stand.z },
+      face: stand.face,
+      tool: null,
+      ready: false,
+      u: 0,
+      prevU: 0,
+      phase: 'work',
+      t: 0,
+    };
+    p.setHeld(null);
+    p.beginGather('cook', stand.x, stand.z, stand.face);
+    g.audio.select();
+    return true;
+  }
+
+  runCook(s, dt, lvl) {
+    const g = this.game;
+    const dur = cookTime(lvl);
+    s.prevU = s.u;
+    s.u += dt / dur;
+    g.player.gAnim = { name: 'cook', u: Math.min(0.99, s.u) };
+    if (!this.fires.includes(s.fire) || s.fire.life <= 0) {
+      g.hud.toast('The fire goes out.', 1400);
+      this.cancel();
+      return;
+    }
+    if (s.u < 1) return;
+    s.u -= 1;
+    s.prevU = 0;
+    this.finishCook(s, lvl);
+  }
+
+  finishCook(s, lvl) {
+    const g = this.game;
+    const fish = s.fish;
+    if (g.progress.good(s.raw) < 1) {
+      this.cancel(true);
+      return;
+    }
+    if (!g.progress.takeGood(s.raw, 1)) {
+      this.cancel(true);
+      return;
+    }
+    const burnt = Math.random() < burnChance(fish, lvl);
+    const made = burnt ? 'burnt_fish' : fish.cooked;
+    g.progress.addGood(made, 1);
+    const P = g.player.pos;
+    if (burnt) {
+      g.hud.toast(`You burn the ${fish.name.toLowerCase()}.`, 1600);
+      g.audio.noise(0.16, 0.12, 500, 0.7);
+      g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0x2a2a2a, 0x6a6a6a, 0xffe0b0], 10, 1.8, 0.07, 0.6, 2, 1.4);
+    } else {
+      this.train('fishing', fish.cookXp, true);
+      g.hud.toast(`You cook the ${fish.name.toLowerCase()}.`, 1600);
+      g.audio.tone(520, 0.08, 'triangle', 0.08, 240);
+      g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0xfff2a0, 0xff8a22, 0xffe0b0], 10, 1.8, 0.06, 0.6, 2, 1.4);
+      g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, 'gold');
+    }
+    this.flyGood(made, s.fire.x, s.fire.y + 0.7, s.fire.z, P.x, P.y + 1.3, P.z, 0.7);
+    g.bagDirty = true;
+    if (g.progress.good(s.raw) < 1) this.cancel(true);
+  }
+
   /* -------------------------------- fishing -------------------------------- */
   runNet(s, dt, lvl) {
     const g = this.game;
@@ -775,7 +905,8 @@ export class Gathering {
       this.models[id] = meshFrom(m, ox, oy, oz, this.mat, size);
     }
     const mesh = this.models[id].clone();
-    mesh.scale.setScalar(FISH[id] ? (id === 'sturgeon' ? 0.75 : 0.9) : id.endsWith('_logs') ? 0.62 : 0.75);
+    const fishish = FISH[id] || id.startsWith('cooked_') || id === 'burnt_fish';
+    mesh.scale.setScalar(fishish ? (id.endsWith('sturgeon') ? 0.75 : 0.9) : id.endsWith('_logs') ? 0.62 : 0.75);
     g.scene.add(mesh);
     this.flyers.push({ mesh, x0, y0, z0, x1, y1, z1, t: 0, dur, spin: rand(4, 9), id });
   }
@@ -792,7 +923,8 @@ export class Gathering {
       const ey = P.y + 1.3;
       const e = u * u * (3 - 2 * u);
       f.mesh.position.set(f.x0 + (ex - f.x0) * e, f.y0 + (ey - f.y0) * e + Math.sin(u * Math.PI) * 1.5, f.z0 + (ez - f.z0) * e);
-      f.mesh.rotation.set(u * f.spin * 0.5, u * f.spin, FISH[f.id] ? Math.sin(u * 14) * 0.6 : 0);
+      const fishish = FISH[f.id] || String(f.id).startsWith('cooked_') || f.id === 'burnt_fish';
+      f.mesh.rotation.set(u * f.spin * 0.5, u * f.spin, fishish ? Math.sin(u * 14) * 0.6 : 0);
       if (u >= 1) {
         g.fx.burst(ex, ey, ez, f.id.endsWith('ore') ? [0xffd9a0, 0xffffff] : [0xbfeaff, 0xffffff], 7, 2, 0.06, 0.5, -1, 0.8);
         g.scene.remove(f.mesh);

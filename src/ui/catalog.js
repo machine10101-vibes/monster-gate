@@ -35,8 +35,9 @@ function buildSubject(spec, silhouette) {
   } else if (spec.kind === 'good') {
     const [gm, size, ox, oy, oz] = goodsVoxels(spec.id);
     tilt.add(meshFrom(gm, ox, oy, oz, toonMaterial({ vertexColors: true }), size));
-    yaw = spec.id === 'shrimp' ? 0.5 : spec.id === 'trout' ? 0.75 : 0.6;
-    pitch = spec.id === 'trout' || spec.id === 'shrimp' ? 0.3 : 0.24;
+    const fishy = spec.id === 'burnt_fish' || spec.id.startsWith('cooked_') || spec.id === 'shrimp' || spec.id === 'trout' || spec.id === 'pikeminnow' || spec.id === 'salmon' || spec.id === 'pike' || spec.id === 'sturgeon';
+    yaw = fishy ? 0.75 : 0.6;
+    pitch = fishy ? 0.3 : 0.24;
   } else if (spec.kind === 'weapon') {
     const g = gearById(spec.id);
     const held = buildHeld(g.held);

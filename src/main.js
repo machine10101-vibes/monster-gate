@@ -1661,6 +1661,10 @@ class Game {
     return this.gather.light(id);
   }
 
+  cookFish(id) {
+    return this.gather.cook(id);
+  }
+
   eatGood(id) {
     const g = GOODS[id];
     if (!g || !g.heal || this.progress.good(id) < 1) return false;

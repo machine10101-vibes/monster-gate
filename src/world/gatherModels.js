@@ -615,6 +615,35 @@ function logStack(kind) {
   return [M, 0.045, 12, 0, 8];
 }
 
+/** Recolour a fresh fish model: gold-brown for the grill, charcoal when it burns. */
+function tintFish(id, mode) {
+  const [M, size, ox, oy, oz] = GOODS_MODELS[id]();
+  const data = M.data;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    if (!v) continue;
+    const r0 = (v >> 16) & 255;
+    const g0 = (v >> 8) & 255;
+    const b0 = v & 255;
+    const l = r0 * 0.3 + g0 * 0.5 + b0 * 0.2;
+    let r;
+    let g;
+    let b;
+    if (mode === 'cooked') {
+      r = Math.min(255, Math.round(l * 1.05 + 68));
+      g = Math.min(255, Math.round(l * 0.55 + 28));
+      b = Math.min(255, Math.round(l * 0.16 + 8));
+    } else {
+      const ash = l * 0.16;
+      r = Math.round(ash + 24);
+      g = Math.round(ash + 18);
+      b = Math.round(ash + 14);
+    }
+    data[i] = (v & ~0xffffff) | (r << 16) | (g << 8) | b;
+  }
+  return [M, size, ox, oy, oz];
+}
+
 const GOODS_MODELS = {
   copper_ore: () => oreChunk('copper'),
   tin_ore: () => oreChunk('tin'),
@@ -624,6 +653,13 @@ const GOODS_MODELS = {
   salmon: salmonModel,
   pike: pikeModel,
   sturgeon: sturgeonModel,
+  cooked_shrimp: () => tintFish('shrimp', 'cooked'),
+  cooked_trout: () => tintFish('trout', 'cooked'),
+  cooked_pikeminnow: () => tintFish('pikeminnow', 'cooked'),
+  cooked_salmon: () => tintFish('salmon', 'cooked'),
+  cooked_pike: () => tintFish('pike', 'cooked'),
+  cooked_sturgeon: () => tintFish('sturgeon', 'cooked'),
+  burnt_fish: () => tintFish('trout', 'burnt'),
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),
   maple_logs: () => logStack('maple'),

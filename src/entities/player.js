@@ -1095,6 +1095,18 @@ export class Player {
           legR = -0.35 * dip * (1 - lift) - 0.2;
           torsoYaw = -0.1;
           headPitch = 0.2 * dip * (1 - lift);
+        } else if (a.name === 'cook') {
+          const turn = Math.sin(u * Math.PI * 2);
+          crouch = 0.2;
+          lean = 0.42;
+          armR = -1.15 + turn * 0.18;
+          armL = -0.85 - turn * 0.16;
+          armRz = 0.15;
+          armLz = -0.1;
+          legL = 0.7;
+          legR = -0.25;
+          headPitch = 0.42;
+          torsoYaw = turn * 0.1;
         } else if (a.name === 'light') {
           const rise = ease(clamp(u / 0.4, 0, 1));
           const strike = ease(clamp((u - 0.48) / 0.16, 0, 1));
