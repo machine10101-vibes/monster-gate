@@ -291,7 +291,7 @@ class Game {
         sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
         status.textContent = window.kleverWeb
           ? 'Tap Sign in. On the Klever screen, tap Confirm and leave that window open until it accepts.'
-          : 'Create an account with your email and password. Your hunt is saved to that account.';
+          : 'Create an account with your email and password. The same account signs in on any device.';
       }
       return;
     }
@@ -308,13 +308,18 @@ class Game {
       : this.walletNote === 'claimed'
         ? 'Your hunt is now saved to '
         : 'Welcome back. This hunt belongs to ';
+    const remoteAccount = email && !!this.wallet.accessToken;
     const tail = this.cloudSyncing
       ? `. Opening the hunt saved to this ${noun}…`
       : this.cloudState === 'on'
-        ? `. It is saved to this ${noun}.`
+        ? `. The hunt is saved to this ${noun} and follows you to other devices.`
         : this.cloudState === 'error'
-          ? '. Saved on this browser. The guild record could not be reached.'
-          : `. It stays on this browser under that ${noun}.`;
+          ? remoteAccount
+            ? '. This account signs in on any device. The hunt could not be opened just now.'
+            : '. Saved on this browser. The guild record could not be reached.'
+          : remoteAccount
+            ? `. This ${noun} signs in on any device.`
+            : `. It stays on this browser under that ${noun}.`;
     status.append(lead, who, tail);
   }
 
@@ -336,7 +341,7 @@ class Game {
     if (error) error.textContent = '';
     if (status) {
       status.textContent = mode === 'create'
-        ? 'Choose an email and a password. This account keeps your hunt.'
+        ? 'Choose an email and a password. This account signs in on any device.'
         : 'Sign in with the email and password for your account.';
     }
     this.refreshWalletUi();

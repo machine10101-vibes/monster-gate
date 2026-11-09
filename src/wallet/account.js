@@ -1,7 +1,9 @@
 /**
- * Email and password accounts. The password is never stored.
- * With the guild record configured, Supabase Auth keeps the account.
- * Otherwise the password is checked on this browser from a salted hash.
+ * Email and password accounts live in Supabase Auth.
+ * The password is never stored. The hunt is saved under that account
+ * so the same email signs in on any device.
+ * A browser-only hash remains only so an account created before the
+ * guild record was connected can still be opened on this browser.
  */
 
 const BOOK_KEY = 'monster-gate-accounts-v1';
@@ -293,14 +295,15 @@ export async function createAccount(email, password, confirm) {
   const secret = checkPassword(password);
   if (secret !== String(confirm ?? '')) throw fail('mismatch', 'Those passwords do not match.');
   const cfg = await cloudConfig();
-  if (cfg.url && cfg.key) {
-    const remote = await createRemote(cfg, normalized, secret);
-    if (remote) return remote;
+  if (!cfg.url || !cfg.key) {
+    throw fail('unavailable', 'Supabase is not connected to this site yet, so the account cannot be saved.');
   }
-  return createLocal(normalized, secret);
+  const remote = await createRemote(cfg, normalized, secret);
+  if (!remote) throw fail('unavailable', 'The account service could not be reached.');
+  return remote;
 }
 
-/** Signs in to an account created on this browser or in the guild record. */
+/** Signs in to the Supabase account. An older browser-only account still opens here. */
 export async function signInAccount(email, password) {
   const normalized = checkEmail(email);
   const secret = checkPassword(password);
@@ -308,14 +311,15 @@ export async function signInAccount(email, password) {
   if (cfg.url && cfg.key) {
     const remote = await signInRemote(cfg, normalized, secret);
     if (remote) return remote;
-    if (remote === false) {
-      const userId = await verifyLocal(normalized, secret);
-      if (!userId) throw fail('rejected', 'That email or password was not accepted.');
-      return saveAccount({ kind: 'email', email: normalized, userId, at: Date.now() });
-    }
+    if (remote === null) throw fail('unavailable', 'The account service could not be reached.');
+    const userId = await verifyLocal(normalized, secret);
+    if (userId) return saveAccount({ kind: 'email', email: normalized, userId, at: Date.now() });
+    throw fail('rejected', 'That email or password was not accepted.');
   }
   const userId = await verifyLocal(normalized, secret);
-  if (!userId) throw fail('rejected', 'That email or password was not accepted.');
+  if (!userId) {
+    throw fail('unavailable', 'Supabase is not connected to this site yet, so this account cannot be opened on another device.');
+  }
   return saveAccount({ kind: 'email', email: normalized, userId, at: Date.now() });
 }
 

@@ -1,6 +1,6 @@
 /**
  * The guild record on Supabase. The browser only talks to the hunter function.
- * Without a project URL and publishable key, the hunt stays on this browser.
+ * Email accounts are Supabase Auth users. The publishable key only identifies the project.
  */
 
 const TOKEN_KEY = 'monster-gate-cloud-token';
