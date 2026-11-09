@@ -1115,6 +1115,27 @@ body.touch #top-right {
   border-radius: 4px;
   font-size: 14px;
 }
+.panel-row.account {
+  margin-top: 8px;
+  border-color: #6a4034;
+}
+.panel-row.account span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.panel-row.account small {
+  color: #d7c2ae;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-row.account button {
+  background: #6e322c;
+  border-color: #d37a62;
+  color: #ffe8df;
+}
 .bigmap {
   width: 100%;
   image-rendering: pixelated;

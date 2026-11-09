@@ -11,6 +11,7 @@ import { mountGear } from './gear.js';
 import { mountBag } from './bag.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
+import { shortAddress } from '../wallet/klever.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -538,6 +539,21 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
+      if (game.wallet?.address) {
+        const row = document.createElement('div');
+        row.className = 'panel-row account';
+        const label = document.createElement('span');
+        const who = document.createElement('small');
+        who.textContent = game.wallet.email || shortAddress(game.wallet.address);
+        label.append('Log out', who);
+        const out = document.createElement('button');
+        out.id = 'set-out';
+        out.type = 'button';
+        out.textContent = 'Log out';
+        out.onclick = () => game.signOut(false);
+        row.append(label, out);
+        body.appendChild(row);
+      }
       add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);

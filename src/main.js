@@ -507,6 +507,7 @@ class Game {
   }
 
   signOut(repromptKlever) {
+    const leaveWorld = this.started;
     this.captureHunter();
     flushCloud();
     if (this.cloudGate) this.cloudGate.open = false;
@@ -520,6 +521,10 @@ class Game {
     this.character = null;
     this.walletNote = '';
     this.cloudState = 'off';
+    if (leaveWorld) {
+      location.reload();
+      return;
+    }
     this.charSelect.close();
     document.getElementById('title').classList.remove('hidden');
     this.closeAccount();
