@@ -369,11 +369,103 @@ function troutModel() {
   return [M, 0.06, 18, 8, 5];
 }
 
+const WOOD = {
+  birch: { bark: 0xf3eee4, barkHi: 0xfffaf0, cut: 0xf6e7c0, heart: 0xe7c98a, ring: 0x2a2622 },
+  oak: { bark: 0x6a4529, barkHi: 0x8a5a34, cut: 0xd9b27a, heart: 0xc49555, ring: 0x8a5a30 },
+  maple: { bark: 0x6e3824, barkHi: 0x8a4630, cut: 0xe2b070, heart: 0xc48448, ring: 0x5a2818 },
+};
+
+/** Fresh-cut stump left when a tree is felled. */
+export function buildWoodStump(kind, seed = 1) {
+  const w = WOOD[kind] || WOOD.oak;
+  const M = new VoxelModel(16, 8, 16);
+  const c = 8;
+  for (let y = 0; y < 5; y++) {
+    for (let z = 0; z < 16; z++)
+      for (let x = 0; x < 16; x++) {
+        const d = Math.hypot(x + 0.5 - c, z + 0.5 - c);
+        const r = y < 2 ? 5.4 : 4.4;
+        if (d > r) continue;
+        if (y === 4) {
+          const band = Math.floor(d);
+          M.set(x, y, z, d < 1.2 ? w.heart : band % 2 === 0 ? w.cut : shade(w.cut, 0.86));
+        } else if (kind === 'birch' && y === 3) M.set(x, y, z, 0x2a2622);
+        else M.set(x, y, z, J(shade(w.bark, hash3(x, 0, z, seed) > 0.6 ? 0.86 : 1), x, y, z, seed, 0.08));
+      }
+  }
+  return bundle([[M, 0.11, c, 0, c]]);
+}
+
+/** Crossed logs and a bright flame. Logs and flame are separate so the fire can flicker. */
+export function buildCampfire(kind = 'birch') {
+  const w = WOOD[kind] || WOOD.oak;
+  const logs = new VoxelModel(20, 8, 20);
+  const lay = (x0, z0, x1, z1, y) => {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(z1 - z0));
+    for (let i = 0; i <= n; i++) {
+      const x = Math.round(x0 + ((x1 - x0) * i) / n);
+      const z = Math.round(z0 + ((z1 - z0) * i) / n);
+      for (let dy = 0; dy < 3; dy++)
+        for (let t = -1; t <= 1; t++) {
+          const across = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+          const px = across ? x : x + t;
+          const pz = across ? z + t : z;
+          const end = i < 2 || i > n - 2;
+          logs.set(px, y + dy, pz, end ? (dy === 1 ? w.cut : w.ring) : dy === 2 ? w.barkHi : w.bark);
+        }
+    }
+  };
+  lay(3, 7, 16, 12, 0);
+  lay(4, 13, 15, 6, 1);
+  const flame = new VoxelModel(20, 16, 20);
+  const hot = [0xfff6c0, 0xffc24a, 0xff6a18, 0xffe080];
+  for (let y = 3; y < 14; y++) {
+    const r = y < 6 ? 2.4 : Math.max(0.4, 2.5 - (y - 5) * 0.28);
+    for (let z = 6; z <= 13; z++)
+      for (let x = 6; x <= 13; x++) {
+        if (Math.hypot(x - 9.5, z - 9.5) > r) continue;
+        if (hash3(x, y, z, 70) < 0.25 && y > 6) continue;
+        flame.set(x, y, z, hot[(x + y + z) % hot.length], true);
+      }
+  }
+  return {
+    logs: bundle([[logs, 0.07, 10, 0, 10]]),
+    flame: bundle([[flame, 0.07, 10, 0, 10]]),
+  };
+}
+
+function logStack(kind) {
+  const w = WOOD[kind];
+  const seed = kind === 'birch' ? 11 : kind === 'maple' ? 13 : 12;
+  const M = new VoxelModel(24, 16, 16);
+  const one = (y0, z0) => {
+    for (let x = 2; x < 22; x++)
+      for (let y = 0; y < 5; y++)
+        for (let z = 0; z < 5; z++) {
+          const dy = y - 2;
+          const dz = z - 2;
+          if (dy * dy + dz * dz > 5.3) continue;
+          const end = x < 4 || x > 19;
+          const ring = Math.hypot(dy, dz);
+          let c = end ? (ring < 1.15 ? w.heart : ring < 2 ? w.cut : w.ring) : y === 4 ? w.barkHi : w.bark;
+          if (!end && kind === 'birch' && y === 1 && z === 2 && x % 4 === 0) c = 0x2a2622;
+          M.set(x, y0 + y, z0 + z, J(c, x, y, z, seed, 0.06));
+        }
+  };
+  one(0, 5);
+  one(3, 1);
+  one(3, 8);
+  return [M, 0.045, 12, 0, 8];
+}
+
 const GOODS_MODELS = {
   copper_ore: () => oreChunk('copper'),
   tin_ore: () => oreChunk('tin'),
   shrimp: shrimpModel,
   trout: troutModel,
+  birch_logs: () => logStack('birch'),
+  oak_logs: () => logStack('oak'),
+  maple_logs: () => logStack('maple'),
 };
 
 export function hasGoodsModel(id) {

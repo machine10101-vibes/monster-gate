@@ -8,7 +8,7 @@ import {
 import { STARTER, TILES } from './tiles.js';
 import * as M from './models.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
-import { FISH_SPOTS, buildGatherSites } from './gatherSite.js';
+import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -645,6 +645,7 @@ export class World {
       if (zn === ZONE.TOWN || zn === ZONE.FARM || zn === ZONE.GATE || zn === ZONE.WATER || zn === ZONE.LAKE || zn === ZONE.MINE) return false;
       if (Math.hypot(x - GATE.x, z - GATE.z) < 9) return false;
       if (Math.hypot(x - TOWN.x, z - TOWN.z) < 15) return false;
+      if (WOOD_GROVES.some((g) => Math.hypot(x - g.x, z - g.z) < g.r)) return false;
       return true;
     };
     const addTree = (parts, x, z, scale, r) => {
@@ -910,6 +911,11 @@ export class World {
     ctx.putImageData(img, 0, 0);
     ctx.fillStyle = 'rgba(20,70,30,0.9)';
     for (const t of this.treeDots) ctx.fillRect(Math.floor(t.x), Math.floor(t.z), 1, 1);
+    const woodInk = { birch: '#f4efe4', oak: '#3f9f47', maple: '#e24a22' };
+    for (const n of this.treeNodes || []) {
+      ctx.fillStyle = woodInk[n.type] || '#7dcc4a';
+      ctx.fillRect(Math.floor(n.x) - 1, Math.floor(n.z) - 1, 3, 3);
+    }
     if (this.waygate) {
       ctx.fillStyle = '#7ef6ff';
       ctx.fillRect(Math.floor(this.waygate.x) - 2, Math.floor(this.waygate.z) - 2, 4, 4);

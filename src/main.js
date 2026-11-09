@@ -1176,8 +1176,12 @@ class Game {
     if (!gold) return false;
     this.addGold(gold);
     this.audio.coin();
-    this.hud.toast(`Sold your catch and ore for ${gold}g`, 1800);
+    this.hud.toast(`Sold your goods for ${gold}g`, 1800);
     return true;
+  }
+
+  lightLog(id) {
+    return this.gather.light(id);
   }
 
   eatGood(id) {

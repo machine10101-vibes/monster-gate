@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { DOCK, LAKE, MINE, WATER_Y } from './terrain.js';
-import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock } from './gatherModels.js';
+import { DOCK, LAKE, MINE, TOWN, WATER_Y, ZONE } from './terrain.js';
+import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock, buildWoodStump } from './gatherModels.js';
+import { buildOak } from './models.js';
 import { goodsVoxels } from './gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
@@ -197,9 +198,102 @@ function buildLake(world) {
   world.jumpers = fishMats;
 }
 
+/** Groves west of Oakhollow. Decorative trees stay out of these circles. */
+export const WOOD_GROVES = [
+  { type: 'birch', x: 50, z: 74, r: 9, count: 5 },
+  { type: 'oak', x: 48, z: 63, r: 9, count: 4 },
+  { type: 'maple', x: 43, z: 54, r: 9, count: 4 },
+];
+
+function nearPath(world, x, z, r) {
+  return world.nearPath(x, z, r);
+}
+
+function buildWoods(world) {
+  const nodes = [];
+  const variants = {};
+  const treeGroup = (type, seed) => {
+    const key = type + (seed % 2);
+    if (!variants[key]) {
+      const kind = type === 'oak' ? 'green' : type;
+      variants[key] = {
+        full: partsToGroup(world, buildOak(seed + 3, kind)),
+        stump: partsToGroup(world, buildWoodStump(type, seed + 3)),
+      };
+    }
+    const full = variants[key].full.clone(true);
+    const stump = variants[key].stump.clone(true);
+    stump.visible = false;
+    return { full, stump };
+  };
+  const taken = [];
+  for (const grove of WOOD_GROVES) {
+    let placed = 0;
+    for (let rad = 0; rad <= grove.r && placed < grove.count; rad += 1.25) {
+      const steps = rad < 0.2 ? 1 : Math.max(6, Math.round(rad * 2.6));
+      for (let k = 0; k < steps && placed < grove.count; k++) {
+        const a = (k / steps) * Math.PI * 2 + 0.4;
+        const x = grove.x + Math.cos(a) * rad;
+        const z = grove.z + Math.sin(a) * rad;
+        if (x < 6 || z < 6 || x > 138 || z > 138) continue;
+        const h = ground(world, x, z);
+        if (h < 1 || h > 7.5) continue;
+        if (world.data.slope[world.idx(x, z)] > 1.2) continue;
+        if (nearPath(world, x, z, 1.8)) continue;
+        const zn = world.zoneAt(x, z);
+        if (zn === ZONE.TOWN || zn === ZONE.WATER || zn === ZONE.LAKE || zn === ZONE.FARM || zn === ZONE.GATE || zn === ZONE.MINE) continue;
+        if (!world.free(x, z, 1.7)) continue;
+        if (taken.some((s) => Math.hypot(s.x - x, s.z - z) < 3.2)) continue;
+        let stand = null;
+        for (let t = 0; t < 8; t++) {
+          const ang = Math.atan2(TOWN.z - z, TOWN.x - x) + t * 0.75;
+          const sx = x + Math.cos(ang) * 1.6;
+          const sz = z + Math.sin(ang) * 1.6;
+          const sh = ground(world, sx, sz);
+          if (sh < 0.9 || sh > 8 || Math.abs(sh - h) > 1.05) continue;
+          if (!world.playable(sx, sz)) continue;
+          stand = { x: sx, z: sz };
+          if (t === 0) break;
+        }
+        if (!stand) continue;
+        const { full, stump } = treeGroup(grove.type, placed + grove.x);
+        const root = new THREE.Group();
+        root.position.set(x, h, z);
+        root.rotation.y = hashAngle(placed * 3 + grove.x);
+        root.scale.setScalar(0.68);
+        root.add(full, stump);
+        world.group.add(root);
+        world.circle(x, z, 0.48);
+        world.occupy(x, z, 1.55);
+        const node = {
+          id: `${grove.type}${placed}`,
+          type: grove.type,
+          x,
+          z,
+          y: h,
+          standX: stand.x,
+          standZ: stand.z,
+          root,
+          full,
+          dead: stump,
+          ready: true,
+          respawnT: 0,
+          pop: 0,
+        };
+        nodes.push(node);
+        taken.push(node);
+        placed++;
+      }
+    }
+  }
+  world.treeNodes = nodes;
+  world.woodGroves = WOOD_GROVES;
+}
+
 export function buildGatherSites(world) {
   buildMine(world);
   buildLake(world);
+  buildWoods(world);
 }
 
 /** Per-frame life for the sites: fish spot shaders, leaping fish, rock pop-in. */
@@ -246,9 +340,9 @@ export function updateGatherSites(world, dt, t, game) {
       }
     }
   }
-  const nodes = world.rockNodes;
-  if (nodes) {
-    for (const n of nodes) {
+  for (const list of [world.rockNodes, world.treeNodes]) {
+    if (!list) continue;
+    for (const n of list) {
       if (!n.ready) {
         n.respawnT -= dt;
         if (n.respawnT <= 0) {

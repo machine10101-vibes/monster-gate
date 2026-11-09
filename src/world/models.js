@@ -99,14 +99,22 @@ export function buildPine(seed, snow = false) {
 
 export function buildOak(seed, kind = 'green') {
   const rng = new RNG(seed * 31 + 7);
+  const birch = kind === 'birch';
+  const maple = kind === 'maple';
+  const bark = birch ? 0xf3eee4 : maple ? 0x6e3824 : 0x6a4529;
+  const barkDark = birch ? 0xddd6c6 : maple ? 0x542818 : 0x5a3a22;
+  const limb = birch ? 0xe7e0d0 : maple ? 0x62301e : 0x5f3d24;
   const T = new VoxelModel(9, 16, 9);
-  T.box(2, 0, 2, 6, 16, 6, (x, y, z) => shade(J(0x6a4529, x, y, z, seed, 0.1), hash3(x, 0, z, seed) > 0.62 ? 0.8 : 1));
-  T.box(1, 0, 2, 2, 3, 6, (x, y, z) => J(0x5a3a22, x, y, z, seed));
-  T.box(6, 0, 2, 7, 3, 6, (x, y, z) => J(0x5a3a22, x, y, z, seed));
-  T.box(2, 0, 1, 6, 3, 2, (x, y, z) => J(0x5a3a22, x, y, z, seed));
-  T.box(2, 0, 6, 6, 3, 7, (x, y, z) => J(0x5a3a22, x, y, z, seed));
-  T.line(4, 11, 4, 8, 15, 4, (x, y, z) => J(0x5f3d24, x, y, z, seed), 2);
-  T.line(4, 10, 4, 0, 14, 5, (x, y, z) => J(0x5f3d24, x, y, z, seed), 2);
+  T.box(2, 0, 2, 6, 16, 6, (x, y, z) => {
+    if (birch && (y % 4 === 0 || (y % 4 === 1 && hash3(x, y, z, seed) > 0.55))) return 0x2a2622;
+    return shade(J(bark, x, y, z, seed, 0.08), hash3(x, 0, z, seed) > 0.62 ? 0.86 : 1);
+  });
+  T.box(1, 0, 2, 2, 3, 6, (x, y, z) => J(barkDark, x, y, z, seed));
+  T.box(6, 0, 2, 7, 3, 6, (x, y, z) => J(barkDark, x, y, z, seed));
+  T.box(2, 0, 1, 6, 3, 2, (x, y, z) => J(barkDark, x, y, z, seed));
+  T.box(2, 0, 6, 6, 3, 7, (x, y, z) => J(barkDark, x, y, z, seed));
+  T.line(4, 11, 4, 8, 15, 4, (x, y, z) => J(limb, x, y, z, seed), 2);
+  T.line(4, 10, 4, 0, 14, 5, (x, y, z) => J(limb, x, y, z, seed), 2);
 
   const F = new VoxelModel(22, 16, 22);
   const palettes = {
@@ -114,6 +122,8 @@ export function buildOak(seed, kind = 'green') {
     blossom: [0xf49ac1, 0xffb7d3, 0xe87fb0, 0xffd3e4],
     autumn: [0xd9722e, 0xe8932f, 0xc9552a, 0xf1b13d],
     teal: [0x2a8a6a, 0x38a07a, 0x4fb88a, 0x7bd9a6],
+    birch: [0x8fb84a, 0xc6dc62, 0x6a9a38, 0xd2e878],
+    maple: [0xc42a28, 0xe24a22, 0xf07a30, 0xa81c24],
   };
   const pal = palettes[kind];
   const colorFn = (x, y, z, d) => {

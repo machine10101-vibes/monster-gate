@@ -61,8 +61,13 @@ export function mountBag(body, game) {
     const tgrid = document.createElement('div');
     tgrid.className = 'bag-grid';
     for (const t of TOOLS.filter((x) => x.id !== 'pickaxe')) {
-      const b = cell(renderThumb({ kind: 'held', id: t.held }, 96), t.name, t.desc);
+      const b = cell(renderThumb({ kind: 'held', id: t.held }, 96), t.name, t.id === 'tinderbox' ? 'Light logs' : t.desc);
       b.classList.add('part');
+      if (t.id === 'tinderbox') {
+        b.onclick = () => {
+          if (game.lightLog()) game.hud.closePanel();
+        };
+      }
       tgrid.appendChild(b);
     }
     tools.appendChild(tgrid);
@@ -78,12 +83,19 @@ export function mountBag(body, game) {
       if (!n) continue;
       anyGood = true;
       const g = GOODS[id];
-      const b = cell(renderThumb({ kind: 'good', id }, 96), g.name, g.heal ? `Eat: +${g.heal} health` : `Sells for ${g.price}g`, badge(String(n), 'bag-n'));
+      const sub = g.heal ? `Eat: +${g.heal} health` : g.kind === 'log' ? 'Light with tinderbox' : `Sells for ${g.price}g`;
+      const b = cell(renderThumb({ kind: 'good', id }, 96), g.name, sub, badge(String(n), 'bag-n'));
       b.classList.add('part');
       if (g.heal) {
         b.classList.add('edible');
         b.onclick = () => {
           if (game.eatGood(id)) paint();
+        };
+      } else if (g.kind === 'log') {
+        b.classList.add('edible');
+        b.onclick = () => {
+          if (game.lightLog(id)) game.hud.closePanel();
+          else paint();
         };
       }
       ggrid2.appendChild(b);
@@ -91,7 +103,7 @@ export function mountBag(body, game) {
     if (!anyGood) {
       const p = document.createElement('p');
       p.className = 'bag-empty';
-      p.textContent = 'Ore from the Greyrock Pit and fish from Mirrormere are kept here. Sell them at the market stall.';
+      p.textContent = 'Ore, fish and logs are kept here. Chop birch, oak and maple west of town, then light the logs with the tinderbox.';
       gath.appendChild(p);
     }
     gath.appendChild(ggrid2);
