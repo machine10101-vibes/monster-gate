@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
@@ -12,6 +13,47 @@ const lerp = (a, b, t) => a + (b - a) * t;
 export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual']);
 /** Held kinds whose model is taller than wide (bows). */
 export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow']);
+
+/**
+ * Swords are sculpted flat in the horizontal plane. Rolled a quarter turn,
+ * the edge faces a side swing instead of the flat slapping into it.
+ */
+const EDGE_HOLD = new Set([
+  'blade', 'dual',
+  'budgeblade', 'budgegreatsword', 'budgedual',
+  'darksword', 'darkgreatsword', 'darkdual',
+]);
+
+/** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
+export function gripRoll(kind) {
+  return EDGE_HOLD.has(kind) ? -Math.PI / 2 : 0;
+}
+
+const sheathTip = new THREE.Vector3();
+const sheathBack = new THREE.Vector3(0, 0, -1);
+const sheathX = new THREE.Vector3();
+const sheathY = new THREE.Vector3();
+const sheathBasis = new THREE.Matrix4();
+
+/**
+ * Hang a carried weapon on the back slot.
+ * Hafted models run along +z. Seen from behind, the grip clears the
+ * right shoulder and the blade angles down toward the left hip.
+ */
+export function placeSheath(group, kind) {
+  if (TALL_KINDS.has(kind)) {
+    group.position.set(-0.08, 0.36, -0.02);
+    group.rotation.set(0.08, -0.15, 0.48);
+    return;
+  }
+  const lean = 0.42;
+  group.position.set(-0.08, 0.32, -0.05);
+  sheathTip.set(Math.sin(lean), -Math.cos(lean), -0.04).normalize();
+  sheathX.crossVectors(sheathBack, sheathTip).normalize();
+  sheathY.crossVectors(sheathTip, sheathX).normalize();
+  sheathBasis.makeBasis(sheathX, sheathY, sheathTip);
+  group.quaternion.setFromRotationMatrix(sheathBasis);
+}
 
 const THEMES = {
   budge: {

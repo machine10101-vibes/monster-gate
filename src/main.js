@@ -430,10 +430,22 @@ class Game {
     this.selectSlot(i);
   }
 
+  /** The starter blade stands in for whatever weapon is actually equipped. */
+  carried(it) {
+    const w = this.progress.weaponItem;
+    if (w && it && (it.id === 'blade' || it.held === 'blade')) return { ...w };
+    return it;
+  }
+
   selectSlot(i, silent = false) {
     if (i < 0 || i >= this.items.length) return;
     this.sel = i;
-    const it = this.items[i];
+    const raw = this.items[i];
+    const it = this.carried(raw);
+    if (it !== raw) {
+      this.items[i] = it;
+      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
+    }
     this.player.setHeld(it.held || null);
     this.syncVitals();
     this.itemsChanged();
@@ -450,7 +462,10 @@ class Game {
     p.reduction = pr.reduction;
     this.syncVitals();
     const w = pr.weaponItem;
-    this.items[7] = w ? { ...w } : { ...ITEMS[7] };
+    // The equipped weapon replaces the starter blade in the main hand slot.
+    this.items[0] = w ? { ...w } : { ...ITEMS[0] };
+    this.items[7] = { ...ITEMS[7] };
+    p.setSheath(w?.held || 'blade');
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
       this.selectSlot(this.sel, true);
@@ -549,10 +564,7 @@ class Game {
     const was = this.progress.worn(id);
     this.progress.toggleWear(id);
     this.applyGear();
-    if (g.type === 'weapon') {
-      if (!was) this.selectSlot(7, true);
-      else if (this.sel === 7) this.selectSlot(0, true);
-    }
+    if (g.type === 'weapon') this.selectSlot(0, true);
     this.audio.select();
     this.hud.toast(was ? `${g.name} unequipped` : `${g.name} equipped`, 1200);
     return true;
@@ -935,12 +947,21 @@ class Game {
   doAttack() {
     const P = this.player;
     if (P.dead) return;
-    const it = this.items[this.sel];
+    let it = this.carried(this.items[this.sel]);
+    if (it !== this.items[this.sel]) {
+      this.items[this.sel] = it;
+      this.player.setHeld(it.held || null);
+      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
+      this.itemsChanged();
+    }
     if (it.kind === 'light' || it.kind === 'none') {
       this.hud.toast(it.kind === 'light' ? 'Torch lit - hold it up in the dark' : 'Nothing equipped', 900);
       return;
     }
-    if (it.kind !== 'use') this.faceForAction();
+    if (it.kind !== 'use') {
+      this.faceForAction();
+      P.drawWeapon();
+    }
     P.tryAttack(it);
   }
 

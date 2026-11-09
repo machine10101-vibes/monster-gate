@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CORE_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SETS, SLOT_LABEL, TIER_LABEL, WEAPON_LABEL, armorPieces, gearById, monsterById, setById, weapons } from '../data/catalog.js';
 import { MONSTER_BUILDERS, MONSTER_STATS } from '../entities/monsters.js';
 import { buildHeld, buildHumanoid, meshFrom } from '../entities/humanoid.js';
-import { TALL_KINDS, buildBookModel, buildShieldModel } from '../entities/weaponModels.js';
+import { TALL_KINDS, buildBookModel, buildShieldModel, gripRoll } from '../entities/weaponModels.js';
 import { toonMaterial } from '../engine/materials.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
 import { goodsVoxels } from '../world/gatherModels.js';
@@ -126,6 +126,7 @@ function buildSubject(spec, silhouette) {
     }
     if (spec.held) {
       h.armR.rotation.x = -0.85;
+      h.heldSlot.rotation.z = gripRoll(spec.held);
       h.heldSlot.add(buildHeld(spec.held));
     }
     tilt.add(h.root);
@@ -135,6 +136,7 @@ function buildSubject(spec, silhouette) {
     const extra = setById(spec.id).tier === 'metal' ? 'shield' : setById(spec.id).tier === 'cloth' ? 'book' : null;
     const h = buildHumanoid({ armor: Object.fromEntries([...CORE_SLOTS, ...(extra ? [extra] : [])].map((s) => [s, spec.id])) });
     h.armR.rotation.x = -0.9;
+    h.heldSlot.rotation.z = gripRoll(SET_HELD[spec.id]);
     if (extra === 'shield') {
       h.shieldG.visible = true;
       h.armL.rotation.set(-0.75, 0, 0.35);
@@ -609,6 +611,7 @@ export class Catalog {
       b.onclick = () => {
         if (!this.forge || !pr.craft(g.id)) return;
         this.game.applyGear();
+        if (g.type === 'weapon') this.game.selectSlot(0, true);
         this.game.audio.quest();
         this.game.hud.toast(`Forged ${g.name}`, 1800);
         const f = this.game.world.forge;
@@ -622,12 +625,10 @@ export class Catalog {
       if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the Forge next to Bram the Blacksmith in Oakhollow.'));
     } else {
       const worn = pr.worn(g.id);
-      const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip (hotbar 8)' : 'Wear');
+      const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip' : 'Wear');
       b.type = 'button';
       b.onclick = () => {
-        pr.toggleWear(g.id);
-        this.game.applyGear();
-        this.game.audio.select();
+        this.game.wearPiece(g.id);
         this.render();
       };
       actions.appendChild(b);
