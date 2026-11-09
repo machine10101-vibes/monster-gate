@@ -32,7 +32,7 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
-import { clearAccount, createAccount, readAccount, signInAccount } from './wallet/account.js';
+import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 
@@ -124,6 +124,8 @@ class Game {
     this.autosaveTimer = 0;
     this.autosaveMs = CLOUD_AUTOSAVE_MS;
     this.cloudFailAt = 0;
+    this.cloudSavedAt = 0;
+    this.cloudReachable = false;
     this.saveAcc = 0;
     this.accountWatch = false;
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
@@ -240,23 +242,39 @@ class Game {
   onPushed(result) {
     if (!result) return;
     if (result.error) {
+      this.cloudReachable = false;
       this.noteCloudFailure();
+      this.paintCloudStatus();
       return;
     }
     if (result.revision && this.roster) this.roster.revision = result.revision;
-    if (result.conflict && result.progress && this.roster?.mergeFrom) {
+    this.cloudReachable = true;
+    this.cloudSavedAt = Number(result.savedAt) || Date.now();
+    if (result.progress && this.roster?.mergeFrom) {
       const outcome = this.roster.mergeFrom(result.progress);
       const activeReplaced = !!(this.character && outcome.replacedIds?.includes(this.character.id));
       if (activeReplaced && this.started) this.adoptActiveHunt();
       else if (this.charSelect?.active) this.charSelect.refresh();
       if (outcome.push && !result.retried && this.wallet && this.cloudState === 'on' && !activeReplaced) {
-        this.roster.touch(Date.now());
         schedulePush(this.wallet, this.roster.data, (next) => this.onPushed({ ...next, retried: true }));
         flushCloud();
       }
-      return;
     }
-    if (result.conflict) this.noteCloudFailure();
+    this.paintCloudStatus();
+  }
+
+  cloudStatusText() {
+    if (!this.wallet) return '';
+    if (this.cloudSyncing) return 'Opening the hunt saved to your account…';
+    if (this.cloudState === 'on' && this.cloudReachable) return 'Saved to your account';
+    return 'Saved on this device only';
+  }
+
+  paintCloudStatus() {
+    const el = document.getElementById('cs-save');
+    if (el) el.textContent = this.cloudStatusText();
+    const row = document.getElementById('set-cloud');
+    if (row) row.textContent = this.cloudStatusText();
   }
 
   /** The guild record has a newer copy of the hunter who is in the world. Use it. */
@@ -336,6 +354,11 @@ class Game {
     this.character = null;
     this.charSelect.close();
     this.roster = new Roster(session.address, session.email || '');
+    if (session.kind === 'email' && session.email) {
+      const oldId = legacyUserId(session.email);
+      const oldOwner = oldId ? accountAddress(oldId) : '';
+      if (oldOwner && oldOwner !== session.address) this.roster.absorbOwner(oldOwner);
+    }
     this.walletNote = this.roster.chars.length ? 'loaded' : 'new';
     this.cloudSyncing = true;
     this.cloudState = 'off';
@@ -359,8 +382,12 @@ class Game {
     if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
     this.cloudState = result?.abandoned ? 'off' : (result?.state || 'error');
     if (result?.replaced) this.walletNote = 'loaded';
-    if (this.cloudState === 'on') this.bindCloudPush();
-    else if (this.cloudState === 'error') this.startAutosave();
+    if (this.cloudState === 'on') {
+      this.cloudReachable = true;
+      this.cloudSavedAt = this.roster?.savedAt || Date.now();
+      this.bindCloudPush();
+    } else if (this.cloudState === 'error') this.startAutosave();
+    this.paintCloudStatus();
     this.refreshWalletUi();
     if (!this.started && this.cloudState !== 'error') this.openCharacterSelect();
   }
@@ -511,10 +538,14 @@ class Game {
     }
   }
 
-  signOut(repromptKlever) {
+  async signOut(repromptKlever) {
     const leaveWorld = this.started;
     this.captureHunter();
-    flushCloud();
+    try {
+      await Promise.race([flushCloud(), new Promise((r) => setTimeout(r, 4000))]);
+    } catch {
+      /* the hunt is still on this device */
+    }
     if (this.cloudGate) this.cloudGate.open = false;
     this.stopAutosave();
     clearSession();
@@ -526,6 +557,8 @@ class Game {
     this.character = null;
     this.walletNote = '';
     this.cloudState = 'off';
+    this.cloudReachable = false;
+    this.cloudSavedAt = 0;
     if (leaveWorld) {
       location.reload();
       return;

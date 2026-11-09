@@ -528,4 +528,15 @@ export class Roster {
   save() {
     this.persist();
   }
+
+  /**
+   * Bring in characters saved on this browser under an older account id.
+   * Those hunts were stored before the account lived in the database.
+   */
+  absorbOwner(owner) {
+    if (!owner || owner === this.owner) return { replaced: false, push: false, replacedIds: [] };
+    const other = new Roster(owner, this.label);
+    if (!other.chars.length && !other.deleted.length) return { replaced: false, push: false, replacedIds: [] };
+    return this.mergeFrom(other.data);
+  }
 }

@@ -1,5 +1,6 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
+import { mergeAccountProgress } from "./huntMerge.js";
 import { loginMessageOk, verifyKleverSignature } from "./verify.ts";
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
@@ -136,24 +137,33 @@ async function accountSave(admin: Admin, body: Record<string, unknown>): Promise
   if (user instanceof Response) return user;
   const progress = sanitizeProgress(body.progress, Date.now());
   if (!progress) return json({ error: "That hunt cannot be stored." }, 400);
+  const { data: existing, error: readError } = await admin
+    .from("hunter_accounts")
+    .select("progress")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (readError) return json({ error: "The guild record could not be saved." }, 503);
+  const stored = (existing as { progress?: Record<string, unknown> } | null)?.progress ?? null;
+  const merged = mergeAccountProgress(stored, progress) as Record<string, unknown> | null;
+  if (!merged) return json({ error: "That hunt cannot be stored." }, 400);
   const { data, error } = await admin.rpc("save_account_hunt", {
     p_user_id: user.id,
     p_email: user.email,
-    p_progress: progress,
+    p_progress: merged,
   });
   if (error || !data || typeof data !== "object") return json({ error: "The guild record could not be saved." }, 503);
   const result = data as { ok?: boolean; revision?: number | string; savedAt?: number | string; progress?: unknown };
-  const savedAt = Number(result.savedAt) || 0;
+  const savedAt = Number(result.savedAt) || Number(merged.savedAt) || 0;
   const revision = Number(result.revision) || 0;
   if (!result.ok) {
     return json({
       error: "A newer hunt is already saved to this account.",
-      progress: result.progress ?? null,
+      progress: result.progress ?? stored ?? null,
       revision,
       savedAt,
     }, 409);
   }
-  return json({ revision, savedAt });
+  return json({ revision, savedAt, progress: merged });
 }
 
 async function save(admin: Admin, body: Record<string, unknown>): Promise<Response> {
