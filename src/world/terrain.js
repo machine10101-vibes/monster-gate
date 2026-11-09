@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { fbm, hash2, smoothstep, lerp, clamp } from '../engine/voxel.js';
 import { TILE, tileUV } from '../engine/materials.js';
+import { STARTER } from './tiles.js';
 
 export const W = 144;
 export const CENTER = { x: 72, z: 72 };
@@ -69,6 +70,16 @@ function smoothPath(pts, subdiv = 6) {
 
 export const SMOOTH_PATHS = Object.fromEntries(Object.entries(PATHS).map(([k, v]) => [k, smoothPath(v)]));
 export const SMOOTH_RIVER = smoothPath(RIVER, 8);
+
+/**
+ * Build the height data for one world tile.
+ * Oakhollow is the only built tile. The other 99 are mapped in tiles.js and
+ * viewed from the world creator until they are built the same way.
+ */
+export function generateTile(tile = STARTER) {
+  if (tile?.kind === 'oakhollow') return generateWorld();
+  return null;
+}
 
 export function generateWorld() {
   const H = new Float32Array(W * W);

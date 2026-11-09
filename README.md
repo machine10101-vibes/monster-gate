@@ -49,6 +49,10 @@ Weapons and armor are forged at the Forge beside Bram the Blacksmith in Oakhollo
 
 ## Skill trees
 
+Character (E) is the equipped page: the hunter, every worn slot, and forged gear waiting to be worn. Inventory (B) is the bag. Both are also the first buttons in Settings (T) and the Menu. On a phone those buttons sit in the top-right cluster.
+
+The world is 100 tiles, ten by ten. The land you play on is one of them: Oakhollow. Settings → World Creator opens the whole grid. Pick a tile to see it from above, north up. Only Oakhollow is built; the other plots are mapped and shown as relief so the world can be filled in one tile at a time.
+
 Gathering: east of town, the Greyrock Pit is sunk into the ground with a cobbled ramp leading down to it. It holds three copper rocks and two tin rocks. South-west of town, Mirrormere has a walk-out dock with two net spots (shrimp, Fishing 1) and two pole spots (trout, Fishing 3). Stand next to a rock or on the dock and press F: the hunter walks into place, swaps to the pickaxe, net or pole, and works until you move, attack or get hurt. Ore and fish go into the bag (Gathered), fish can be eaten from there, and Dalla's market stall (the pumpkin stall in town) buys everything. Strength, Agility, Stamina, Mining and Fishing each level from 1 to 99 on a RuneScape-style XP curve; press H for the stats page. Strength adds 1% melee damage a level, Agility 0.3% move speed, Stamina 1 maximum stamina.
 
 Press K (or Menu → Skill Tree) to choose Warrior, Ranger, or Mage. Each class has three paths, and each path runs five skills deep: a passive, an active, a special, another passive, and a capstone.

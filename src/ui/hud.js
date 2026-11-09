@@ -1,6 +1,7 @@
 import { iconCanvas, iconURL, heartCanvas } from './icons.js';
 import { GOODS } from '../data/gathering.js';
 import { mountStats } from './stats.js';
+import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
 import { GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
 import { SKILLS } from '../data/skills.js';
@@ -332,7 +333,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -369,13 +370,13 @@ export class HUD {
       ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
       ctx.fillStyle = '#4ec8ff';
       ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
-      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). White: you.</p>');
+      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). White: you. This view is the Oakhollow tile. The full world is 100 tiles — open Settings, then World Creator.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
       add(`<p><b>${q.text}</b><br/>Progress: ${q.n} / ${q.total}</p><p>Total monsters defeated: <b>${game.kills}</b></p><p style="color:#aab;font-size:13px">The Monster Gate in the northern forest keeps spitting out creatures. Slay them to earn guild gold.</p>`);
     } else if (name === 'bag') {
-      title.textContent = 'Bag';
+      title.textContent = 'Inventory';
       this.cleanup = mountBag(body, game);
     } else if (name === 'gear') {
       title.textContent = 'Character';
@@ -383,6 +384,9 @@ export class HUD {
     } else if (name === 'spellbook') {
       title.textContent = 'Skill & Spell Book';
       this.cleanup = mountSpellbook(body, game);
+    } else if (name === 'world') {
+      title.textContent = 'World Map';
+      this.cleanup = mountWorldMap(body, game);
     } else if (name === 'stats') {
       title.textContent = 'Hunter Stats';
       this.cleanup = mountStats(body, game, game.statsFocus);
@@ -481,12 +485,25 @@ export class HUD {
       game.refreshWaygate();
     } else if (name === 'settings' || name === 'menu') {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
+      const jumps = document.createElement('div');
+      jumps.className = 'set-jumps';
+      for (const [id, label, sub] of [
+        ['gear', 'Character', 'Equipped and unequipped'],
+        ['bag', 'Inventory', 'Bag, tools and goods'],
+        ['world', 'World Creator', '100-tile map'],
+      ]) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'set-jump';
+        b.innerHTML = `<b>${label}</b><small>${sub}</small>`;
+        b.onclick = () => this.openPanel(id, game);
+        jumps.appendChild(b);
+      }
+      body.appendChild(jumps);
       const q = game.quality;
       const rows = [
         ...(name === 'menu'
           ? [
-              ['Character', '<button id="set-gear">Open</button>'],
-              ['Bag', '<button id="set-bag">Open</button>'],
               ['Skill & Spell Book', '<button id="set-book">Open</button>'],
               ['Hunter Catalog', '<button id="set-cat">Open</button>'],
               ['Skill Tree', '<button id="set-skills">Open</button>'],
@@ -499,7 +516,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - G skill book - K skill tree - H stats - 1-9 and 0 items - E character - B bag - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - E character - B inventory - G skill book - K skill tree - H stats - T settings - 1-9 and 0 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
