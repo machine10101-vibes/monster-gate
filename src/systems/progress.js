@@ -2,7 +2,21 @@ import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, corePieces, gearById } f
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 import { GOODS, LEVEL_SKILLS, MAX_LEVEL, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
 
-const KEY = 'monster-gate-hunter-v1';
+const ANON_KEY = 'monster-gate-hunter-v1';
+
+export function saveKey(address) {
+  return address ? `${ANON_KEY}:${address}` : ANON_KEY;
+}
+
+function readRaw(key) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || 'null');
+    if (raw && typeof raw === 'object') return raw;
+  } catch {
+    /* corrupt save */
+  }
+  return null;
+}
 
 const blank = () => ({
   seen: {},
@@ -17,27 +31,69 @@ const blank = () => ({
   goods: {},
 });
 
-/** Discoveries, harvested parts, crafted gear and what is worn. Persisted in localStorage. */
+/** Discoveries, harvested parts, crafted gear and what is worn. Persisted for one Klever address. */
 export class Progress {
   constructor() {
-    this.data = blank();
-    try {
-      const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (raw && typeof raw === 'object') this.data = { ...blank(), ...raw };
-    } catch {
-      /* corrupt save: start fresh */
+    this.address = null;
+    this.revision = 0;
+    this.onCloud = null;
+    this.loadRaw(readRaw(ANON_KEY));
+  }
+
+  /**
+   * Bind the hunt to a wallet address.
+   * Returns `loaded` when this browser already has that wallet's hunt,
+   * `claimed` when the older unsigned hunt was moved onto the wallet,
+   * or `new` when the wallet is starting fresh here.
+   */
+  useAddress(address) {
+    this.address = address;
+    const own = readRaw(saveKey(address));
+    if (own) {
+      this.loadRaw(own);
+      return 'loaded';
     }
+    const anon = readRaw(ANON_KEY);
+    this.loadRaw(anon);
+    // Do not stamp savedAt here. The guild record may already hold a newer hunt.
+    this.save(false);
+    try {
+      if (anon && localStorage.getItem(saveKey(address))) localStorage.removeItem(ANON_KEY);
+    } catch {
+      /* keep the old hunt if storage cannot be updated */
+    }
+    return anon ? 'claimed' : 'new';
+  }
+
+  loadRaw(raw) {
+    this.data = { ...blank(), ...(raw || {}) };
     this.data.skills = normalizeSkills(this.data.skills);
     this.data.xp = normalizeXp(this.data.xp);
     this.data.goods = normalizeGoods(this.data.goods);
+    this.data.hunter = normalizeHunter(this.data.hunter);
   }
 
-  save() {
+  save(echo = true) {
+    if (echo) this.data.savedAt = Date.now();
     try {
-      localStorage.setItem(KEY, JSON.stringify(this.data));
+      localStorage.setItem(saveKey(this.address), JSON.stringify(this.data));
     } catch {
       /* storage unavailable */
     }
+    if (echo && this.address && typeof this.onCloud === 'function') {
+      try {
+        this.onCloud(this.data);
+      } catch {
+        /* the local hunt is already written */
+      }
+    }
+  }
+
+  rememberHunter(hunter) {
+    const next = normalizeHunter(hunter);
+    if (!next) return;
+    this.data.hunter = next;
+    this.save();
   }
 
   get gold() {
@@ -375,6 +431,26 @@ export class Progress {
     this.save();
     return true;
   }
+}
+
+function normalizeHunter(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const x = Number(raw.x);
+  const z = Number(raw.z);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+  const quest = raw.quest && typeof raw.quest === 'object' ? raw.quest : {};
+  const text = String(quest.text || '').slice(0, 80);
+  return {
+    x,
+    z,
+    yaw: Number.isFinite(Number(raw.yaw)) ? Number(raw.yaw) : 0,
+    hp: Math.max(0, raw.hp | 0),
+    mana: Math.max(0, raw.mana | 0),
+    stamina: Math.max(0, raw.stamina | 0),
+    rank: Math.max(0, Math.min(6, raw.rank | 0)),
+    quest: text ? { text, n: Math.max(0, quest.n | 0), total: Math.max(1, quest.total | 0 || 5) } : null,
+    realm: raw.realm === 'cave' ? 'cave' : 'over',
+  };
 }
 
 function normalizeSkills(raw) {
