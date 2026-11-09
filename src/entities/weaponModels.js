@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
@@ -28,14 +29,30 @@ export function gripRoll(kind) {
   return EDGE_HOLD.has(kind) ? -Math.PI / 2 : 0;
 }
 
+const sheathTip = new THREE.Vector3();
+const sheathBack = new THREE.Vector3(0, 0, -1);
+const sheathX = new THREE.Vector3();
+const sheathY = new THREE.Vector3();
+const sheathBasis = new THREE.Matrix4();
+
 /**
- * Placement of a carried weapon on the back slot.
- * Hafted weapons run along +z; bows are already upright along +y.
+ * Hang a carried weapon on the back slot.
+ * Hafted models run along +z. The grip leans up over the right shoulder
+ * and the tip runs down across the back at a shallow angle.
  */
-export function sheathMount(kind) {
-  if (TALL_KINDS.has(kind)) return { x: 0.1, y: 0.02, z: 0, rx: 0.12, ry: 0, rz: -0.2 };
-  // Model tip is +z. Pitch that end straight down so the hilt sits above the shoulder.
-  return { x: 0.12, y: 0.34, z: 0.02, rx: Math.PI / 2, ry: 0.15, rz: 0 };
+export function placeSheath(group, kind) {
+  if (TALL_KINDS.has(kind)) {
+    group.position.set(0.14, 0.22, -0.02);
+    group.rotation.set(0.08, 0.2, -0.48);
+    return;
+  }
+  const lean = 0.4;
+  group.position.set(0.1, 0.16, -0.06);
+  sheathTip.set(-Math.sin(lean), -Math.cos(lean), -0.05).normalize();
+  sheathX.crossVectors(sheathBack, sheathTip).normalize();
+  sheathY.crossVectors(sheathTip, sheathX).normalize();
+  sheathBasis.makeBasis(sheathX, sheathY, sheathTip);
+  group.quaternion.setFromRotationMatrix(sheathBasis);
 }
 
 const THEMES = {

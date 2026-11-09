@@ -434,7 +434,7 @@ export function buildHumanoid(o = {}) {
   elbowR.add(aR.lower);
   upper.add(armL, armR);
 
-  /* Sheathed weapon. The hilt sits over the right shoulder; the model hangs down the back. */
+  /* Sheathed weapon. The hilt leans up over the right shoulder; the blade runs down the back. */
   const backSlot = new THREE.Group();
   backSlot.position.set(0.02, 0.34, -0.3);
   upper.add(backSlot);
