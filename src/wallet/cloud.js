@@ -157,9 +157,64 @@ export async function pushHunt(session, data, keepalive = false) {
 }
 
 /**
- * Open the guild record and keep whichever hunt was saved later.
- * `replaced` means the wallet's remote hunt replaced this browser's copy.
- * `gate.open` lets the title screen abandon a slow record without it landing mid-hunt.
+ * Keep every character. A hunt stays with whichever copy was saved later.
+ * `push` reads `progress.data` when it runs, after a newer stamp is applied.
+ * `abandoned` means the player signed out before the write, so the local copy stands.
+ */
+export async function reconcileHunt(progress, remote, push) {
+  if (typeof progress.mergeFrom === 'function') {
+    const outcome = remote?.progress
+      ? progress.mergeFrom(remote.progress)
+      : {
+        replaced: false,
+        push: typeof progress.hasLocalProgress === 'function' ? progress.hasLocalProgress() : false,
+        replacedIds: [],
+      };
+    if (remote?.revision) progress.revision = remote.revision || 0;
+    if (!outcome.push) return { state: 'on', replaced: !!outcome.replaced };
+    if (typeof progress.touch === 'function') progress.touch(Date.now());
+    let pushed = await push();
+    if (pushed?.abandoned) return { state: 'on', replaced: !!outcome.replaced, abandoned: true };
+    if (pushed?.conflict && pushed.progress) {
+      const again = progress.mergeFrom(pushed.progress);
+      progress.revision = pushed.revision || progress.revision || 0;
+      if (again.push) {
+        if (typeof progress.touch === 'function') progress.touch(Date.now());
+        pushed = await push();
+        if (pushed?.abandoned) return { state: 'on', replaced: true, abandoned: true };
+        if (!pushed?.conflict) progress.revision = pushed?.revision || progress.revision || 0;
+      }
+      return { state: 'on', replaced: !!(outcome.replaced || again.replaced) };
+    }
+    progress.revision = pushed?.revision || progress.revision || 0;
+    return { state: 'on', replaced: !!outcome.replaced };
+  }
+
+  const localAt = Number(progress.data.savedAt) || 0;
+  const remoteAt = Number(remote?.savedAt) || 0;
+  if (remote?.progress && remoteAt > localAt) {
+    progress.loadRaw(remote.progress);
+    progress.revision = remote.revision || 0;
+    progress.save(false);
+    return { state: 'on', replaced: true };
+  }
+  const pushed = await push();
+  if (pushed?.abandoned) return { state: 'on', replaced: false, abandoned: true };
+  if (pushed?.conflict && pushed.progress) {
+    progress.loadRaw(pushed.progress);
+    progress.revision = pushed.revision || 0;
+    progress.save(false);
+    return { state: 'on', replaced: true };
+  }
+  progress.revision = pushed?.revision || progress.revision || 0;
+  progress.save(false);
+  return { state: 'on', replaced: false };
+}
+
+/**
+ * Open the guild record and fold it into the roster on this device.
+ * `gate.open` stops a write after the player has signed out.
+ * A download that finishes is still applied.
  */
 export async function syncHunt(session, progress, gate = { open: true }) {
   if (session?.kind === 'email') {
@@ -169,26 +224,10 @@ export async function syncHunt(session, progress, gate = { open: true }) {
   const cfg = await loadCloudConfig();
   if (!cfg.url || !cfg.key) return { state: 'off', replaced: false };
   const remote = await pullHunt(session);
-  if (!gate.open) return { state: 'error', replaced: false };
-  const localAt = Number(progress.data.savedAt) || 0;
-  const remoteAt = Number(remote?.savedAt) || 0;
-  if (remote && remoteAt > localAt) {
-    progress.loadRaw(remote.progress);
-    progress.revision = remote.revision || 0;
-    progress.save(false);
-    return { state: 'on', replaced: true };
-  }
-  const pushed = await pushHunt(session, progress.data);
-  if (!gate.open) return { state: 'error', replaced: false };
-  if (pushed.conflict && pushed.progress) {
-    progress.loadRaw(pushed.progress);
-    progress.revision = pushed.revision || 0;
-    progress.save(false);
-    return { state: 'on', replaced: true };
-  }
-  progress.revision = pushed.revision || progress.revision || 0;
-  progress.save(false);
-  return { state: 'on', replaced: false };
+  return reconcileHunt(progress, remote, () => {
+    if (!gate.open) return Promise.resolve({ abandoned: true });
+    return pushHunt(session, progress.data);
+  });
 }
 
 /** Debounce gameplay saves so a fight does not write the guild record on every hit. */

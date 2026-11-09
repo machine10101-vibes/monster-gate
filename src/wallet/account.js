@@ -338,11 +338,25 @@ async function refreshSession(session, cfg) {
   return next;
 }
 
+/** Copy a refreshed Supabase session onto the object the game is holding. */
+function adoptSession(session, next) {
+  if (!next) return session;
+  if (next !== session) {
+    session.accessToken = next.accessToken;
+    if (next.refreshToken) session.refreshToken = next.refreshToken;
+    if (next.expiresAt) session.expiresAt = next.expiresAt;
+    if (next.userId) session.userId = next.userId;
+    if (next.email) session.email = next.email;
+  }
+  saveAccount(session);
+  return session;
+}
+
 async function freshSession(session) {
   const cfg = await cloudConfig();
   if (!cfg.url || !cfg.key || !session.accessToken) return null;
   if (Date.parse(session.expiresAt) > Date.now() + 60_000) return session;
-  return refreshSession(session, cfg);
+  return adoptSession(session, await refreshSession(session, cfg));
 }
 
 async function accountOp(session, body, keepalive = false) {
@@ -350,40 +364,32 @@ async function accountOp(session, body, keepalive = false) {
   const current = await freshSession(session);
   if (!current?.accessToken) return { state: 'off' };
   let res = await guildPost({ ...body, accessToken: current.accessToken }, keepalive);
-  if (res?.status === 401 && current.refreshToken) {
-    const again = await refreshSession(current, await cloudConfig());
+  if (res?.status === 401 && session.refreshToken) {
+    const again = adoptSession(session, await refreshSession(session, await cloudConfig()));
     res = await guildPost({ ...body, accessToken: again.accessToken }, keepalive);
   }
   return res;
 }
 
-/** Pull and push the hunt saved to this email account. */
+/** Pull the hunt saved to this email account and fold it into the local roster. */
 export async function syncEmailHunt(session, progress, gate = { open: true }) {
   const cfg = await cloudConfig();
   if (!cfg.url || !cfg.key || !session.accessToken) return { state: 'off', replaced: false };
   const res = await accountOp(session, { op: 'account-load' });
   if (res?.state === 'off') return { state: 'off', replaced: false };
   if (!res || res.status !== 200) throw new Error(res?.json?.error || 'The guild record could not be opened.');
-  if (!gate.open) return { state: 'error', replaced: false };
-  const remoteAt = Number(res.json.savedAt) || 0;
-  const localAt = Number(progress.data.savedAt) || 0;
-  if (res.json.progress && remoteAt > localAt) {
-    progress.loadRaw(res.json.progress);
-    progress.revision = Number(res.json.revision) || 0;
-    progress.save(false);
-    return { state: 'on', replaced: true };
-  }
-  const pushed = await pushEmailHunt(session, progress.data);
-  if (!gate.open) return { state: 'error', replaced: false };
-  if (pushed.conflict && pushed.progress) {
-    progress.loadRaw(pushed.progress);
-    progress.revision = pushed.revision || 0;
-    progress.save(false);
-    return { state: 'on', replaced: true };
-  }
-  progress.revision = pushed.revision || progress.revision || 0;
-  progress.save(false);
-  return { state: 'on', replaced: false };
+  const remote = res.json.progress
+    ? {
+      progress: res.json.progress,
+      revision: Number(res.json.revision) || 0,
+      savedAt: Number(res.json.savedAt) || 0,
+    }
+    : null;
+  const { reconcileHunt } = await import('./cloud.js');
+  return reconcileHunt(progress, remote, () => {
+    if (!gate.open) return Promise.resolve({ abandoned: true });
+    return pushEmailHunt(session, progress.data);
+  });
 }
 
 export async function pushEmailHunt(session, data, keepalive = false) {
