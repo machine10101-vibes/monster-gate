@@ -32,7 +32,7 @@ import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from '.
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
-import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, releaseOrientation, requestGameFullscreen } from './engine/immersive.js';
+import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
@@ -180,15 +180,9 @@ class Game {
 
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('title').classList.remove('hidden');
-    // Sign-in stays in whatever way the phone is held. Landscape starts with the hunt.
-    releaseOrientation();
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
-    if (!session && new URLSearchParams(location.search).get('klever') === '1' && !promptIsCooling()) {
-      // One ask. A reload while the sheet is up must not open a second one.
-      setTimeout(() => this.onWallet(true), 600);
-    }
   }
 
   start() {
@@ -283,7 +277,9 @@ class Game {
       help?.classList.add('hidden');
       const where = window.kleverWeb ? (isMobile() ? 'Klever Wallet' : 'the Klever extension') : 'your Klever wallet';
       sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
-      status.textContent = 'Sign in with your Klever wallet. Your hunt is saved to that address.';
+      status.textContent = window.kleverWeb
+        ? 'Tap Sign in, then approve the signature. Klever keeps that window open until you do.'
+        : 'Sign in with your Klever wallet. Your hunt is saved to that address.';
       return;
     }
     help?.classList.add('hidden');
@@ -318,7 +314,7 @@ class Game {
       // Coming back from the wallet must not open it again. The hunter taps Sign in to retry.
       const help = document.getElementById('wallet-help');
       if (help) showWalletHelp(help, 'mobile-app');
-      if (status) status.textContent = 'Sign in once inside Klever Wallet. Approving there is enough.';
+      if (status) status.textContent = 'Klever Wallet is open. Tap Sign in there, then approve the signature.';
     };
     window.setTimeout(() => {
       if (!document.hidden) {
@@ -480,10 +476,15 @@ class Game {
       this.tucked = false;
       sync();
     });
-    window.visualViewport?.addEventListener('resize', () => this.resize());
-    window.visualViewport?.addEventListener('scroll', () => this.resize());
-    document.addEventListener('fullscreenchange', () => this.resize());
-    document.addEventListener('webkitfullscreenchange', () => this.resize());
+    const onViewport = () => {
+      // A Klever confirm sheet resizes the page. Resizing back dismisses that sheet.
+      if (!this.started || this.walletBusy) return;
+      this.resize();
+    };
+    window.visualViewport?.addEventListener('resize', onViewport);
+    window.visualViewport?.addEventListener('scroll', onViewport);
+    document.addEventListener('fullscreenchange', onViewport);
+    document.addEventListener('webkitfullscreenchange', onViewport);
     window.addEventListener(
       'pointerdown',
       (e) => {
@@ -501,7 +502,8 @@ class Game {
   }
 
   syncImmersive() {
-    if (!this.input.touch || !this.started || this.walletBusy) {
+    if (this.walletBusy || !this.started) return;
+    if (!this.input.touch) {
       this.resize();
       return;
     }
@@ -1746,6 +1748,10 @@ class Game {
   /* ------------------------------ loop ------------------------------ */
   loop(now) {
     requestAnimationFrame(this.loop);
+    if (this.walletBusy) {
+      this.last = now;
+      return;
+    }
     const raw = now - this.last;
     this.last = now;
     if (!(raw >= 0) || raw > 250) return;
