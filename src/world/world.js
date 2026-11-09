@@ -94,12 +94,8 @@ export class World {
     if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
     const land = this.landAt(x, z);
     if (!land || land.role !== 'ring') return false;
-    const lx = Math.floor(x) - land.x0;
-    const lzw = Math.floor(z) - land.z0;
-    if (land.rim?.n && lzw < 5) return false;
-    if (land.rim?.s && lzw > W - 6) return false;
-    if (land.rim?.w && lx < 5) return false;
-    if (land.rim?.e && lx > W - 6) return false;
+    // Rim peaks are already above walking height. A pass cut through one stays open,
+    // including Harefield's north gate into Ashen Road (tile 34) and the volcanic block.
     return h < 8.6 && h > 0.45;
   }
 

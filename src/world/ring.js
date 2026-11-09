@@ -275,7 +275,7 @@ const SPECS = {
     banner: ['Hare Leas', 'Harefield'], shade: 0.05, forest: 0.28, amp: 3.4, base: 3.6, seed: 44,
     rim: { n: true, w: true },
     knolls: [[40, 48, 10, 6], [78, 70, 8, 4.5], [24, 90, 7, -1.4], [110, 40, 6, 3]],
-    roads: [[[100, 143], [90, 100], [70, 70]]],
+    roads: [[[100, 143], [90, 100], [70, 70], [72, 0]]],
   },
   northleas: {
     banner: ['North Pasture', 'Northleas'], shade: 0, forest: 0.22, amp: 3.2, base: 3.3, seed: 45,
