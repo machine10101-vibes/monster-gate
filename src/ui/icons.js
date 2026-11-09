@@ -807,6 +807,35 @@ ART.fishing = draw((p, line) => {
   line(7, 5, 9, 4, 'C');
 });
 
+ART.woodcutting = draw((p, line) => {
+  line(2, 14, 8, 8, 'B');
+  line(3, 14, 9, 8, 'b');
+  line(8, 8, 13, 3, 'l');
+  line(9, 8, 14, 3, 'g');
+  p(12, 2, 'w');
+  p(13, 2, 'w');
+  p(14, 3, 's');
+  for (let y = 1; y <= 6; y++) for (let x = 1; x <= 6; x++) if ((x - 3) * (x - 3) + (y - 3) * (y - 3) < 8) p(x, y, y < 3 ? 'e' : 'E');
+  p(3, 2, 'y');
+  line(4, 6, 4, 14, 'B');
+  line(5, 7, 5, 14, 'b');
+});
+
+ART.firemaking = draw((p, line) => {
+  line(2, 13, 13, 10, 'B');
+  line(2, 14, 13, 11, 'b');
+  line(3, 11, 12, 14, 'b');
+  line(3, 12, 12, 15, 'B');
+  for (let y = 2; y <= 10; y++) {
+    const half = y < 6 ? 2 + (y - 2) : 5 - (y - 6);
+    for (let x = 8 - half; x <= 8 + half; x++) p(x, y, y < 5 ? 'h' : y < 8 ? 'y' : 'o');
+  }
+  p(8, 3, 'w');
+  p(8, 4, 'h');
+  p(7, 6, 'Y');
+  p(9, 7, 'O');
+});
+
 export function iconCanvas(name) {
   if (!cache[name]) cache[name] = make(ART[name] || ART.empty);
   return cache[name];

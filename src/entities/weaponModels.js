@@ -781,6 +781,21 @@ function crossbow(T, style) {
   return c.done();
 }
 
+function tinderbox() {
+  const c = ctx();
+  for (let z = 0; z < 12; z++)
+    for (let x = -4; x <= 3; x++)
+      for (let y = -3; y <= 2; y++) {
+        const shell = x === -4 || x === 3 || y === -3 || y === 2 || z === 0 || z === 11;
+        const lid = y >= 1;
+        c.set(x, y, z, shell ? (lid ? 0xb7bcc4 : 0x8d939c) : lid ? 0xd23a32 : 0x6a4030);
+      }
+  for (let z = 4; z <= 8; z++) c.set(-1, 3, z, 0x2c3038);
+  c.set(0, 3, 6, 0xe8e4dc);
+  c.set(1, 3, 7, 0xffe08a);
+  return c.done();
+}
+
 /* ------------------------------ registry ---------------------------- */
 
 const BUILDERS = {
@@ -790,6 +805,7 @@ const BUILDERS = {
   pick: ironPick,
   fishrod: fishingPole,
   fishnet: fishingNet,
+  tinder: tinderbox,
   hammer: ironHammer,
   wand: ashWand,
   tome: fieldTome,

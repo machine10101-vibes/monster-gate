@@ -370,7 +370,7 @@ export class HUD {
       ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
       ctx.fillStyle = '#4ec8ff';
       ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
-      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). White: you. This view is the Oakhollow tile. The full world is 100 tiles — open Settings, then World Creator.</p>');
+      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). Pale, green and red squares west of town are birch, oak and maple. White: you. This view is the Oakhollow tile. The full world is 100 tiles — open Settings, then World Creator.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
@@ -516,7 +516,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - E character - B inventory - G skill book - K skill tree - H stats - T settings - 1-9 and 0 items - F talk - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - E character - B inventory - G skill book - K skill tree - H stats - T settings - 1-9 and 0 items - F talk, mine, fish or chop - light logs from the inventory - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
@@ -652,7 +652,7 @@ function mountMarket(body, game) {
     body.innerHTML = '';
     const intro = document.createElement('p');
     intro.className = 'alc-intro mk-intro';
-    intro.innerHTML = "<b>Dalla's Market</b>Fresh ore and fish are always welcome. I will buy what the pit and the lake give you.";
+    intro.innerHTML = "<b>Dalla's Market</b>Fresh ore, fish and timber are always welcome. I will buy what the pit, the lake and the woods give you.";
     body.appendChild(intro);
     const gold = document.createElement('p');
     gold.className = 'alc-gold';
@@ -702,7 +702,7 @@ function mountMarket(body, game) {
     if (!any) {
       const p = document.createElement('p');
       p.className = 'bag-empty';
-      p.textContent = 'You have nothing to sell. Mine copper and tin in the Greyrock Pit east of town, or fish Mirrormere from its dock.';
+      p.textContent = 'You have nothing to sell. Mine the Greyrock Pit, fish Mirrormere, or chop birch, oak and maple west of town.';
       body.appendChild(p);
     } else {
       const all = document.createElement('button');

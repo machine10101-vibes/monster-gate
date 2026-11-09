@@ -930,7 +930,7 @@ export class Player {
         legExtraR = 0;
         liftL = 0;
         liftR = 0;
-        if (a.name === 'mine') {
+        if (a.name === 'mine' || a.name === 'chop') {
           if (u < 0.5) {
             const p = ease(u / 0.5);
             armR = lerp(-0.7, -3.0, p);
@@ -1016,6 +1016,19 @@ export class Player {
           legR = -0.35 * dip * (1 - lift) - 0.2;
           torsoYaw = -0.1;
           headPitch = 0.2 * dip * (1 - lift);
+        } else if (a.name === 'light') {
+          const rise = ease(clamp(u / 0.4, 0, 1));
+          const strike = ease(clamp((u - 0.48) / 0.16, 0, 1));
+          const back = ease(clamp((u - 0.7) / 0.3, 0, 1));
+          crouch = 0.22 * rise * (1 - back * 0.35);
+          lean = lerp(0.4 * rise, 0.55, strike) * (1 - back * 0.7);
+          armR = lerp(lerp(-0.35, -1.7, rise), 0.35, strike);
+          armR = lerp(armR, -0.45, back);
+          armL = lerp(-0.2, -0.7, rise) * (1 - back);
+          legL = 0.15 + crouch * 2.2;
+          legR = -0.1 - crouch;
+          headPitch = 0.4 * rise * (1 - back * 0.5);
+          torsoYaw = 0.05;
         }
         break;
       }

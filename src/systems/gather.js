@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { FISH, GOODS, LEVEL_SKILLS, ROCKS, fishChance, fishTickTime, mineChance, mineSwingTime } from '../data/gathering.js';
-import { goodsVoxels } from '../world/gatherModels.js';
+import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, chopChance, chopSwingTime, fishChance, fishTickTime, lightChance, lightTime, mineChance, mineSwingTime, treeByLog } from '../data/gathering.js';
+import { buildCampfire, goodsVoxels } from '../world/gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
-import { WATER_Y } from '../world/terrain.js';
+import { WATER_Y, ZONE } from '../world/terrain.js';
 
-const TOOL_HELD = { mine: 'pick', net: 'fishnet', rod: 'fishrod' };
+const TOOL_HELD = { mine: 'pick', net: 'fishnet', rod: 'fishrod', chop: 'axe', light: 'tinder' };
 const STRIKE_AT = 0.56;
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -19,6 +19,8 @@ export class Gathering {
     this.near = null;
     this.drops = {};
     this.flyers = [];
+    this.fires = [];
+    this.woodHinted = false;
     this.mat = toonMaterial({ vertexColors: true });
     this.models = {};
 
@@ -110,6 +112,14 @@ export class Gathering {
         best = { kind: 'mine', node: n, x: n.x, y: n.y + 1.5, z: n.z };
       }
     }
+    for (const n of w.treeNodes || []) {
+      if (!n.ready) continue;
+      const d = Math.hypot(n.x - P.x, n.z - P.z);
+      if (d < 3.3 && d < bd) {
+        bd = d;
+        best = { kind: 'chop', node: n, x: n.x, y: n.y + 2.4, z: n.z };
+      }
+    }
     if (w.onDock(P.x, P.z, 0.5)) {
       for (const s of w.fishSpots || []) {
         const d = Math.hypot(s.x - P.x, s.z - P.z);
@@ -127,6 +137,11 @@ export class Gathering {
     if (t.kind === 'mine') {
       const r = ROCKS[t.node.type];
       return `${r.name}<small>F · mine ${t.node.type}</small>`;
+    }
+    if (t.kind === 'chop') {
+      const tree = TREES[t.node.type];
+      const ok = pr.level('woodcutting') >= tree.level;
+      return `${tree.name} tree<small>${ok ? 'F · chop' : `Needs Woodcutting Lv ${tree.level}`}</small>`;
     }
     const f = t.kind === 'net' ? FISH.shrimp : FISH.trout;
     const ok = pr.level('fishing') >= f.level;
@@ -149,6 +164,13 @@ export class Gathering {
         return false;
       }
       spec = { kind: 'mine', node: t.node, go: { x: t.node.standX, z: t.node.standZ }, face: Math.atan2(t.node.x - t.node.standX, t.node.z - t.node.standZ) };
+    } else if (t.kind === 'chop') {
+      const tree = TREES[t.node.type];
+      if (pr.level('woodcutting') < tree.level) {
+        g.hud.toast(`You need Woodcutting level ${tree.level} to chop ${tree.name.toLowerCase()}.`, 2200);
+        return false;
+      }
+      spec = { kind: 'chop', node: t.node, tree, go: { x: t.node.standX, z: t.node.standZ }, face: Math.atan2(t.node.x - t.node.standX, t.node.z - t.node.standZ) };
     } else {
       const fish = t.kind === 'net' ? FISH.shrimp : FISH.trout;
       if (pr.level('fishing') < fish.level) {
@@ -192,6 +214,7 @@ export class Gathering {
     const g = this.game;
     this.flushDrops(dt);
     this.updateFlyers(dt);
+    this.updateFires(dt);
     const p = g.player;
 
     if (this.session) {
@@ -208,6 +231,11 @@ export class Gathering {
       this.near = this.findTarget();
     } else if (!this.session) this.near = null;
 
+    if (this.near && !this.session && this.near.kind === 'chop' && !this.woodHinted) {
+      this.woodHinted = true;
+      g.hud.toast('Whispering Wood — press F to chop. Light the logs from your inventory.', 3200);
+    }
+
     if (this.near && !this.session) {
       const t = this.near;
       const [sx, sy, vis] = g.screenOf(t.x, t.y, t.z, true);
@@ -216,7 +244,7 @@ export class Gathering {
     } else if (this.session) {
       const s = this.session;
       const [sx, sy, vis] = g.screenOf(s.node.x, (s.node.y || WATER_Y) + 1.6, s.node.z, true);
-      const what = s.kind === 'mine' ? `Mining ${s.node.type}` : s.kind === 'net' ? 'Netting shrimp' : 'Fishing for trout';
+      const what = s.kind === 'mine' ? `Mining ${s.node.type}` : s.kind === 'chop' ? `Chopping ${s.tree.name.toLowerCase()}` : s.kind === 'light' ? `Lighting ${GOODS[s.log].name.toLowerCase()}` : s.kind === 'net' ? 'Netting shrimp' : 'Fishing for trout';
       g.hud.plate('gather', `${what}<small>${s.ready ? 'Move to stop' : 'Walking over…'}</small>`);
       g.hud.placePlate('gather', sx, sy, vis);
     } else g.hud.removePlate('gather');
@@ -245,8 +273,11 @@ export class Gathering {
         s.prevU = 0;
       } else return;
     }
-    const lvl = g.progress.level(s.kind === 'mine' ? 'mining' : 'fishing');
+    const skill = s.kind === 'mine' ? 'mining' : s.kind === 'chop' ? 'woodcutting' : s.kind === 'light' ? 'firemaking' : 'fishing';
+    const lvl = g.progress.level(skill);
     if (s.kind === 'mine') this.runMine(s, dt, lvl);
+    else if (s.kind === 'chop') this.runChop(s, dt, lvl);
+    else if (s.kind === 'light') this.runLight(s, dt, lvl);
     else if (s.kind === 'net') this.runNet(s, dt, lvl);
     else this.runRod(s, dt, lvl);
   }
@@ -313,6 +344,262 @@ export class Gathering {
     g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[rock.ore].name}`, 'gold');
     g.bagDirty = true;
     this.cancel();
+  }
+
+  /* ------------------------------- woodcutting ------------------------------ */
+  runChop(s, dt, lvl) {
+    const dur = chopSwingTime(lvl);
+    s.prevU = s.u;
+    s.u += dt / dur;
+    if (s.prevU < STRIKE_AT && s.u >= STRIKE_AT) this.chopStrike(s, lvl);
+    if (s.u >= 1) {
+      s.u -= 1;
+      s.prevU = 0;
+    }
+    this.game.player.gAnim = { name: 'chop', u: s.u };
+  }
+
+  chopStrike(s, lvl) {
+    const g = this.game;
+    const tree = s.tree;
+    const n = s.node;
+    if (!n.ready) {
+      this.cancel();
+      return;
+    }
+    const f = g.player.facing;
+    const hx = g.player.pos.x + f.x * 1.05;
+    const hz = g.player.pos.z + f.z * 1.05;
+    const hy = n.y + 0.85;
+    g.fx.burst(hx, hy, hz, tree.chip, 9, 3.2, 0.07, 0.45, 7, 1.6);
+    g.vfx.sparks(hx, hy, hz, tree.chip, 7, 3.2, 0.06, 0.4, 6, 1);
+    g.shake(0.05);
+    g.audio.tone(210, 0.07, 'triangle', 0.16, -70);
+    g.audio.noise(0.07, 0.14, 900, 0.7);
+    const lean = Math.random() < 0.5 ? -1 : 1;
+    n.full.rotation.z = lean * 0.07;
+    setTimeout(() => {
+      if (n.full) n.full.rotation.z = 0;
+    }, 80);
+    if (Math.random() > chopChance(tree, lvl)) {
+      if (Math.random() < 0.35) g.hud.toast(`You swing your axe at the ${tree.name.toLowerCase()}.`, 700);
+      return;
+    }
+    this.felled(s, tree, n);
+  }
+
+  felled(s, tree, n) {
+    const g = this.game;
+    const P = g.player.pos;
+    g.progress.addGood(tree.log, 1);
+    this.train('woodcutting', tree.xp, true);
+    g.hud.toast(`You get some ${GOODS[tree.log].name.toLowerCase()}.`, 1800);
+    g.audio.tone(140, 0.14, 'triangle', 0.18, -40);
+    g.audio.coin();
+    g.fx.burst(n.x, n.y + 1.6, n.z, tree.chip, 18, 3.8, 0.12, 0.9, 6, 2.2);
+    g.fx.shockwave(n.x, n.y, n.z, tree.chip[0], 1.3);
+    g.shake(0.12);
+    n.ready = false;
+    n.respawnT = tree.respawn;
+    n.full.visible = false;
+    n.full.rotation.z = 0;
+    n.dead.visible = true;
+    this.flyGood(tree.log, n.x, n.y + 1.2, n.z, P.x, P.y + 1.3, P.z, 0.75);
+    g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[tree.log].name}`, 'gold');
+    g.bagDirty = true;
+    this.cancel();
+  }
+
+  /* ------------------------------- firemaking ------------------------------- */
+  /** Start lighting `id`, or the best log the hunter can burn. */
+  light(id) {
+    const g = this.game;
+    const p = g.player;
+    if (p.dead || this.session) return false;
+    if (['roll', 'stagger', 'attack', 'use', 'dead'].includes(p.state)) return false;
+    const lvl = g.progress.level('firemaking');
+    let tree = id ? treeByLog(id) : null;
+    if (!id) {
+      const owned = Object.values(TREES).filter((t) => g.progress.good(t.log) > 0 && lvl >= t.fireLevel);
+      owned.sort((a, b) => b.fireXp - a.fireXp);
+      tree = owned[0] || null;
+      if (!tree) {
+        const any = Object.values(TREES).some((t) => g.progress.good(t.log) > 0);
+        g.hud.toast(any ? 'Those logs need a higher Firemaking level.' : 'You need logs. Chop birch, oak or maple west of town.', 2400);
+        return false;
+      }
+    }
+    if (!tree) return false;
+    if (lvl < tree.fireLevel) {
+      g.hud.toast(`You need Firemaking level ${tree.fireLevel} to light ${GOODS[tree.log].name.toLowerCase()}.`, 2200);
+      return false;
+    }
+    if (g.progress.good(tree.log) < 1) {
+      g.hud.toast(`You have no ${GOODS[tree.log].name.toLowerCase()}.`, 1600);
+      return false;
+    }
+    if (this.fires.length >= 6) {
+      g.hud.toast('There are too many fires burning.', 1600);
+      return false;
+    }
+    const spot = this.fireSpot();
+    if (!spot) {
+      g.hud.toast("You can't light a fire here.", 1600);
+      return false;
+    }
+    const spec = {
+      kind: 'light',
+      tree,
+      log: tree.log,
+      node: { x: spot.x, y: spot.y + 0.6, z: spot.z },
+      go: { x: spot.x, z: spot.z },
+      face: Math.atan2(p.facing.x, p.facing.z),
+      tool: 'tinder',
+      ready: false,
+      u: 0,
+      prevU: 0,
+      phase: 'work',
+      t: 0,
+      struck: false,
+    };
+    this.session = spec;
+    p.setHeld('tinder');
+    p.beginGather('light', spot.x, spot.z, spec.face);
+    g.audio.select();
+    return true;
+  }
+
+  fireSpot() {
+    const g = this.game;
+    const p = g.player.pos;
+    const tries = [[0, 0]];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      tries.push([Math.cos(a) * 1.15, Math.sin(a) * 1.15]);
+    }
+    for (const [dx, dz] of tries) {
+      const x = p.x + dx;
+      const z = p.z + dz;
+      if (this.clearForFire(x, z, p.y)) return { x, z, y: g.world.heightAt(x, z) };
+    }
+    return null;
+  }
+
+  clearForFire(x, z, fromY) {
+    const w = this.game.world;
+    if (!w.canStep(x, z, fromY) || w.isWater(x, z) || w.onDock(x, z, 0.3)) return false;
+    const zn = w.zoneAt(x, z);
+    if (zn === ZONE.WATER || zn === ZONE.LAKE) return false;
+    if (this.fires.some((f) => f.life > 0 && Math.hypot(f.x - x, f.z - z) < 1.8)) return false;
+    if ((w.treeNodes || []).some((n) => Math.hypot(n.x - x, n.z - z) < 1.4)) return false;
+    if ((w.rockNodes || []).some((n) => Math.hypot(n.x - x, n.z - z) < 1.5)) return false;
+    return true;
+  }
+
+  runLight(s, dt, lvl) {
+    const g = this.game;
+    const dur = lightTime(lvl);
+    s.prevU = s.u;
+    s.u += dt / dur;
+    const n = s.node;
+    if (s.prevU < 0.62 && s.u >= 0.62) {
+      g.fx.burst(n.x, n.y, n.z, [0xfff2a0, 0xffb020, 0xff6a18], 8, 2.4, 0.05, 0.4, 4, 1.4);
+      g.audio.noise(0.08, 0.1, 1800, 0.6);
+      g.audio.tone(680, 0.05, 'square', 0.05, 200);
+      if (g.progress.good(s.log) < 1) {
+        g.hud.toast('You have no logs left.', 1400);
+        this.cancel();
+        return;
+      }
+      if (Math.random() <= lightChance(s.tree, lvl)) this.lit(s);
+      else if (Math.random() < 0.7) g.hud.toast('The fire fails to light.', 800);
+    }
+    if (s.u >= 1) {
+      s.u -= 1;
+      s.prevU = 0;
+    }
+    g.player.gAnim = { name: 'light', u: Math.min(0.99, s.u) };
+  }
+
+  lit(s) {
+    const g = this.game;
+    if (!g.progress.takeGood(s.log, 1)) {
+      this.cancel();
+      return;
+    }
+    this.train('firemaking', s.tree.fireXp, true);
+    const n = s.node;
+    this.spawnFire(n.x, n.y - 0.6, n.z, s.tree);
+    g.hud.toast('The fire catches.', 1600);
+    g.audio.tone(420, 0.12, 'triangle', 0.12, 180);
+    g.bagDirty = true;
+    this.stepOffFire(n.x, n.z);
+    this.cancel();
+  }
+
+  stepOffFire(x, z) {
+    const g = this.game;
+    const p = g.player;
+    const dirs = [[0, -1.25], [1.25, 0], [-1.25, 0], [0, 1.25], [0.9, 0.9], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9]];
+    for (const [dx, dz] of dirs) {
+      const nx = x + dx;
+      const nz = z + dz;
+      if (!g.world.canStep(nx, nz, p.pos.y) || g.world.isWater(nx, nz)) continue;
+      if (Math.hypot(nx - x, nz - z) < 0.8) continue;
+      p.pos.x = nx;
+      p.pos.z = nz;
+      p.pos.y = g.world.heightAt(nx, nz);
+      return;
+    }
+  }
+
+  spawnFire(x, y, z, tree) {
+    const g = this.game;
+    const built = buildCampfire(tree.id);
+    const logs = this.fireGroup(built.logs);
+    const flame = this.fireGroup(built.flame);
+    const root = new THREE.Group();
+    root.add(logs, flame);
+    root.position.set(x, y, z);
+    root.rotation.y = Math.random() * Math.PI * 2;
+    g.scene.add(root);
+    const light = new THREE.PointLight(0xff7a22, 2.2, 8, 1.8);
+    light.position.set(x, y + 0.9, z);
+    g.scene.add(light);
+    g.fx.burst(x, y + 0.5, z, [0xfff2a0, 0xff8a22, 0xfff6e0], 16, 2.8, 0.08, 0.7, 3, 2);
+    this.fires.push({ root, flame, light, x, y, z, life: tree.burn, t: 0, tree });
+  }
+
+  fireGroup(parts) {
+    const g = new THREE.Group();
+    const mats = this.game.world.mats;
+    for (const p of parts) {
+      const mesh = new THREE.Mesh(p.geo, p.kind === 'glow' ? mats.glow : mats.solid);
+      mesh.castShadow = p.kind === 'solid';
+      g.add(mesh);
+    }
+    return g;
+  }
+
+  updateFires(dt) {
+    const g = this.game;
+    for (let i = this.fires.length - 1; i >= 0; i--) {
+      const f = this.fires[i];
+      f.t += dt;
+      f.life -= dt;
+      const flick = 0.86 + Math.sin(f.t * 17) * 0.08 + Math.sin(f.t * 9.3) * 0.06;
+      f.flame.scale.set(1, flick, 1);
+      f.flame.position.y = (flick - 1) * 0.15;
+      f.light.intensity = 1.5 + Math.sin(f.t * 13) * 0.45 + Math.sin(f.t * 23) * 0.2;
+      if (g.started && Math.random() < dt * 7) {
+        g.fx.burst(f.x + (Math.random() - 0.5) * 0.3, f.y + 0.7 + Math.random() * 0.4, f.z + (Math.random() - 0.5) * 0.3, [0xfff2a0, 0xff8a22, 0x6a6a6a], 1, 0.7, 0.05, 0.8, -1.2, 1.1);
+      }
+      if (f.life > 0) continue;
+      g.fx.burst(f.x, f.y + 0.3, f.z, [0x6a6a6a, 0x3a3a3a, 0xffe0b0], 10, 1.6, 0.08, 0.7, 1, 1.2);
+      g.scene.remove(f.root);
+      g.scene.remove(f.light);
+      this.fires.splice(i, 1);
+    }
   }
 
   /* -------------------------------- fishing -------------------------------- */
@@ -468,7 +755,7 @@ export class Gathering {
       this.models[id] = meshFrom(m, ox, oy, oz, this.mat, size);
     }
     const mesh = this.models[id].clone();
-    mesh.scale.setScalar(id === 'trout' || id === 'shrimp' ? 0.9 : 0.75);
+    mesh.scale.setScalar(id === 'trout' || id === 'shrimp' ? 0.9 : id.endsWith('_logs') ? 0.62 : 0.75);
     g.scene.add(mesh);
     this.flyers.push({ mesh, x0, y0, z0, x1, y1, z1, t: 0, dur, spin: rand(4, 9), id });
   }
