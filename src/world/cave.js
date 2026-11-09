@@ -8,6 +8,8 @@ const CD = 32;
 const OX = 800;
 const OZ = 800;
 const FLOOR = 2;
+/** Just over the hunter's head. The play camera sits above this, so the walls read as walls without covering the character. */
+const WALL = 4.5;
 
 /**
  * The Darksycle den. A small map of its own, placed far from Oakhollow so it
@@ -27,14 +29,16 @@ export function buildCave(world) {
       const edge = x < 3 || z < 3 || x >= CW - 3 || z >= CD - 3;
       const hall = x >= 14 && x <= 26 && z >= 20 && z <= CD - 1;
       const nest = Math.hypot(x - 20, z - 10) < 4.2;
+      const bump = ((x * 17 + z * 31) % 5) * 0.12;
       let h = FLOOR;
-      if (edge && !hall) h = 26;
+      if (edge && !hall) h = WALL + bump;
       else if (nest) h = 3;
       H[i] = h;
-      top[i] = h > 9 ? TILE.STONE : TILE.DARK_STONE;
-      tint[i * 3] = h > 9 ? 0.55 : 0.72;
-      tint[i * 3 + 1] = h > 9 ? 0.5 : 0.62;
-      tint[i * 3 + 2] = h > 9 ? 0.62 : 0.9;
+      const wall = h > FLOOR + 1.2;
+      top[i] = wall ? TILE.STONE : TILE.DARK_STONE;
+      tint[i * 3] = wall ? 0.62 : 0.78;
+      tint[i * 3 + 1] = wall ? 0.58 : 0.68;
+      tint[i * 3 + 2] = wall ? 0.7 : 0.95;
       zone[i] = 0;
       slope[i] = 0;
     }
@@ -95,14 +99,6 @@ export function buildCave(world) {
     world.circle(x, z, 0.5);
   }
 
-  const lid = new THREE.Mesh(
-    new THREE.PlaneGeometry(CW - 2, CD - 2),
-    new THREE.MeshBasicMaterial({ color: 0x100c16 })
-  );
-  lid.rotation.x = Math.PI / 2;
-  lid.position.set(OX + CW / 2, 18, OZ + CD / 2);
-  group.add(lid);
-
   const minimap = paintCaveMap(H);
 
   function sample(x, z) {
@@ -132,8 +128,14 @@ export function buildCave(world) {
       return x >= OX && z >= OZ && x < OX + CW && z < OZ + CD;
     },
     walkable(x, z) {
-      const h = sample(x, z);
-      return h < 9 && h > 0.5;
+      const lx = Math.floor(x - OX);
+      const lz = Math.floor(z - OZ);
+      if (lx < 0 || lz < 0 || lx >= CW || lz >= CD) return false;
+      const hall = lx >= 14 && lx <= 26 && lz >= 20;
+      const edge = lx < 3 || lz < 3 || lx >= CW - 3 || lz >= CD - 3;
+      if (edge && !hall) return false;
+      const h = H[lz * CW + lx];
+      return h < 8 && h > 0.5;
     },
   };
 }
@@ -145,7 +147,7 @@ function paintCaveMap(H) {
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(CW, CD);
   for (let i = 0; i < CW * CD; i++) {
-    const wall = H[i] > 9;
+    const wall = H[i] > FLOOR + 1.2;
     img.data[i * 4] = wall ? 42 : 92;
     img.data[i * 4 + 1] = wall ? 36 : 62;
     img.data[i * 4 + 2] = wall ? 58 : 110;

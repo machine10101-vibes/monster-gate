@@ -178,10 +178,10 @@ export class Sky {
     if (this.indoors) {
       this.fog.color.setHex(0x16101f);
       this.scene.background.setHex(0x100c16);
-      this.fog.near = 6;
-      this.fog.far = 26;
-      this.sun.intensity *= 0.08;
-      this.hemi.intensity *= 0.28;
+      this.fog.near = 18;
+      this.fog.far = 72;
+      this.sun.intensity *= 0.22;
+      this.hemi.intensity *= 0.5;
       this.skyMesh.visible = false;
       this.clouds.visible = false;
     } else {

@@ -1342,6 +1342,7 @@ class Game {
     let cy = c.look.y + sp * dist;
     const gh = this.world.heightAt(cx, cz);
     if (cy < gh + 1.2) cy = gh + 1.2;
+    if (this.world.realm === 'cave' && cy < 8.2) cy = 8.2;
     this.camera.position.set(cx, cy, cz);
 
     if (this.punchAmt > 0.002) {

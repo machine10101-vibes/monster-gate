@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VoxelModel, hash2, lerp, clamp, smoothstep } from '../engine/voxel.js';
+import { VoxelModel, fbm, hash2, lerp, clamp, smoothstep } from '../engine/voxel.js';
 import { TILE } from '../engine/materials.js';
 import { W, ZONE } from './terrain.js';
 import { bundle } from './models.js';
@@ -85,45 +85,84 @@ function reslope(H, slope, z0, z1, x0, x1) {
   }
 }
 
+/** Hills and hollows scattered through the vale. [x, z, radius, height]. */
+const KNOLLS = [
+  [18, 62, 9, 7],
+  [24, 98, 8, 6],
+  [46, 112, 7, 5],
+  [74, 100, 6, 4.5],
+  [84, 78, 7, 5],
+  [96, 118, 8, 6.5],
+  [122, 72, 10, 8],
+  [130, 108, 8, 6],
+  [52, 78, 5, -1.8],
+  [108, 96, 6, -1.6],
+  [28, 80, 4, -1.2],
+  [70, 64, 4, 2.2],
+];
+
+function relief(x, z) {
+  const broad = fbm(x * 0.032, z * 0.03, 65, 4);
+  const mid = fbm(x * 0.085 + 4.2, z * 0.078, 21, 3);
+  const fine = fbm(x * 0.17, z * 0.16, 7, 2);
+  let h = (broad - 0.4) * 4.6 + (mid - 0.5) * 2.1 + (fine - 0.5) * 0.9;
+  for (const [cx, cz, r, amp] of KNOLLS) {
+    const d = Math.hypot(x - cx, z - cz) / r;
+    if (d < 1) h += amp * (1 - d) * (1 - d);
+  }
+  return h;
+}
+
+function wildHeight(x, z) {
+  const bluffD = Math.hypot(x - 112, z - 44);
+  const bluffN = fbm(x * 0.18, z * 0.18, 44, 2);
+  const bluffR = 14.2 + (bluffN - 0.5) * 5;
+  let h = 3.05 + relief(x, z);
+  if (bluffD < bluffR) {
+    const t = bluffD / bluffR;
+    h = Math.max(h, lerp(10.2 + bluffN * 3, 4.4, t * t));
+  }
+  if (x < 18) h += (18 - x) * 0.55;
+  if (x > 128) h += (x - 128) * 0.62;
+  if (z > 118) h += (z - 118) * 0.42;
+  return Math.max(0.2, h);
+}
+
+function riverHeight(z) {
+  if (z >= 24 && z <= 40) {
+    const edge = Math.min(z - 24, 40 - z) / 4;
+    return lerp(0, 1.2, clamp(edge, 0, 1));
+  }
+  return 0;
+}
+
 /** Local Southford height and surface, before it is blended into Oakhollow's edge. */
 function valley(x, z) {
-  const bluff = Math.hypot(x - 112, z - 44);
   const inCut = x >= 88 && x <= 106 && z >= 37 && z <= 48;
   const cavePath = distToSeg(x, z, 60, 36, 100, 42) <= 4.6;
   const onRoad = Math.abs(x - ROAD_X) <= 5 && z <= 82;
-  const river = x >= 34 && x <= 42;
   const ford = z >= 24 && z <= 40;
 
-  if (river) {
-    if (ford) {
-      const edge = Math.min(z - 24, 40 - z) / 4;
-      const h = lerp(0, 1.2, clamp(edge, 0, 1));
-      return { h, kind: h < 0.35 ? 'water' : 'ford' };
-    }
-    return { h: 0, kind: 'water' };
-  }
-  if (ford && x >= 28 && x < 34) {
-    const u = (34 - x) / 6;
-    return { h: lerp(1.2, 3.2, u), kind: 'grass' };
+  if (x >= 34 && x <= 42) {
+    const h = riverHeight(z);
+    return { h, kind: h < 0.35 ? 'water' : 'ford' };
   }
   if (inCut || cavePath || onRoad) return { h: 3.2, kind: 'path' };
-  if (x > 42 && x < 54) {
-    const u = (x - 42) / 12;
-    const wet = ford ? 1.2 : 0;
-    return { h: lerp(wet, 3.2, u), kind: 'grass' };
+  if (ford && x >= 28 && x < 34) {
+    const u = (34 - x) / 6;
+    return { h: lerp(1.2, wildHeight(x, z), u), kind: 'grass' };
   }
-  if (bluff < 16) {
-    const h = lerp(12.5, 4.4, bluff / 16);
-    return { h, kind: h >= 8 ? 'stone' : 'grass' };
+  if (x > 42 && x < 52) {
+    const wet = riverHeight(z);
+    const land = wildHeight(x, z);
+    const capped = Math.min(land, wet + (x - 42) * 0.7);
+    return { h: lerp(wet, capped, (x - 42) / 10), kind: 'grass' };
   }
-  let h = 3.3 + Math.sin(x * 0.08) * 0.4 + Math.cos(z * 0.055 + 1.7) * 0.35;
-  if (x < 22) h += (22 - x) * 0.42;
-  if (x > 126) h += (x - 126) * 0.5;
-  if (z > 112) h += (z - 112) * 0.34;
-  return { h, kind: h >= 8 ? 'stone' : 'grass' };
+  const h = wildHeight(x, z);
+  return { h, kind: h >= 8 ? 'stone' : h < 0.35 ? 'water' : 'grass' };
 }
 
-function paintCell(data, i, h, kind) {
+function paintCell(data, i, h, kind, x, z) {
   const { zone, top, tint, pathMask, forest } = data;
   if (kind === 'water' || h < 0.35) {
     zone[i] = ZONE.WATER;
@@ -152,12 +191,14 @@ function paintCell(data, i, h, kind) {
     tint[i * 3 + 2] = 0.96;
     return;
   }
-  zone[i] = ZONE.SOUTH;
-  top[i] = TILE.GRASS;
-  forest[i] = 0.14;
-  tint[i * 3] = 0.84;
-  tint[i * 3 + 1] = 1;
-  tint[i * 3 + 2] = 0.7;
+  const n = fbm(x * 0.06, z * 0.06, 3, 2);
+  const rocky = n < 0.22 && h > 4;
+  zone[i] = h >= 8 ? ZONE.MOUNTAIN : ZONE.SOUTH;
+  top[i] = rocky ? TILE.GRAVEL : n > 0.68 && h < 5.5 && h > 1.4 ? TILE.FLOWER_GRASS : h > 6.5 ? TILE.MOSS_STONE : TILE.GRASS;
+  forest[i] = clamp(0.05 + n * 0.35, 0, 0.5);
+  tint[i * 3] = 0.7 + n * 0.28;
+  tint[i * 3 + 1] = 0.86 + (1 - n) * 0.2;
+  tint[i * 3 + 2] = 0.52 + n * 0.22;
 }
 
 /**
@@ -181,7 +222,7 @@ export function generateSouthford(northRow) {
       const h = z === 0 ? northRow[x] : Math.round(lerp(northRow[x], spec.h, blend) * 2) / 2;
       data.H[z * W + x] = h;
       const kind = z === 0 ? kindFromEdge(h, spec.kind) : spec.kind;
-      paintCell(data, z * W + x, h, kind);
+      paintCell(data, z * W + x, h, kind, x, z);
     }
   }
   // Keep the road and the cave approach at the valley floor once the blend has settled.
@@ -191,7 +232,7 @@ export function generateSouthford(northRow) {
       if (spec.kind !== 'path' && spec.kind !== 'ford') continue;
       const i = z * W + x;
       data.H[i] = Math.round(spec.h * 2) / 2;
-      paintCell(data, i, data.H[i], spec.kind);
+      paintCell(data, i, data.H[i], spec.kind, x, z);
     }
   }
   reslope(data.H, data.slope, 0, W - 1, 0, W - 1);
@@ -219,35 +260,62 @@ function buildArch() {
   return bundle([[m, 0.26, 8, 0, 2]]);
 }
 
+function onSouthPath(world, x, z) {
+  const lx = clamp(Math.floor(x), 0, W - 1);
+  const lz = Math.floor(z - SOUTH_Z);
+  if (lz < 0 || lz >= W) return false;
+  return world.south.pathMask[lz * W + lx] > 0;
+}
+
 /** Trees, the ford, and the cave mouth. Called after height queries know about Southford. */
 export function dressSouthford(world) {
   const m = world.models;
-  const oak = m.oaks[0];
-  const birch = m.blossoms[0];
-  for (let n = 0; n < 34; n++) {
-    const x = 16 + hash2(n, 2, 11) * 108;
-    const z = SOUTH_Z + 6 + hash2(n, 5, 11) * 96;
+  const treeOf = (n, h) => {
+    const r = hash2(n, 9, 11);
+    if (h > 6.2) return m.pines[n % m.pines.length];
+    if (r > 0.82) return m.blossoms[n % m.blossoms.length];
+    if (r > 0.68) return m.autumn[n % m.autumn.length];
+    if (r > 0.55) return m.teal[n % m.teal.length];
+    return m.oaks[n % m.oaks.length];
+  };
+  for (let n = 0; n < 78; n++) {
+    const x = 12 + hash2(n, 2, 11) * 118;
+    const z = SOUTH_Z + 8 + hash2(n, 5, 11) * 118;
     const h = world.heightAt(x, z);
-    if (h < 1.2 || h > 6.2) continue;
-    if (world.south.pathMask[Math.floor(z - SOUTH_Z) * W + clamp(Math.floor(x), 0, W - 1)]) continue;
-    if (Math.hypot(x - CAVE_MOUTH.x, z - CAVE_MOUTH.z) < 8) continue;
-    if (!world.free(x, z, 1.6)) continue;
-    const parts = hash2(n, 9, 11) > 0.72 ? birch : oak;
-    const s = 0.62 + hash2(n, 4, 11) * 0.18;
-    world.putAt(parts, x, z, hash2(n, 1, 11) * 6, s);
-    world.circle(x, z, 0.45);
-    world.occupy(x, z, 1.3);
+    if (h < 1.3 || h > 7.4) continue;
+    if (onSouthPath(world, x, z)) continue;
+    if (Math.hypot(x - CAVE_MOUTH.x, z - CAVE_MOUTH.z) < 9) continue;
+    if (!world.free(x, z, 1.7)) continue;
+    const s = 0.58 + hash2(n, 4, 11) * 0.28;
+    world.putAt(treeOf(n, h), x, z, hash2(n, 1, 11) * 6, s);
+    world.circle(x, z, 0.42);
+    world.occupy(x, z, 1.35);
     world.treeDots.push({ x, z });
   }
-  for (let n = 0; n < 16; n++) {
-    const x = 14 + hash2(n, 3, 21) * 116;
-    const z = SOUTH_Z + 8 + hash2(n, 8, 21) * 100;
+  for (let n = 0; n < 36; n++) {
+    const x = 10 + hash2(n, 3, 21) * 122;
+    const z = SOUTH_Z + 6 + hash2(n, 8, 21) * 124;
     const h = world.heightAt(x, z);
-    if (h < 3.6 || h > 8) continue;
-    if (!world.free(x, z, 1.2)) continue;
-    world.putAt(m.rocks[n % m.rocks.length], x, z, n, 0.8 + hash2(n, 2, 21) * 0.5);
-    world.circle(x, z, 0.55);
-    world.occupy(x, z, 1);
+    if (h < 2.4 || h > 9.5) continue;
+    if (onSouthPath(world, x, z)) continue;
+    if (Math.hypot(x - CAVE_MOUTH.x, z - CAVE_MOUTH.z) < 7) continue;
+    if (!world.free(x, z, 1.1)) continue;
+    const big = h > 6.5 && hash2(n, 6, 21) > 0.62;
+    const parts = big ? m.boulders[n % m.boulders.length] : m.rocks[n % m.rocks.length];
+    world.putAt(parts, x, z, n * 0.7, (big ? 0.85 : 0.55) + hash2(n, 2, 21) * 0.45);
+    world.circle(x, z, big ? 0.8 : 0.4);
+    world.occupy(x, z, big ? 1.3 : 0.8);
+  }
+  for (let n = 0; n < 70; n++) {
+    const x = 14 + hash2(n, 1, 31) * 112;
+    const z = SOUTH_Z + 10 + hash2(n, 4, 31) * 110;
+    const h = world.heightAt(x, z);
+    if (h < 1.6 || h > 5.8) continue;
+    if (onSouthPath(world, x, z)) continue;
+    if (!world.free(x, z, 0.6)) continue;
+    const roll = hash2(n, 7, 31);
+    const parts = roll > 0.72 ? m.bushes[n % m.bushes.length] : roll > 0.4 ? m.flowers[n % m.flowers.length] : m.tufts[n % m.tufts.length];
+    world.putAt(parts, x, z, roll * 6, roll > 0.72 ? 0.85 : 1, { cover: roll <= 0.72 });
   }
   for (let z = SOUTH_Z + 4; z < SOUTH_Z + 100; z += 3) {
     for (const x of [32, 44]) {
