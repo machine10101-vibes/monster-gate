@@ -76,6 +76,7 @@ export class Monster {
     this.spawnT = 0.6;
     this.id = 'm' + Math.random().toString(36).slice(2, 8);
     this.hover = type === 'wraith' ? 1.15 : type === 'darksycledragon' ? 1.0 : 0;
+    this.realm = 'over';
 
     const built = d.build();
     this.model = built;
@@ -328,6 +329,14 @@ export class Monster {
 
   update(dt) {
     const g = this.game;
+    const home = this.realm || 'over';
+    const here = g.world?.realm || 'over';
+    if (home !== here) {
+      this.obj.visible = false;
+      if (this.dead) this.deadAnim(dt);
+      return;
+    }
+    this.obj.visible = true;
     if (this.dead) {
       this.deadAnim(dt);
       return;
@@ -1189,10 +1198,13 @@ export class Spawner {
     const spots = [
       ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
       ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70], ['slime', 76, 102],
-      ['budgedragon', 120, 74], ['darksycledragon', 62, 120],
+      ['budgedragon', 120, 74],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
-    void w;
+    if (w.cave) {
+      const den = this.spawn('darksycledragon', w.cave.nest.x, w.cave.nest.z, false);
+      den.realm = 'cave';
+    }
   }
 
   spawn(type, x, z, fx = true) {
@@ -1239,6 +1251,7 @@ export class Spawner {
 
   update(dt) {
     if (this.game.net?.role === 'guest') return;
+    if (this.game.world?.realm === 'cave') return;
     const g = this.game;
     this.timer -= dt;
     if (this.timer > 0) return;
@@ -1254,8 +1267,6 @@ export class Spawner {
     if (g.sky.night > 0.6 && r > 0.6) type = 'wraith';
     const drakes = g.monsters.filter((m) => !m.dead && m.type === 'budgedragon').length;
     if (!spot.nearGate && drakes < 2 && this.rng.next() < 0.3) type = 'budgedragon';
-    const dusk = g.monsters.filter((m) => !m.dead && m.type === 'darksycledragon').length;
-    if (!spot.nearGate && dusk < 1 && this.rng.next() < 0.16) type = 'darksycledragon';
     this.spawn(type, spot.x, spot.z);
     if (spot.nearGate) g.audio.portal();
   }

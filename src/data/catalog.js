@@ -59,7 +59,7 @@ export const MONSTERS = [
     desc: 'A stocky, short-fused young dragon with more attitude than altitude. It snaps at anything that moves, spits embers when you back off, and flies into a rage when hurt.',
   },
   {
-    id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'Open fields, hovering above the grass',
+    id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
     desc: 'A dusk-scaled dragon with sickle blades for horns, wings and tail. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Corner it and it blinks back with a tail slash. Hit its wind-up hard to stagger it.',
   },
 ];

@@ -26,6 +26,7 @@ import { GOODS } from './data/gathering.js';
 import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
+import { updateCaveTravel, tendCaveDragon } from './world/cave.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
 
@@ -45,6 +46,7 @@ const ZONE_NAMES = {
   [ZONE.GATE]: ['Danger', 'The Monster Gate'],
   [ZONE.MINE]: ['Mine', 'Greyrock Pit'],
   [ZONE.LAKE]: ['Lake', 'Mirrormere'],
+  [ZONE.SOUTH]: ['River Vale', 'Southford'],
 };
 
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
@@ -131,6 +133,7 @@ class Game {
     this.world = new World(this.quality);
     await this.world.build(progress);
     this.scene.add(this.world.group);
+    if (this.world.cave) this.scene.add(this.world.cave.group);
     this.sky = new Sky(this.scene, this.quality);
     this.fx = new FX(this.scene, this.quality);
     this.vfx = new VFX(this);
@@ -1375,6 +1378,14 @@ class Game {
   /* ------------------------------ world state ------------------------------ */
   updateZone(dt) {
     const P = this.player.pos;
+    if (this.world.realm === 'cave') {
+      if (this.zone !== 'cave') {
+        this.zone = 'cave';
+        this.hud.setArea('Darksycle Den');
+      }
+      this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
+      return;
+    }
     const z = this.world.zoneAt(P.x, P.z);
     const dg = Math.hypot(P.x - GATE.x, P.z - GATE.z);
     const zone = dg < 11 ? ZONE.GATE : z;
@@ -1418,6 +1429,8 @@ class Game {
     if (this.started) this.sky.setHour(this.sky.hour + rawDt / 50);
 
     this.player.update(dt);
+    updateCaveTravel(this, dt);
+    tendCaveDragon(this, dt);
     if (this.player) updateSkillWorld(this, dt);
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
@@ -1440,7 +1453,8 @@ class Game {
 
     const P = this.player;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
-    this.sky.assignTorchLights(this.world.lightSpots, P.pos.x, P.pos.z);
+    const lights = this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
+    this.sky.assignTorchLights(lights, P.pos.x, P.pos.z);
     const night = this.sky.night;
     const scale = this.pxScale * 0.03;
     this.fx.update(dt, t, P.pos, scale, night, this.forestAmt);

@@ -10,9 +10,10 @@ function thumb(tile, game) {
   c.width = 36;
   c.height = 36;
   const ctx = c.getContext('2d');
-  if (tile.built && game.world.minimapCanvas) {
+  const land = tile.built && game.world.tileCanvas?.[tile.id];
+  if (land) {
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(game.world.minimapCanvas, 0, 0, 36, 36);
+    ctx.drawImage(land, 0, 0, 36, 36);
   } else paintTileMap(c, tile);
   thumbs.set(tile.id, c);
   return c;
@@ -34,7 +35,7 @@ export function mountWorldMap(body, game) {
     left.className = 'wm-left';
     const note = document.createElement('p');
     note.className = 'wm-note';
-    note.textContent = `${TILE_COUNT} tiles. North is up. The gold ring is the one built tile.`;
+    note.textContent = `${TILE_COUNT} tiles. North is up. Gold rings mark the built tiles: Oakhollow and Southford.`;
     left.appendChild(note);
     const grid = document.createElement('div');
     grid.className = 'wm-grid';
@@ -81,9 +82,10 @@ export function mountWorldMap(body, game) {
     shot.width = 384;
     shot.height = 384;
     const sctx = shot.getContext('2d');
-    if (sel.built && game.world.minimapCanvas) {
+    const land = sel.built && game.world.tileCanvas?.[sel.id];
+    if (land) {
       sctx.imageSmoothingEnabled = false;
-      sctx.drawImage(game.world.minimapCanvas, 0, 0, 384, 384);
+      sctx.drawImage(land, 0, 0, 384, 384);
     } else paintTileMap(shot, sel);
     right.appendChild(shot);
     const cap = document.createElement('p');

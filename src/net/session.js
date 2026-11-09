@@ -17,10 +17,14 @@ const r2 = (n) => Math.round(n * 100) / 100;
 const STATE = { idle: 0, attack: 1, roll: 2, dead: 3, stagger: 4, use: 5 };
 
 export function poseOf(player) {
+  const parked = player.game?.world?.realm === 'cave' ? player.game.world.cave?.outside : null;
+  const x = parked ? parked.x : player.pos.x;
+  const y = parked ? parked.y : player.pos.y;
+  const z = parked ? parked.z : player.pos.z;
   return [
-    r2(player.pos.x),
-    r2(player.pos.y),
-    r2(player.pos.z),
+    r2(x),
+    r2(y),
+    r2(z),
     r2(player.yaw),
     r2(player.moveAmt),
     STATE[player.state] ?? 0,

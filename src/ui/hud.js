@@ -4,6 +4,7 @@ import { mountStats } from './stats.js';
 import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
 import { GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
+import { CAVE_MOUTH } from '../world/southford.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
 import { mountGear } from './gear.js';
@@ -255,13 +256,18 @@ export class HUD {
     const sc = cv.width / N;
     ctx.fillStyle = '#0d1116';
     ctx.fillRect(0, 0, cv.width, cv.height);
-    const sx = Math.round(px - N / 2);
-    const sz = Math.round(pz - N / 2);
+    const cave = world.realm === 'cave' ? world.cave : null;
+    const sx = Math.round((cave ? px - cave.origin.x : px) - N / 2);
+    const sz = Math.round((cave ? pz - cave.origin.z : pz) - N / 2);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(world.minimapCanvas, sx, sz, N, N, 0, 0, cv.width, cv.height);
-    const toX = (x) => (x - sx) * sc;
-    const toZ = (z) => (z - sz) * sc;
-    const inView = (x, z) => x > sx && z > sz && x < sx + N && z < sz + N;
+    ctx.drawImage(cave ? cave.minimap : world.minimapCanvas, sx, sz, N, N, 0, 0, cv.width, cv.height);
+    const toX = (x) => ((cave ? x - cave.origin.x : x) - sx) * sc;
+    const toZ = (z) => ((cave ? z - cave.origin.z : z) - sz) * sc;
+    const inView = (x, z) => {
+      const X = toX(x);
+      const Z = toZ(z);
+      return X > 0 && Z > 0 && X < cv.width && Z < cv.height;
+    };
     ctx.fillStyle = '#ffd23f';
     if (inView(GUILD.x, GUILD.z)) {
       ctx.fillRect(toX(GUILD.x) - 3, toZ(GUILD.z) - 3, 6, 6);
@@ -293,7 +299,7 @@ export class HUD {
     }
     ctx.fillStyle = '#ff4d4d';
     for (const m of monsters) {
-      if (m.dead || !inView(m.x, m.z)) continue;
+      if (m.dead || (m.realm || 'over') !== (world.realm || 'over') || !inView(m.x, m.z)) continue;
       ctx.fillRect(toX(m.x) - 2, toZ(m.z) - 2, 4, 4);
       ctx.fillStyle = '#7a0f0f';
       ctx.fillRect(toX(m.x) - 1, toZ(m.z) - 1, 2, 2);
@@ -344,33 +350,45 @@ export class HUD {
       return d;
     };
     if (name === 'map') {
-      title.textContent = 'Map of Oakhollow';
+      const inCave = game.world.realm === 'cave';
+      title.textContent = inCave ? 'Darksycle Den' : 'Oakhollow and Southford';
       const c = document.createElement('canvas');
       c.className = 'bigmap';
-      c.width = 144;
-      c.height = 144;
+      const src = inCave ? game.world.cave.minimap : game.world.minimapCanvas;
+      c.width = inCave ? 240 : src.width;
+      c.height = inCave ? 192 : src.height;
       const ctx = c.getContext('2d');
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(game.world.minimapCanvas, 0, 0);
+      ctx.drawImage(src, 0, 0, c.width, c.height);
       const p = game.player;
-      ctx.fillStyle = '#c27bff';
-      ctx.fillRect(GATE.x - 3, GATE.z - 3, 6, 6);
-      ctx.fillStyle = '#ffd23f';
-      ctx.fillRect(GUILD.x - 3, GUILD.z - 3, 6, 6);
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(p.pos.x - 2, p.pos.z - 2, 4, 4);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(p.pos.x - 1, p.pos.z - 1, 2, 2);
-      body.appendChild(c);
-      if (game.world.waygate) {
-        ctx.fillStyle = '#7ef6ff';
-        ctx.fillRect(game.world.waygate.x - 2, game.world.waygate.z - 2, 5, 5);
+      const mx = inCave ? (p.pos.x - game.world.cave.origin.x) * (c.width / src.width) : p.pos.x;
+      const mz = inCave ? (p.pos.z - game.world.cave.origin.z) * (c.height / src.height) : p.pos.z;
+      if (!inCave) {
+        ctx.fillStyle = '#c27bff';
+        ctx.fillRect(GATE.x - 3, GATE.z - 3, 6, 6);
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(GUILD.x - 3, GUILD.z - 3, 6, 6);
+        ctx.fillStyle = '#b25cff';
+        ctx.fillRect(CAVE_MOUTH.x - 3, CAVE_MOUTH.z - 3, 6, 6);
       }
-      ctx.fillStyle = '#ff9a3c';
-      ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
-      ctx.fillStyle = '#4ec8ff';
-      ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
-      add('<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). Pale, green and red squares west of town are birch, oak and maple. White: you. This view is the Oakhollow tile. The full world is 100 tiles — open Settings, then World Creator.</p>');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(mx - 2, mz - 2, 4, 4);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(mx - 1, mz - 1, 2, 2);
+      body.appendChild(c);
+      if (!inCave) {
+        if (game.world.waygate) {
+          ctx.fillStyle = '#7ef6ff';
+          ctx.fillRect(game.world.waygate.x - 2, game.world.waygate.z - 2, 5, 5);
+        }
+        ctx.fillStyle = '#ff9a3c';
+        ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
+        ctx.fillStyle = '#4ec8ff';
+        ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
+      }
+      add(inCave
+        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Violet marks the dragon\'s nest. Walk back down the tunnel to return to the vale. White: you.</p>'
+        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). Pale, green and red squares west of town are birch, oak and maple. The lower half is Southford, tile 65. Violet there is the Darksycle Cave. White: you. The full world is 100 tiles — open Settings, then World Creator.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
@@ -516,7 +534,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - E character - B inventory - G skill book - K skill tree - H stats - T settings - 1-9 and 0 items - F talk, mine, fish or chop - light logs from the inventory - C catalog - [ ] or R rotate camera - Wheel zoom.</p>');
+      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - E character - B inventory - G skill book - K skill tree - H stats - T settings - 1-9 and 0 items - F talk, mine, fish or chop - light logs from the inventory - C catalog - [ ] or R rotate camera - Wheel zoom. The south road leaves Oakhollow through a pass into Southford. Walk into the cave in the eastern bluff to enter the Darksycle Den.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');

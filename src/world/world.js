@@ -6,6 +6,8 @@ import {
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
 import { STARTER, TILES } from './tiles.js';
+import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
+import { buildCave } from './cave.js';
 import * as M from './models.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
@@ -27,6 +29,7 @@ export class World {
     this.occupied = new Map();
     this.batches = new Map();
     this.rng = new RNG(20260711);
+    this.realm = 'over';
   }
 
   /* ------------------------------ queries ------------------------------ */
@@ -34,8 +37,14 @@ export class World {
     return clamp(Math.floor(z), 0, W - 1) * W + clamp(Math.floor(x), 0, W - 1);
   }
   heightAt(x, z) {
+    if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
     const d = this.dock;
     if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
+    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W) {
+      const lx = clamp(Math.floor(x), 0, W - 1);
+      const lz = Math.floor(z) - SOUTH_Z;
+      return this.south.H[lz * W + lx];
+    }
     return this.data.H[this.idx(x, z)];
   }
   onDock(x, z, pad = 0) {
@@ -46,6 +55,12 @@ export class World {
     return this.heightAt(x, z) < WATER_Y;
   }
   zoneAt(x, z) {
+    if (this.cave?.contains(x, z)) return ZONE.FIELD;
+    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W) {
+      const lx = clamp(Math.floor(x), 0, W - 1);
+      const lz = Math.floor(z) - SOUTH_Z;
+      return this.south.zone[lz * W + lx];
+    }
     return this.data.zone[this.idx(x, z)];
   }
   nearPath(x, z, r = 1) {
@@ -54,7 +69,11 @@ export class World {
     return false;
   }
   playable(x, z) {
-    return Math.hypot(x - CENTER.x, z - CENTER.z) < PLAY_RADIUS;
+    if (this.cave?.contains(x, z)) return this.cave.walkable(x, z);
+    if (Math.hypot(x - CENTER.x, z - CENTER.z) < PLAY_RADIUS) return true;
+    if (z >= 108 && z < SOUTH_Z && x >= 50 && x <= 72) return true;
+    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W - 8 && x >= 14 && x <= 130) return this.heightAt(x, z) < 8.6;
+    return false;
   }
 
   /** can a body walk from height `fromY` to (x,z)? */
@@ -223,6 +242,10 @@ export class World {
     this.activeTile = STARTER;
     this.data = generateTile(STARTER);
     if (!this.data) throw new Error('The Oakhollow tile failed to generate');
+    openSouthPass(this.data);
+    const northEdge = new Float32Array(W);
+    for (let x = 0; x < W; x++) northEdge[x] = this.data.H[(W - 1) * W + x];
+    this.south = generateSouthford(northEdge);
     const atlas = buildAtlas();
     this.atlas = atlas;
     this.mats = {
@@ -236,8 +259,15 @@ export class World {
 
     progress(0.12, 'Raising the mountains');
     await nextFrame();
-    this.terrain = buildTerrainMeshes(this.data, this.mats.terrain);
+    this.terrain = buildTerrainMeshes(this.data, this.mats.terrain, {
+      outside: (x, z) => (z === W && x >= 0 && x < W ? this.south.H[x] : null),
+    });
     this.group.add(this.terrain);
+    this.southTerrain = buildTerrainMeshes(this.south, this.mats.terrain, {
+      oz: SOUTH_Z,
+      outside: (x, z) => (z === -1 && x >= 0 && x < W ? this.data.H[(W - 1) * W + x] : null),
+    });
+    this.group.add(this.southTerrain);
     this.buildWater();
 
     progress(0.3, 'Growing the fairy forest');
@@ -258,6 +288,8 @@ export class World {
     await nextFrame();
     this.scatterCover();
     this.placeWaygate();
+    dressSouthford(this);
+    this.cave = buildCave(this);
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
@@ -321,9 +353,6 @@ export class World {
 
   /* -------------------------------- water -------------------------------- */
   buildWater() {
-    const geo = new THREE.PlaneGeometry(W, W, 1, 1);
-    geo.rotateX(-Math.PI / 2);
-    geo.translate(W / 2, WATER_Y, W / 2);
     const mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -377,10 +406,15 @@ export class World {
         }`,
     });
     this.waterMat = mat;
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = 2;
-    mesh.frustumCulled = false;
-    this.group.add(mesh);
+    for (const oz of [0, SOUTH_Z]) {
+      const geo = new THREE.PlaneGeometry(W, W, 1, 1);
+      geo.rotateX(-Math.PI / 2);
+      geo.translate(W / 2, WATER_Y, oz + W / 2);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.renderOrder = 2;
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+    }
   }
 
   /* -------------------------------- town --------------------------------- */
@@ -872,22 +906,21 @@ export class World {
     this.group.add(halos);
   }
 
-  buildMinimap() {
+  paintLandCanvas(data) {
     const c = document.createElement('canvas');
     c.width = W;
     c.height = W;
     const ctx = c.getContext('2d');
     const img = ctx.createImageData(W, W);
-    const D = this.data;
-    const colorOf = (i) => {
-      const t = D.top[i];
-      const h = D.H[i];
+    for (let i = 0; i < W * W; i++) {
+      const t = data.top[i];
+      const h = data.H[i];
       let r = 90;
       let g = 150;
       let b = 70;
       if (h < WATER_Y) [r, g, b] = [60, 130, 190];
       else if (t === TILE.SNOW) [r, g, b] = [240, 245, 255];
-      else if (t === TILE.STONE || t === TILE.MOSS_STONE) [r, g, b] = [130, 135, 142];
+      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [130, 135, 142];
       else if (t === TILE.COBBLE) [r, g, b] = [170, 170, 176];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];
       else if (t === TILE.SAND) [r, g, b] = [225, 205, 150];
@@ -895,20 +928,22 @@ export class World {
       else if (t === TILE.DIRT) [r, g, b] = [150, 112, 78];
       else if (t === TILE.FARMLAND) [r, g, b] = [200, 170, 70];
       else {
-        const fo = D.forest[i];
+        const fo = data.forest[i];
         [r, g, b] = [105 - fo * 55, 175 - fo * 60, 75 - fo * 15];
       }
       const sh = 0.78 + clamp(h / 18, 0, 1) * 0.35;
-      return [r * sh, g * sh, b * sh];
-    };
-    for (let i = 0; i < W * W; i++) {
-      const [r, g, b] = colorOf(i);
-      img.data[i * 4] = r;
-      img.data[i * 4 + 1] = g;
-      img.data[i * 4 + 2] = b;
+      img.data[i * 4] = r * sh;
+      img.data[i * 4 + 1] = g * sh;
+      img.data[i * 4 + 2] = b * sh;
       img.data[i * 4 + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
+    return c;
+  }
+
+  buildMinimap() {
+    const c = this.paintLandCanvas(this.data);
+    const ctx = c.getContext('2d');
     ctx.fillStyle = 'rgba(20,70,30,0.9)';
     for (const t of this.treeDots) ctx.fillRect(Math.floor(t.x), Math.floor(t.z), 1, 1);
     const woodInk = { birch: '#f4efe4', oak: '#3f9f47', maple: '#e24a22' };
@@ -930,7 +965,24 @@ export class World {
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
       ctx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);
     }
-    this.minimapCanvas = c;
+    const south = this.paintLandCanvas(this.south);
+    const sctx = south.getContext('2d');
+    sctx.fillStyle = '#b25cff';
+    sctx.fillRect(CAVE_MOUTH.x - 2, CAVE_MOUTH.z - SOUTH_Z - 2, 5, 5);
+    for (const t of this.treeDots) {
+      if (t.z < SOUTH_Z) continue;
+      sctx.fillStyle = 'rgba(20,70,30,0.9)';
+      sctx.fillRect(Math.floor(t.x), Math.floor(t.z - SOUTH_Z), 1, 1);
+    }
+    const map = document.createElement('canvas');
+    map.width = W;
+    map.height = W * 2;
+    const mctx = map.getContext('2d');
+    mctx.drawImage(c, 0, 0);
+    mctx.drawImage(south, 0, W);
+    this.minimapCanvas = map;
+    const southTile = TILES.find((t) => t.kind === 'southford');
+    this.tileCanvas = { [STARTER.id]: c, [southTile.id]: south };
   }
 
   update(dt, t) {
