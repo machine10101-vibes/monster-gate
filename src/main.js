@@ -1390,6 +1390,18 @@ class Game {
       this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
       return;
     }
+    const land = this.world.landAt(P.x, P.z);
+    if (land?.banner) {
+      if (this.zone !== land.banner[1]) {
+        const first = this.zone === -1;
+        this.zone = land.banner[1];
+        this.hud.setArea(land.banner[1]);
+        if (!first && this.started) this.hud.banner(land.banner[0], land.banner[1], 2600);
+      }
+      const shade = land.shade || 0;
+      this.forestAmt += (shade - this.forestAmt) * Math.min(1, dt * 1.5);
+      return;
+    }
     const z = this.world.zoneAt(P.x, P.z);
     const dg = Math.hypot(P.x - GATE.x, P.z - GATE.z);
     const zone = dg < 11 ? ZONE.GATE : z;

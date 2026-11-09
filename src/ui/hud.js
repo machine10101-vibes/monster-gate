@@ -257,12 +257,13 @@ export class HUD {
     ctx.fillStyle = '#0d1116';
     ctx.fillRect(0, 0, cv.width, cv.height);
     const cave = world.realm === 'cave' ? world.cave : null;
-    const sx = Math.round((cave ? px - cave.origin.x : px) - N / 2);
-    const sz = Math.round((cave ? pz - cave.origin.z : pz) - N / 2);
+    const origin = cave ? cave.origin : (world.minimapOrigin || { x: 0, z: 0 });
+    const sx = Math.round(px - origin.x - N / 2);
+    const sz = Math.round(pz - origin.z - N / 2);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(cave ? cave.minimap : world.minimapCanvas, sx, sz, N, N, 0, 0, cv.width, cv.height);
-    const toX = (x) => ((cave ? x - cave.origin.x : x) - sx) * sc;
-    const toZ = (z) => ((cave ? z - cave.origin.z : z) - sz) * sc;
+    const toX = (x) => (x - origin.x - sx) * sc;
+    const toZ = (z) => (z - origin.z - sz) * sc;
     const inView = (x, z) => {
       const X = toX(x);
       const Z = toZ(z);
@@ -351,7 +352,7 @@ export class HUD {
     };
     if (name === 'map') {
       const inCave = game.world.realm === 'cave';
-      title.textContent = inCave ? 'Darksycle Den' : 'Oakhollow and Southford';
+      title.textContent = inCave ? 'Darksycle Den' : 'Oakhollow and the nearby tiles';
       const c = document.createElement('canvas');
       c.className = 'bigmap';
       const src = inCave ? game.world.cave.minimap : game.world.minimapCanvas;
@@ -361,15 +362,17 @@ export class HUD {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(src, 0, 0, c.width, c.height);
       const p = game.player;
-      const mx = inCave ? (p.pos.x - game.world.cave.origin.x) * (c.width / src.width) : p.pos.x;
-      const mz = inCave ? (p.pos.z - game.world.cave.origin.z) * (c.height / src.height) : p.pos.z;
+      const ox = inCave ? game.world.cave.origin.x : (game.world.minimapOrigin?.x || 0);
+      const oz = inCave ? game.world.cave.origin.z : (game.world.minimapOrigin?.z || 0);
+      const mx = (p.pos.x - ox) * (c.width / src.width);
+      const mz = (p.pos.z - oz) * (c.height / src.height);
       if (!inCave) {
         ctx.fillStyle = '#c27bff';
-        ctx.fillRect(GATE.x - 3, GATE.z - 3, 6, 6);
+        ctx.fillRect(GATE.x - ox - 3, GATE.z - oz - 3, 6, 6);
         ctx.fillStyle = '#ffd23f';
-        ctx.fillRect(GUILD.x - 3, GUILD.z - 3, 6, 6);
+        ctx.fillRect(GUILD.x - ox - 3, GUILD.z - oz - 3, 6, 6);
         ctx.fillStyle = '#b25cff';
-        ctx.fillRect(CAVE_MOUTH.x - 3, CAVE_MOUTH.z - 3, 6, 6);
+        ctx.fillRect(CAVE_MOUTH.x - ox - 3, CAVE_MOUTH.z - oz - 3, 6, 6);
       }
       ctx.fillStyle = '#fff';
       ctx.fillRect(mx - 2, mz - 2, 4, 4);
@@ -379,16 +382,16 @@ export class HUD {
       if (!inCave) {
         if (game.world.waygate) {
           ctx.fillStyle = '#7ef6ff';
-          ctx.fillRect(game.world.waygate.x - 2, game.world.waygate.z - 2, 5, 5);
+          ctx.fillRect(game.world.waygate.x - ox - 2, game.world.waygate.z - oz - 2, 5, 5);
         }
         ctx.fillStyle = '#ff9a3c';
-        ctx.fillRect(MINE.x - 2, MINE.z - 2, 5, 5);
+        ctx.fillRect(MINE.x - ox - 2, MINE.z - oz - 2, 5, 5);
         ctx.fillStyle = '#4ec8ff';
-        ctx.fillRect(LAKE.x - 2, LAKE.z - 2, 5, 5);
+        ctx.fillRect(LAKE.x - ox - 2, LAKE.z - oz - 2, 5, 5);
       }
       add(inCave
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Violet marks the dragon\'s nest. Walk back down the tunnel to return to the vale. White: you.</p>'
-        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate, south of town. Orange: the Greyrock Pit (mining). Light blue: Mirrormere (fishing). Pale, green and red squares west of town are birch, oak and maple. The lower half is Southford, tile 65. Violet there is the Darksycle Cave. White: you. The full world is 100 tiles — open Settings, then World Creator.</p>');
+        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate. Orange: the Greyrock Pit. Light blue: Mirrormere. The map shows Oakhollow and the eight tiles around it. Violet in Southford is the Darksycle Cave. White: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
