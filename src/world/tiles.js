@@ -56,7 +56,8 @@ function buildTiles() {
       const code = CODES[tz][tx];
       const biome = BIOMES[code];
       if (!biome) throw new Error('Unknown biome ' + code);
-      const built = code === 'O';
+      const southford = tz === 6 && tx === 4;
+      const built = code === 'O' || southford;
       tiles.push({
         id: `t${tx}-${tz}`,
         tx,
@@ -67,11 +68,13 @@ function buildTiles() {
         biomeName: biome.name,
         color: biome.color,
         name: NAMES[tz][tx],
-        blurb: built
-          ? 'The starter tile. Oakhollow, the fairy forest, Greyrock Pit, Mirrormere and the farm all sit on this one tile.'
-          : `${biome.blurb} Mapped, not built yet.`,
+        blurb: code === 'O'
+          ? 'The starter tile. Oakhollow, the fairy forest, Greyrock Pit, Mirrormere and the farm all sit on this one tile. The south road continues into Southford.'
+          : southford
+            ? 'South of Oakhollow. The south road drops through a pass beside the river and opens into Southford. A cave in the eastern bluff is the Darksycle Dragon\'s den.'
+            : `${biome.blurb} Mapped, not built yet.`,
         built,
-        kind: built ? 'oakhollow' : 'planned',
+        kind: code === 'O' ? 'oakhollow' : southford ? 'southford' : 'planned',
         seed: 400 + tz * 17 + tx * 13,
       });
     }

@@ -175,6 +175,21 @@ export class Sky {
 
     this.fog.color.copy(s.fog);
     this.scene.background.copy(s.fog);
+    if (this.indoors) {
+      this.fog.color.setHex(0x16101f);
+      this.scene.background.setHex(0x100c16);
+      this.fog.near = 18;
+      this.fog.far = 72;
+      this.sun.intensity *= 0.22;
+      this.hemi.intensity *= 0.5;
+      this.skyMesh.visible = false;
+      this.clouds.visible = false;
+    } else {
+      this.fog.near = 34;
+      this.fog.far = 150;
+      this.skyMesh.visible = true;
+      this.clouds.visible = true;
+    }
 
     const u = this.skyMat.uniforms;
     u.uTop.value.copy(s.top);
@@ -211,7 +226,8 @@ export class Sky {
       }
       l.position.set(n.sp.x, n.sp.y + 0.2, n.sp.z);
       l.color.set(n.sp.color);
-      l.intensity = (0.35 + this.night * 5.0) * (0.92 + Math.sin(performance.now() * 0.013 + i * 3) * 0.08);
+      const base = this.indoors ? 4.4 : 0.35 + this.night * 5.0;
+      l.intensity = base * (0.92 + Math.sin(performance.now() * 0.013 + i * 3) * 0.08);
     }
   }
 }

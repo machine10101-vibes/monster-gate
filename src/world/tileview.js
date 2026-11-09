@@ -44,6 +44,12 @@ export function captureTileView(game, tile, outCanvas) {
   const clouds = game.sky?.clouds;
   const cloudVis = clouds?.visible;
   if (clouds) clouds.visible = false;
+  const over = game.world?.group;
+  const overVis = over?.visible;
+  const caveG = game.world?.cave?.group;
+  const caveVis = caveG?.visible;
+  if (tile.built && over) over.visible = true;
+  if (caveG) caveG.visible = false;
   const cam = game.camera;
   const saved = {
     px: cam.position.x,
@@ -59,6 +65,8 @@ export function captureTileView(game, tile, outCanvas) {
     fov: cam.fov,
     near: game.scene.fog.near,
     far: game.scene.fog.far,
+    fog: game.scene.fog.color.getHex(),
+    bg: game.scene.background?.isColor ? game.scene.background.getHex() : null,
     hx: hideUniforms.uPlayerScreen.value.x,
     hy: hideUniforms.uPlayerScreen.value.y,
   };
@@ -72,6 +80,8 @@ export function captureTileView(game, tile, outCanvas) {
     cam.updateProjectionMatrix();
     game.scene.fog.near = 500;
     game.scene.fog.far = 1100;
+    game.scene.fog.color.setHex(0xbfe0f4);
+    if (game.scene.background?.isColor) game.scene.background.setHex(0xbfe0f4);
     hideUniforms.uPlayerScreen.value.set(-9999, -9999);
     game.renderer.render(game.scene, cam);
 
@@ -91,6 +101,8 @@ export function captureTileView(game, tile, outCanvas) {
     cam.updateProjectionMatrix();
     game.scene.fog.near = saved.near;
     game.scene.fog.far = saved.far;
+    game.scene.fog.color.setHex(saved.fog);
+    if (saved.bg != null && game.scene.background?.isColor) game.scene.background.setHex(saved.bg);
     hideUniforms.uPlayerScreen.value.set(saved.hx, saved.hy);
     if (mesh) {
       game.scene.remove(mesh);
@@ -98,6 +110,8 @@ export function captureTileView(game, tile, outCanvas) {
       mesh.material.dispose();
     }
     if (clouds) clouds.visible = cloudVis;
+    if (over) over.visible = overVis;
+    if (caveG) caveG.visible = caveVis;
     game.renderer.render(game.scene, cam);
   }
 }

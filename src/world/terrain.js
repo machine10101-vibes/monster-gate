@@ -30,7 +30,7 @@ export const RIVER = [
 ];
 export const POND = { x: 34, z: 42, r: 7.5 };
 
-export const ZONE = { FIELD: 0, FOREST: 1, MOUNTAIN: 2, TOWN: 3, WATER: 4, FARM: 5, GATE: 6, MINE: 7, LAKE: 8 };
+export const ZONE = { FIELD: 0, FOREST: 1, MOUNTAIN: 2, TOWN: 3, WATER: 4, FARM: 5, GATE: 6, MINE: 7, LAKE: 8, SOUTH: 9 };
 
 function segDist(px, pz, ax, az, bx, bz) {
   const abx = bx - ax;
@@ -285,17 +285,25 @@ const SIDE_TILES = {
 
 const CHUNK = 24;
 
-export function buildTerrainMeshes(data, material) {
+export function buildTerrainMeshes(data, material, opt = {}) {
+  const width = opt.width || W;
+  const depth = opt.depth || W;
+  const ox = opt.ox || 0;
+  const oz = opt.oz || 0;
   const { H, top, tint, zone } = data;
   const group = new THREE.Group();
-  const hAt = (x, z) => (x < 0 || z < 0 || x >= W || z >= W ? -3 : H[z * W + x]);
+  const hAt = (x, z) => {
+    if (x >= 0 && z >= 0 && x < width && z < depth) return H[z * width + x];
+    const outside = opt.outside?.(x, z);
+    return outside == null ? -3 : outside;
+  };
   const chunks = [];
 
   const uvCache = {};
   const uvOf = (t) => (uvCache[t] ??= tileUV(t));
 
-  for (let cz = 0; cz < W; cz += CHUNK) {
-    for (let cx = 0; cx < W; cx += CHUNK) {
+  for (let cz = 0; cz < depth; cz += CHUNK) {
+    for (let cx = 0; cx < width; cx += CHUNK) {
       const pos = [];
       const nor = [];
       const uv = [];
@@ -313,9 +321,9 @@ export function buildTerrainMeshes(data, material) {
         idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
       };
 
-      for (let z = cz; z < Math.min(W, cz + CHUNK); z++) {
-        for (let x = cx; x < Math.min(W, cx + CHUNK); x++) {
-          const i = z * W + x;
+      for (let z = cz; z < Math.min(depth, cz + CHUNK); z++) {
+        for (let x = cx; x < Math.min(width, cx + CHUNK); x++) {
+          const i = z * width + x;
           const h = H[i];
           const tl = top[i];
           const tr = tint[i * 3];
@@ -346,10 +354,10 @@ export function buildTerrainMeshes(data, material) {
           ];
           const uvs = [0, 1, 2, 3].map((k) => baseUV[(k + rot) % 4]);
           const ps = [
-            [x, h, z],
-            [x, h, z + 1],
-            [x + 1, h, z + 1],
-            [x + 1, h, z],
+            [x + ox, h, z + oz],
+            [x + ox, h, z + oz + 1],
+            [x + ox + 1, h, z + oz + 1],
+            [x + ox + 1, h, z + oz],
           ];
           const cs = aos.map((a) => [tr * a, tg * a, tb * a]);
           if (aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, [0, 1, 0], uvs, cs);
@@ -401,10 +409,10 @@ export function buildTerrainMeshes(data, material) {
               const cBot = [sr * shadeSide * bot * jb, sg * shadeSide * bot * jb, sb * shadeSide * bot * jb];
               quad(
                 [
-                  [ax, yb, az],
-                  [bx, yb, bz],
-                  [bx, yt, bz],
-                  [ax, yt, az],
+                  [ax + ox, yb, az + oz],
+                  [bx + ox, yb, bz + oz],
+                  [bx + ox, yt, bz + oz],
+                  [ax + ox, yt, az + oz],
                 ],
                 [dx, 0, dz],
                 [
