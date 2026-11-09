@@ -395,7 +395,8 @@ export class HUD {
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
-      add(`<p><b>${q.text}</b><br/>Progress: ${q.n} / ${q.total}</p><p>Total monsters defeated: <b>${game.kills}</b></p><p style="color:#aab;font-size:13px">The Monster Gate in the northern forest keeps spitting out creatures. Slay them to earn guild gold.</p>`);
+      const pct = Math.round((q.n / Math.max(1, q.total)) * 100);
+      add(`<div class="quest-card"><b>${q.text}</b><span>${q.n} / ${q.total}</span><i style="width:${pct}%"></i></div><p class="panel-help">Monsters defeated: <b>${game.kills}</b>. The Monster Gate in the northern forest keeps sending creatures. Slay them for guild gold.</p>`);
     } else if (name === 'bag') {
       title.textContent = 'Inventory';
       this.cleanup = mountBag(body, game);
@@ -537,7 +538,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
-      add('<p style="color:#99a;font-size:13px;margin-top:10px">WASD move - Click attack - Shift shield - Space/Right-click evade - Skill bar 1 2 3 (Z X V, empty 1 is Spirit Bolt, empty 3 is Fury) - E character - B inventory - G skill book - K skill tree - H stats - T settings - 1-9 and 0 items - F talk, mine, fish or chop - light logs from the inventory - C catalog - [ ] or R rotate camera - Wheel zoom. The south road leaves Oakhollow through a pass into Southford. Walk into the cave in the eastern bluff to enter the Darksycle Den.</p>');
+      add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
@@ -578,73 +579,63 @@ export class HUD {
   }
 
   updateSkillbar(game) {
-    const bar = document.getElementById('skillbar');
-    if (!bar || !game?.progress || !game.player) return;
+    if (!game?.progress || !game.player) return;
     const eq = game.progress.equipped();
     const keys = ['Z', 'X', 'V'];
-    const fallback = ['Bolt', 'Skill', 'Fury'];
+    const fallback = ['Spirit Bolt', 'Empty', 'Fury'];
     const rightIds = ['tb-bolt', 'tb-skill', 'tb-fury'];
-    if (!bar.dataset.built) {
-      bar.dataset.built = '1';
-      for (let i = 0; i < 3; i++) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'skslot';
-        b.innerHTML = '<canvas></canvas><span class="skk"></span><span class="skn"></span><i class="skcd"></i>';
-        b.addEventListener('click', () => {
-          if (game.progress.equipped()[i]) game.castSlot(i);
-          else game.hud.openPanel('spellbook', game);
-        });
-        b.addEventListener('dragover', (e) => e.preventDefault());
-        b.addEventListener('drop', (e) => {
+    const casts = [...document.querySelectorAll('#cast-buttons .cast')];
+    if (!document.body.dataset.skillsWired) {
+      document.body.dataset.skillsWired = '1';
+      const accept = (el, i) => {
+        el.addEventListener('dragover', (e) => e.preventDefault());
+        el.addEventListener('drop', (e) => {
           e.preventDefault();
-          const id = e.dataTransfer.getData('text/plain').replace(/^skill:/, '');
+          const id = (e.dataTransfer.getData('text/plain') || '').replace(/^skill:/, '');
           if (SKILLS[id]) game.equipSkill(i, id);
-          if (game.hud.panelId === 'spellbook') game.hud.openPanel('spellbook', game);
+          if (game.hud.panelId === 'spellbook' || game.hud.panelId === 'skills') game.hud.openPanel(game.hud.panelId, game);
         });
-        bar.appendChild(b);
-      }
-      document.querySelectorAll('#cast-buttons .cast').forEach((b) => {
-        b.addEventListener('click', () => game.castSlot(Number(b.dataset.slot)));
+      };
+      casts.forEach((b, i) => {
+        b.addEventListener('click', () => game.castSlot(i));
+        accept(b, i);
+      });
+      rightIds.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el) accept(el, i);
       });
     }
-    const paintOne = (b, i, canvas) => {
-      const id = eq[i];
-      const skill = id && SKILLS[id];
-      if (b.dataset.sid !== (id || '')) {
-        b.dataset.sid = id || '';
-        if (skill) paintSkillIcon(canvas, skill.shape, skill.color);
-        else {
-          canvas.width = 16;
-          canvas.height = 16;
-          const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, 16, 16);
-          const fb = rightIds[i] === 'tb-bolt' ? 'bolt' : rightIds[i] === 'tb-fury' ? 'fury' : '';
-          if (fb) ctx.drawImage(iconCanvas(fb), 0, 0);
-        }
+    const paintCanvas = (canvas, skill, i) => {
+      if (!canvas) return;
+      const id = eq[i] || '';
+      if (canvas.dataset.sid === id) return;
+      canvas.dataset.sid = id;
+      if (skill) paintSkillIcon(canvas, skill.shape, skill.color);
+      else {
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, 16, 16);
+        const fb = i === 0 ? 'bolt' : i === 2 ? 'fury' : '';
+        if (fb) ctx.drawImage(iconCanvas(fb), 0, 0);
       }
-      return skill;
     };
-    [...bar.children].forEach((b, i) => {
-      const canvas = b.querySelector('canvas');
-      const skill = paintOne(b, i, canvas);
-      b.querySelector('.skk').textContent = String(i + 1);
-      b.querySelector('.skn').textContent = skill ? skill.name : fallback[i];
-      b.title = skill ? `${skill.name} (${keys[i]})` : `${fallback[i]} (${keys[i]}). Open the skill book to place one here.`;
-      b.classList.toggle('empty', !skill);
-      b.style.borderColor = skill ? skill.color : '';
+    for (let i = 0; i < 3; i++) {
+      const skill = eq[i] && SKILLS[eq[i]];
       const cd = skill ? game.player.cds[skill.id] || 0 : 0;
       const max = skill?.cd || 1;
-      b.querySelector('.skcd').style.transform = `scaleX(${cd > 0 ? Math.min(1, cd / max) : 0})`;
-      const cast = document.querySelector(`#cast-buttons .cast[data-slot="${i}"]`);
+      const frac = cd > 0 ? Math.min(1, cd / max) : 0;
+      const title = skill ? `${skill.name} (${keys[i]})` : `${fallback[i]} (${keys[i]})`;
+      const cast = casts[i];
       if (cast) {
-        const sk = paintOne(cast, i, cast.querySelector('canvas'));
-        cast.classList.toggle('on', !!sk);
-        cast.style.borderColor = sk ? sk.color : '';
-        cast.title = sk ? sk.name : fallback[i];
-        cast.querySelector('small').textContent = keys[i];
-        const cd2 = sk ? game.player.cds[sk.id] || 0 : 0;
-        cast.classList.toggle('cd', cd2 > 0);
+        paintCanvas(cast.querySelector('canvas'), skill, i);
+        cast.classList.toggle('on', !!skill);
+        cast.classList.toggle('cd', frac > 0);
+        cast.style.setProperty('--cd', String(frac));
+        cast.style.borderColor = skill ? skill.color : '';
+        cast.title = title;
+        const small = cast.querySelector('small');
+        if (small) small.textContent = keys[i];
       }
       const touch = document.getElementById(rightIds[i]);
       if (touch) {
@@ -654,13 +645,14 @@ export class HUD {
           cv.className = 'skico';
           touch.appendChild(cv);
         }
-        const sk = paintOne(touch, i, cv);
-        touch.classList.toggle('has-skill', !!sk);
-        touch.title = sk ? sk.name : fallback[i];
-        const cd3 = sk ? game.player.cds[sk.id] || 0 : 0;
-        touch.classList.toggle('cd', cd3 > 0);
+        paintCanvas(cv, skill, i);
+        touch.classList.toggle('has-skill', !!skill);
+        touch.classList.toggle('cd', frac > 0);
+        touch.style.setProperty('--cd', String(frac));
+        touch.style.borderColor = skill ? skill.color : '';
+        touch.title = title;
       }
-    });
+    }
   }
 }
 

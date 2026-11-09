@@ -39,7 +39,7 @@ export function mountSpellbook(body, game) {
 
     const note = document.createElement('p');
     note.className = 'book-note';
-    note.textContent = 'The numbered slots are the skill bar at the bottom of the screen. Tap 1, 2, or 3 on a skill to place it, or drag it onto a slot. The buttons on the right of the bar cast the same slots.';
+    note.textContent = 'Tap 1, 2, or 3 on a skill to place it on the round action buttons beside your health. Z, X, and V cast those buttons. An empty 1 is Spirit Bolt and an empty 3 is Fury. You can also drag a skill onto a slot or onto a button.';
     root.appendChild(note);
 
     const bar = document.createElement('div');

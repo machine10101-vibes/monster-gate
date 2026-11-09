@@ -55,6 +55,27 @@ export function paintSkillIcon(canvas, shape, tint) {
 }
 
 const KIND_LABEL = { passive: 'Passive', active: 'Active', special: 'Special' };
+const BUBBLE_EMPTY = ['Spirit Bolt', 'Empty', 'Fury'];
+
+function equippedBubbles(game) {
+  const row = document.createElement('div');
+  row.className = 'sk-bubbles';
+  const eq = game.progress.equipped();
+  eq.forEach((id, i) => {
+    const skill = id && SKILLS[id];
+    const b = document.createElement('div');
+    b.className = 'sk-bubble' + (skill ? ' on' : '');
+    const cv = document.createElement('canvas');
+    if (skill) paintSkillIcon(cv, skill.shape, skill.color);
+    const num = document.createElement('b');
+    num.textContent = String(i + 1);
+    const name = document.createElement('span');
+    name.textContent = skill ? skill.name : BUBBLE_EMPTY[i];
+    b.append(cv, num, name);
+    row.appendChild(b);
+  });
+  return row;
+}
 
 export function mountSkillTree(body, game) {
   const root = document.createElement('div');
@@ -73,7 +94,7 @@ export function mountSkillTree(body, game) {
     intro.className = 'sk-intro';
     const slain = game.progress.totalKills();
     const banked = Math.floor(slain / 2);
-    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every 2 monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on skill bar slots 1, 2, and 3 (keys Z, X, and V).`;
+    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every 2 monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on the round action buttons 1, 2, and 3 (keys Z, X, and V).`;
     root.appendChild(intro);
     const row = document.createElement('div');
     row.className = 'sk-pick';
@@ -140,6 +161,7 @@ export function mountSkillTree(body, game) {
     actions.append(respec, change);
     head.appendChild(actions);
     root.appendChild(head);
+    root.appendChild(equippedBubbles(game));
 
     const note = document.createElement('p');
     note.className = 'sk-note';
@@ -177,8 +199,6 @@ export function mountSkillTree(body, game) {
       row.append(name, desc, pips, btn);
       attrs.appendChild(row);
     }
-    root.appendChild(attrs);
-
     const weapons = document.createElement('section');
     weapons.className = 'sk-attrs';
     const weaponHead = document.createElement('h3');
@@ -211,7 +231,10 @@ export function mountSkillTree(body, game) {
       row.append(name, desc, pips, btn);
       weapons.appendChild(row);
     }
-    root.appendChild(weapons);
+    const split = document.createElement('div');
+    split.className = 'sk-split';
+    split.append(attrs, weapons);
+    root.appendChild(split);
 
     const cols = document.createElement('div');
     cols.className = 'sk-cols';
@@ -259,7 +282,7 @@ export function mountSkillTree(body, game) {
             b.type = 'button';
             b.className = 'sk-key' + (eq[slot] === s.id ? ' on' : '');
             b.textContent = key;
-            b.title = eq[slot] === s.id ? `Take off skill bar ${key}` : `Place on skill bar ${key} (${hot})`;
+            b.title = eq[slot] === s.id ? `Take off action button ${key}` : `Place on action button ${key} (${hot})`;
             b.onclick = () => {
               game.equipSkill(slot, eq[slot] === s.id ? null : s.id);
               paint();
@@ -296,11 +319,6 @@ export function mountSkillTree(body, game) {
     }
     root.appendChild(cols);
 
-    const bar = document.createElement('div');
-    bar.className = 'sk-equipped';
-    const labels = eq.map((id, i) => `${i + 1} ${id ? SKILLS[id].name : 'empty'}`);
-    bar.textContent = 'Skill bar  ' + labels.join('   ·   ');
-    root.appendChild(bar);
   };
 
   paint();

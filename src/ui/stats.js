@@ -27,10 +27,17 @@ export function mountStats(body, game, initial = null) {
     const root = document.createElement('div');
     root.className = 'stats';
 
+    const split = document.createElement('div');
+    split.className = 'st-split';
+    const main = document.createElement('div');
+    main.className = 'st-main';
+    const side = document.createElement('div');
+    side.className = 'st-side';
+
     const top = document.createElement('div');
     top.className = 'st-top';
     top.innerHTML = `<div><small>Total level</small><b>${pr.totalLevel}</b></div><div><small>Total XP</small><b>${fmt(pr.totalXp)}</b></div><div><small>Monsters slain</small><b>${game.kills}</b></div>`;
-    root.appendChild(top);
+    main.appendChild(top);
 
     const grid = document.createElement('div');
     grid.className = 'st-grid';
@@ -65,12 +72,13 @@ export function mountStats(body, game, initial = null) {
       };
       grid.appendChild(b);
     }
-    root.appendChild(grid);
-
-    root.appendChild(detail(sel));
-    root.appendChild(vitals());
+    main.appendChild(grid);
+    main.appendChild(vitals());
     const talents = talentsBlock();
-    if (talents) root.appendChild(talents);
+    if (talents) main.appendChild(talents);
+    side.appendChild(detail(sel));
+    split.append(main, side);
+    root.appendChild(split);
     body.appendChild(root);
   };
 

@@ -1,8 +1,6 @@
-import { ARMOR_SLOTS, GEAR, SLOT_LABEL, gearById } from '../data/catalog.js';
+import { GEAR, SLOT_LABEL, gearById } from '../data/catalog.js';
 import { STYLE_LABEL } from '../data/skills.js';
 import { flushThumbs, renderThumb } from './catalog.js';
-
-const SLOT_ORDER = ['weapon', ...ARMOR_SLOTS];
 
 function slotLabel(slot) {
   return slot === 'weapon' ? 'Weapon' : SLOT_LABEL[slot];
@@ -20,6 +18,12 @@ export function mountGear(body, game) {
     const pr = game.progress;
     const root = document.createElement('div');
     root.className = 'gear-layout';
+    const paper = document.createElement('div');
+    paper.className = 'gear-paper';
+
+    const left = document.createElement('div');
+    left.className = 'gear-col';
+    for (const slot of ['weapon', 'shield', 'book']) left.appendChild(slotButton(slot));
 
     const doll = document.createElement('div');
     doll.className = 'gear-doll';
@@ -33,14 +37,15 @@ export function mountGear(body, game) {
     const path = pr.className || 'No path yet';
     caption.textContent = `${path} · ${wornWeapon ? 'Equipped' : 'In hand'}: ${hand?.name || 'Nothing'}`;
     doll.appendChild(caption);
-    root.appendChild(doll);
 
-    const slots = document.createElement('div');
-    slots.className = 'gear-slots';
-    const wornHead = document.createElement('h3');
-    wornHead.textContent = 'Equipped';
-    slots.appendChild(wornHead);
-    for (const slot of SLOT_ORDER) {
+    const right = document.createElement('div');
+    right.className = 'gear-col';
+    for (const slot of ['helm', 'chest', 'arms', 'legs', 'boots']) right.appendChild(slotButton(slot));
+
+    paper.append(left, doll, right);
+    root.appendChild(paper);
+
+    function slotButton(slot) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'gear-slot';
@@ -61,11 +66,11 @@ export function mountGear(body, game) {
         };
       } else {
         name.textContent = 'Empty';
+        btn.title = `Empty ${slotLabel(slot)}`;
       }
       btn.appendChild(text);
-      slots.appendChild(btn);
+      return btn;
     }
-    root.appendChild(slots);
 
     const loose = document.createElement('div');
     loose.className = 'gear-loose';
