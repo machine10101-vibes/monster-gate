@@ -168,7 +168,69 @@
             <span><kbd>1-8</kbd> Items</span>
             <span><kbd>F</kbd> Talk</span>
           </div>
-          <p class="touch-only">Sign in while the phone is upright. After you begin, turn it sideways and the game fills the screen. Left stick moves, buttons fight, drag looks.</p>
+          <p class="touch-only">Sign in and pick your hunter while the phone is upright. After you enter the world, turn it sideways and the game fills the screen. Left stick moves, buttons fight, drag looks.</p>
+        </div>
+      </div>
+
+      <div id="charselect" class="hidden" aria-label="Character selection">
+        <div id="cs-stage" class="cs-stage"></div>
+        <div class="cs-vignette"></div>
+        <div id="cs-plates" class="cs-plates"></div>
+        <div id="cs-rotate" class="cs-rotate hidden">
+          <button id="cs-rot-left" type="button" aria-label="Turn left"></button>
+          <button id="cs-rot-right" type="button" aria-label="Turn right"></button>
+        </div>
+
+        <header class="cs-top">
+          <b class="cs-brand">MONSTER <em>GATE</em></b>
+          <span id="cs-account" class="cs-account"></span>
+        </header>
+
+        <aside id="cs-panel" class="cs-panel">
+          <div class="cs-search">
+            <input id="cs-search" type="search" placeholder="Search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="24" />
+          </div>
+          <div id="cs-list" class="cs-list" role="listbox" aria-label="Characters"></div>
+          <div class="cs-foot">
+            <button id="cs-create" class="cs-btn" type="button">Create Character</button>
+            <button id="cs-delete" class="cs-icon" type="button" title="Delete character" aria-label="Delete character"></button>
+            <button id="cs-restore" class="cs-icon" type="button" title="Restore a deleted character" aria-label="Restore a deleted character"></button>
+          </div>
+        </aside>
+
+        <form id="cs-form" class="cs-panel cs-form hidden" novalidate>
+          <h2 class="cs-form-title">Create Character</h2>
+          <label class="cs-label" for="cs-name-input">Name</label>
+          <input id="cs-name-input" class="cs-input" type="text" maxlength="14" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Choose a name" />
+          <div class="cs-label">Path</div>
+          <div id="cs-classes" class="cs-classes"></div>
+          <div id="cs-class-blurb" class="cs-blurb"></div>
+          <div id="cs-looks" class="cs-looks"></div>
+          <p id="cs-form-error" class="cs-error" role="alert"></p>
+          <div class="cs-form-foot">
+            <button id="cs-form-cancel" class="cs-btn quiet" type="button">Cancel</button>
+            <button id="cs-form-submit" class="cs-btn" type="submit">Create</button>
+          </div>
+        </form>
+
+        <button id="cs-back" class="cs-btn cs-back" type="button">Back</button>
+        <div id="cs-enter-wrap" class="cs-enter">
+          <div id="cs-name" class="cs-name"></div>
+          <button id="cs-enter" class="cs-btn big" type="button">Enter World</button>
+        </div>
+        <div id="cs-toggle" class="cs-toggle">
+          <span>CHARACTER LIST</span>
+          <button id="cs-list-toggle" type="button" aria-pressed="true" aria-label="Show or hide the character list"></button>
+        </div>
+
+        <div id="cs-confirm" class="cs-confirm hidden" role="alertdialog" aria-modal="true">
+          <div class="cs-confirm-box">
+            <p id="cs-confirm-text"></p>
+            <div class="cs-confirm-actions">
+              <button id="cs-confirm-no" class="cs-btn quiet" type="button">Keep</button>
+              <button id="cs-confirm-yes" class="cs-btn" type="button">Delete</button>
+            </div>
+          </div>
         </div>
       </div>
 

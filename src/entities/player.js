@@ -104,12 +104,20 @@ export class Player {
     this.syncObj();
   }
 
+  /** Body, hair and tunic picked when the character was made. */
+  setLook(opts) {
+    this.lookOpts = opts || {};
+    this.armorKey = null;
+    this.setArmor(this.armorWorn || {});
+  }
+
   setArmor(look) {
     const key = JSON.stringify(look || {});
+    this.armorWorn = look || {};
     if (this.armorKey === key) return;
     this.armorKey = key;
     const old = this.model;
-    const next = buildHumanoid({ armor: look || {} });
+    const next = buildHumanoid({ ...(this.lookOpts || {}), armor: look || {} });
     next.root.position.copy(old.root.position);
     this.pivot.remove(old.root);
     old.root.traverse((o) => {

@@ -65,6 +65,13 @@ export class Progress {
     return anon ? 'claimed' : 'new';
   }
 
+  /** Bind to one character's own hunt. Nothing is claimed from older saves. */
+  useCharacter(key) {
+    this.address = key;
+    this.loadRaw(readRaw(saveKey(key)));
+    this.save(false);
+  }
+
   loadRaw(raw) {
     this.data = { ...blank(), ...(raw || {}) };
     this.data.skills = normalizeSkills(this.data.skills);

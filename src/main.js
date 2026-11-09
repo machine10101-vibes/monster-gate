@@ -19,6 +19,8 @@ import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
+import { Roster, lookOptions } from './systems/roster.js';
+import { CharacterSelect } from './ui/charselect.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
 import { buildProjectileMesh, endProjectile, initProjectile, tickProjectile } from './systems/skillfx.js';
 import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
@@ -108,6 +110,8 @@ class Game {
     this.waygateHinted = false;
     this.guestBound = false;
     this.wallet = null;
+    this.roster = null;
+    this.character = null;
     this.walletBusy = false;
     this.walletNote = '';
     this.cloudState = 'off';
@@ -125,6 +129,7 @@ class Game {
     this.ray = new THREE.Raycaster();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this.bindImmersive();
+    this.charSelect = new CharacterSelect(this);
   }
 
   initRenderer() {
@@ -184,7 +189,7 @@ class Game {
     this.renderer.compile(this.scene, this.camera);
 
     document.getElementById('loading').classList.add('hidden');
-    document.getElementById('title').classList.remove('hidden');
+    if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -192,7 +197,7 @@ class Game {
 
   start() {
     if (this.started) return;
-    if (!this.wallet?.address || this.cloudSyncing) return;
+    if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
     document.body.classList.add('hunting');
     if (this.input.touch && this.isLandscape()) this.enterImmersive({ gesture: true, lock: true });
     this.started = true;
@@ -202,7 +207,7 @@ class Game {
     document.getElementById('hud').classList.remove('hidden');
     const returning = this.restoreHunter();
     if (this.world.realm === 'cave') this.hud.banner('Dragon Cave', 'Darksycle Den', 3200);
-    else if (returning) this.hud.banner('Welcome back', this.wallet.email || shortAddress(this.wallet.address), 3200);
+    else if (returning) this.hud.banner('Welcome back', this.character.name, 3200);
     else {
       this.hud.banner('Village', 'Oakhollow', 3600);
       setTimeout(() => this.hud.toast('A Monster Gate has opened in the northern forest!', 4200), 3700);
@@ -221,50 +226,93 @@ class Game {
     this.refreshHud(true);
   }
 
+  onPushed(result) {
+    if (!result) return;
+    if (result.revision && this.roster) this.roster.revision = result.revision;
+    if (result.conflict && !this.cloudConflict) {
+      this.cloudConflict = true;
+      this.progress.onCloud = null;
+      const noun = this.wallet?.kind === 'email' ? 'account' : 'wallet';
+      this.hud?.toast(`A newer hunt is saved to this ${noun}. Reload to use it.`, 4200);
+      this.charSelect?.note(`A newer hunt is saved to this ${noun}. Reload to use it.`, true);
+    }
+  }
+
   bindCloudPush() {
     this.progress.onCloud = (data) => {
-      schedulePush(this.wallet, data, (result) => {
-        if (!result) return;
-        if (result.revision) this.progress.revision = result.revision;
-        if (result.conflict && !this.cloudConflict) {
-          this.cloudConflict = true;
-          this.progress.onCloud = null;
-          const noun = this.wallet?.kind === 'email' ? 'account' : 'wallet';
-          this.hud?.toast(`A newer hunt is saved to this ${noun}. Reload to use it.`, 4200);
-        }
-      });
+      this.roster.touch(data.savedAt);
+      schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
     };
+  }
+
+  /** Send the character list to the guild record after it changes. */
+  pushRoster() {
+    if (!this.roster || !this.wallet) return;
+    this.roster.touch(Date.now());
+    this.roster.save();
+    if (this.cloudState !== 'on' || this.cloudConflict) return;
+    schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
   }
 
   async applyWallet(session) {
     this.wallet = session;
     this.cloudConflict = false;
     this.progress.onCloud = null;
-    this.walletNote = this.progress.useAddress(session.address);
-    this.rebindFromProgress();
+    this.character = null;
+    this.charSelect.close();
+    this.roster = new Roster(session.address, session.email || '');
+    this.walletNote = this.roster.chars.length ? 'loaded' : 'new';
     this.cloudSyncing = true;
     this.cloudState = 'off';
     this.refreshWalletUi();
     const gate = { open: true };
     try {
       const result = await Promise.race([
-        syncHunt(session, this.progress, gate).catch(() => ({ state: 'error', replaced: false })),
+        syncHunt(session, this.roster, gate).catch(() => ({ state: 'error', replaced: false })),
         new Promise((_, reject) => setTimeout(() => {
           gate.open = false;
           reject(new Error('timeout'));
         }, 8000)),
       ]);
       this.cloudState = result.state;
-      if (result.replaced) {
-        this.walletNote = 'loaded';
-        this.rebindFromProgress();
-      }
+      if (result.replaced) this.walletNote = 'loaded';
       if (result.state === 'on') this.bindCloudPush();
     } catch {
       this.cloudState = 'error';
     }
     this.cloudSyncing = false;
     this.refreshWalletUi();
+    if (this.wallet === session && !this.started) this.openCharacterSelect();
+  }
+
+  openCharacterSelect() {
+    if (this.started || !this.wallet?.address || !this.roster || this.cloudSyncing) return;
+    this.charSelect.open();
+  }
+
+  leaveCharacterSelect() {
+    this.signOut(false);
+  }
+
+  /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
+  enterWorld(char) {
+    if (this.started || !this.roster?.get(char.id)) return;
+    this.character = char;
+    this.roster.played(char.id);
+    this.progress.useCharacter(this.roster.charKey(char.id));
+    if (this.cloudState === 'on' && !this.cloudConflict) this.bindCloudPush();
+    this.player.lookOpts = lookOptions(char.look);
+    this.player.armorKey = null;
+    this.rebindFromProgress();
+    this.net.name = char.name;
+    try {
+      localStorage.setItem('mg-name', char.name);
+    } catch {
+      /* the name just will not prefill */
+    }
+    this.charSelect.close();
+    this.start();
+    this.pushRoster();
   }
 
   refreshWalletUi() {
@@ -281,8 +329,7 @@ class Game {
     const email = this.wallet?.kind === 'email';
     choices?.classList.toggle('hidden', signed || forming);
     sign.classList.toggle('hidden', signed || forming);
-    start.classList.toggle('hidden', !signed);
-    start.disabled = !!this.cloudSyncing;
+    start.classList.add('hidden');
     swap.classList.toggle('hidden', !signed);
     if (!signed) {
       help?.classList.add('hidden');
@@ -303,24 +350,11 @@ class Game {
     if (email) who.className = 'account-email';
     who.textContent = this.wallet.email || shortAddress(this.wallet.address);
     const noun = email ? 'account' : 'wallet';
-    const lead = this.walletNote === 'new'
-      ? 'New hunt saved to '
-      : this.walletNote === 'claimed'
-        ? 'Your hunt is now saved to '
-        : 'Welcome back. This hunt belongs to ';
-    const remoteAccount = email && !!this.wallet.accessToken;
-    const tail = this.cloudSyncing
-      ? `. Opening the hunt saved to this ${noun}…`
-      : this.cloudState === 'on'
-        ? `. The hunt is saved to this ${noun} and follows you to other devices.`
-        : this.cloudState === 'error'
-          ? remoteAccount
-            ? '. This account signs in on any device. The hunt could not be opened just now.'
-            : '. Saved on this browser. The guild record could not be reached.'
-          : remoteAccount
-            ? `. This ${noun} signs in on any device.`
-            : `. It stays on this browser under that ${noun}.`;
-    status.append(lead, who, tail);
+    status.append(
+      this.cloudSyncing ? `Opening the characters saved to this ${noun}, ` : 'Signed in as ',
+      who,
+      this.cloudSyncing ? '…' : '.'
+    );
   }
 
   openAccount(mode) {
@@ -392,8 +426,12 @@ class Game {
     clearCloudToken();
     this.progress.onCloud = null;
     this.wallet = null;
+    this.roster = null;
+    this.character = null;
     this.walletNote = '';
     this.cloudState = 'off';
+    this.charSelect.close();
+    document.getElementById('title').classList.remove('hidden');
     this.closeAccount();
     this.refreshWalletUi();
     if (repromptKlever) this.onWallet();
@@ -475,7 +513,12 @@ class Game {
       clearSession();
       this.wallet = null;
       if (this.started) location.reload();
-      else this.refreshWalletUi();
+      else {
+        this.roster = null;
+        this.charSelect.close();
+        document.getElementById('title').classList.remove('hidden');
+        this.refreshWalletUi();
+      }
     });
   }
 
@@ -534,10 +577,13 @@ class Game {
     document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
     swap.addEventListener('click', () => this.signOut(this.wallet?.kind !== 'email'));
     window.addEventListener('keydown', (e) => {
-      if (this.started || (e.code !== 'Enter' && e.code !== 'Space')) return;
+      if (this.started || this.charSelect.active || (e.code !== 'Enter' && e.code !== 'Space')) return;
       if (e.target?.closest?.('input, textarea, #account-panel')) return;
       if (!document.getElementById('account-panel')?.classList.contains('hidden')) return;
-      if (this.wallet) this.start();
+      if (this.wallet) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
     });
     document.getElementById('panel-close').addEventListener('click', () => this.hud.closePanel());
@@ -1749,6 +1795,10 @@ class Game {
   }
 
   positionCamera(dt) {
+    if (this.charSelect?.active) {
+      this.charSelect.update(dt, this.time);
+      return;
+    }
     const c = this.cam;
     const P = this.player.pos;
     const k = dt === 0 ? 1 : Math.min(1, dt * 7);
@@ -1793,6 +1843,11 @@ class Game {
   }
 
   updateHideUniforms() {
+    if (this.charSelect?.active) {
+      hideUniforms.uPlayerScreen.value.set(-9999, -9999);
+      hideUniforms.uPlayerDepth.value = 0;
+      return;
+    }
     const P = this.player.pos;
     this.tmpV.set(P.x, P.y + 1, P.z);
     const cam = this.camera;
@@ -1911,8 +1966,10 @@ class Game {
     this.sky.chill = this.chill;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
     this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.chill);
-    const lights = this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
-    this.sky.assignTorchLights(lights, P.pos.x, P.pos.z);
+    const camp = this.charSelect?.active ? this.charSelect.stage : null;
+    const lights = camp ? camp.lightSpots : this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
+    if (camp) this.sky.assignTorchLights(lights, camp.origin.x, camp.origin.z);
+    else this.sky.assignTorchLights(lights, P.pos.x, P.pos.z);
     const night = this.sky.night;
     const scale = this.pxScale * 0.03;
     this.fx.update(dt, t, P.pos, scale, night, this.forestAmt);
