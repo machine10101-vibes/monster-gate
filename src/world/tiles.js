@@ -19,14 +19,15 @@ const BIOMES = {
   C: { id: 'coast', name: 'Coast', color: '#e4d2a0', blurb: 'Sand, rock and the tide.' },
   S: { id: 'sea', name: 'Sea', color: '#1d4e86', blurb: 'Open water.' },
   I: { id: 'arctic', name: 'Arctic', color: '#d6ebf8', blurb: 'Snowfields, glass-blue ice and long white winds.' },
+  V: { id: 'volcanic', name: 'Volcanic wasteland', color: '#5a2c28', blurb: 'Black stone, drifting ash and rivers of fire.' },
   D: { id: 'ruins', name: 'Ruins', color: '#8d6e9c', blurb: 'Something old broke here.' },
 };
 
 const CODES = [
   'PPPPPPPPPP',
-  'PFFFFFFPPP',
-  'PFFFGGFFWP',
-  'PRFFFMIIWP',
+  'PFVVFFFPPP',
+  'PFVVGGFFWP',
+  'PRFVFMIIWP',
   'RRMMMFIIWA',
   'MRLMOMAHMM',
   'CRMMRMAHDD',
@@ -46,15 +47,20 @@ const RING = {
   '7,4': ['icewind', 'East of Snowfall. Icewind Reach is a wind-scoured barren of ice spires, frozen lakes and the bones of something enormous.'],
   '6,3': ['rimefang', 'North of Snowfall. The land climbs a long ramp to the flat summit of Rimefang Mesa, where the Ravenous Snow Yetis make their nests.'],
   '7,3': ['glimmerfrost', 'North of Icewind Reach. Glimmerfrost is a glacier of blue crystal, frozen lakes and glittering spires.'],
+  '3,3': ['ashroad', 'North of Harefield. A pass through the northern peaks opens onto Ashen Road, where the green meadow gives way to scorched earth, dead trees and the first pools of lava.'],
+  '3,2': ['warfield', 'North of Ashen Road. The Endless Field is the battleground of the Holy Knight and the Demon Knight, strewn with broken swords, shields, siege engines and the banners of both armies.'],
+  '2,2': ['dawnspire', 'West of the Endless Field. Dawnspire is the Holy Knight\'s white marble castle, with gold-trimmed towers, a cathedral keep and a courtyard of blue fire.'],
+  '3,1': ['hellspire', 'North of the Endless Field. Hellspire is the Demon Knight\'s black fortress, ringed in iron spikes, with lava in every crack and a gate shaped like a mouth.'],
+  '2,1': ['cinderfall', 'West of Hellspire. Cinderfall is a smoking volcano of black basalt, surrounded by obsidian spires, lava pools and magma vents.'],
   '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Long fenced fields and a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
 };
 
 const NAMES = [
   ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Glasscrag', 'Pale Spire', 'Frostspire', 'Last Snow'],
-  ['Greymarch', 'Pinehollow', 'Deerwood', 'Mossdeep', 'Northwood', 'Hartwood', 'Ashgrove', 'Elmshade', 'Coldridge', 'Windcrag'],
-  ['Fellwatch', 'Bramblewood', 'Thornveil', 'Gloomwood', 'Gatewood', 'Wyrmwood', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
-  ['Riverwatch', 'Silverbend', 'Fernwood', 'Owlhollow', 'Goldglade', 'Meadowrise', 'Rimefang Mesa', 'Glimmerfrost', 'Dusthill', 'Redcrag'],
+  ['Greymarch', 'Pinehollow', 'Cinderfall', 'Hellspire', 'Northwood', 'Hartwood', 'Ashgrove', 'Elmshade', 'Coldridge', 'Windcrag'],
+  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Gatewood', 'Wyrmwood', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
+  ['Riverwatch', 'Silverbend', 'Fernwood', 'Ashen Road', 'Goldglade', 'Meadowrise', 'Rimefang Mesa', 'Glimmerfrost', 'Dusthill', 'Redcrag'],
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Old Acre', 'Harrowfen', 'Reedbank', 'Frogmarsh'],
   ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Greenrows', 'Blackfen', 'Broken Arch', 'Old Stones'],
@@ -230,6 +236,14 @@ export function sampleTile(tile, u, v) {
       g = 0.28 + n2 * 0.12;
       b = 0.52 + n * 0.15;
       break;
+    case 'volcanic': {
+      h = 2.4 + n * 3.4;
+      const lava = n2 > 0.8;
+      r = lava ? 0.95 : 0.2 + n2 * 0.12;
+      g = lava ? 0.42 : 0.19 + n2 * 0.06;
+      b = lava ? 0.1 : 0.2 + n2 * 0.06;
+      break;
+    }
     case 'ruins': {
       const pad = u > 0.32 && u < 0.68 && v > 0.3 && v < 0.7;
       h = pad ? 1.6 : 1.1 + n * 0.4;

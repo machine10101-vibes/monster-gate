@@ -3,12 +3,15 @@ import * as darkMetal from './armorDark.js';
 import * as frostMetal from './armorFrost.js';
 import { makeSoftArmor } from './armorSoft.js';
 import { withDetail } from './armorDetail.js';
+import { demonPlate, holyPlate } from './armorKnights.js';
 
 const CACHE = {};
 const BUILD = {
   budgeset: () => budgeMetal,
   darksyceset: () => darkMetal,
   yetiset: () => frostMetal,
+  demonset: () => demonPlate,
+  holyset: () => holyPlate,
   budgeleather: () => makeSoftArmor('budgeleather'),
   budgecloth: () => makeSoftArmor('budgecloth'),
   darkleather: () => makeSoftArmor('darkleather'),

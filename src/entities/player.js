@@ -1308,7 +1308,7 @@ export class Player {
 /** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
 const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow']);
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe']);
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -1332,4 +1332,6 @@ const TRAIL_SPEC = {
   yetihammer: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0x9fdcff, hot: 0xf2fbff },
   yetispear: { b: [0, 0, 1.6], t: [0, 0, 2.3], col: 0x9fdcff, hot: 0xf2fbff },
   yetiscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0x9fdcff, hot: 0xf2fbff },
+  demonsword: { b: [0, 0, 0.55], t: [0, 0, 2.2], col: 0xff3a1a, hot: 0xffb070 },
+  holyhammer: { b: [0, 0, 1.0], t: [0, 0, 1.7], col: 0x9fd0ff, hot: 0xffffff },
 };

@@ -1,4 +1,6 @@
 /** Everything the Hunter Catalog knows about: monsters, their parts, and what the parts make. */
+import { KNIGHT_LORE, GEAR_DROPS } from './knights.js';
+export { GEAR_DROPS };
 
 export const MATERIALS = {
   budgescale: { name: 'Budge Scale', desc: 'Overlapping green plate. Tougher than boiled leather.' },
@@ -83,6 +85,16 @@ export const MONSTERS = [
   {
     id: 'snowyeti', name: 'Ravenous Snow Yeti', level: 9, temper: 'Ravenous', style: 'Brawler', habitat: 'The flat-topped mountain of Rimecrown, high in the Arctic north',
     desc: 'A hulking beast of ice-crystal fur with glowing blue eyes and a mouth full of fangs. It rakes in a fast double swipe, exhales a cone of frost that slows you, leaps and slams the ground so ice spikes burst up around you, and hurls boulders of ice from range. Below half health it bellows and goes into a feeding frenzy, chaining attacks with barely a breath between them. Roll out of the marked ground and strike during its recovery.',
+  },
+  {
+    id: 'demonknight', name: 'Demon Knight', level: 11, temper: 'Merciless', style: 'Brawler', habitat: 'The obsidian fortress on tile 14, in the volcanic wasteland',
+    desc: 'A towering knight in jagged black plate, crowned with spikes, red-eyed and wreathed in smoke. It cleaves with a serrated greatsword, charges behind a spiked shield and drives its blade into the ground to send a line of hellfire. It drops no parts, only whole pieces of its own gear, and rarely.',
+    lore: KNIGHT_LORE.demonknight,
+  },
+  {
+    id: 'holyknight', name: 'Holy Knight', level: 11, temper: 'Righteous', style: 'Brawler', habitat: 'The white castle on tile 23, in the volcanic wasteland',
+    desc: 'A giant knight in white and gold plate with glowing blue crosses and a ragged gold-trimmed cape. It smashes the ground with a rune-lit stone war hammer and calls pillars of holy light down on wherever you stand. It drops no parts, only whole pieces of its own gear, and rarely.',
+    lore: KNIGHT_LORE.holyknight,
   },
 ];
 
@@ -316,6 +328,44 @@ armorSet(YETI_ARMOR, 'yeticloth', [
   ['book', 'yetibook', 'Frostheart Grimoire', 0, 'A hide-bound tome rimed with frost and clasped with a fang. A caged frostheart pulses on its cover.', { frostheart: 1, rimefur: 3, yetifang: 1, yetihide: 1 }, { mana: 24, spell: 0.07 }],
 ]);
 
+
+const DEMON_K = 'demonknight';
+const HOLY_K = 'holyknight';
+function foundSet(monster, set, defs) {
+  for (const [slot, id, name, def, desc] of defs) GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe: {}, found: true });
+}
+GEAR.push(
+  {
+    id: 'demonsword', type: 'weapon', wtype: 'onesword', name: 'Hellrend Greatsword', monster: DEMON_K, held: 'demonsword', found: true,
+    desc: 'A tall serrated blade of black iron, its fuller cracked open and glowing red. The Demon Knight carries it point-up.',
+    recipe: {},
+    item: { id: 'demonsword', icon: 'demonsword', name: 'Hellrend Greatsword', kind: 'melee', style: 'swordshield', dmg: 23, reach: 2.9, arc: 2.3, dur: 0.42, hit: 0.18, stam: 11, knock: 7, held: 'demonsword', desc: 'Sword and shield. A serrated blade of hellfire.' },
+    stats: [['Damage', 23], ['Reach', '2.9'], ['Style', 'Sword & Shield']],
+  },
+  {
+    id: 'holyhammer', type: 'weapon', wtype: 'hammer', name: 'Smiterfall War Hammer', monster: HOLY_K, held: 'holyhammer', found: true,
+    desc: 'A block of runed stone in a gold frame on a ribbed haft, lit by glowing blue crosses. It lands like a verdict.',
+    recipe: {},
+    item: { id: 'holyhammer', icon: 'holyhammer', name: 'Smiterfall War Hammer', kind: 'melee', style: 'twohand', dmg: 36, reach: 2.8, arc: 2.5, dur: 0.78, hit: 0.36, stam: 18, knock: 12, held: 'holyhammer', desc: 'Two-handed. A holy stone hammer.' },
+    stats: [['Damage', 36], ['Reach', '2.8'], ['Style', 'Two-Handed']],
+  },
+  { id: 'demonshield', type: 'armor', slot: 'shield', name: 'Hellforged Bulwark', monster: DEMON_K, set: 'demonset', def: 4, desc: 'A tall kite shield of black plate with a spiked rim and a glowing red demon face.', recipe: {}, found: true },
+);
+foundSet(DEMON_K, 'demonset', [
+  ['helm', 'demonhelm', 'Hellforged Crown', 3, 'A black helm crowned with spikes. Two red eyes burn behind the visor.'],
+  ['chest', 'demonchest', 'Hellforged Cuirass', 5, 'Layered shards of black plate, cracked and glowing red, with a row of spikes across the back.'],
+  ['arms', 'demonarms', 'Hellforged Gauntlets', 3, 'Spiked vambraces under huge jagged pauldrons.'],
+  ['legs', 'demonlegs', 'Hellforged Greaves', 4, 'Heavy black thigh plate with spiked knee guards.'],
+  ['boots', 'demonboots', 'Hellforged Sabatons', 3, 'Broad black boots with spiked toes.'],
+]);
+foundSet(HOLY_K, 'holyset', [
+  ['helm', 'holyhelm', 'Radiant Helm', 3, 'A white helm with a dark visor, a forehead cross, a gold crest and curved gold horns.'],
+  ['chest', 'holychest', 'Radiant Cuirass', 5, 'White plate trimmed in gold, with a glowing blue cross over the heart.'],
+  ['arms', 'holyarms', 'Radiant Gauntlets', 3, 'Gold-rimmed pauldrons and vambraces, each with a glowing blue cross.'],
+  ['legs', 'holylegs', 'Radiant Greaves', 4, 'White thigh plate in gold diamond frames with blue crosses.'],
+  ['boots', 'holyboots', 'Radiant Sabatons', 3, 'Large white sabatons with gold bands.'],
+]);
+
 const set = (id, name, monster, tier, role, stats, bonus) => ({ id, name, monster, tier, role, hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0, ...stats, bonus });
 export const SETS = [
   set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 4 }, 'Full set: +4 max health (2 hearts).'),
@@ -327,6 +377,8 @@ export const SETS = [
   set('yetiset', 'Glacierplate', YETI_ARMOR, 'metal', 'Warrior', { hp: 4, stamina: 10 }, 'Full set: +4 max health (2 hearts) and +10 max stamina.'),
   set('yetileather', 'Rimehide Leathers', YETI_ARMOR, 'leather', 'Ranger', { stamina: 30, ranged: 0.08 }, 'Full set: +30 max stamina and +8% ranged damage.'),
   set('yeticloth', 'Frostweave Robes', YETI_ARMOR, 'cloth', 'Mage', { mana: 36, spell: 0.1 }, 'Full set: +36 max mana and +10% spell damage.'),
+  set('demonset', 'Hellforged Plate', DEMON_K, 'metal', 'Warrior', { hp: 6, stamina: 10 }, 'Full set: +6 max health (3 hearts) and +10 max stamina.'),
+  set('holyset', 'Radiant Plate', HOLY_K, 'metal', 'Warrior', { hp: 6, mana: 20 }, 'Full set: +6 max health (3 hearts) and +20 max mana.'),
 ];
 
 export const DEF_PER_POINT = 0.04;

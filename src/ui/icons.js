@@ -530,6 +530,8 @@ ART.book = [
 ];
 ART.budgeblade = recolor(ART.blade, { l: 'h', g: 't', d: 'Y', y: 'e', b: 'E' });
 ART.orcblade = recolor(ART.blade, { l: 's', g: 'S', d: 'k', y: 't', b: 'B' });
+ART.demonsword = recolor(ART.blade, { l: 'G', g: 'd', d: 'k', y: 'R', b: 'B' });
+ART.holyhammer = recolor(ART.hammer, { s: 'y', S: 'Y', l: 'g', g: 'G', d: 'c' });
 ART.budgebow = recolor(ART.bow, { b: 't', t: 'h' });
 ART.budgemaul = [
   '................',

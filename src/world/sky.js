@@ -17,6 +17,11 @@ const KEYS = [
 const COLD_FOG = new THREE.Color(0xdcebf6);
 const COLD_HEMI = new THREE.Color(0xb8d4f2);
 const COLD_SUN = new THREE.Color(0xe4efff);
+const EMBER_FOG = new THREE.Color(0x452a26);
+const EMBER_HEMI = new THREE.Color(0xd08a6a);
+const EMBER_SUN = new THREE.Color(0xff9c6a);
+const EMBER_TOP = new THREE.Color(0x2c1a1c);
+const EMBER_HOR = new THREE.Color(0x7a3a28);
 KEYS.forEach((k) => {
   for (const f of ['top', 'hor', 'fog', 'sun', 'hs', 'hg']) k[f] = new THREE.Color(k[f]);
 });
@@ -184,6 +189,13 @@ export class Sky {
       this.sun.color.lerp(COLD_SUN, chill * 0.3);
       this.sun.intensity *= 1 - chill * 0.08;
     }
+    const ember = this.ember || 0;
+    if (ember > 0.01) {
+      this.fog.color.lerp(EMBER_FOG, ember * 0.9 * (1 - night * 0.4));
+      this.hemi.color.lerp(EMBER_HEMI, ember * 0.4);
+      this.sun.color.lerp(EMBER_SUN, ember * 0.4);
+      this.sun.intensity *= 1 - ember * 0.22;
+    }
     this.scene.background.copy(this.fog.color);
     if (this.indoors) {
       this.fog.color.setHex(0x16101f);
@@ -195,8 +207,8 @@ export class Sky {
       this.skyMesh.visible = false;
       this.clouds.visible = false;
     } else {
-      this.fog.near = 34 - chill * 8;
-      this.fog.far = 150 - chill * 36;
+      this.fog.near = 34 - chill * 8 - ember * 8;
+      this.fog.far = 150 - chill * 36 - ember * 28;
       this.skyMesh.visible = true;
       this.clouds.visible = true;
     }
@@ -204,6 +216,10 @@ export class Sky {
     const u = this.skyMat.uniforms;
     u.uTop.value.copy(s.top);
     u.uHor.value.copy(s.hor);
+    if (ember > 0.01) {
+      u.uTop.value.lerp(EMBER_TOP, ember * 0.8);
+      u.uHor.value.lerp(EMBER_HOR, ember * 0.7);
+    }
     u.uSun.value.copy(sunDir);
     u.uMoon.value.copy(moonDir);
     u.uSunCol.value.copy(s.sun);

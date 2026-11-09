@@ -3,6 +3,7 @@ import { VoxelModel, hash3, jitter, shade, mix } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
 import { YETI } from '../data/yeti.js';
+import { holyHammerVoxels, demonSwordVoxels, demonShieldVoxels } from './knightWeapons.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
 export const WEAPON_SIZE = 0.015;
@@ -25,6 +26,7 @@ const EDGE_HOLD = new Set([
   'darksword', 'darkgreatsword', 'darkdual',
   'orcblade',
   'yetisword', 'yetigreatsword', 'yetidual',
+  'demonsword',
 ]);
 
 /** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
@@ -952,6 +954,8 @@ const BUILDERS = {
   yetistaff: frostStaff,
   yetiwand: frostWand,
   yeticrossbow: () => crossbow(THEMES.frost, 'dark'),
+  holyhammer: holyHammerVoxels,
+  demonsword: demonSwordVoxels,
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */
@@ -965,6 +969,7 @@ const themeOf = (setId) => (setId === 'iron' ? THEMES.iron : setId.startsWith('d
 
 /** Flat shield (face up on +y), 48 wide and deep with raised rim, boss and relief. */
 export function buildShieldModel(setId) {
+  if (setId === 'demonset') return demonShieldVoxels();
   const T = themeOf(setId);
   const dark = T === THEMES.dark || T === THEMES.frost;
   const c = ctx();

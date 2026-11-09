@@ -319,6 +319,8 @@ const SWING = {
   yetihammer: { c: 0xbfeaff, h: 0xffffff },
   yetispear: { c: 0xbfeaff, h: 0xffffff },
   yetiscythe: { c: 0x9fdcff, h: 0xffffff },
+  demonsword: { c: 0xff3a1a, h: 0xffd0a0 },
+  holyhammer: { c: 0x9fd0ff, h: 0xffffff },
 };
 
 export function meleeSwing(game, p, it, combo, reach) {

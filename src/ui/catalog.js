@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CORE_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SETS, SLOT_LABEL, TIER_LABEL, WEAPON_LABEL, armorPieces, gearById, monsterById, setById, weapons } from '../data/catalog.js';
+import { GEAR_DROPS, CORE_SLOTS, DROPS, GEAR, MATERIALS, MATERIAL_ORDER, MONSTERS, SETS, SLOT_LABEL, TIER_LABEL, WEAPON_LABEL, armorPieces, gearById, monsterById, setById, weapons } from '../data/catalog.js';
 import { MONSTER_BUILDERS, MONSTER_STATS } from '../entities/monsters.js';
 import { buildHeld, buildHumanoid, meshFrom } from '../entities/humanoid.js';
 import { TALL_KINDS, buildBookModel, buildShieldModel, gripRoll } from '../entities/weaponModels.js';
@@ -166,7 +166,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 
@@ -309,9 +309,12 @@ function el(tag, cls, html) {
 const SET_HELD = {
   budgeset: 'budgeblade', darksyceset: 'darkscythe', budgeleather: 'budgecrossbow', darkleather: 'darkcrossbow', budgecloth: 'budgestaff', darkcloth: 'darkstaff',
   yetiset: 'yetigreatsword', yetileather: 'yeticrossbow', yeticloth: 'yetistaff',
+  demonset: 'demonsword', holyset: 'holyhammer',
 };
 
 const SET_BLURB = {
+  demonset: 'Jagged black plate lit by cracks of red: a spike-crowned helm with burning eyes, a shard-layered cuirass with a row of spikes across the back, spiked gauntlets under huge pauldrons, spiked greaves and sabatons, with a demon-faced bulwark. Dropped whole, and rarely, by the Demon Knight. The warrior set.',
+  holyset: 'White plate trimmed in gold and marked with glowing blue crosses: a horned, gold-crested helm, a cross-bearing cuirass, gold-rimmed gauntlets, diamond-framed greaves and large sabatons. Dropped whole, and rarely, by the Holy Knight. The warrior set.',
   budgeset: 'Dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots, with a horn-bossed shield. The warrior set.',
   darksyceset: 'Five pieces of indigo scale lit from within by gloom: a sickle-horned helm, a core-burning cuirass, scythe-pauldron gauntlets, rune greaves and silent talon boots, with a gloom-gem shield. The warrior set.',
   budgeleather: 'Laced hide in budge green with bone-stud trim: a horn-stud cap, jerkin, bracer gloves, strapped leggings and claw-toed boots. Light and quiet. The ranger set.',
@@ -542,6 +545,22 @@ export class Catalog {
       <p>${esc(m.desc)}</p>
       <div class="cat-stats"><div><small>Health</small><b>${st.hp}</b></div><div><small>Attack</small><b>${st.dmg}</b></div><div><small>Speed</small><b>${st.speed}</b></div></div>
       <p class="cat-muted">Habitat: ${esc(m.habitat)}</p>`;
+    if (m.lore) info.appendChild(el('p', 'cat-muted', esc(m.lore)));
+    const gearDrops = GEAR_DROPS[m.id];
+    if (gearDrops) {
+      info.appendChild(el('h4', null, 'Drops (whole pieces only, no parts)'));
+      const mk = el('div', 'cat-made');
+      for (const d of gearDrops) {
+        const g = gearById(d.id);
+        const c = el('button', 'cat-mini' + (pr.crafted(g.id) ? ' done' : ''));
+        c.type = 'button';
+        c.appendChild(getStage().thumb({ kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id }, false, 96));
+        c.appendChild(el('span', null, `${esc(g.name)} <small>${Math.round(d.chance * 1000) / 10}%</small>`));
+        c.onclick = () => this.goto({ type: 'gear', id: g.id }, g.type === 'weapon' ? 'weapons' : 'armor');
+        mk.appendChild(c);
+      }
+      info.appendChild(mk);
+    }
     const drops = DROPS[m.id];
     if (drops) {
       info.appendChild(el('h4', null, 'Parts'));
@@ -605,7 +624,7 @@ export class Catalog {
       <div class="cat-tags"><span>${g.type === 'weapon' ? WEAPON_LABEL[g.wtype] : `${TIER_LABEL[setById(g.set).tier]} ${SLOT_LABEL[g.slot]}`}</span><span>From ${esc(m.name)}</span></div>
       <p>${esc(g.desc)}</p>
       <div class="cat-stats">${stats}</div>`;
-    if (g.found) info.appendChild(el('p', 'cat-muted', 'Orc Scouts drop this. It is not forged at the smithy.'));
+    if (g.found) info.appendChild(el('p', 'cat-muted', g.monster === 'orcscout' ? 'Orc Scouts drop this. It is not forged at the smithy.' : `${m.name}s drop this whole, and only rarely (1 to 2%). It cannot be forged.`));
     else {
       info.appendChild(el('h4', null, 'Parts needed'));
       info.appendChild(this.recipeChips(g));
