@@ -241,7 +241,7 @@ function mapAuthFailure(parsed) {
 async function createRemote(cfg, email, password) {
   let res;
   try {
-    res = await fetch(`${cfg.url}/auth/v1/signup`, {
+    res = await fetch(`${cfg.url}/functions/v1/signup`, {
       method: 'POST',
       headers: authHeaders(cfg),
       body: JSON.stringify({ email, password }),
@@ -250,14 +250,15 @@ async function createRemote(cfg, email, password) {
     return null;
   }
   const parsed = await authError(res);
-  if (!res.ok) throw mapAuthFailure(parsed);
-  const identities = parsed.json.user?.identities ?? parsed.json.identities;
-  if (Array.isArray(identities) && identities.length === 0) {
-    throw fail('exists', 'That email already has an account. Sign in instead.');
+  if (!res.ok) {
+    if (res.status === 409 || parsed.msg.includes('already')) {
+      throw fail('exists', 'That email already has an account. Sign in instead.');
+    }
+    throw fail('unavailable', parsed.json?.error || 'The account could not be created.');
   }
-  const session = sessionFromAuth(parsed.json, email);
-  if (session) return session;
-  throw fail('confirm', 'Account created. Open the confirmation email, then sign in. The same email works on any device.');
+  const session = await signInRemote(cfg, email, password);
+  if (session === false) throw fail('rejected', 'That email or password was not accepted.');
+  return session;
 }
 
 async function signInRemote(cfg, email, password) {
