@@ -29,7 +29,7 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
-import { clearSession, inKleverHandoff, isMobile, launchKleverApp, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
+import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, requestGameFullscreen } from './engine/immersive.js';
@@ -183,9 +183,9 @@ class Game {
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
-    if (!session && new URLSearchParams(location.search).get('klever') === '1') {
-      // Let the wallet finish opening this page before the confirm sheet appears.
-      setTimeout(() => this.onWallet(), 600);
+    if (!session && new URLSearchParams(location.search).get('klever') === '1' && !promptIsCooling()) {
+      // One ask. A reload while the sheet is up must not open a second one.
+      setTimeout(() => this.onWallet(true), 600);
     }
   }
 
@@ -309,17 +309,13 @@ class Game {
     if (status) status.textContent = 'Opening Klever Wallet…';
     launchKleverApp();
     const finish = () => {
-      if (window.kleverWeb) {
-        this.walletBusy = false;
-        if (sign) sign.disabled = false;
-        this.onWallet();
-        return;
-      }
-      const help = document.getElementById('wallet-help');
-      if (help) showWalletHelp(help, 'mobile-app');
-      if (status) status.textContent = 'Klever Wallet did not open. Use the button below to open the app installed on this phone.';
       this.walletBusy = false;
       if (sign) sign.disabled = false;
+      if (this.wallet?.address) return;
+      // Coming back from the wallet must not open it again. The hunter taps Sign in to retry.
+      const help = document.getElementById('wallet-help');
+      if (help) showWalletHelp(help, 'mobile-app');
+      if (status) status.textContent = 'Sign in once inside Klever Wallet. Approving there is enough.';
     };
     window.setTimeout(() => {
       if (!document.hidden) {
@@ -335,13 +331,16 @@ class Game {
     }, 1500);
   }
 
-  async onWallet() {
+  async onWallet(automatic = false) {
     if (this.walletBusy) return;
+    if (automatic && (this.wallet?.address || promptIsCooling())) return;
     if (isMobile() && !window.kleverWeb && !inKleverHandoff()) {
+      markPrompt();
       this.walletBusy = true;
       this.handOffToWallet();
       return;
     }
+    markPrompt();
     this.walletBusy = true;
     const sign = document.getElementById('btn-wallet');
     const status = document.getElementById('wallet-status');
