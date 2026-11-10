@@ -52,7 +52,7 @@ const DEFS = {
   boar: { name: 'Thorn Boar', hp: 38, radius: 0.7, speed: 2.5, dmg: 3, gold: [5, 10], aggro: 10, build: buildBoar },
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
   budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
-  darksycledragon: { name: 'Darksycle Dragon', hp: 110, radius: 0.95, speed: 2.7, dmg: 4, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
+  darksycledragon: { name: 'Darksycle Dragon', hp: 220, radius: 1.9, speed: 2.7, dmg: 8, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
   snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
   demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 7, gold: [90, 140], aggro: 17, build: buildDemonKnight },
   holyknight: { name: 'Holy Knight', hp: 300, radius: 1.05, speed: 3.0, dmg: 7, gold: [90, 140], aggro: 17, build: buildHolyKnight },
@@ -122,7 +122,7 @@ export class Monster {
     this.obj.add(built.root);
     game.scene.add(this.obj);
     this.obj.position.set(x, this.y, z);
-    this.baseScale = type === 'voidslime' ? 1.15 : 1;
+    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : 1;
     this.air = false;
     this.attacking = false;
     this.chargeDir = new THREE.Vector3();
@@ -351,7 +351,7 @@ export class Monster {
     const tz = P.pos.z;
     this.dive = { x: tx, z: tz };
     const gy = g.world.heightAt(tx, tz);
-    this.teleSlot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 4.4, 0, 0xb25cff, DRAGON_DESCEND);
+    this.teleSlot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 8.8, 0, 0xb25cff, DRAGON_DESCEND);
     this.teleSlot.owner = this;
     this.teleKind = 'dive';
     g.audio.tone(380, DRAGON_DESCEND, 'sawtooth', 0.1, -280);
@@ -367,8 +367,8 @@ export class Monster {
     g.shake(0.45);
     g.punch(0.3);
     g.audio.tone(90, 0.35, 'square', 0.14, -40);
-    if (Math.hypot(P.pos.x - this.x, P.pos.z - this.z) < 4.4 && P.pos.y < this.y + 1.2) {
-      if (P.hurt(this.def.dmg + 1, this.x, this.z, 9)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0xb25cff], 8, 3, 0.09, 0.35);
+    if (Math.hypot(P.pos.x - this.x, P.pos.z - this.z) < 8.8 && P.pos.y < this.y + 2.4) {
+      if (P.hurt(this.def.dmg + 2, this.x, this.z, 18)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0xb25cff], 8, 3, 0.09, 0.35);
     }
     this.state = 'recover';
     this.t = -0.45;
@@ -380,9 +380,9 @@ export class Monster {
     const g = this.game;
     const frenzy = !!this.enraged;
     const a = Math.atan2(P.pos.x - this.x, P.pos.z - this.z);
-    const mx = this.x + Math.sin(a) * 2.2;
-    const mz = this.z + Math.cos(a) * 2.2;
-    const my = this.y + this.hover + 1.6;
+    const mx = this.x + Math.sin(a) * 4.4;
+    const mz = this.z + Math.cos(a) * 4.4;
+    const my = this.y + this.hover + 3.2;
     const aim = (speed) => clamp((P.pos.y + 1.0 - my) / Math.max(0.5, Math.max(dist - 1.5, 1) / speed), -9, 9);
     if (kind === 'fan') {
       const fan = frenzy ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.26, 0, 0.26];
@@ -390,7 +390,7 @@ export class Monster {
       g.fx.burst(mx, my, mz, [0xb25cff, 0xd8d3ee, 0xffffff], 10, 3.2, 0.1, 0.4);
       g.audio.tone(520, 0.16, 'sawtooth', 0.09, -300);
     } else if (kind === 'gloom') {
-      g.spawnProjectile({ owner: 'enemy', kind: 'gloom', x: mx, y: my, z: mz, vx: Math.sin(a) * 5.4, vz: Math.cos(a) * 5.4, vy: aim(5.4), dmg: this.def.dmg + 1, life: 4.4, r: 0.55, homing: 2.4 });
+      g.spawnProjectile({ owner: 'enemy', kind: 'gloom', x: mx, y: my, z: mz, vx: Math.sin(a) * 5.4, vz: Math.cos(a) * 5.4, vy: aim(5.4), dmg: this.def.dmg + 2, life: 4.4, r: 0.55, homing: 2.4 });
       g.fx.ring(mx, my, mz, 0xb25cff, 8, 1.8, 0.08, 0.4);
       g.audio.tone(210, 0.3, 'sine', 0.12, 120);
     } else {
@@ -428,7 +428,7 @@ export class Monster {
       g.shake(0.12);
       g.audio.tone(150, 0.18, 'square', 0.08, -60);
       if (!P.dead && Math.hypot(P.pos.x - s.x, P.pos.z - s.z) < s.r + 0.2 && P.pos.y < s.gy + 1.4) {
-        if (P.hurt(this.def.dmg, s.x, s.z, 7)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0x7a5cff], 8, 3, 0.09, 0.35);
+        if (P.hurt(this.def.dmg, s.x, s.z, 14)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0x7a5cff], 8, 3, 0.09, 0.35);
       }
     }
   }
@@ -819,14 +819,14 @@ export class Monster {
             if (this.cd <= 0.2 && this.skyCd <= 0 && sees && dist < 16) {
               this.beginFlight();
             } else if (this.cd <= 0 && sees) {
-              if (dist < 3.6) this.atk = 'slash';
+              if (dist < 7.2) this.atk = 'slash';
               else if (dist < 16) this.atk = Math.random() < (frenzy ? 0.45 : 0.3) ? 'gloom' : 'sickle';
               else this.atk = null;
               if (this.atk) {
                 this.state = 'windup';
                 this.t = 0;
                 const wt = { slash: 0.38, sickle: 0.65, gloom: 0.95 }[this.atk] / (frenzy ? 1.25 : 1);
-                if (this.atk === 'slash') this.warn('circle', 4.8, 0, wt, true);
+                if (this.atk === 'slash') this.warn('circle', 9.6, 0, wt, true);
                 else if (this.atk === 'sickle') this.warn('line', frenzy ? 4.2 : 2.6, 13, wt);
                 else this.warn('line', 1.3, 10, wt);
               }
@@ -840,9 +840,9 @@ export class Monster {
               this.clearWarn();
               this.kick = 1;
               const a = Math.atan2(dx, dz);
-              const mx = this.x + Math.sin(a) * 2.2;
-              const mz = this.z + Math.cos(a) * 2.2;
-              const my = this.y + this.hover + 1.6;
+              const mx = this.x + Math.sin(a) * 4.4;
+              const mz = this.z + Math.cos(a) * 4.4;
+              const my = this.y + this.hover + 3.2;
               const aim = (speed) => clamp(((P.pos.y + 1.0 - my) / Math.max(0.5, dist / speed)), -5, 5);
               if (this.atk === 'sickle') {
                 const fan = frenzy ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.24, 0, 0.24];
@@ -851,14 +851,14 @@ export class Monster {
                 g.audio.tone(520, 0.16, 'sawtooth', 0.09, -300);
                 this.cd = (1.7 + Math.random() * 0.5) * (frenzy ? 0.7 : 1);
               } else if (this.atk === 'gloom') {
-                g.spawnProjectile({ owner: 'enemy', kind: 'gloom', x: mx, y: my, z: mz, vx: Math.sin(a) * 5.4, vz: Math.cos(a) * 5.4, vy: aim(5.4), dmg: this.def.dmg + 1, life: 4.2, r: 0.55, homing: 2.4 });
+                g.spawnProjectile({ owner: 'enemy', kind: 'gloom', x: mx, y: my, z: mz, vx: Math.sin(a) * 5.4, vz: Math.cos(a) * 5.4, vy: aim(5.4), dmg: this.def.dmg + 2, life: 4.2, r: 0.55, homing: 2.4 });
                 g.fx.ring(mx, my, mz, 0xb25cff, 6, 1.6, 0.08, 0.4);
                 g.audio.tone(210, 0.3, 'sine', 0.12, 120);
                 this.cd = (2.4 + Math.random() * 0.7) * (frenzy ? 0.7 : 1);
               } else {
-                if (dist < 4.8 && P.hurt(this.def.dmg + 1, this.x, this.z, 8)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0xb25cff], 8, 3, 0.09, 0.35);
-                g.fx.ring(this.x, this.y + this.hover - 0.2, this.z, 0xb25cff, 14, 4.2, 0.1, 0.4);
-                g.vfx.slashArc(this.x, this.y + this.hover + 0.9, this.z, a, { radius: 3.4, thick: 1.5, sweep: 5.8, color: 0xb25cff, hot: 0xf0e0ff, life: 0.4, sweepT: 0.22, tail: 0.95, follow: () => ({ x: this.x, y: this.y + this.hover, z: this.z }) });
+                if (dist < 9.6 && P.hurt(this.def.dmg + 2, this.x, this.z, 16)) g.fx.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xd8d3ee, 0xb25cff], 8, 3, 0.09, 0.35);
+                g.fx.ring(this.x, this.y + this.hover - 0.2, this.z, 0xb25cff, 14, 8.4, 0.1, 0.4);
+                g.vfx.slashArc(this.x, this.y + this.hover + 1.8, this.z, a, { radius: 6.8, thick: 2.4, sweep: 5.8, color: 0xb25cff, hot: 0xf0e0ff, life: 0.4, sweepT: 0.22, tail: 0.95, follow: () => ({ x: this.x, y: this.y + this.hover, z: this.z }) });
                 g.vfx.glow(this.x, this.y + this.hover + 0.9, this.z, 0xb25cff, 4, 0.3, { grow: 0.6, gain: 0.7 });
                 g.fx.dust(this.x, this.y, this.z, 6, 2.4, 0xb9a6e0);
                 this.vx = -(dx / dist) * 9;
@@ -1436,7 +1436,7 @@ export class Monster {
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'darksycledragon' && this.airCharge) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 3.0 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 6.0 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
