@@ -1,4 +1,5 @@
-import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
+import { GEAR, MATERIAL_ORDER, MATERIALS, SLOT_LABEL, setById } from '../data/catalog.js';
+import { STYLE_LABEL } from '../data/skills.js';
 import { iconCanvas } from './icons.js';
 import { FISH, GOODS, GOODS_ORDER, SHAFT_FROM_LOG, SHAFTS_PER_LOG, TOOLS, burnChance } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
@@ -89,6 +90,26 @@ export function mountBag(body, game) {
       const sub = document.createElement('span');
       sub.textContent = current.sub;
       detail.append(name, sub);
+      if (current.stats?.length) {
+        const box = document.createElement('div');
+        box.className = 'bag-stats';
+        for (const [label, value] of current.stats) {
+          const row = document.createElement('div');
+          const k = document.createElement('small');
+          k.textContent = label;
+          const v = document.createElement('b');
+          v.textContent = String(value);
+          row.append(k, v);
+          box.appendChild(row);
+        }
+        detail.appendChild(box);
+      }
+      if (current.setNote) {
+        const note = document.createElement('p');
+        note.className = 'bag-set';
+        note.textContent = current.setNote;
+        detail.appendChild(note);
+      }
       const actions = current.actions || (current.action ? [{ label: current.action, run: current.run }] : []);
       if (actions.length) {
         const row = document.createElement('div');
@@ -114,6 +135,31 @@ export function mountBag(body, game) {
   return () => {};
 }
 
+function pieceStats(g, progress) {
+  if (g.type === 'weapon') return { rows: g.stats.map(([k, v]) => [k, String(v)]), note: null };
+  const rows = [
+    ['Slot', SLOT_LABEL[g.slot] || g.slot],
+    ['Defense', '+' + (g.def || 0)],
+  ];
+  const set = g.set ? setById(g.set) : null;
+  if (!set) return { rows, note: null };
+  rows.push(['Set', set.name]);
+  const active = progress.setComplete(set.id);
+  return { rows, note: set.bonus + (active ? ' Active.' : '') };
+}
+
+function heldStats(it) {
+  if (it.dmg == null || it.kind === 'use' || it.kind === 'light' || it.kind === 'none') return null;
+  const rows = [['Damage', String(it.dmg)]];
+  if (it.reach != null) rows.push(['Reach', Number(it.reach).toFixed(1)]);
+  else if (it.kind === 'ranged') {
+    const range = { shortbow: 'Short', longbow: 'Long', crossbow: 'Bolt', staff: 'Spell', wand: 'Spell', tome: 'Spell' };
+    rows.push([it.spell ? 'Shot' : 'Range', range[it.style] || 'Short']);
+  }
+  if (STYLE_LABEL[it.style]) rows.push(['Style', STYLE_LABEL[it.style]]);
+  return rows;
+}
+
 function emptyText(tab) {
   if (tab === 'carried') return 'Weapons and supplies on your hotbar show up here.';
   if (tab === 'tools') return 'The tinderbox lights logs you have chopped.';
@@ -128,10 +174,12 @@ function collect(game) {
   game.items.forEach((it, i) => {
     if (!it || it.id === 'empty' || !it.held || forged.has(it.id)) return;
     const count = it.count !== undefined ? `Carried ${it.count}` : i === game.sel ? 'In hand' : 'On the hotbar';
+    const held = heldStats(it);
     carried.push({
       key: 'c' + i,
       name: it.name,
       sub: it.desc ? `${count}. ${it.desc}` : count,
+      stats: held,
       badge: it.count !== undefined ? String(it.count) : null,
       canvas: () => renderThumb({ kind: 'held', id: it.held }, 96),
       action: it.kind === 'use' ? 'Use' : 'Hold',
@@ -236,12 +284,15 @@ function collect(game) {
 
   const gear = GEAR.filter((g) => game.progress.crafted(g.id) && !game.progress.storedGear(g.id)).map((g) => {
     const worn = game.progress.worn(g.id);
+    const sheet = pieceStats(g, game.progress);
     return {
       key: 'w' + g.id,
       name: g.name,
-      sub: worn ? 'Equipped. Take it off, or open Character to see the full set.' : 'In the bag. Wear it from here or from the Character screen.',
+      sub: worn ? 'Equipped.' : 'In the bag.',
       badge: worn ? 'Worn' : null,
       worn,
+      stats: sheet.rows,
+      setNote: sheet.note,
       canvas: () => renderThumb({ kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id }, 96),
       action: worn ? 'Unequip' : 'Equip',
       run: (paint) => {
