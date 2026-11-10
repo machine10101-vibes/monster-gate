@@ -21,9 +21,21 @@ export const MATERIALS = {
   yetifang: { name: 'Yeti Fang', desc: 'A cream-white fang with a rime of frost along the root.' },
   frostshard: { name: 'Frost Shard', desc: 'A spike of living ice from a yeti\'s back. It never melts.' },
   frostheart: { name: 'Frostheart', desc: 'A palm-sized crystal that beats once a minute, long after its owner is gone.' },
+  tigerpelt: { name: 'Tiger Pelt', desc: 'Orange fur banded in black. Heavy, warm and unmistakable.' },
+  tigerfang: { name: 'Tiger Fang', desc: 'A curved ivory fang as long as a finger.' },
+  tigerclaw: { name: 'Tiger Claw', desc: 'A hooked claw, still sharp enough to scratch steel.' },
+  raptorscale: { name: 'Raptor Scale', desc: 'Olive and tan scale in a mosaic pattern. Tougher than it looks.' },
+  raptorclaw: { name: 'Raptor Sickle Claw', desc: 'A curved killing claw from a raptor\'s foot.' },
+  raptorspike: { name: 'Raptor Back Spike', desc: 'A grey bone spike from the ridge of a battle raptor.' },
+  piratebandana: { name: 'Red Bandana', desc: 'A faded red bandana with a salt-stained knot.' },
+  brassbutton: { name: 'Gold Button', desc: 'A gold coat button stamped with an anchor.' },
+  cutlassscrap: { name: 'Cutlass Shard', desc: 'A chipped curved blade fragment. Good scrap iron.' },
+  cursedbone: { name: 'Cursed Bone', desc: 'A yellowed bone that is still cold from the grave.' },
+  cursedcoin: { name: 'Cursed Doubloon', desc: 'A tarnished doubloon. It is never quite where you left it.' },
+  tatteredsail: { name: 'Tattered Sailcloth', desc: 'Rotted canvas from a ghost ship.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerpelt', 'tigerfang', 'tigerclaw', 'raptorscale', 'raptorclaw', 'raptorspike', 'piratebandana', 'brassbutton', 'cutlassscrap', 'cursedbone', 'cursedcoin', 'tatteredsail'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -50,6 +62,26 @@ export const DROPS = {
     { id: 'glacierclaw', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
     { id: 'yetifang', chance: 0.5, qty: [1, 2], rate: 'Uncommon' },
     { id: 'frostheart', chance: 0.25, qty: [1, 1], rate: 'Rare' },
+  ],
+  tiger: [
+    { id: 'tigerpelt', chance: 1, qty: [1, 2], rate: 'Common' },
+    { id: 'tigerfang', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'tigerclaw', chance: 0.5, qty: [1, 3], rate: 'Uncommon' },
+  ],
+  raptor: [
+    { id: 'raptorscale', chance: 1, qty: [2, 3], rate: 'Common' },
+    { id: 'raptorclaw', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'raptorspike', chance: 0.35, qty: [1, 2], rate: 'Rare' },
+  ],
+  pirate: [
+    { id: 'piratebandana', chance: 0.7, qty: [1, 1], rate: 'Common' },
+    { id: 'brassbutton', chance: 0.8, qty: [1, 3], rate: 'Common' },
+    { id: 'cutlassscrap', chance: 0.4, qty: [1, 1], rate: 'Uncommon' },
+  ],
+  cursedpirate: [
+    { id: 'cursedbone', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'tatteredsail', chance: 0.5, qty: [1, 2], rate: 'Common' },
+    { id: 'cursedcoin', chance: 0.3, qty: [1, 1], rate: 'Rare' },
   ],
 };
 
@@ -95,6 +127,22 @@ export const MONSTERS = [
     id: 'holyknight', name: 'Holy Knight', level: 11, temper: 'Righteous', style: 'Brawler', habitat: 'The white castle on tile 23, in the volcanic wasteland',
     desc: 'A giant knight in white and gold plate with glowing blue crosses and a ragged gold-trimmed cape. It smashes the ground with a rune-lit stone war hammer and calls pillars of holy light down on wherever you stand. It drops no parts, only whole pieces of its own gear, and rarely.',
     lore: KNIGHT_LORE.holyknight,
+  },
+  {
+    id: 'tiger', name: 'Bengal Tiger', level: 6, temper: 'Stalking', style: 'Pouncer', habitat: 'The jungle oasis, west of Brookside',
+    desc: 'An orange and black striped cat with white paws and yellow eyes. It creeps low through the undergrowth, then pounces from a distance and rakes with both paws. If you roll away it lunges again. Hit it during its crouch to knock it off the pounce.',
+  },
+  {
+    id: 'raptor', name: 'Battle Raptor', level: 6, temper: 'Savage', style: 'Pack Hunter', habitat: 'The jungle oasis, west of Brookside',
+    desc: 'A scarred, olive-scaled raptor with a ridge of grey spikes and an orange eye. It hunts in packs, snaps with a mouthful of teeth and leaps with its sickle claws. One alone is a fight and three is a problem.',
+  },
+  {
+    id: 'pirate', name: 'Pirate', level: 5, temper: 'Greedy', style: 'Melee', habitat: 'The shipyard docks and the jungle gate on the western coast',
+    desc: 'A cutthroat in a navy coat, tricorn hat and red bandana. It swings a curved cutlass and lunges when you are out of reach.',
+  },
+  {
+    id: 'cursedpirate', name: 'Cursed Pirate', level: 7, temper: 'Vengeful', style: 'Melee', habitat: 'Deep in the jungle oasis, west of Brookside',
+    desc: 'A skeleton in a rotted tricorn, red bandana and navy coat, still gripping a bloody cutlass. It hits harder than a living pirate and does not stay down for long.',
   },
 ];
 
