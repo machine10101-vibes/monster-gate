@@ -52,6 +52,12 @@ const RING = {
   '2,2': ['dawnspire', 'West of the Endless Field. Dawnspire is the Holy Knight\'s white marble castle, with gold-trimmed towers, a cathedral keep and a courtyard of blue fire.'],
   '3,1': ['hellspire', 'North of the Endless Field. Hellspire is the Demon Knight\'s black fortress, ringed in iron spikes, with lava in every crack and a gate shaped like a mouth.'],
   '2,1': ['cinderfall', 'West of Hellspire. Cinderfall is a smoking volcano of black basalt, surrounded by obsidian spires, lava pools and magma vents.'],
+  '2,5': ['lagoon', 'West of Brookside. A pass through the western peaks opens onto Mirrormere Oasis, a turquoise lagoon ringed by palms, ferns and flowering jungle.'],
+  '1,5': ['canopy', 'West of the oasis. Silverrun Canopy is thick jungle under giant trees, with an overgrown stone temple, carved idols and roaming Bengal Tigers.'],
+  '2,6': ['sunken', 'South of the oasis, west of Longacre. Southmead is dense jungle with bamboo groves, pools and tall grass, where Battle Raptors hunt in packs.'],
+  '1,6': ['tigerwood', 'Southwest of the oasis. Runmouth is a steaming jungle hollow with a wrecked pirate ship half swallowed by roots, haunted by Cursed Pirates.'],
+  '2,7': ['pirateshore', 'South of Southmead. The jungle thins to a palm beach at Dunes, where two pirate ships are moored and a long fishing pier runs out over deep water.'],
+  '1,7': ['shellbeach', 'West of Dunes. Shellbeach is a sweep of white sand, shells and driftwood between the jungle and the sea, with a pirate ship dock on the shore.'],
   '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Long fenced fields and a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
 };

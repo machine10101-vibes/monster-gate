@@ -12,6 +12,7 @@ import { buildCave } from './cave.js';
 import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
+import { buildJungleModels } from './jungleModels.js';
 import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
@@ -52,6 +53,7 @@ export class World {
     if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
     const d = this.dock;
     if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
+    if (this.docks) for (const p of this.docks) if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.y;
     const land = this.landAt(x, z);
     if (land) {
       const lx = Math.floor(x) - land.x0;
@@ -62,7 +64,9 @@ export class World {
   }
   onDock(x, z, pad = 0) {
     const d = this.dock;
-    return !!d && x > d.x0 - pad && x < d.x1 + pad && z > d.z - d.hw - pad && z < d.z + d.hw + pad;
+    if (d && x > d.x0 - pad && x < d.x1 + pad && z > d.z - d.hw - pad && z < d.z + d.hw + pad) return true;
+    if (this.docks) for (const p of this.docks) if (x > p.x0 - pad && x < p.x1 + pad && z > p.z0 - pad && z < p.z1 + pad) return true;
+    return false;
   }
   isWater(x, z) {
     return this.heightAt(x, z) < WATER_Y;
@@ -393,6 +397,7 @@ export class World {
       tentFrost: M.buildTent(9, 0x9ec3e6, 0xf2ead3),
       arctic: buildArcticModels(),
       volcanic: buildVolcanicModels(),
+      jungle: buildJungleModels(),
       keeps: buildKeepModels(),
     };
     void q;
