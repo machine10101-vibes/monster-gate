@@ -1,8 +1,11 @@
-import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, SETS, corePieces, gearById } from '../data/catalog.js';
+import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 import { GOODS, LEVEL_SKILLS, MAX_LEVEL, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
 
 const ANON_KEY = 'monster-gate-hunter-v1';
+
+export const STORAGE_SLOTS = 30;
+const POTION_IDS = new Set(['potion', 'manapotion']);
 
 export function saveKey(address) {
   return address ? `${ANON_KEY}:${address}` : ANON_KEY;
@@ -29,6 +32,7 @@ const blank = () => ({
   stock: {},
   xp: {},
   goods: {},
+  storage: emptyStorage(),
 });
 
 /** Discoveries, harvested parts, crafted gear and what is worn. Persisted for one Klever address. */
@@ -78,6 +82,8 @@ export class Progress {
     this.data.xp = normalizeXp(this.data.xp);
     this.data.goods = normalizeGoods(this.data.goods);
     this.data.hunter = normalizeHunter(this.data.hunter);
+    this.data.storage = normalizeStorage(this.data.storage);
+    releaseStoredGear(this.data);
   }
 
   save(echo = true) {
@@ -430,6 +436,53 @@ export class Progress {
     return Object.values(this.data.goods).reduce((a, b) => a + (b | 0), 0);
   }
 
+  /* ------------------------------ storage crate ------------------------------ */
+  storedGear(id) {
+    return this.data.storage.some((s) => s && s.k === 'gear' && s.id === id);
+  }
+
+  storageUsed() {
+    return this.data.storage.filter(Boolean).length;
+  }
+
+  canFitStorage(k, id) {
+    if (k !== 'gear' && this.data.storage.some((s) => s && s.k === k && s.id === id)) return true;
+    if (k === 'gear' && this.storedGear(id)) return false;
+    return this.data.storage.some((s) => !s);
+  }
+
+  /** Merge into an existing stack, or take the first empty slot. Gear always uses its own slot. */
+  putStorage(k, id, n) {
+    n = n | 0;
+    if (n < 1 || !this.canFitStorage(k, id)) return false;
+    const slots = this.data.storage;
+    if (k !== 'gear') {
+      const have = slots.find((s) => s && s.k === k && s.id === id);
+      if (have) {
+        have.n += n;
+        this.save();
+        return true;
+      }
+    }
+    const at = slots.findIndex((s) => !s);
+    slots[at] = { k, id, n: k === 'gear' ? 1 : n };
+    this.save();
+    return true;
+  }
+
+  /** Pull up to n from a slot. Omit n to take the whole stack. */
+  pullStorage(index, n) {
+    const s = this.data.storage[index];
+    if (!s) return null;
+    const take = n == null ? s.n : Math.min(s.n, n | 0);
+    if (take < 1) return null;
+    const out = { k: s.k, id: s.id, n: take };
+    s.n -= take;
+    if (s.n <= 0) this.data.storage[index] = null;
+    this.save();
+    return out;
+  }
+
   clearLearned() {
     if (!this.classId) return false;
     this.data.skills.learned = {};
@@ -510,6 +563,71 @@ function normalizeXp(raw) {
     }
   }
   return out;
+}
+
+function emptyStorage() {
+  return Array.from({ length: STORAGE_SLOTS }, () => null);
+}
+
+function storageEntry(item) {
+  if (!item || typeof item !== 'object') return null;
+  const k = item.k;
+  const id = typeof item.id === 'string' ? item.id : '';
+  let n = item.n | 0;
+  if (!id || n < 1) return null;
+  n = Math.min(n, 99999);
+  if (k === 'good' && GOODS[id]) return { k, id, n };
+  if (k === 'part' && MATERIALS[id]) return { k, id, n };
+  if (k === 'potion' && POTION_IDS.has(id)) return { k, id, n };
+  if (k === 'gear' && gearById(id)) return { k, id, n: 1 };
+  return null;
+}
+
+function normalizeStorage(raw) {
+  const slots = emptyStorage();
+  if (!Array.isArray(raw)) return slots;
+  const positioned = raw.length === STORAGE_SLOTS;
+  let cursor = 0;
+  for (let i = 0; i < raw.length && cursor < STORAGE_SLOTS; i++) {
+    const entry = storageEntry(raw[i]);
+    if (!entry) {
+      if (positioned) cursor = i + 1;
+      continue;
+    }
+    if (entry.k !== 'gear') {
+      const have = slots.find((s) => s && s.k === entry.k && s.id === entry.id);
+      if (have) {
+        have.n = Math.min(99999, have.n + entry.n);
+        if (positioned) cursor = i + 1;
+        continue;
+      }
+    } else if (slots.some((s) => s && s.k === 'gear' && s.id === entry.id)) {
+      if (positioned) cursor = i + 1;
+      continue;
+    }
+    const at = positioned ? i : slots.findIndex((s) => !s);
+    if (at < 0 || at >= STORAGE_SLOTS) break;
+    slots[at] = entry;
+    cursor = at + 1;
+  }
+  return slots;
+}
+
+function releaseStoredGear(data) {
+  if (!data.armor) data.armor = {};
+  for (const s of data.storage) {
+    if (!s || s.k !== 'gear' || !data.crafted?.[s.id]) {
+      if (s && s.k === 'gear' && !data.crafted?.[s.id]) {
+        const at = data.storage.indexOf(s);
+        if (at >= 0) data.storage[at] = null;
+      }
+      continue;
+    }
+    const g = gearById(s.id);
+    if (!g) continue;
+    if (g.type === 'weapon' && data.weapon === s.id) data.weapon = null;
+    if (g.type === 'armor' && data.armor[g.slot] === s.id) data.armor[g.slot] = null;
+  }
 }
 
 function normalizeGoods(raw) {

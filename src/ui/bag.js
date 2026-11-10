@@ -193,7 +193,7 @@ function collect(game) {
     });
   }
 
-  const gear = GEAR.filter((g) => game.progress.crafted(g.id)).map((g) => {
+  const gear = GEAR.filter((g) => game.progress.crafted(g.id) && !game.progress.storedGear(g.id)).map((g) => {
     const worn = game.progress.worn(g.id);
     return {
       key: 'w' + g.id,
