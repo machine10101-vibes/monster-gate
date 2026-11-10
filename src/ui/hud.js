@@ -12,6 +12,7 @@ import { mountBag } from './bag.js';
 import { mountStorage } from './storage.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
+import { mountTeleport } from './teleport.js';
 import { shortAddress } from '../wallet/klever.js';
 
 export const ITEMS = [
@@ -291,6 +292,14 @@ export class HUD {
       ctx.fillStyle = '#14343a';
       ctx.fillRect(toX(world.waygate.x) - 1, toZ(world.waygate.z) - 1, 3, 3);
     }
+    ctx.fillStyle = '#f4fbff';
+    for (const p of world.teleports || []) {
+      if (!inView(p.x, p.z)) continue;
+      ctx.fillRect(toX(p.x) - 2, toZ(p.z) - 2, 5, 5);
+      ctx.fillStyle = '#2f6f99';
+      ctx.fillRect(toX(p.x) - 1, toZ(p.z) - 1, 3, 3);
+      ctx.fillStyle = '#f4fbff';
+    }
     ctx.fillStyle = '#5ad0ff';
     for (const n of npcs) if (inView(n.x, n.z)) ctx.fillRect(toX(n.x) - 2, toZ(n.z) - 2, 4, 4);
     if (remotes) {
@@ -386,6 +395,8 @@ export class HUD {
           ctx.fillStyle = '#7ef6ff';
           ctx.fillRect(game.world.waygate.x - ox - 2, game.world.waygate.z - oz - 2, 5, 5);
         }
+        ctx.fillStyle = '#f4fbff';
+        for (const p of game.world.teleports || []) ctx.fillRect(p.x - ox - 2, p.z - oz - 2, 5, 5);
         ctx.fillStyle = '#ff9a3c';
         ctx.fillRect(MINE.x - ox - 2, MINE.z - oz - 2, 5, 5);
         ctx.fillStyle = '#4ec8ff';
@@ -393,7 +404,7 @@ export class HUD {
       }
       add(inCave
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Violet marks the dragon\'s nest. Walk back down the tunnel to return to the vale. White: you.</p>'
-        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate. Orange: the Greyrock Pit. Light blue: Mirrormere. The map shows Oakhollow and the eight tiles around it. Violet in Southford is the Darksycle Cave. White: you.</p>');
+        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate. White: a teleportation portal. Orange: the Greyrock Pit. Light blue: Mirrormere. The map shows Oakhollow and the eight tiles around it. Violet in Southford is the Darksycle Cave. White dot: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
@@ -408,6 +419,9 @@ export class HUD {
     } else if (name === 'gear') {
       title.textContent = 'Character';
       this.cleanup = mountGear(body, game);
+    } else if (name === 'tome') {
+      title.textContent = 'Teleportation Tome';
+      this.cleanup = mountTeleport(body, game);
     } else if (name === 'spellbook') {
       title.textContent = 'Skill & Spell Book';
       this.cleanup = mountSpellbook(body, game);
@@ -515,6 +529,7 @@ export class HUD {
       const jumps = document.createElement('div');
       jumps.className = 'set-jumps';
       for (const [id, label, sub] of [
+        ['tome', 'Teleportation Tome', 'Travel to a remembered place'],
         ['gear', 'Character', 'Equipped and unequipped'],
         ['bag', 'Inventory', 'Bag, tools and goods'],
         ['world', 'World Creator', '100-tile map'],

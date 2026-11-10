@@ -1074,6 +1074,29 @@ body.touch #top-right {
   text-transform: uppercase;
   letter-spacing: 3px;
 }
+.tome-note, .tome-more {
+  margin: 0 0 12px;
+  color: #c5d4e4;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.tome-more { color: #9eb4c8; font-size: 13px; }
+.tome-list { display: flex; flex-direction: column; gap: 8px; }
+.tome-go {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  color: #071014;
+  background: linear-gradient(#f7fdff, #8fd4ef);
+  border: 2px solid #f4fbff;
+  border-radius: 6px;
+  touch-action: auto;
+}
+.tome-go b { font-family: var(--font-px); font-size: 8px; letter-spacing: 0.04em; }
+.tome-go small { color: #1c4660; font-size: 13px; }
 .wg-btn {
   margin-top: 8px;
   padding: 8px 12px;

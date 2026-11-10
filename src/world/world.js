@@ -16,6 +16,7 @@ import { buildJungleModels } from './jungleModels.js';
 import { buildStorageCrate as makeStorageCrate } from './storageCrate.js';
 import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
+import { placeTeleportPortals } from './teleport.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
@@ -347,6 +348,7 @@ export class World {
     await nextFrame();
     this.scatterCover();
     this.placeWaygate();
+    placeTeleportPortals(this);
     dressSouthford(this);
     dressRing(this);
     this.cave = buildCave(this);
@@ -1119,6 +1121,14 @@ export class World {
       octx.fillStyle = '#7ef6ff';
       octx.fillRect(Math.floor(this.waygate.x) - 2, Math.floor(this.waygate.z) - 2, 4, 4);
     }
+    for (const p of this.teleports || []) {
+      const land = this.landAt(p.x, p.z);
+      const canvas = land && this.tileCanvas[land.tileId];
+      if (!canvas) continue;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f4fbff';
+      ctx.fillRect(Math.floor(p.x - land.x0) - 2, Math.floor(p.z - land.z0) - 2, 4, 4);
+    }
     octx.fillStyle = '#6a3d86';
     octx.fillRect(70, 84, 4, 3);
     if (this.dock) {
@@ -1162,6 +1172,16 @@ export class World {
     this.portalMat.uniforms.uTime.value = t;
     this.haloMat.uniforms.uTime.value = t;
     this.waygate?.tick(t);
+    const gate = this.teleportFx;
+    if (gate) {
+      gate.curtainMat.uniforms.uTime.value = t;
+      for (const mat of gate.ringMats) mat.uniforms.uTime.value = t;
+      const beat = 0.5 + 0.5 * Math.sin(t * 2.4);
+      for (const site of this.teleports) {
+        site.light.intensity = 1.4 + beat * 1.1;
+        site.light.color.setHex(beat > 0.72 ? 0xffffff : 0xd6f3ff);
+      }
+    }
   }
 
   placeWaygate() {

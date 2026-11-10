@@ -1,4 +1,5 @@
 import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
+import { iconCanvas } from './icons.js';
 import { FISH, GOODS, GOODS_ORDER, TOOLS, burnChance } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
@@ -143,7 +144,22 @@ function collect(game) {
     });
   });
 
-  const tools = TOOLS.filter((x) => x.id !== 'pickaxe').map((t) => ({
+  const tools = [{
+    key: 'tome',
+    name: 'Teleportation Tome',
+    sub: 'Opens a path back to Oakhollow, and to every portal you have attuned.',
+    canvas: () => {
+      const c = document.createElement('canvas');
+      c.width = 96;
+      c.height = 96;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(iconCanvas('warp'), 16, 16, 64, 64);
+      return c;
+    },
+    action: 'Open',
+    run: () => game.openTome(),
+  }].concat(TOOLS.filter((x) => x.id !== 'pickaxe').map((t) => ({
     key: 't' + t.id,
     name: t.name,
     sub: t.id === 'tinderbox' ? 'Light a log from Gathered.' : t.desc,
@@ -152,7 +168,7 @@ function collect(game) {
     run: () => {
       if (game.lightLog()) game.hud.closePanel();
     },
-  }));
+  })));
 
   const goods = [];
   for (const id of GOODS_ORDER) {
