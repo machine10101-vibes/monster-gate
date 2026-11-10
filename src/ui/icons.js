@@ -645,6 +645,24 @@ ART.wand = [
   '................',
   '................',
 ];
+ART.warp = [
+  '................',
+  '..bbbbbbbbbb....',
+  '.bwwwwwwwwwwb...',
+  '.bwcccwwcccwb...',
+  '.bwccwwwwccwb...',
+  '.bwcwwwwwwcwb...',
+  '.bwwcccwwwcwb...',
+  '.bwwwwcccwcwb...',
+  '.bwwwwwwcccwb...',
+  '.bbbbbbbbbbbb...',
+  '..iiiiiiiiii....',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+];
 ART.tome = [
   '................',
   '..bbbbbbbbbb....',

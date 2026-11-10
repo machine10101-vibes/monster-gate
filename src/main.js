@@ -111,6 +111,8 @@ class Game {
     this.net.onChange = () => this.refreshWaygate();
     this.waygateNear = false;
     this.waygateHinted = false;
+    this.portalNear = false;
+    this.portalHinted = false;
     this.guestBound = false;
     this.wallet = null;
     this.roster = null;
@@ -1725,6 +1727,87 @@ class Game {
     }
   }
 
+  nearestPortal() {
+    const p = this.player.pos;
+    let best = null;
+    let bd = 3.6;
+    for (const site of this.world.teleports || []) {
+      const d = Math.hypot(p.x - site.x, p.z - site.z);
+      if (d < bd) {
+        bd = d;
+        best = site;
+      }
+    }
+    return best;
+  }
+
+  openTome() {
+    this.hud.openPanel('tome', this);
+    this.hud.panelId = 'tome';
+    this.audio.select();
+  }
+
+  attunePortal(site) {
+    if (!site) return;
+    const fresh = this.progress.rememberPortal(site.id);
+    this.audio.portal();
+    this.fx.burst(site.x, site.y + 1.6, site.z, [0xd6f3ff, 0xffffff, 0x6fd6ff], 14, 2.2, 0.08, 0.45);
+    this.hud.toast(fresh ? `${site.name} is written in the tome` : `${site.name} is already in the tome`, 2400);
+    this.openTome();
+  }
+
+  travelTo(dest) {
+    if (!this.started || !this.player || this.player.dead || !dest) return;
+    if (this.world.realm === 'cave') restoreOverworld(this);
+    this.gather?.cancel?.();
+    const y = this.world.heightAt(dest.x, dest.z);
+    this.player.dead = false;
+    this.player.pos.set(dest.x, y, dest.z);
+    this.player.vel.set(0, 0, 0);
+    this.player.knock?.set(0, 0, 0);
+    this.player.setState('idle');
+    this.player.invuln = 0.8;
+    this.player.syncObj();
+    this.snapCamera();
+    this.hud.closePanel();
+    this.audio.portal();
+    this.fx.burst(dest.x, y + 1.2, dest.z, [0xd6f3ff, 0xffffff, 0x6fd6ff], 18, 2.6, 0.1, 0.5);
+    const banner = dest.banner || ['Travel', dest.name];
+    this.hud.banner(banner[0], banner[1], 2400);
+  }
+
+  updatePortals() {
+    const site = this.nearestPortal();
+    this.portalNear = !!(site && this.started);
+    if (this.portalNear && !this.portalHinted) {
+      this.portalHinted = true;
+      this.hud.toast('Teleportation Portal — press F to attune it to your tome', 2800);
+    }
+    if (site) {
+      const known = this.progress.knowsPortal(site.id);
+      const [sx, sy, vis] = this.screenOf(site.x, site.y + 3.2, site.z, true);
+      const label = known
+        ? `${site.name}<small>F · open tome</small>`
+        : `${site.name}<small>F · attune</small>`;
+      this.hud.plate('portal', label);
+      this.hud.placePlate('portal', sx, sy, vis);
+    } else this.hud.removePlate('portal');
+  }
+
+  clickPortal() {
+    const aim = this.input.aim;
+    if (!this.started || !aim.has || this.input.touch) return false;
+    const P = this.player.pos;
+    for (const site of this.world.teleports || []) {
+      if (Math.hypot(P.x - site.x, P.z - site.z) > 4.2) continue;
+      const hits = this.ray.intersectObject(site.group, true);
+      if (!hits.length) continue;
+      this.attunePortal(site);
+      return true;
+    }
+    return false;
+  }
+
   tryTalk() {
     const w = this.world.waygate;
     const p = this.player.pos;
@@ -1740,6 +1823,13 @@ class Game {
     };
     if (!this.talkNpc && this.storageNear && !npcNear && closerThanShops()) {
       this.openStorage();
+      return;
+    }
+    const portal = this.nearestPortal();
+    const pd = portal ? Math.hypot(p.x - portal.x, p.z - portal.z) : 99;
+    const shop = (spot) => (spot ? Math.hypot(p.x - spot.x, p.z - spot.z) : 99);
+    if (!this.talkNpc && portal && pd < 3.6 && !npcNear && pd <= sd && pd <= wd && pd <= shop(this.world.market) && pd <= shop(this.world.alchemy) && pd <= shop(this.world.forge)) {
+      this.attunePortal(portal);
       return;
     }
     if (!this.talkNpc && this.marketNear && !npcNear) {
@@ -2114,7 +2204,7 @@ class Game {
       if (!blocked) this.tryTalk();
     }
     if (inp.take('attack') && !blocked) {
-      if (!this.clickStorage()) this.doAttack();
+      if (!this.clickStorage() && !this.clickPortal()) this.doAttack();
     }
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
@@ -2349,9 +2439,10 @@ class Game {
     this.updateAlchemy(dt);
     this.updateMarket();
     this.updateStorage();
+    this.updatePortals();
     updateGatherSites(this.world, dt, t, this);
     this.gather.update(dt);
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }

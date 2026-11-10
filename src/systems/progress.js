@@ -1,6 +1,7 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 import { GOODS, LEVEL_SKILLS, MAX_LEVEL, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
+import { PORTAL_IDS } from '../data/portals.js';
 
 const ANON_KEY = 'monster-gate-hunter-v1';
 
@@ -33,6 +34,7 @@ const blank = () => ({
   xp: {},
   goods: {},
   storage: emptyStorage(),
+  portals: [],
 });
 
 /** Discoveries, harvested parts, crafted gear and what is worn. Persisted for one Klever address. */
@@ -83,6 +85,7 @@ export class Progress {
     this.data.goods = normalizeGoods(this.data.goods);
     this.data.hunter = normalizeHunter(this.data.hunter);
     this.data.storage = normalizeStorage(this.data.storage);
+    this.data.portals = normalizePortals(this.data.portals);
     releaseStoredGear(this.data);
   }
 
@@ -111,6 +114,22 @@ export class Progress {
 
   get gold() {
     return this.data.gold | 0;
+  }
+
+  knownPortals() {
+    return this.data.portals || [];
+  }
+
+  knowsPortal(id) {
+    return this.knownPortals().includes(id);
+  }
+
+  /** Write a discovered portal into the tome. Returns false when it was already there. */
+  rememberPortal(id) {
+    if (!PORTAL_IDS.has(id) || this.knowsPortal(id)) return false;
+    this.data.portals = this.knownPortals().concat(id);
+    this.save();
+    return true;
   }
 
   setGold(n) {
@@ -561,6 +580,15 @@ function normalizeXp(raw) {
       const n = Number(raw[id]);
       if (n > 0 && isFinite(n)) out[id] = Math.min(xpForLevel(MAX_LEVEL), n);
     }
+  }
+  return out;
+}
+
+function normalizePortals(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const id of raw) {
+    if (typeof id === 'string' && PORTAL_IDS.has(id) && !out.includes(id)) out.push(id);
   }
   return out;
 }
