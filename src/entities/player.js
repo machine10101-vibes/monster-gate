@@ -370,6 +370,12 @@ export class Player {
       return true;
     }
     if (item.kind === 'light' || item.kind === 'none') return false;
+    if (item.kind === 'ranged' && !item.proj && !item.spell) {
+      if (!this.game.progress.hasArrow()) {
+        this.game.hud.toast(this.game.progress.data.armor.quiver ? 'The quiver is empty' : 'Equip a quiver of arrows', 1400);
+        return false;
+      }
+    }
     if (this.stamina < 3) return false;
     this.drawWeapon();
     this.attackItem = item;
@@ -721,6 +727,7 @@ export class Player {
         g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
         g.audio.tone(it.proj === 'gloom' ? 260 : focus ? 720 : 620, 0.14, 'sawtooth', 0.08, -200);
       } else {
+        if (!g.progress.drawArrow()) return;
         g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * (it.style === 'crossbow' ? 26 : 20), vz: f.z * (it.style === 'crossbow' ? 26 : 20), dmg, life: 1.3, r: 0.35, crit: aimed, pierce });
         g.audio.tone(it.style === 'crossbow' ? 420 : 900, 0.08, 'triangle', 0.1, -500);
       }

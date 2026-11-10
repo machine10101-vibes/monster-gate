@@ -14,6 +14,7 @@ import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
 import { buildJungleModels } from './jungleModels.js';
 import { buildStorageCrate as makeStorageCrate } from './storageCrate.js';
+import { buildSmithy as makeSmithy } from './smithy.js';
 import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { placeTeleportPortals } from './teleport.js';
@@ -614,6 +615,7 @@ export class World {
     this.lightSpots.push({ x: FX + 0.7, y: fy + 0.9, z: FZ, color: 0xff7a22 });
     this.forge = { x: FX, y: fy, z: FZ, anvil: { x: 63.4, z: 86.1 } };
     this.buildStorageCrate();
+    this.buildSmithy();
 
     this.npcSpots = {
       guild: { x: GUILD.x - 1.4, z: GUILD.z + 3.5 },
@@ -656,6 +658,29 @@ export class World {
     this.occupy(x, z, 1.6);
     this.lightSpots.push({ x: x + 1.15, y: y + 1.15, z, color: 0xffc866 });
     this.storage = { x, y, z, group: g, lid, flag, open: false };
+  }
+
+  /** Beside the west path out of Oakhollow, on the grass between the stream and the trees. The door faces the path. */
+  buildSmithy() {
+    const x = 42;
+    const z = 70;
+    const y = this.heightAt(x, z);
+    const g = new THREE.Group();
+    g.name = 'smithy';
+    g.position.set(x, y, z);
+    g.rotation.y = -2.4;
+    for (const p of makeSmithy(11)) {
+      const mat = p.kind === 'solid' ? this.mats.solid : p.kind === 'glow' ? this.mats.glow : this.mats.window;
+      const mesh = new THREE.Mesh(p.geo, mat);
+      mesh.castShadow = p.kind === 'solid';
+      mesh.receiveShadow = p.kind === 'solid';
+      g.add(mesh);
+    }
+    this.group.add(g);
+    this.box(x, z, 2.3, 1.9);
+    this.occupy(x, z, 2.6);
+    this.lightSpots.push({ x: x + 1.2, y: y + 1.4, z, color: 0xff9a3a });
+    this.smithy = { x, y, z, group: g };
   }
 
   buildGate() {
@@ -1138,6 +1163,10 @@ export class World {
     if (this.storage) {
       octx.fillStyle = '#3f7d79';
       octx.fillRect(Math.floor(this.storage.x) - 2, Math.floor(this.storage.z) - 2, 5, 4);
+    }
+    if (this.smithy) {
+      octx.fillStyle = '#e07030';
+      octx.fillRect(Math.floor(this.smithy.x) - 2, Math.floor(this.smithy.z) - 2, 5, 4);
     }
     octx.fillStyle = '#6b4a2b';
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {

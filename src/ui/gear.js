@@ -1,11 +1,12 @@
 import { GEAR, SLOT_LABEL, TIER_LABEL, gearById, setById } from '../data/catalog.js';
 import { STYLE_LABEL } from '../data/skills.js';
+import { ARROW_TYPES, GOODS, QUIVER_MAX } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
 const LEFT = ['helm', 'chest', 'arms'];
-const RIGHT = ['legs', 'boots'];
-const BOTTOM = ['weapon', 'shield', 'book'];
+const RIGHT = ['legs', 'boots', 'quiver'];
+const BOTTOM = ['weapon', 'shield', 'book', 'ammo'];
 const TIER_COLOR = { metal: '#aab4c4', leather: '#c88a4a', cloth: '#b98aff' };
 const TABS = [
   ['gear', 'Character'],
@@ -17,6 +18,7 @@ const TABS = [
 const slotLabel = (slot) => (slot === 'weapon' ? 'Weapon' : SLOT_LABEL[slot]);
 
 function thumbFor(gear, px = 96) {
+  if (gear.type === 'ammo') return renderThumb({ kind: 'good', id: gear.id }, px);
   return renderThumb({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, px);
 }
 
@@ -40,6 +42,7 @@ function bonusText(gear) {
 }
 
 function statLine(gear) {
+  if (gear.type === 'ammo') return gear.line;
   if (gear.type === 'weapon') return `Damage ${gear.item.dmg} · ${STYLE_LABEL[gear.item.style] || 'Weapon'}`;
   if (gear.slot === 'book') return bonusText(gear) || 'Spell book';
   const tier = TIER_LABEL[setById(gear.set)?.tier] || '';
@@ -53,6 +56,18 @@ export function mountGear(body, game) {
 
   const equippedIn = (slot) => {
     const d = game.progress.data;
+    if (slot === 'ammo') {
+      const id = d.ammo;
+      if (!id || !GOODS[id]) return null;
+      const loaded = d.quiverLoad?.id === id ? d.quiverLoad.n : 0;
+      const bag = game.progress.good(id);
+      return {
+        id,
+        name: GOODS[id].name,
+        type: 'ammo',
+        line: d.armor.quiver ? `${loaded}/${QUIVER_MAX} in the quiver · ${bag} in the bag` : `${bag} in the bag · equip a quiver to carry them`,
+      };
+    }
     return gearById(slot === 'weapon' ? d.weapon : d.armor[slot]);
   };
   const ownedFor = (slot) =>
@@ -133,6 +148,13 @@ export function mountGear(body, game) {
       if (gear) {
         btn.style.setProperty('--rc', colorOf(gear));
         btn.appendChild(thumbFor(gear));
+        if (slot === 'ammo') {
+          const n = game.progress.data.quiverLoad?.id === gear.id ? game.progress.data.quiverLoad.n : 0;
+          const badge = document.createElement('b');
+          badge.className = 'cg-count';
+          badge.textContent = game.progress.data.armor.quiver ? `${n}` : '';
+          if (badge.textContent) btn.appendChild(badge);
+        }
       } else {
         const lab = document.createElement('span');
         lab.textContent = slotLabel(slot);
@@ -200,13 +222,21 @@ export function mountGear(body, game) {
     head.append(title, close);
     pop.appendChild(head);
 
+    if (slot === 'ammo') {
+      fillAmmo(pop, pr);
+      return;
+    }
     const list = ownedFor(slot).sort((a, b) => (pr.worn(b.id) ? 1 : 0) - (pr.worn(a.id) ? 1 : 0) || (b.def || 0) - (a.def || 0));
     const wrap = document.createElement('div');
     wrap.className = 'cg-pop-list';
     if (!list.length) {
       const p = document.createElement('p');
       p.className = 'cg-pop-empty';
-      p.textContent = slot === 'weapon' ? 'No weapons yet. Forge one from monster parts.' : `No ${slotLabel(slot).toLowerCase()} in your bag. Forge one from monster parts.`;
+      p.textContent = slot === 'weapon'
+        ? 'No weapons yet. Forge one from monster parts, or iron bars at Bram\'s.'
+        : slot === 'quiver'
+          ? 'No quiver yet. Forge one at Bram\'s from an iron bar and two birch logs.'
+          : `No ${slotLabel(slot).toLowerCase()} in your bag. Forge one from monster parts, or iron bars at Bram\'s.`;
       wrap.appendChild(p);
     }
     for (const gear of list) {
@@ -242,6 +272,43 @@ export function mountGear(body, game) {
     }
     pop.appendChild(wrap);
     flushThumbs(200);
+  }
+
+  function fillAmmo(pop, pr) {
+    const wrap = document.createElement('div');
+    wrap.className = 'cg-pop-list';
+    const wornId = pr.data.ammo;
+    for (const id of ARROW_TYPES) {
+      const bag = pr.good(id);
+      const loaded = pr.data.quiverLoad?.id === id ? pr.data.quiverLoad.n : 0;
+      const on = wornId === id;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'cg-item' + (on ? ' worn' : '');
+      item.appendChild(renderThumb({ kind: 'good', id }, 96));
+      const info = document.createElement('div');
+      const name = document.createElement('b');
+      name.textContent = GOODS[id].name;
+      const line = document.createElement('small');
+      line.textContent = pr.data.armor.quiver ? `${loaded}/${QUIVER_MAX} loaded · ${bag} in the bag` : `${bag} in the bag`;
+      info.append(name, line);
+      const tag = document.createElement('u');
+      tag.textContent = on ? 'Clear' : 'Select';
+      item.append(info, tag);
+      item.onclick = () => {
+        pr.setAmmo(id);
+        openSlot = null;
+        paint();
+      };
+      wrap.appendChild(item);
+    }
+    if (!ARROW_TYPES.length) {
+      const p = document.createElement('p');
+      p.className = 'cg-pop-empty';
+      p.textContent = 'No arrow types yet.';
+      wrap.appendChild(p);
+    }
+    pop.appendChild(wrap);
   }
 
   function infoPanel(wornWeapon, held) {

@@ -6,6 +6,7 @@ import { TALL_KINDS, buildBookModel, buildShieldModel, gripRoll } from '../entit
 import { toonMaterial } from '../engine/materials.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
 import { goodsVoxels } from '../world/gatherModels.js';
+import { GOODS, HEADS_PER_BAR } from '../data/gathering.js';
 
 /* ------------------------------------------------------------------ */
 /* Offscreen 3D stage: renders the same in-game models to 2D canvases   */
@@ -60,6 +61,11 @@ function buildSubject(spec, silhouette) {
       pitch = 0.12;
     }
     if (g.wtype !== 'crossbow') tilt.add(held);
+  } else if (spec.kind === 'armor' && gearById(spec.id)?.slot === 'quiver') {
+    const [gm, size, ox, oy, oz] = goodsVoxels('quiver');
+    tilt.add(meshFrom(gm, ox, oy, oz, toonMaterial({ vertexColors: true }), size));
+    yaw = 0.5;
+    pitch = 0.2;
   } else if (spec.kind === 'armor' && (gearById(spec.id).slot === 'shield' || gearById(spec.id).slot === 'book')) {
     const g = gearById(spec.id);
     const mat = toonMaterial({ vertexColors: true });
@@ -312,11 +318,13 @@ const SET_HELD = {
   tigerleather: 'tigerspear', tigercloth: 'tigerclaws', raptorleather: 'raptorcrossbow', raptorcloth: 'raptorsaber',
   pirateset: 'piratecutlass', piratecloth: 'bonestaff',
   demonset: 'demonsword', holyset: 'holyhammer',
+  iron: 'ironsword',
 };
 
 const SET_BLURB = {
   demonset: 'Jagged black plate lit by cracks of red: a spike-crowned helm with burning eyes, a shard-layered cuirass with a row of spikes across the back, spiked gauntlets under huge pauldrons, spiked greaves and sabatons, with a demon-faced bulwark. Dropped whole, and rarely, by the Demon Knight. The warrior set.',
   holyset: 'White plate trimmed in gold and marked with glowing blue crosses: a horned, gold-crested helm, a cross-bearing cuirass, gold-rimmed gauntlets, diamond-framed greaves and large sabatons. Dropped whole, and rarely, by the Holy Knight. The warrior set.',
+  iron: 'Plain steel plate smelted from copper and tin: a nasal helm, hammered cuirass, gauntlets, platelegs and brass-capped boots, with a square shield. The first warrior set.',
   budgeset: 'Dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots, with a horn-bossed shield. The warrior set.',
   darksyceset: 'Five pieces of indigo scale lit from within by gloom: a sickle-horned helm, a core-burning cuirass, scythe-pauldron gauntlets, rune greaves and silent talon boots, with a gloom-gem shield. The warrior set.',
   budgeleather: 'Laced hide in budge green with bone-stud trim: a horn-stud cap, jerkin, bracer gloves, strapped leggings and claw-toed boots. Light and quiet. The ranger set.',
@@ -427,7 +435,10 @@ export class Catalog {
       tabs.appendChild(b);
     }
     root.appendChild(tabs);
-    if (this.forge) root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Pick a weapon or armor piece, then forge it from monster parts. Pieces you have forged can be worn right here.`));
+    if (this.forge) {
+      root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Iron bars from the smithy outside town become armor, weapons, a carving knife and arrowheads. Head the shafts here, then wear a quiver.`));
+      root.appendChild(this.forgeBench());
+    }
 
     const grid = el('div', 'cat-grid');
     const s = getStage();
@@ -439,6 +450,11 @@ export class Catalog {
         grid.appendChild(card);
       }
     } else if (this.tab === 'weapons') {
+      const smithW = weapons('smith');
+      if (smithW.length) {
+        grid.appendChild(this.heading('Ironwork'));
+        for (const g of smithW) grid.appendChild(this.gearCard(g));
+      }
       for (const m of MONSTERS) {
         const list = weapons(m.id);
         if (!list.length) continue;
@@ -449,9 +465,11 @@ export class Catalog {
       for (const set of SETS) {
         const pieces = armorPieces(set.id);
         const done = pieces.filter((g) => pr.crafted(g.id)).length;
-        const known = pr.seen(set.monster);
+        const smith = set.monster === 'smith';
+        const known = smith || pr.seen(set.monster);
         const complete = pr.setComplete(set.id);
-        grid.appendChild(this.heading(known ? `${monsterById(set.monster).name} - ${TIER_LABEL[set.tier]} (${set.role})` : '???'));
+        const who = smith ? 'Ironwork' : monsterById(set.monster).name;
+        grid.appendChild(this.heading(known ? `${who} - ${TIER_LABEL[set.tier]} (${set.role})` : '???'));
         const card = this.card(s.thumb({ kind: 'set', id: set.id }, !known), known ? set.name : '???', known ? `${done}/${pieces.length} pieces${complete ? '  -  Complete' : ''}` : 'Undiscovered', (known ? 'set' : 'locked') + (complete ? ' worn' : ''));
         card.onclick = () => this.goto({ type: 'set', id: set.id });
         grid.appendChild(card);
@@ -529,7 +547,7 @@ export class Catalog {
       this.fillMonster(info, m, known);
     } else if (view.type === 'set') {
       const set = setById(view.id);
-      known = pr.seen(set.monster);
+      known = set.monster === 'smith' || pr.seen(set.monster);
       spec = { kind: 'set', id: set.id };
       this.fillSet(info, set, known);
     } else {
@@ -604,15 +622,107 @@ export class Catalog {
   recipeChips(g) {
     const pr = this.progress;
     const row = el('div', 'cat-parts');
-    for (const id of MATERIAL_ORDER) {
+    const ids = [...MATERIAL_ORDER.filter((id) => g.recipe[id]), ...Object.keys(g.recipe).filter((id) => !MATERIALS[id])];
+    for (const id of ids) {
       const need = g.recipe[id];
-      if (!need) continue;
-      const have = pr.count(id);
-      const chip = this.partChip(id, `Need ${need}`, '', false);
+      const have = pr.stockOf(id);
+      const chip = MATERIALS[id] ? this.partChip(id, `Need ${need}`, '', false) : this.goodChip(id, `Need ${need}`);
       chip.appendChild(el('em', have >= need ? 'ok' : 'short', `${have}/${need}`));
       row.appendChild(chip);
     }
     return row;
+  }
+
+  goodChip(id, label) {
+    const chip = el('div', 'cat-part');
+    chip.title = GOODS[id]?.desc || id;
+    chip.appendChild(getStage().thumb({ kind: 'good', id }, false, 96));
+    const t = el('div');
+    t.innerHTML = `<b>${esc(GOODS[id]?.name || id)}</b><small>${esc(label)}</small>`;
+    chip.appendChild(t);
+    return chip;
+  }
+
+  forgeBench() {
+    const pr = this.progress;
+    const box = el('div', 'smith-bench');
+    const row = (title, sub, buttons) => {
+      const r = el('div', 'smith-row');
+      const info = el('div');
+      info.innerHTML = `<b>${esc(title)}</b><small>${esc(sub)}</small>`;
+      r.appendChild(info);
+      const acts = el('div', 'smith-acts');
+      for (const b of buttons) {
+        const btn = el('button', 'cat-btn' + (b.on ? ' go' : ''), esc(b.label));
+        btn.type = 'button';
+        btn.disabled = !b.on;
+        btn.onclick = b.run;
+        acts.appendChild(btn);
+      }
+      r.appendChild(acts);
+      return r;
+    };
+    const bars = pr.good('iron_bar');
+    const heads = pr.good('arrowhead');
+    const shafts = pr.good('arrow_shaft');
+    box.appendChild(row(
+      'Arrowheads',
+      `1 iron bar makes ${HEADS_PER_BAR}. You have ${bars} ${bars === 1 ? 'bar' : 'bars'} and ${heads} heads.`,
+      [
+        { label: `Forge ${HEADS_PER_BAR}`, on: bars >= 1, run: () => this.madeHeads(false) },
+        { label: 'Forge all', on: bars >= 1, run: () => this.madeHeads(true) },
+      ],
+    ));
+    const pair = Math.min(heads, shafts);
+    box.appendChild(row(
+      'Head the shafts',
+      `1 arrowhead and 1 shaft make an iron arrow. ${heads} heads, ${shafts} shafts.`,
+      [
+        { label: 'Make 1', on: pair >= 1, run: () => this.madeArrows(false) },
+        { label: 'Make all', on: pair >= 1, run: () => this.madeArrows(true) },
+      ],
+    ));
+    const hasKnife = pr.crafted('knife');
+    box.appendChild(row(
+      'Carving knife',
+      hasKnife ? 'In your tools. Use it on logs anywhere to shave arrow shafts.' : 'One iron bar. Carve shafts from logs wherever you stand.',
+      [{ label: hasKnife ? 'Forged' : 'Forge knife', on: !hasKnife && bars >= 1, run: () => this.madeKnife() }],
+    ));
+    return box;
+  }
+
+  madeHeads(all) {
+    const n = this.progress.forgeHeads(all);
+    if (!n) return;
+    this.game.audio.quest();
+    this.game.hud.toast(`Forged ${n} arrowheads`, 1600);
+    this.sparkForge();
+    this.render();
+  }
+
+  madeArrows(all) {
+    const n = this.progress.fletchArrows(all);
+    if (!n) return;
+    this.game.audio.quest();
+    const load = this.progress.data.quiverLoad;
+    const pocket = load?.id === 'iron_arrow' ? load.n : 0;
+    this.game.hud.toast(pocket ? `Made ${n} iron arrows · ${pocket} in the quiver` : `Made ${n} iron arrows`, 1800);
+    this.sparkForge();
+    this.render();
+  }
+
+  madeKnife() {
+    if (!this.progress.craftKnife()) return;
+    this.game.audio.quest();
+    this.game.hud.toast('Forged a carving knife', 1600);
+    this.sparkForge();
+    this.render();
+  }
+
+  sparkForge() {
+    const f = this.game.world.forge;
+    if (!f) return;
+    this.game.fx.burst(f.x + 0.4, f.y + 1.1, f.z, [0xff8a1e, 0xffd27a, 0xffffff], 16, 3.5, 0.09, 0.8, 6, 2);
   }
 
   fillGear(info, g, known) {
@@ -623,13 +733,16 @@ export class Catalog {
       void m;
       return;
     }
-    const m = monsterById(g.monster);
+    const smith = g.monster === 'smith';
+    const m = smith ? { name: 'iron bars' } : monsterById(g.monster);
+    const set = g.set ? setById(g.set) : null;
     const stats =
       g.type === 'weapon'
         ? g.stats.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')
         : `<div><small>Slot</small><b>${SLOT_LABEL[g.slot]}</b></div><div><small>Defense</small><b>+${g.def}</b></div>${g.bonus ? `<div><small>Bonus</small><b>${bonusText(g.bonus)}</b></div>` : ''}`;
+    const kindTag = g.type === 'weapon' ? WEAPON_LABEL[g.wtype] : `${set ? TIER_LABEL[set.tier] + ' ' : ''}${SLOT_LABEL[g.slot]}`;
     info.innerHTML = `<h3>${esc(g.name)}</h3>
-      <div class="cat-tags"><span>${g.type === 'weapon' ? WEAPON_LABEL[g.wtype] : `${TIER_LABEL[setById(g.set).tier]} ${SLOT_LABEL[g.slot]}`}</span><span>From ${esc(m.name)}</span></div>
+      <div class="cat-tags"><span>${kindTag}</span><span>From ${esc(m.name)}</span></div>
       <p>${esc(g.desc)}</p>
       <div class="cat-stats">${stats}</div>`;
     if (g.found) info.appendChild(el('p', 'cat-muted', g.monster === 'orcscout' ? 'Orc Scouts drop this. It is not forged at the smithy.' : `${m.name}s drop this whole, and only rarely (1 to 2%). It cannot be forged.`));
@@ -673,15 +786,14 @@ export class Catalog {
       actions.appendChild(b);
     }
     info.appendChild(actions);
-    if (g.type === 'armor') {
-      const set = setById(g.set);
-      info.appendChild(el('p', 'cat-muted', CORE_SLOTS.includes(g.slot) ? `${esc(set.name)}. ${esc(set.bonus)}` : `${esc(set.name)} extra. Worn alongside any set${g.slot === 'book' ? '; it also lets Spell Book mastery apply to staffs and wands' : ''}.`));
+    if (g.type === 'armor' && set) {
+      info.appendChild(el('p', 'cat-muted', CORE_SLOTS.includes(g.slot) ? `${esc(set.name)}. ${esc(set.bonus)}` : `${esc(set.name)} extra. Worn alongside any set${g.slot === 'book' ? '; it also lets Spell Book mastery apply to staffs and wands' : g.slot === 'quiver' ? '. It fills from the arrows in your bag, 99 at a time' : ''}.`));
     }
   }
 
   fillSet(info, set, known) {
     const pr = this.progress;
-    const m = monsterById(set.monster);
+    const m = set.monster === 'smith' ? { name: 'the smithy' } : monsterById(set.monster);
     if (!known) {
       info.innerHTML = `<h3>???</h3><p class="cat-muted">Discover the ${esc(m.name)} to reveal this armor set.</p>`;
       return;

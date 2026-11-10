@@ -159,7 +159,14 @@ function collect(game) {
     },
     action: 'Open',
     run: () => game.openTome(),
-  }].concat(TOOLS.filter((x) => x.id !== 'pickaxe').map((t) => ({
+  }].concat(game.progress.crafted('knife') ? [{
+    key: 'tkife',
+    name: 'Carving knife',
+    sub: 'Shaves a log into 15 arrow shafts. Works anywhere.',
+    canvas: () => renderThumb({ kind: 'held', id: 'knife' }, 96),
+    action: 'Carve',
+    run: () => game.openCarve(),
+  }] : []).concat(TOOLS.filter((x) => x.id !== 'pickaxe').map((t) => ({
     key: 't' + t.id,
     name: t.name,
     sub: t.id === 'tinderbox' ? 'Light a log from Gathered.' : t.desc,
@@ -192,6 +199,8 @@ function collect(game) {
       sub = `Eat to restore ${g.heal} health. You have ${n}.`;
       action = 'Eat';
       run = (paint) => { if (game.eatGood(id)) paint(); };
+    } else if (g.kind === 'bar' || g.kind === 'part' || g.kind === 'arrow') {
+      sub = `${g.desc} You have ${n}.`;
     } else if (g.kind === 'log') {
       sub = `Light with the tinderbox. You have ${n}.`;
       action = 'Light';

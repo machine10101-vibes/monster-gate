@@ -28,6 +28,7 @@ const EDGE_HOLD = new Set([
   'orcblade',
   'yetisword', 'yetigreatsword', 'yetidual',
   'demonsword',
+  'ironsword', 'irongreatsword',
   ...JUNGLE_EDGE,
 ]);
 
@@ -917,6 +918,20 @@ function crossbow(T, style, after = null) {
   return c.done();
 }
 
+function carvingKnife() {
+  const c = ctx();
+  for (let z = 0; z < 14; z++)
+    for (let x = -2; x <= 1; x++)
+      for (let y = -2; y <= 1; y++) c.set(x, y, z, z < 2 ? 0x3c444c : 0x6a4328);
+  for (let x = -4; x <= 3; x++) for (let y = -1; y <= 0; y++) c.set(x, y, 14, 0x9aa3ab);
+  for (let z = 15; z < 36; z++) {
+    const w = z > 30 ? 0 : 1;
+    for (let x = -w; x <= w; x++) c.set(x, 0, z, z > 28 ? 0xffffff : 0xd5dde4);
+    if (z < 32) c.set(0, -1, z, 0x8d969e);
+  }
+  return c.done();
+}
+
 function tinderbox() {
   const c = ctx();
   for (let z = 0; z < 12; z++)
@@ -941,6 +956,11 @@ const BUILDERS = {
   ...jungleWeapons(KIT),
   ...BOWS,
   axe: ironAxe,
+  knife: carvingKnife,
+  ironsword: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } }),
+  irongreatsword: () => sword(THEMES.iron, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } }),
+  ironspear: () => spear(THEMES.iron, false),
+  ironhammer: ironHammer,
   pick: ironPick,
   fishrod: fishingPole,
   fishnet: fishingNet,
