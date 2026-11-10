@@ -1,4 +1,4 @@
-import { GRID, TILES, TILE_COUNT, paintTileMap } from '../world/tiles.js';
+import { TILES, TILE_COUNT, paintTileMap } from '../world/tiles.js';
 import { captureTileView } from '../world/tileview.js';
 
 const thumbs = new Map();
@@ -35,24 +35,24 @@ export function mountWorldMap(body, game) {
     left.className = 'wm-left';
     const note = document.createElement('p');
     note.className = 'wm-note';
-    note.textContent = `${TILE_COUNT} tiles. North is up. Gold rings mark the built tiles around Oakhollow.`;
+    note.textContent = `${TILE_COUNT} lands. North is up. Gold names are the areas and cities that are built.`;
     left.appendChild(note);
     const grid = document.createElement('div');
     grid.className = 'wm-grid';
-    grid.style.gridTemplateColumns = `repeat(${GRID}, 1fr)`;
     for (const tile of TILES) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'wm-cell' + (tile.built ? ' built' : '') + (tile.id === sel.id ? ' sel' : '');
-      b.title = `${tile.n}. ${tile.name} — ${tile.biomeName}`;
+      b.title = `${tile.name} — ${tile.biomeName}. Tile ${tile.n}`;
       const cv = document.createElement('canvas');
       cv.width = 36;
       cv.height = 36;
       cv.getContext('2d').drawImage(thumb(tile, game), 0, 0);
       b.appendChild(cv);
-      const num = document.createElement('i');
-      num.textContent = String(tile.n);
-      b.appendChild(num);
+      const name = document.createElement('b');
+      name.className = 'wm-name';
+      name.textContent = tile.name;
+      b.appendChild(name);
       b.onclick = () => {
         sel = tile;
         game.audio.select();
