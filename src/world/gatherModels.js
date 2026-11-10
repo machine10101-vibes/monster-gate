@@ -784,7 +784,58 @@ const GOODS_MODELS = {
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),
   maple_logs: () => logStack('maple'),
+  iron_bar: ironBar,
+  arrowhead: arrowHead,
+  arrow_shaft: arrowShaft,
+  iron_arrow: ironArrow,
+  quiver: quiverModel,
 };
+
+function ironBar() {
+  const M = new VoxelModel(22, 8, 8);
+  M.box(1, 2, 2, 20, 6, 6, (x, y, z) => J(y === 5 ? 0xd7dee6 : y === 2 ? 0x6e7680 : 0xb7c0c8, x, y, z, 4, 0.05));
+  M.box(1, 3, 3, 20, 5, 5, 0x9aa3ab);
+  return [M, 0.05, 11, 0, 4];
+}
+
+function arrowHead() {
+  const M = new VoxelModel(14, 8, 8);
+  for (let x = 2; x <= 11; x++) {
+    const w = x < 8 ? 1 : Math.max(0, 11 - x);
+    for (let y = 3 - w; y <= 4 + w; y++) M.set(x, y, 4, J(0xb7c0c8, x, y, 4, 5, 0.04));
+  }
+  M.box(1, 3, 3, 3, 5, 5, 0x6a4328);
+  return [M, 0.06, 7, 0, 4];
+}
+
+function arrowShaft() {
+  const M = new VoxelModel(22, 6, 6);
+  M.box(1, 2, 2, 18, 4, 4, (x, y, z) => J(0xc9a36a, x, y, z, 6, 0.05));
+  M.box(16, 1, 2, 20, 5, 4, 0xf4efe4);
+  return [M, 0.05, 11, 0, 3];
+}
+
+function ironArrow() {
+  const M = new VoxelModel(26, 8, 8);
+  M.box(4, 3, 3, 20, 5, 5, (x, y, z) => J(0xc9a36a, x, y, z, 7, 0.04));
+  for (let x = 18; x <= 24; x++) {
+    const w = Math.max(0, 24 - x);
+    for (let y = 4 - w; y <= 4 + w; y++) M.set(x, y, 4, 0xd7dee6);
+  }
+  M.box(2, 2, 3, 5, 6, 5, 0xf4efe4);
+  M.set(1, 4, 4, 0xe24a22);
+  return [M, 0.045, 13, 0, 4];
+}
+
+function quiverModel() {
+  const M = new VoxelModel(16, 22, 12);
+  M.box(4, 1, 3, 12, 18, 9, (x, y, z) => J(y % 3 === 0 ? 0x8a5a32 : 0x6a4328, x, y, z, 8, 0.05));
+  M.box(5, 16, 4, 11, 20, 8, 0xf4efe4);
+  for (let i = 0; i < 4; i++) M.box(6 + i, 18, 5, 6 + i, 21, 6, 0xd7dee6);
+  M.box(3, 8, 4, 4, 12, 8, 0x9aa3ab);
+  M.box(12, 8, 4, 13, 12, 8, 0x9aa3ab);
+  return [M, 0.045, 8, 0, 6];
+}
 
 export function hasGoodsModel(id) {
   return !!GOODS_MODELS[id];

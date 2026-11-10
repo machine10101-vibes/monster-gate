@@ -7,6 +7,7 @@ import { SOFT_PALETTES } from './armorSoft.js';
 const J = (c, x, y, z, s = 0, a = 0.04) => jitter(c, a, hash3(x, y, z, s));
 
 const METAL = {
+  iron: { a: 0xd7dee6, b: 0x8d969e, g: 0x5e6770, gd: 0x3c444c, glow: null, hot: 0xc9a24a, edge: 0xc9a24a, base: 0xb7c0c8 },
   budgeset: { a: BUDGE.horn, b: BUDGE.hornDark, g: BUDGE.belly, gd: BUDGE.bellyDark, glow: null, hot: BUDGE.vein, edge: BUDGE.claw, base: BUDGE.scale },
   yetiset: { a: YETI.iceHi, b: YETI.ice, g: YETI.leather, gd: YETI.leatherLo, glow: YETI.glow, hot: YETI.glowHi, edge: YETI.furWhite, base: 0x95b6d3 },
   darksyceset: { a: DARK.blade, b: DARK.bladeDark, g: DARK.trim, gd: DARK.bladeDark, glow: DARK.glow, hot: DARK.glowHi, edge: DARK.edge, base: DARK.scale },

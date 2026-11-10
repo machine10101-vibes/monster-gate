@@ -1,4 +1,5 @@
 import * as budgeMetal from './armor.js';
+import * as ironMetal from './armorIron.js';
 import * as darkMetal from './armorDark.js';
 import * as frostMetal from './armorFrost.js';
 import { makeSoftArmor } from './armorSoft.js';
@@ -8,6 +9,7 @@ import { JUNGLE_SETS, makeJungleArmor } from './armorJungle.js';
 
 const CACHE = {};
 const BUILD = {
+  iron: () => ironMetal,
   budgeset: () => budgeMetal,
   darksyceset: () => darkMetal,
   yetiset: () => frostMetal,

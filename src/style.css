@@ -1852,6 +1852,13 @@ body.touch .how {
 
 .cat-forge{margin:0 0 12px;padding:10px 12px;border:2px solid #7a3b14;border-radius:6px;background:linear-gradient(90deg,rgba(255,122,34,.22),rgba(60,30,20,.4));color:#ffe3bf;font-size:13px;line-height:1.4}
 .cat-forge b{display:block;color:#ffb347;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+.smith-bench{display:flex;flex-direction:column;gap:8px;margin:0 0 14px}
+.smith-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:2px solid #5a4632;border-radius:6px;background:#161410}
+.smith-row small{display:block;color:#b7c0b4;font-size:12px;margin-top:2px}
+.smith-acts{display:flex;gap:8px;flex:none}
+.smith-stock{display:flex;gap:12px;margin:0 0 12px}
+.smith-stock div{display:flex;flex-direction:column;align-items:center;gap:4px;color:#d7deea;font-size:12px}
+.smith-stock canvas{width:64px;height:64px;background:#0e1210;border-radius:6px}
 .alc-intro{margin:0 0 10px;padding:10px 12px;border:2px solid #2f6b4a;border-radius:6px;background:linear-gradient(90deg,rgba(80,220,140,.16),rgba(20,40,36,.45));color:#d7ffe8;font-size:13px;line-height:1.4}
 .alc-intro b{display:block;color:#7dffb2;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
 .alc-gold{margin:0 0 10px;color:#ffe27a;font-family:var(--font-px);font-size:11px}
@@ -2277,6 +2284,18 @@ body.touch .how {
   touch-action: auto;
 }
 .cg-slot canvas { width: 50px; height: 50px; background: #0e1210; border-radius: 5px; }
+.cg-count {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  min-width: 14px;
+  padding: 1px 3px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #ffe7a0;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 3px;
+}
 .cg-slot span {
   font-size: 10px;
   letter-spacing: 0.04em;

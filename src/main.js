@@ -1819,7 +1819,7 @@ class Game {
     const sd = crate ? Math.hypot(p.x - crate.x, p.z - crate.z) : 99;
     const closerThanShops = () => {
       const shop = (spot) => (spot ? Math.hypot(p.x - spot.x, p.z - spot.z) : 99);
-      return sd <= shop(this.world.market) && sd <= shop(this.world.alchemy) && sd <= shop(this.world.forge) && sd <= wd;
+      return sd <= shop(this.world.market) && sd <= shop(this.world.alchemy) && sd <= shop(this.world.forge) && sd <= shop(this.world.smithy) && sd <= wd;
     };
     if (!this.talkNpc && this.storageNear && !npcNear && closerThanShops()) {
       this.openStorage();
@@ -1828,7 +1828,7 @@ class Game {
     const portal = this.nearestPortal();
     const pd = portal ? Math.hypot(p.x - portal.x, p.z - portal.z) : 99;
     const shop = (spot) => (spot ? Math.hypot(p.x - spot.x, p.z - spot.z) : 99);
-    if (!this.talkNpc && portal && pd < 3.6 && !npcNear && pd <= sd && pd <= wd && pd <= shop(this.world.market) && pd <= shop(this.world.alchemy) && pd <= shop(this.world.forge)) {
+    if (!this.talkNpc && portal && pd < 3.6 && !npcNear && pd <= sd && pd <= wd && pd <= shop(this.world.market) && pd <= shop(this.world.alchemy) && pd <= shop(this.world.forge) && pd <= shop(this.world.smithy)) {
       this.attunePortal(portal);
       return;
     }
@@ -1838,6 +1838,10 @@ class Game {
     }
     if (!this.talkNpc && this.alchemyNear && !npcNear) {
       this.openAlchemy();
+      return;
+    }
+    if (!this.talkNpc && this.smithyNear && !npcNear) {
+      this.openSmithy();
       return;
     }
     if (!this.talkNpc && this.forgeNear && !npcNear) {
@@ -2127,6 +2131,56 @@ class Game {
     return true;
   }
 
+  openSmithy() {
+    this.hud.openPanel('smithy', this);
+    this.hud.panelId = 'smithy';
+    this.audio.select();
+    const s = this.world.smithy;
+    if (s) this.fx.burst(s.x, s.y + 1.2, s.z, [0xff8a1e, 0xffd27a, 0xffffff], 10, 2.2, 0.08, 0.7, -1, 1.2);
+  }
+
+  updateSmithy(dt) {
+    const s = this.world.smithy;
+    if (!s) return;
+    const P = this.player.pos;
+    const d = Math.hypot(P.x - s.x, P.z - s.z);
+    this.smithyNear = d < 4.2 && this.started;
+    if (d < 22 && Math.random() < dt * 8) {
+      this.fx.burst(s.x + 0.4, s.y + 1.1, s.z, [0xff8a1e, 0xffd27a, 0xff5a1a], 1, 0.6, 0.06, 1.1, -1.4, 1.6);
+    }
+    if (d < 22 && Math.random() < dt * 2) {
+      this.fx.burst(s.x - 0.6, s.y + 3.2, s.z, [0x6a6a70, 0x8a8a90], 1, 0.35, 0.16, 1.6, -0.4, 0.7);
+    }
+    if (this.smithyNear && !this.smithyHinted) {
+      this.smithyHinted = true;
+      this.hud.toast('The Smithy - press F to smelt copper and tin into iron bars', 2800);
+    }
+    if (this.smithyNear) {
+      const [sx, sy, vis] = this.screenOf(s.x, s.y + 3.2, s.z, true);
+      this.hud.plate('smithy', 'The Smithy<small>F · smelt iron</small>');
+      this.hud.placePlate('smithy', sx, sy, vis);
+    } else this.hud.removePlate('smithy');
+    if (this.hud.panelId === 'smithy' && d > 5.2) this.hud.closePanel();
+  }
+
+  clickSmithy() {
+    const s = this.world.smithy;
+    const aim = this.input.aim;
+    if (!s || !this.started || !aim.has || this.input.touch) return false;
+    const P = this.player.pos;
+    if (Math.hypot(P.x - s.x, P.z - s.z) > 4.8) return false;
+    const hits = this.ray.intersectObject(s.group, true);
+    if (!hits.length) return false;
+    this.openSmithy();
+    return true;
+  }
+
+  openCarve() {
+    this.hud.openPanel('carve', this);
+    this.hud.panelId = 'carve';
+    this.audio.select();
+  }
+
   openForge() {
     this.hud.openPanel('forge', this);
     this.hud.panelId = 'forge';
@@ -2204,7 +2258,7 @@ class Game {
       if (!blocked) this.tryTalk();
     }
     if (inp.take('attack') && !blocked) {
-      if (!this.clickStorage() && !this.clickPortal()) this.doAttack();
+      if (!this.clickStorage() && !this.clickPortal() && !this.clickSmithy()) this.doAttack();
     }
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
@@ -2436,13 +2490,14 @@ class Game {
       this.hud.placePlate('waygate', sx, sy, vis);
     } else this.hud.removePlate('waygate');
     this.updateForge(dt);
+    this.updateSmithy(dt);
     this.updateAlchemy(dt);
     this.updateMarket();
     this.updateStorage();
     this.updatePortals();
     updateGatherSites(this.world, dt, t, this);
     this.gather.update(dt);
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }

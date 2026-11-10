@@ -13,6 +13,7 @@ import { mountStorage } from './storage.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
 import { mountTeleport } from './teleport.js';
+import { mountCarve, mountSmithy } from './smithy.js';
 import { shortAddress } from '../wallet/klever.js';
 
 export const ITEMS = [
@@ -300,6 +301,10 @@ export class HUD {
       ctx.fillRect(toX(p.x) - 1, toZ(p.z) - 1, 3, 3);
       ctx.fillStyle = '#f4fbff';
     }
+    if (world.smithy && inView(world.smithy.x, world.smithy.z)) {
+      ctx.fillStyle = '#e07030';
+      ctx.fillRect(toX(world.smithy.x) - 3, toZ(world.smithy.z) - 2, 6, 5);
+    }
     ctx.fillStyle = '#5ad0ff';
     for (const n of npcs) if (inView(n.x, n.z)) ctx.fillRect(toX(n.x) - 2, toZ(n.z) - 2, 4, 4);
     if (remotes) {
@@ -351,7 +356,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'storage');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'storage' || name === 'smithy' || name === 'carve');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -397,6 +402,10 @@ export class HUD {
         }
         ctx.fillStyle = '#f4fbff';
         for (const p of game.world.teleports || []) ctx.fillRect(p.x - ox - 2, p.z - oz - 2, 5, 5);
+        if (game.world.smithy) {
+          ctx.fillStyle = '#e07030';
+          ctx.fillRect(game.world.smithy.x - ox - 2, game.world.smithy.z - oz - 2, 5, 4);
+        }
         ctx.fillStyle = '#ff9a3c';
         ctx.fillRect(MINE.x - ox - 2, MINE.z - oz - 2, 5, 5);
         ctx.fillStyle = '#4ec8ff';
@@ -404,7 +413,7 @@ export class HUD {
       }
       add(inCave
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Violet marks the dragon\'s nest. Walk back down the tunnel to return to the vale. White: you.</p>'
-        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate. White: a teleportation portal. Orange: the Greyrock Pit. Light blue: Mirrormere. The map shows Oakhollow and the eight tiles around it. Violet in Southford is the Darksycle Cave. White dot: you.</p>');
+        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate. White: a teleportation portal. Ember: the smithy. Orange: the Greyrock Pit. Light blue: Mirrormere. The map shows Oakhollow and the eight tiles around it. Violet in Southford is the Darksycle Cave. White dot: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
@@ -441,6 +450,12 @@ export class HUD {
     } else if (name === 'forge') {
       title.textContent = 'The Forge';
       this.cleanup = game.catalog.mount(body, { forge: true });
+    } else if (name === 'smithy') {
+      title.textContent = 'The Smithy';
+      this.cleanup = mountSmithy(body, game);
+    } else if (name === 'carve') {
+      title.textContent = 'Carving Knife';
+      this.cleanup = mountCarve(body, game);
     } else if (name === 'skills') {
       title.textContent = 'Skill Tree';
       this.cleanup = mountSkillTree(body, game);

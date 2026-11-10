@@ -364,8 +364,19 @@ export const GOODS = {
   birch_logs: { id: 'birch_logs', name: 'Birch logs', desc: 'Pale wood from the meadow west of Oakhollow. Light it with a tinderbox.', price: 4, kind: 'log', tree: 'birch' },
   oak_logs: { id: 'oak_logs', name: 'Oak logs', desc: 'Heavy timber from the oak grove. Light it with a tinderbox.', price: 8, kind: 'log', tree: 'oak' },
   maple_logs: { id: 'maple_logs', name: 'Maple logs', desc: 'Red maple wood. Light it with a tinderbox once Firemaking is 10.', price: 16, kind: 'log', tree: 'maple' },
+  iron_bar: { id: 'iron_bar', name: 'Iron bar', desc: 'Smelted from one copper ore and one tin ore. The stock of every iron piece.', price: 12, kind: 'bar' },
+  arrowhead: { id: 'arrowhead', name: 'Iron arrowhead', desc: 'Forged at the blacksmith. One bar makes fifteen. Fits an arrow shaft.', price: 2, kind: 'part' },
+  arrow_shaft: { id: 'arrow_shaft', name: 'Arrow shaft', desc: 'Carved from a log with a carving knife. One log makes fifteen.', price: 1, kind: 'part' },
+  iron_arrow: { id: 'iron_arrow', name: 'Iron arrow', desc: 'An iron head on a wooden shaft. A quiver holds 99.', price: 3, kind: 'arrow' },
 };
-export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'shrimp', 'cooked_shrimp', 'trout', 'cooked_trout', 'pikeminnow', 'cooked_pikeminnow', 'salmon', 'cooked_salmon', 'pike', 'cooked_pike', 'sturgeon', 'cooked_sturgeon', 'tuna', 'cooked_tuna', 'stingray', 'cooked_stingray', 'tigershark', 'cooked_tigershark', 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs'];
+export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'iron_bar', 'arrowhead', 'arrow_shaft', 'iron_arrow', 'shrimp', 'cooked_shrimp', 'trout', 'cooked_trout', 'pikeminnow', 'cooked_pikeminnow', 'salmon', 'cooked_salmon', 'pike', 'cooked_pike', 'sturgeon', 'cooked_sturgeon', 'tuna', 'cooked_tuna', 'stingray', 'cooked_stingray', 'tigershark', 'cooked_tigershark', 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs'];
+
+/** Arrow goods a quiver can be told to carry. */
+export const ARROW_TYPES = ['iron_arrow'];
+export const QUIVER_MAX = 99;
+export const HEADS_PER_BAR = 15;
+export const SHAFTS_PER_LOG = 15;
+export const SHAFT_LOGS = ['birch_logs', 'oak_logs', 'maple_logs'];
 
 export const TOOLS = [
   { id: 'pickaxe', held: 'pick', name: 'Iron Pickaxe', desc: 'Used on rocks in the Greyrock Pit.' },

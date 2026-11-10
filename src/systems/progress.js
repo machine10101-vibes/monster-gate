@@ -1,6 +1,6 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
-import { GOODS, LEVEL_SKILLS, MAX_LEVEL, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
+import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_LOGS, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
 import { PORTAL_IDS } from '../data/portals.js';
 
 const ANON_KEY = 'monster-gate-hunter-v1';
@@ -35,6 +35,8 @@ const blank = () => ({
   goods: {},
   storage: emptyStorage(),
   portals: [],
+  ammo: null,
+  quiverLoad: { id: null, n: 0 },
 });
 
 /** Discoveries, harvested parts, crafted gear and what is worn. Persisted for one Klever address. */
@@ -86,6 +88,8 @@ export class Progress {
     this.data.hunter = normalizeHunter(this.data.hunter);
     this.data.storage = normalizeStorage(this.data.storage);
     this.data.portals = normalizePortals(this.data.portals);
+    this.data.ammo = normalizeAmmo(this.data.ammo);
+    this.data.quiverLoad = normalizeLoad(this.data.quiverLoad);
     releaseStoredGear(this.data);
   }
 
@@ -186,6 +190,7 @@ export class Progress {
   }
 
   gearSeen(gear) {
+    if (gear.monster === 'smith') return true;
     return this.seen(gear.monster);
   }
 
@@ -195,7 +200,12 @@ export class Progress {
 
   canCraft(gear) {
     if (gear.found) return false;
-    return !this.crafted(gear.id) && Object.entries(gear.recipe).every(([m, n]) => this.count(m) >= n);
+    return !this.crafted(gear.id) && Object.entries(gear.recipe).every(([m, n]) => this.stockOf(m) >= n);
+  }
+
+  /** Monster parts and smelted goods share a recipe. */
+  stockOf(id) {
+    return GOODS[id] ? this.good(id) : this.count(id);
   }
 
   /** A dropped weapon joins the bag. The first one is equipped when the hunter has none. */
@@ -212,11 +222,20 @@ export class Progress {
   craft(id) {
     const g = gearById(id);
     if (!g || !this.canCraft(g)) return false;
-    for (const [m, n] of Object.entries(g.recipe)) this.data.materials[m] = this.count(m) - n;
+    this._filling = true;
+    for (const [m, n] of Object.entries(g.recipe)) {
+      if (GOODS[m]) this.data.goods[m] = this.good(m) - n;
+      else this.data.materials[m] = this.count(m) - n;
+    }
+    this._filling = false;
     this.data.crafted[id] = true;
     if (g.type === 'armor') this.data.armor[g.slot] = id;
-    else this.data.weapon = id;
+    else if (g.type === 'weapon') this.data.weapon = id;
     this.save();
+    if (g.slot === 'quiver') {
+      if (!this.data.ammo && this.good('iron_arrow') > 0) this.data.ammo = 'iron_arrow';
+      this.refillQuiver();
+    }
     return true;
   }
 
@@ -229,15 +248,24 @@ export class Progress {
   toggleWear(id) {
     const g = gearById(id);
     if (!g || !this.crafted(id)) return;
-    if (g.type === 'armor') this.data.armor[g.slot] = this.worn(id) ? null : id;
-    else this.data.weapon = this.worn(id) ? null : id;
+    const off = this.worn(id);
+    if (g.type === 'armor') this.data.armor[g.slot] = off ? null : id;
+    else this.data.weapon = off ? null : id;
     this.save();
+    if (g.slot === 'quiver') {
+      if (off) this.dumpQuiver();
+      else {
+        if (!this.data.ammo && this.good('iron_arrow') > 0) this.data.ammo = 'iron_arrow';
+        this.refillQuiver();
+      }
+    }
   }
 
   /** {helm:'budgeset',...} describing which pieces are on the hero and which set styles them. */
   armorLook() {
     const look = {};
     for (const s of ARMOR_SLOTS) {
+      if (s === 'quiver') continue;
       const g = gearById(this.data.armor[s]);
       if (g) look[s] = g.set;
     }
@@ -439,15 +467,137 @@ export class Progress {
   }
 
   addGood(id, n = 1) {
-    if (!GOODS[id]) return;
+    if (!GOODS[id] || n < 1) return;
     this.data.goods[id] = this.good(id) + n;
     this.save();
+    if (!this._filling && this.data.armor?.quiver && ARROW_TYPES.includes(id) && (id === this.data.ammo || !this.data.ammo)) {
+      if (!this.data.ammo) this.data.ammo = id;
+      this.refillQuiver();
+    }
   }
 
   takeGood(id, n = 1) {
     if (!GOODS[id] || this.good(id) < n) return false;
     this.data.goods[id] = this.good(id) - n;
     this.save();
+    return true;
+  }
+
+  /** One copper and one tin become one iron bar. Pass `all` to run the whole stack. */
+  smeltBars(all = false) {
+    const can = Math.min(this.good('copper_ore'), this.good('tin_ore'));
+    const n = all ? can : Math.min(1, can);
+    if (n < 1) return 0;
+    this.takeGood('copper_ore', n);
+    this.takeGood('tin_ore', n);
+    this.addGood('iron_bar', n);
+    return n;
+  }
+
+  /** One iron bar becomes fifteen arrowheads. */
+  forgeHeads(all = false) {
+    const can = this.good('iron_bar');
+    const n = all ? can : Math.min(1, can);
+    if (n < 1) return 0;
+    this.takeGood('iron_bar', n);
+    this.addGood('arrowhead', n * HEADS_PER_BAR);
+    return n * HEADS_PER_BAR;
+  }
+
+  craftKnife() {
+    if (this.crafted('knife') || this.good('iron_bar') < 1) return false;
+    this.takeGood('iron_bar', 1);
+    this.data.crafted.knife = true;
+    this.save();
+    return true;
+  }
+
+  /** One log becomes fifteen shafts. The carving knife has to be forged first. */
+  carveShafts(logId, all = false) {
+    if (!this.crafted('knife') || !SHAFT_LOGS.includes(logId)) return 0;
+    const can = this.good(logId);
+    const n = all ? can : Math.min(1, can);
+    if (n < 1) return 0;
+    this.takeGood(logId, n);
+    this.addGood('arrow_shaft', n * SHAFTS_PER_LOG);
+    return n * SHAFTS_PER_LOG;
+  }
+
+  /** One arrowhead and one shaft become one iron arrow, then the quiver tops itself up. */
+  fletchArrows(all = false) {
+    const can = Math.min(this.good('arrowhead'), this.good('arrow_shaft'));
+    const n = all ? can : Math.min(1, can);
+    if (n < 1) return 0;
+    this.takeGood('arrowhead', n);
+    this.takeGood('arrow_shaft', n);
+    this.addGood('iron_arrow', n);
+    return n;
+  }
+
+  /** Put the chosen arrow into the quiver, up to 99, pulling from the bag. */
+  refillQuiver() {
+    if (this._filling || !this.data.armor?.quiver) return;
+    this._filling = true;
+    try {
+      const type = this.data.ammo;
+      if (!type || !ARROW_TYPES.includes(type)) return;
+      const load = this.data.quiverLoad;
+      const before = load.n;
+      const ammoBefore = this.data.ammo;
+      if (load.id && load.id !== type && load.n > 0) {
+        this.data.goods[load.id] = this.good(load.id) + load.n;
+        load.n = 0;
+      }
+      load.id = type;
+      this.data.ammo = type;
+      const room = QUIVER_MAX - load.n;
+      const take = Math.min(room, this.good(type));
+      if (take > 0) {
+        this.data.goods[type] = this.good(type) - take;
+        load.n += take;
+      }
+      if (load.n !== before || ammoBefore !== type) this.save();
+    } finally {
+      this._filling = false;
+    }
+  }
+
+  /** Empty the quiver back into the bag. The chosen arrow type stays selected. */
+  dumpQuiver() {
+    this._filling = true;
+    const load = this.data.quiverLoad;
+    if (load?.id && load.n > 0) this.data.goods[load.id] = this.good(load.id) + load.n;
+    this.data.quiverLoad = { id: null, n: 0 };
+    this._filling = false;
+    this.save();
+  }
+
+  /** Choose which arrow the quiver draws. The same choice again clears it. */
+  setAmmo(id) {
+    if (!ARROW_TYPES.includes(id)) return;
+    if (this.data.ammo === id) {
+      this.dumpQuiver();
+      this.data.ammo = null;
+      this.save();
+      return;
+    }
+    this.data.ammo = id;
+    this.refillQuiver();
+    this.save();
+  }
+
+  hasArrow() {
+    if (!this.data.armor?.quiver) return false;
+    this.refillQuiver();
+    return (this.data.quiverLoad.n | 0) > 0;
+  }
+
+  /** Spend one loaded arrow, then top the quiver back up from the bag. */
+  drawArrow() {
+    if (!this.hasArrow()) return false;
+    this.data.quiverLoad.n -= 1;
+    this.save();
+    this.refillQuiver();
     return true;
   }
 
@@ -656,6 +806,17 @@ function releaseStoredGear(data) {
     if (g.type === 'weapon' && data.weapon === s.id) data.weapon = null;
     if (g.type === 'armor' && data.armor[g.slot] === s.id) data.armor[g.slot] = null;
   }
+}
+
+function normalizeAmmo(id) {
+  return ARROW_TYPES.includes(id) ? id : null;
+}
+
+function normalizeLoad(raw) {
+  const q = raw && typeof raw === 'object' ? raw : {};
+  const id = ARROW_TYPES.includes(q.id) ? q.id : null;
+  const n = Math.max(0, Math.min(QUIVER_MAX, q.n | 0));
+  return { id, n: id ? n : 0 };
 }
 
 function normalizeGoods(raw) {
