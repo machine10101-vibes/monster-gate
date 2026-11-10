@@ -63,6 +63,7 @@ function landMapLabels(world) {
     { name: 'Mirrormere', x: LAKE.x - 32, z: LAKE.z + 34 },
     { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24 },
   );
+  for (const mark of world.farmMarks || []) labels.push(mark);
   return labels;
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, S } from './humanoid.js';
-import { buildFowl, buildButterfly } from './creatures.js';
+import { buildFowl, buildButterfly, buildCow } from './creatures.js';
 import { clamp, RNG, shade } from '../engine/voxel.js';
 import { ZONE, WATER_Y } from '../world/terrain.js';
 
@@ -101,8 +101,9 @@ export class NPC {
     this.phase = Math.random() * 10;
     this.line = 0;
     game.scene.add(this.obj);
-    game.world.circle(this.x, this.z, 0.4);
+    if (!def.roam) game.world.circle(this.x, this.z, 0.4);
     this.height = 1.9 * (def.scale || 1);
+    this.speed = 0;
   }
 
   update(dt, t) {
@@ -110,14 +111,26 @@ export class NPC {
     const dx = P.x - this.x;
     const dz = P.z - this.z;
     const d = Math.hypot(dx, dz);
+    if (this.def.roam && d >= 5) this.stepRoam(dt);
+    else this.speed = 0;
     const target = d < 6 ? Math.atan2(dx, dz) : this.baseYaw;
     this.yaw += angDiff(this.yaw, target) * Math.min(1, dt * 4);
     this.obj.rotation.y = this.yaw;
     const m = this.model;
     const b = Math.sin(t * 2 + this.phase);
     m.hip.position.y = 24 * S + b * 0.01;
-    m.armL.rotation.x = Math.sin(t * 1.5 + this.phase) * 0.04;
-    m.armR.rotation.x = -Math.sin(t * 1.5 + this.phase) * 0.04;
+    const swing = this.speed > 0.2 ? Math.sin(t * 8 + this.phase) * 0.55 : 0;
+    if (this.def.roam && this.speed > 0.2) {
+      m.legL.rotation.x = swing;
+      m.legR.rotation.x = -swing;
+      m.armL.rotation.x = -swing * 0.55;
+      m.armR.rotation.x = swing * 0.55;
+    } else {
+      m.legL.rotation.x *= 0.8;
+      m.legR.rotation.x *= 0.8;
+      m.armL.rotation.x = Math.sin(t * 1.5 + this.phase) * 0.04;
+      m.armR.rotation.x = -Math.sin(t * 1.5 + this.phase) * 0.04;
+    }
     const look = d < 6 ? clamp(angDiff(this.yaw, Math.atan2(dx, dz)), -0.6, 0.6) : 0;
     m.head.rotation.y = look * 0.5;
     if (this.id === 'npc-smith') m.armR.rotation.x = -0.9 + Math.sin(t * 4) * 0.35 * (d > 6 ? 1 : 0.15);
@@ -131,6 +144,52 @@ export class NPC {
     const [sx, sy, vis] = this.game.screenOf(this.x, this.y + this.height + 0.4, this.z, true);
     this.game.hud.plate(this.id, `${this.def.name}<small>${this.def.title}</small>`);
     this.game.hud.placePlate(this.id, sx, sy, vis && d < 16);
+  }
+
+  stepRoam(dt) {
+    const rects = this.def.roam;
+    if (!this.goal) {
+      this.wait = (this.wait || 0) - dt;
+      if (this.wait > 0) {
+        this.speed = 0;
+        return;
+      }
+      const rect = rects[Math.floor(Math.random() * rects.length)];
+      this.goal = {
+        x: rect.x0 + Math.random() * (rect.x1 - rect.x0),
+        z: rect.z0 + Math.random() * (rect.z1 - rect.z0),
+      };
+    }
+    const dx = this.goal.x - this.x;
+    const dz = this.goal.z - this.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.45) {
+      this.goal = null;
+      this.wait = 0.8 + Math.random() * 2.4;
+      this.speed = 0;
+      return;
+    }
+    const sp = 1.15;
+    const pos = { x: this.x + (dx / dist) * sp * dt, z: this.z + (dz / dist) * sp * dt };
+    this.game.world.resolve(pos, 0.34);
+    const moved = Math.hypot(pos.x - this.x, pos.z - this.z);
+    if (!this.game.world.canStep(pos.x, pos.z, this.y) || moved < sp * dt * 0.2) {
+      this.stuck = (this.stuck || 0) + 1;
+      if (this.stuck > 10) {
+        this.goal = null;
+        this.stuck = 0;
+        this.wait = 0.4;
+      }
+      this.speed = 0;
+      return;
+    }
+    this.stuck = 0;
+    this.x = pos.x;
+    this.z = pos.z;
+    this.y = this.game.world.heightAt(this.x, this.z);
+    this.obj.position.set(this.x, this.y, this.z);
+    this.baseYaw = Math.atan2(dx, dz);
+    this.speed = sp;
   }
 
   nextLine() {
@@ -218,6 +277,66 @@ export class Fowl {
   }
 }
 
+export class Cow {
+  constructor(game, x, z, bounds) {
+    this.game = game;
+    this.bounds = bounds;
+    const built = buildCow();
+    this.model = built;
+    this.obj = built.root;
+    this.x = x;
+    this.z = z;
+    this.y = game.world.heightAt(x, z);
+    this.yaw = Math.random() * TAU;
+    this.t = Math.random() * 4;
+    this.goal = null;
+    this.phase = Math.random() * 10;
+    game.scene.add(this.obj);
+    this.obj.position.set(this.x, this.y, this.z);
+  }
+
+  update(dt, t) {
+    if (!this.goal) {
+      this.t -= dt;
+      if (this.t <= 0) {
+        this.t = 1.4 + Math.random() * 2.6;
+        const b = this.bounds;
+        this.goal = {
+          x: b.cx + (Math.random() - 0.5) * b.hx * 1.7,
+          z: b.cz + (Math.random() - 0.5) * b.hz * 1.7,
+        };
+      }
+    }
+    let sp = 0;
+    if (this.goal) {
+      const dx = this.goal.x - this.x;
+      const dz = this.goal.z - this.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.4) this.goal = null;
+      else {
+        sp = 0.7;
+        const nx = this.x + (dx / d) * sp * dt;
+        const nz = this.z + (dz / d) * sp * dt;
+        const b = this.bounds;
+        if (Math.abs(nx - b.cx) < b.hx && Math.abs(nz - b.cz) < b.hz && this.game.world.canStep(nx, nz, this.y)) {
+          this.x = nx;
+          this.z = nz;
+          this.yaw += angDiff(this.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 4);
+        } else this.goal = null;
+      }
+    }
+    this.y += (this.game.world.heightAt(this.x, this.z) - this.y) * Math.min(1, dt * 10);
+    this.obj.position.set(this.x, this.y, this.z);
+    this.obj.rotation.y = this.yaw;
+    const step = sp > 0.1 ? Math.sin(t * 7 + this.phase) : 0;
+    this.model.parts.legs.forEach((leg, i) => {
+      leg.rotation.x = step * (i % 2 ? 0.35 : -0.35);
+    });
+    this.model.parts.head.rotation.y = Math.sin(t * 0.8 + this.phase) * 0.15;
+    this.model.parts.tail.rotation.x = 0.4 + Math.sin(t * 2 + this.phase) * 0.2;
+  }
+}
+
 export class Butterfly {
   constructor(game, x, z, color) {
     this.game = game;
@@ -252,6 +371,20 @@ export function createAmbient(game) {
   const rng = new RNG(31337);
   const npcs = NPC_DEFS.map((d) => new NPC(game, d));
   const fowl = [];
+  const cows = [];
+  for (const pen of game.world.cowPens || []) {
+    for (const spot of pen.spots) cows.push(new Cow(game, spot.x, spot.z, pen.bounds));
+  }
+  const farmers = (game.world.farms || []).map((farm) => new NPC(game, {
+    id: farm.id,
+    name: farm.farmer,
+    title: 'Farmer',
+    spot: farm.id,
+    yaw: farm.yaw || 0,
+    roam: farm.roam,
+    look: farm.look,
+    lines: farm.lines,
+  }));
   const butterflies = [];
   const colors = [0xffd23f, 0xff7aa8, 0x7fd0ff, 0xffffff, 0xff9a3a, 0xc27bff];
   for (let i = 0; i < 16; i++) {
@@ -264,7 +397,7 @@ export function createAmbient(game) {
     const z = rng.range(40, 58);
     butterflies.push(new Butterfly(game, x, z, [0x6af4ff, 0x9affef, 0xc27bff][i % 3]));
   }
-  return { npcs, fowl, butterflies };
+  return { npcs: npcs.concat(farmers), fowl, butterflies, cows };
 }
 
 export { ZONE, shade };

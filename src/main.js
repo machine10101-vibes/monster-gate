@@ -2450,6 +2450,7 @@ class Game {
     }
     for (const n of this.ambient.npcs) n.update(dt, t);
     for (const f of this.ambient.fowl) f.update(dt, t);
+    for (const c of this.ambient.cows || []) c.update(dt, t);
     for (const b of this.ambient.butterflies) b.update(dt);
     this.updateProjectiles(dt);
     this.updatePickups(dt);

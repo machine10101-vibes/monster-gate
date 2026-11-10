@@ -430,6 +430,51 @@ export function buildFowl() {
   return { root, body, mat, parts: { body } };
 }
 
+/* ------------------------------- cow ------------------------------ */
+export function buildCow() {
+  const S = 0.072;
+  const mat = toonMaterial({ vertexColors: true, emissive: new THREE.Color(0x000000) });
+  const hide = (x, y, z) => (hash3(x >> 1, y, z >> 1, 4) > 0.72 ? 0x2c2622 : 0xf7f4ee);
+  const B = new VoxelModel(18, 14, 28);
+  B.box(2, 4, 4, 16, 12, 24, hide);
+  B.box(3, 12, 6, 15, 13, 22, hide);
+  B.box(6, 2, 16, 12, 5, 22, 0xf2b6c4);
+  const H = new VoxelModel(14, 12, 14);
+  H.box(2, 3, 2, 12, 10, 10, hide);
+  H.box(4, 4, 10, 10, 7, 13, 0xf3c2b0);
+  H.box(5, 5, 12, 6, 6, 13, 0x2a1c18);
+  H.box(8, 5, 12, 9, 6, 13, 0x2a1c18);
+  H.set(5, 7, 11, 0x1a1412);
+  H.set(9, 7, 11, 0x1a1412);
+  H.box(3, 10, 4, 5, 13, 6, 0xe8e2d4);
+  H.box(9, 10, 4, 11, 13, 6, 0xe8e2d4);
+  const L = new VoxelModel(6, 10, 6);
+  L.box(1, 2, 1, 5, 10, 5, hide);
+  L.box(1, 0, 1, 5, 2, 5, 0x2a2420);
+  const root = new THREE.Group();
+  const body = meshFrom(B, S, 9, 4, 14, mat);
+  root.add(body);
+  const head = meshFrom(H, S, 7, 6, 2, mat);
+  head.position.set(0, 8 * S, 12 * S);
+  root.add(head);
+  const legs = [];
+  for (const [x, z] of [[-5, 6], [5, 6], [-5, -6], [5, -6]]) {
+    const g = new THREE.Group();
+    g.position.set(x * S, 0, z * S);
+    g.add(meshFrom(L, S, 3, 0, 3, mat));
+    root.add(g);
+    legs.push(g);
+  }
+  const tailM = new VoxelModel(4, 10, 4);
+  tailM.box(1, 1, 1, 3, 9, 3, 0x2c2622);
+  tailM.box(0, 0, 0, 4, 2, 4, 0xf7f4ee);
+  const tailG = new THREE.Group();
+  tailG.position.set(0, 9 * S, -10 * S);
+  tailG.add(meshFrom(tailM, S, 2, 8, 2, mat));
+  root.add(tailG);
+  return { root, body, mat, parts: { body, head, legs, tail: tailG } };
+}
+
 /* ---------------------------- butterfly --------------------------- */
 export function buildButterfly(color) {
   const S = 0.045;
