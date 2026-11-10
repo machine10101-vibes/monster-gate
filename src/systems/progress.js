@@ -1,6 +1,6 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
-import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_LOGS, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
+import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_FROM_LOG, SHAFT_IDS, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
 import { PORTAL_IDS } from '../data/portals.js';
 
 const ANON_KEY = 'monster-gate-hunter-v1';
@@ -85,6 +85,8 @@ export class Progress {
     this.data.skills = normalizeSkills(this.data.skills);
     this.data.xp = normalizeXp(this.data.xp);
     this.data.goods = normalizeGoods(this.data.goods);
+    if (!this.data.crafted || typeof this.data.crafted !== 'object') this.data.crafted = {};
+    this.data.crafted.knife = true;
     this.data.hunter = normalizeHunter(this.data.hunter);
     this.data.storage = normalizeStorage(this.data.storage);
     this.data.portals = normalizePortals(this.data.portals);
@@ -182,7 +184,8 @@ export class Progress {
     for (const d of DROPS[type] || []) {
       if (Math.random() > d.chance) continue;
       const n = d.qty[0] + Math.floor(Math.random() * (d.qty[1] - d.qty[0] + 1));
-      this.data.materials[d.id] = this.count(d.id) + n;
+      if (GOODS[d.id]) this.data.goods[d.id] = this.good(d.id) + n;
+      else this.data.materials[d.id] = this.count(d.id) + n;
       got.push({ id: d.id, n });
     }
     this.save();
@@ -342,7 +345,7 @@ export class Progress {
   }
 
   skillPoints() {
-    const earned = (this.classId ? 2 : 0) + Math.floor(this.totalKills() / 2);
+    const earned = (this.classId ? 2 : 0) + Math.floor((this.totalKills() - this.kills('chicken')) / 2);
     let spent = 0;
     const learned = this.data.skills?.learned || {};
     for (const id of Object.keys(learned)) {
@@ -512,24 +515,27 @@ export class Progress {
     return true;
   }
 
-  /** One log becomes fifteen shafts. The carving knife has to be forged first. */
+  /** One log becomes fifteen shafts of that wood. The carving knife is part of the starting kit. */
   carveShafts(logId, all = false) {
-    if (!this.crafted('knife') || !SHAFT_LOGS.includes(logId)) return 0;
+    const shaftId = SHAFT_FROM_LOG[logId];
+    if (!this.crafted('knife') || !shaftId) return 0;
     const can = this.good(logId);
     const n = all ? can : Math.min(1, can);
     if (n < 1) return 0;
     this.takeGood(logId, n);
-    this.addGood('arrow_shaft', n * SHAFTS_PER_LOG);
+    this.addGood(shaftId, n * SHAFTS_PER_LOG);
     return n * SHAFTS_PER_LOG;
   }
 
-  /** One arrowhead and one shaft become one iron arrow, then the quiver tops itself up. */
-  fletchArrows(all = false) {
-    const can = Math.min(this.good('arrowhead'), this.good('arrow_shaft'));
+  /** One arrowhead, one shaft and one feather become one iron arrow, then the quiver tops itself up. */
+  fletchArrows(shaftId, all = false) {
+    if (!SHAFT_IDS.includes(shaftId)) return 0;
+    const can = Math.min(this.good('arrowhead'), this.good(shaftId), this.good('feather'));
     const n = all ? can : Math.min(1, can);
     if (n < 1) return 0;
     this.takeGood('arrowhead', n);
-    this.takeGood('arrow_shaft', n);
+    this.takeGood(shaftId, n);
+    this.takeGood('feather', n);
     this.addGood('iron_arrow', n);
     return n;
   }
@@ -822,8 +828,11 @@ function normalizeLoad(raw) {
 function normalizeGoods(raw) {
   const out = {};
   if (raw && typeof raw === 'object') {
+    const src = { ...raw };
+    const oldShafts = src.arrow_shaft | 0;
+    if (oldShafts > 0) src.birch_shaft = (src.birch_shaft | 0) + oldShafts;
     for (const id of Object.keys(GOODS)) {
-      const n = raw[id] | 0;
+      const n = src[id] | 0;
       if (n > 0) out[id] = n;
     }
   }

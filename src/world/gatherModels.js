@@ -786,7 +786,11 @@ const GOODS_MODELS = {
   maple_logs: () => logStack('maple'),
   iron_bar: ironBar,
   arrowhead: arrowHead,
-  arrow_shaft: arrowShaft,
+  feather,
+  birch_shaft: () => arrowShaft('birch'),
+  oak_shaft: () => arrowShaft('oak'),
+  maple_shaft: () => arrowShaft('maple'),
+  arrow_shaft: () => arrowShaft('birch'),
   iron_arrow: ironArrow,
   quiver: quiverModel,
 };
@@ -808,11 +812,23 @@ function arrowHead() {
   return [M, 0.06, 7, 0, 4];
 }
 
-function arrowShaft() {
+function arrowShaft(kind = 'birch') {
+  const w = WOOD[kind] || WOOD.birch;
   const M = new VoxelModel(22, 6, 6);
-  M.box(1, 2, 2, 18, 4, 4, (x, y, z) => J(0xc9a36a, x, y, z, 6, 0.05));
-  M.box(16, 1, 2, 20, 5, 4, 0xf4efe4);
+  M.box(1, 2, 2, 18, 4, 4, (x, y, z) => J(w.heart, x, y, z, 6, 0.05));
+  M.box(16, 1, 2, 20, 5, 4, w.bark);
   return [M, 0.05, 11, 0, 3];
+}
+
+function feather() {
+  const M = new VoxelModel(18, 10, 6);
+  M.box(1, 4, 2, 5, 6, 4, 0xe7d2a4);
+  for (let x = 4; x <= 16; x++) {
+    const w = Math.max(0, 4 - Math.floor((x - 4) / 3));
+    M.box(x, 5 - w, 2, x, 5 + w, 3, x % 2 ? 0xfffaf0 : 0xe4e0d4);
+  }
+  M.set(17, 5, 2, 0xfffaf0);
+  return [M, 0.055, 9, 0, 3];
 }
 
 function ironArrow() {

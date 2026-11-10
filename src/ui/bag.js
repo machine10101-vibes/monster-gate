@@ -1,6 +1,6 @@
 import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
 import { iconCanvas } from './icons.js';
-import { FISH, GOODS, GOODS_ORDER, TOOLS, burnChance } from '../data/gathering.js';
+import { FISH, GOODS, GOODS_ORDER, SHAFT_FROM_LOG, SHAFTS_PER_LOG, TOOLS, burnChance } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 const TABS = [
@@ -162,7 +162,7 @@ function collect(game) {
   }].concat(game.progress.crafted('knife') ? [{
     key: 'tkife',
     name: 'Carving knife',
-    sub: 'Shaves a log into 15 arrow shafts. Works anywhere.',
+    sub: 'Shaves a log into 15 shafts of that wood. A feather fletches each shaft at the forge.',
     canvas: () => renderThumb({ kind: 'held', id: 'knife' }, 96),
     action: 'Carve',
     run: () => game.openCarve(),
@@ -202,9 +202,25 @@ function collect(game) {
     } else if (g.kind === 'bar' || g.kind === 'part' || g.kind === 'arrow') {
       sub = `${g.desc} You have ${n}.`;
     } else if (g.kind === 'log') {
-      sub = `Light with the tinderbox. You have ${n}.`;
-      action = 'Light';
-      run = (paint) => { if (game.lightLog(id)) game.hud.closePanel(); else paint(); };
+      const shaft = GOODS[SHAFT_FROM_LOG[id]];
+      sub = shaft
+        ? `Light it, or carve ${SHAFTS_PER_LOG} ${shaft.name.toLowerCase()}s. You have ${n}.`
+        : `Light with the tinderbox. You have ${n}.`;
+      actions = [
+        { label: 'Light', run: (paint) => { if (game.lightLog(id)) game.hud.closePanel(); else paint(); } },
+      ];
+      if (shaft) {
+        actions.push({
+          label: 'Carve',
+          run: (paint) => {
+            const made = game.progress.carveShafts(id, false);
+            if (!made) return;
+            game.audio.quest();
+            game.hud.toast(`Carved ${made} ${shaft.name.toLowerCase()}s`, 1600);
+            paint();
+          },
+        });
+      }
     } else sub = `Sells for ${g.price} gold each. You have ${n}.`;
     goods.push({
       key: 'g' + id,

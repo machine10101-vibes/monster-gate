@@ -34,6 +34,9 @@ export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehor
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
+  chicken: [
+    { id: 'feather', chance: 1, qty: [5, 12], rate: 'Common' },
+  ],
   budgedragon: [
     { id: 'budgescale', chance: 1, qty: [2, 4], rate: 'Common' },
     { id: 'budgehide', chance: 0.6, qty: [1, 1], rate: 'Common' },
@@ -79,6 +82,10 @@ export const DROPS = {
 };
 
 export const MONSTERS = [
+  {
+    id: 'chicken', name: 'Chicken', level: 1, temper: 'Skittish', style: 'Passive', habitat: 'The farm and the meadows around Oakhollow',
+    desc: 'A barnyard hen. It pecks the grass and runs when you come close. It will not fight back. Feathers from a chicken fletch arrow shafts, and another hen takes its place soon after.',
+  },
   {
     id: 'slime', name: 'Gate Slime', level: 1, temper: 'Bouncy', style: 'Melee', habitat: 'Around the Monster Gate',
     desc: 'A wobbling green blob that the gate spits out by the dozen. Harmless until it lands on you.',
