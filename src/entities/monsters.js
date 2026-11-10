@@ -1012,9 +1012,16 @@ export class Monster {
                 this.state = 'peck';
               } else {
                 this.state = 'wander';
-                const a = Math.random() * TAU;
-                const rr = 1.2 + Math.random() * 2.4;
-                this.target = { x: this.home.x + Math.cos(a) * rr, z: this.home.z + Math.sin(a) * rr };
+                if (this.pen) {
+                  this.target = {
+                    x: this.pen.cx + (Math.random() - 0.5) * this.pen.hx * 1.6,
+                    z: this.pen.cz + (Math.random() - 0.5) * this.pen.hz * 1.6,
+                  };
+                } else {
+                  const a = Math.random() * TAU;
+                  const rr = 1.2 + Math.random() * 2.4;
+                  this.target = { x: this.home.x + Math.cos(a) * rr, z: this.home.z + Math.sin(a) * rr };
+                }
               }
             }
             if (this.state !== 'peck' && this.target) {
@@ -1028,12 +1035,19 @@ export class Monster {
               }
             }
           }
-          const hx = this.home.x - this.x;
-          const hz = this.home.z - this.z;
-          const hd = Math.hypot(hx, hz);
-          if (hd > 6) {
-            mvx = (hx / hd) * 2.4;
-            mvz = (hz / hd) * 2.4;
+          if (this.pen) {
+            const ox = this.x - this.pen.cx;
+            const oz = this.z - this.pen.cz;
+            if (Math.abs(ox) > this.pen.hx) mvx = -Math.sign(ox) * 2.2;
+            if (Math.abs(oz) > this.pen.hz) mvz = -Math.sign(oz) * 2.2;
+          } else {
+            const hx = this.home.x - this.x;
+            const hz = this.home.z - this.z;
+            const hd = Math.hypot(hx, hz);
+            if (hd > 6) {
+              mvx = (hx / hd) * 2.4;
+              mvz = (hz / hd) * 2.4;
+            }
           }
           break;
         }
@@ -1755,7 +1769,8 @@ export class Spawner {
     this.timer = 1;
     this.rng = new RNG(4242);
     this.max = 9;
-    this.nests = CHICKEN_NESTS.map(([x, z]) => ({ x, z, t: 0 }));
+    const penned = (game.world?.chickenNests || []).map((n) => ({ x: n.x, z: n.z, t: 0, pen: n.pen }));
+    this.nests = CHICKEN_NESTS.map(([x, z]) => ({ x, z, t: 0 })).concat(penned);
   }
 
   populate() {
@@ -1891,6 +1906,7 @@ export class Spawner {
       nest.t = 0;
       const hen = this.spawn('chicken', x, z, false);
       hen.nest = nest;
+      hen.pen = nest.pen || null;
       hen.home.x = nest.x;
       hen.home.z = nest.z;
     }

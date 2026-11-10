@@ -58,7 +58,7 @@ const RING = {
   '1,6': ['tigerwood', 'Southwest of the oasis. Runmouth is a steaming jungle hollow with a wrecked pirate ship half swallowed by roots, haunted by Cursed Pirates.'],
   '2,7': ['pirateshore', 'South of Southmead. The jungle thins to a palm beach at Dunes, where two pirate ships are moored and a long fishing pier runs out over deep water.'],
   '1,7': ['shellbeach', 'West of Dunes. Shellbeach is a sweep of white sand, shells and driftwood between the jungle and the sea, with a pirate ship dock on the shore.'],
-  '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Long fenced fields and a lane from the vale.'],
+  '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Mara\'s Acre and Wend Farm sit on the long fields, with a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
 };
 

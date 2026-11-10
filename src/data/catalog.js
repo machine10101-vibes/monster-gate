@@ -83,8 +83,8 @@ export const DROPS = {
 
 export const MONSTERS = [
   {
-    id: 'chicken', name: 'Chicken', level: 1, temper: 'Skittish', style: 'Passive', habitat: 'The farm and the meadows around Oakhollow',
-    desc: 'A barnyard hen. It pecks the grass and runs when you come close. It will not fight back. Feathers from a chicken fletch arrow shafts, and another hen takes its place soon after.',
+    id: 'chicken', name: 'Chicken', level: 1, temper: 'Skittish', style: 'Passive', habitat: 'Mara\'s Acre on Longacre, and the meadows around Oakhollow',
+    desc: 'A barnyard hen. It pecks the grass and runs when you come close. It will not fight back. Feathers from a chicken fletch arrow shafts, and another hen takes its place soon after. A flock lives in the pen at Mara\'s Acre on Longacre.',
   },
   {
     id: 'slime', name: 'Gate Slime', level: 1, temper: 'Bouncy', style: 'Melee', habitat: 'Around the Monster Gate',

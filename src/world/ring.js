@@ -5,6 +5,7 @@ import { TILES } from './tiles.js';
 import { ARCTIC_SPECS, arcticFeature, paintArcticCell, frostGoldmead, dressArctic } from './arctic.js';
 import { JUNGLE_SPECS, jungleFeature, paintJungleCell, dressJungle, finishJungle } from './jungle.js';
 import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount } from './volcanic.js';
+import { buildHouse } from './models.js';
 
 /**
  * The seven tiles around Oakhollow (44, 45, 46, 54, 56, 64, 66).
@@ -345,6 +346,105 @@ const SPECS = {
 
 const HAY = 6;
 
+const ROOF_RUST = [0xa8452f, 0xb9553a, 0x93402c, 0xc66443, 0x7d3a2b];
+const ROOF_GOLD = [0xc9a14a, 0xd9b45a, 0xb88f3c, 0xe6c76a, 0xa8802f];
+const ROOF_MOSS = [0x4f7f3a, 0x5d9444, 0x44702f, 0x6aa650, 0x3d5f2b];
+
+/** Two farmsteads on Longacre. Coordinates are local to the tile. */
+const LONGACRE_FARMS = [
+  {
+    id: 'mara',
+    name: "Mara's Acre",
+    farmer: 'Mara',
+    animals: 'chicken',
+    yard: { x0: 78, z0: 24, x1: 118, z1: 62 },
+    lane: { x0: 98, z0: 62, x1: 98, z1: 84 },
+    house: { x: 86, z: 32, w: 5, d: 4, rot: 0, seed: 21, wall: 0xe4d2a4, roof: ROOF_MOSS, shutters: 0x4a8c86 },
+    barn: { x: 104, z: 30, w: 7, d: 5, rot: 0, seed: 22, wall: 0x6a4328, roof: ROOF_RUST },
+    pen: { x0: 84, z0: 44, x1: 114, z1: 58 },
+    gate: 's',
+    herd: 8,
+    look: { skin: 0xf0c09a, hair: 0x6a3418, hairStyle: 'short', hairLen: 6, tunic: 0x3f7a45, sleeve: 0xe7d7b0, pants: 0x3d4f78, boots: 0x3a2a1f, hat: 'straw', seed: 31 },
+    lines: [
+      'The hens stay in the pen. They drop feathers if you need them for fletching.',
+      'Mind the gate. They run when a hunter comes close, and another hen takes the place soon after.',
+    ],
+  },
+  {
+    id: 'wend',
+    name: 'Wend Farm',
+    farmer: 'Wend',
+    animals: 'cow',
+    yard: { x0: 98, z0: 98, x1: 132, z1: 124 },
+    lane: { x0: 114, z0: 98, x1: 114, z1: 88 },
+    house: { x: 106, z: 104, w: 5, d: 4, rot: 0, seed: 41, wall: 0x9a6a3c, roof: ROOF_GOLD, shutters: 0xa8452f },
+    barn: { x: 122, z: 102, w: 7, d: 5, rot: 0, seed: 42, wall: 0x5c4030, roof: ROOF_RUST },
+    pen: { x0: 104, z0: 112, x1: 128, z1: 122 },
+    gate: 'n',
+    herd: 4,
+    look: { skin: 0xc89868, hair: 0x3a2414, hairStyle: 'short', beard: true, tunic: 0x8a4a2c, sleeve: 0xd8c4a0, pants: 0x3a4a78, boots: 0x2a1c14, hat: 'straw', seed: 44 },
+    lines: [
+      'The cows keep to the pen. The milk goes down the lane to Southford.',
+      'Hay is in the barn. Shut the gate if you walk through, or they will stare you down.',
+    ],
+  },
+];
+
+function stampYard(H, kind, yard) {
+  const { x0, z0, x1, z1 } = yard;
+  let sum = 0;
+  let n = 0;
+  for (let z = z0; z <= z1; z++) {
+    for (let x = x0; x <= x1; x++) {
+      sum += H[z * W + x];
+      n++;
+    }
+  }
+  const h = Math.round((sum / Math.max(1, n)) * 2) / 2;
+  const pad = 6;
+  for (let z = z0 - pad; z <= z1 + pad; z++) {
+    for (let x = x0 - pad; x <= x1 + pad; x++) {
+      if (x <= 0 || z <= 0 || x >= W - 1 || z >= W - 1) continue;
+      const dx = Math.max(x0 - x, x - x1, 0);
+      const dz = Math.max(z0 - z, z - z1, 0);
+      const d = Math.hypot(dx, dz);
+      const i = z * W + x;
+      if (d <= 0) {
+        H[i] = h;
+        kind[i] = FARM;
+      } else if (d < pad) H[i] = Math.round(lerp(h, H[i], d / pad) * 2) / 2;
+    }
+  }
+  yard.h = h;
+}
+
+function stampLane(H, kind, mask, lane) {
+  const x0 = Math.round(lane.x0);
+  const z0 = Math.round(lane.z0);
+  const x1 = Math.round(lane.x1);
+  const z1 = Math.round(lane.z1);
+  const a = H[z0 * W + x0];
+  const b = H[z1 * W + x1];
+  const steps = Math.max(1, Math.ceil(Math.hypot(lane.x1 - lane.x0, lane.z1 - lane.z0)));
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const x = lane.x0 + (lane.x1 - lane.x0) * t;
+    const z = lane.z0 + (lane.z1 - lane.z0) * t;
+    for (let dz = -2; dz <= 2; dz++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const xx = Math.round(x + dx);
+        const zz = Math.round(z + dz);
+        if (xx <= 0 || zz <= 0 || xx >= W - 1 || zz >= W - 1) continue;
+        if (Math.hypot(xx - x, zz - z) > 1.6) continue;
+        const i = zz * W + xx;
+        kind[i] = PATH;
+        mask[i] = 1;
+        H[i] = Math.round(lerp(a, b, t) * 2) / 2;
+      }
+    }
+  }
+}
+
 function applyFeature(h, x, z, spec) {
   if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.volcanic) return volcanicFeature(h, x, z, spec);
@@ -431,6 +531,12 @@ function makeTile(spec, edges) {
       if (spec.hay && x > 24 && x < W - 24 && z > 24 && z < W - 24 && H[i] > 1.4 && H[i] < 5.2 && hash2(x, z, spec.seed) > 0.62) {
         kind[i] = HAY;
       }
+    }
+  }
+  if (spec.kind === 'longacre') {
+    for (const farm of LONGACRE_FARMS) {
+      stampYard(H, kind, farm.yard);
+      stampLane(H, kind, mask, farm.lane);
     }
   }
 
@@ -712,6 +818,7 @@ function dressLand(world, land) {
     dressVolcanic(world, land, spec);
     return;
   }
+  reserveLongacre(world, land);
   const place = (parts, lx, lz, rot, scale, opts) => {
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
@@ -788,17 +895,7 @@ function dressLand(world, land) {
       }
     }
   }
-  if (land.kind === 'longacre') {
-    for (let n = 0; n < 16; n++) {
-      const lx = 30 + Math.floor(hash2(n, 2, seed + 4) * 80);
-      const lz = 30 + Math.floor(hash2(n, 9, seed + 4) * 80);
-      const i = lz * W + lx;
-      if (data.zone[i] !== ZONE.FARM || data.pathMask[i]) continue;
-      if (place(m.fence[n % m.fence.length], lx, lz, (n % 2) * 1.57, 1, { r: 0.7 })) {
-        world.circle(land.x0 + lx + 0.5, land.z0 + lz + 0.5, 0.3);
-      }
-    }
-  }
+  if (land.kind === 'longacre') buildLongacre(world, land);
   if (land.kind === 'goldmead') {
     const [cx, cz, cr] = spec.clearing;
     let extra = 0;
@@ -831,6 +928,118 @@ function dressLand(world, land) {
         world.circle(land.x0 + lx + 0.5, land.z0 + lz + 0.5, 0.45);
       }
     }
+  }
+}
+
+function reserveLongacre(world, land) {
+  if (land.kind !== 'longacre') return;
+  for (const farm of LONGACRE_FARMS) {
+    for (let x = farm.yard.x0; x <= farm.yard.x1; x += 4) {
+      for (let z = farm.yard.z0; z <= farm.yard.z1; z += 4) world.occupy(land.x0 + x, land.z0 + z, 3);
+    }
+  }
+}
+
+function fenceRect(world, x0, z0, x1, z1, gate) {
+  const g = 2.6;
+  const gap = (side) => {
+    if (gate.side !== side) return [];
+    if (side === 'n' || side === 's') {
+      const z = side === 'n' ? z0 : z1;
+      return [[gate.at - g / 2, gate.at + g / 2, z - 0.7, z + 0.7]];
+    }
+    const x = side === 'w' ? x0 : x1;
+    return [[x - 0.7, x + 0.7, gate.at - g / 2, gate.at + g / 2]];
+  };
+  world.fenceLine(x0, z0, x1, z0, gap('n'));
+  world.fenceLine(x1, z0, x1, z1, gap('e'));
+  world.fenceLine(x1, z1, x0, z1, gap('s'));
+  world.fenceLine(x0, z1, x0, z0, gap('w'));
+}
+
+function buildLongacre(world, land) {
+  const m = world.models;
+  const X = (lx) => land.x0 + lx;
+  const Z = (lz) => land.z0 + lz;
+  world.farms = [];
+  world.farmMarks = [];
+  world.chickenNests = [];
+  world.cowPens = [];
+  if (!world.npcSpots) world.npcSpots = {};
+  for (const farm of LONGACRE_FARMS) {
+    const house = buildHouse({ ...farm.house, wh: 22, pitch: 1.05, chimney: true, flowers: true });
+    const barn = buildHouse({ ...farm.barn, wh: 18, pitch: 0.72, chimney: false, flowers: false, bigDoor: true });
+    const hx = X(farm.house.x);
+    const hz = Z(farm.house.z);
+    const bx = X(farm.barn.x);
+    const bz = Z(farm.barn.z);
+    world.putAt(house, hx, hz, farm.house.rot, 1);
+    world.putAt(barn, bx, bz, farm.barn.rot, 1);
+    world.box(hx, hz, farm.house.w * 0.42, farm.house.d * 0.42);
+    world.box(bx, bz, farm.barn.w * 0.42, farm.barn.d * 0.42);
+    const pen = {
+      x0: X(farm.pen.x0),
+      z0: Z(farm.pen.z0),
+      x1: X(farm.pen.x1),
+      z1: Z(farm.pen.z1),
+    };
+    const gateAt = farm.gate === 'n' || farm.gate === 's' ? (pen.x0 + pen.x1) / 2 : (pen.z0 + pen.z1) / 2;
+    fenceRect(world, pen.x0, pen.z0, pen.x1, pen.z1, { side: farm.gate, at: gateAt });
+    const bounds = {
+      cx: (pen.x0 + pen.x1) / 2,
+      cz: (pen.z0 + pen.z1) / 2,
+      hx: (pen.x1 - pen.x0) / 2 - 1.6,
+      hz: (pen.z1 - pen.z0) / 2 - 1.6,
+    };
+    const spots = [];
+    const cols = farm.animals === 'chicken' ? 4 : 2;
+    const rows = Math.ceil(farm.herd / cols);
+    for (let i = 0; i < farm.herd; i++) {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      spots.push({
+        x: bounds.cx + (c - (cols - 1) / 2) * (bounds.hx * 1.3 / Math.max(1, cols - 1)),
+        z: bounds.cz + (r - (rows - 1) / 2) * (bounds.hz * 1.1 / Math.max(1, rows - 1)),
+      });
+    }
+    if (farm.animals === 'chicken') {
+      for (const spot of spots) world.chickenNests.push({ x: spot.x, z: spot.z, pen: bounds });
+    } else {
+      world.cowPens.push({ bounds, spots });
+    }
+    for (let x = farm.yard.x0 + 2; x < farm.yard.x1 - 1; x += 1.4) {
+      for (let z = farm.yard.z0 + 2; z < farm.pen.z0 - 1.2; z += 1.5) {
+        if (Math.abs(x - farm.lane.x0) < 2.2) continue;
+        if (Math.hypot(x - farm.house.x, z - farm.house.z) < 4.2) continue;
+        if (Math.hypot(x - farm.barn.x, z - farm.barn.z) < 5) continue;
+        const wx = X(x);
+        const wz = Z(z);
+        const ripe = hash2(Math.floor(x), Math.floor(z), farm.house.seed) > 0.25;
+        const list = ripe ? m.wheat : m.wheatGreen;
+        world.putAt(list[(x + z) % list.length | 0], wx, wz, ((x + z) % 4) * (Math.PI / 2), 1, { cover: true });
+      }
+    }
+    world.putAt(m.scarecrow, X((farm.pen.x0 + farm.pen.x1) / 2), Z(farm.pen.z0 - 2.2), 0.4, 1.3);
+    world.putAt(m.hay, bx + 3.2, bz + 1.4, 0.5, 1.35);
+    world.circle(bx + 3.2, bz + 1.4, 0.55);
+    world.putAt(m.hay, bx + 4.3, bz + 2.2, 1.2, 1.15);
+    world.circle(bx + 4.3, bz + 2.2, 0.45);
+    const roam = [
+      { x0: X(farm.yard.x0 + 2), z0: Z(farm.yard.z0 + 2), x1: X(farm.yard.x1 - 2), z1: Z(farm.pen.z0 - 1.5) },
+      { x0: X(farm.lane.x0 - 1.4), z0: Z(Math.min(farm.lane.z0, farm.lane.z1)), x1: X(farm.lane.x0 + 1.4), z1: Z(Math.max(farm.lane.z0, farm.lane.z1)) },
+    ];
+    world.npcSpots[farm.id] = { x: hx + 1.2, z: hz + farm.house.d * 0.55 + 1.4 };
+    world.farmMarks.push({ name: farm.name, x: hx, z: hz - 4 });
+    world.farms.push({
+      id: farm.id,
+      name: farm.name,
+      farmer: farm.farmer,
+      animals: farm.animals,
+      look: farm.look,
+      lines: farm.lines,
+      roam,
+      yaw: 0,
+    });
   }
 }
 
