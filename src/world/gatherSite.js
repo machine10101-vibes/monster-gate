@@ -229,6 +229,8 @@ function buildLake(world) {
     fishMats[id] = g;
   }
   world.jumpers = fishMats;
+  world.addSeaFishSpot = (s) =>
+    addFishSpot(world, { kind: 'rod', site: 'sea', title: 'Deep-sea pole spot', catches: ['tuna', 'stingray', 'tigershark'], reach: 3, run: 1.2, from: 0.8, ...s }, WATER_Y);
 }
 
 function addFishSpot(world, def, y) {
@@ -422,7 +424,7 @@ export function updateGatherSites(world, dt, t, game) {
           head: HEAD_DIR[id] ?? -1,
           spin: id === 'shrimp' ? 6 : 0,
           lift: s.site === 'ice' ? 1.15 : 0.95,
-          scale: id === 'sturgeon' ? 0.7 : 0.85,
+          scale: id === 'sturgeon' || id === 'tigershark' ? 0.7 : 0.85,
         };
         model.visible = true;
         game.fx.burst(s.x + dx * s.from, s.y + 0.1, s.z + dz * s.from, [0xbfeaff, 0xffffff], 5, 1.6, 0.06, 0.4, -4, 0.5);

@@ -5,6 +5,8 @@ const PAL = {
   p: '#c27bff', P: '#7a45c8', s: '#9aa0a8', S: '#6c727c', t: '#f2dfb0', h: '#ffe9a0',
   v: '#8a7ad0', V: '#4b3f8c', m: '#b25cff', n: '#2b2450', q: '#f0c8ff',
   i: '#dff4ff', I: '#8fd0ff', j: '#4f8fc8', J: '#2d5a8c', u: '#f6fbff', f: '#b4d0e6', F: '#7fa6c8',
+  U: '#f08a22', a: '#c9b27a', A: '#7d8438', x: '#555c26', X: '#efe4c8', z: '#2c3a66', Z: '#1b2444',
+  D: '#4cf08a', K: '#a82424', M: '#6a1616', Q: '#8c6c52', W: '#5a3d28', N: '#d2a22c', H: '#ffd95a', L: '#c6ccd6', T: '#8d939c',
 };
 
 function make(rows) {
@@ -745,6 +747,114 @@ ART.yetishortbow = shortbow('i', 'F', 'I', 'F', 'u');
 ART.yetilongbow = recolor(ART.bow, { b: 'F', t: 'u', h: 'I' });
 ART.yeticrossbow = recolor(ART.crossbow, { l: 'i', b: 'F', y: 'I' });
 ART.yetiscythe = recolor(ART.darkscythe, { l: 'u', g: 'i', G: 'I', V: 'j', n: 'J', m: 'I', v: 'F' });
+
+const arc = (p, x0, y0, cx, cy, x1, y1, fn, steps = 24) => {
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1;
+    const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y1;
+    p(Math.round(x), Math.round(y), fn(i, t));
+  }
+};
+
+/** Curved blade of tapering width, with a bright edge, a guard bar and a short grip. */
+const sabre = (p, line, x0, y0, cx, cy, x1, y1, o) => {
+  const { body, edge, back, guard, grip, pommel, band = null, w0 = 3, w1 = 1, wcut = 0 } = o;
+  const dl = Math.hypot(cx - x0, cy - y0) || 1;
+  const dx = (cx - x0) / dl;
+  const dy = (cy - y0) / dl;
+  const steps = 30;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1;
+    const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y1;
+    const ax = 2 * (1 - t) * (cx - x0) + 2 * t * (x1 - cx);
+    const ay = 2 * (1 - t) * (cy - y0) + 2 * t * (y1 - cy);
+    const al = Math.hypot(ax, ay) || 1;
+    const nx = -ay / al;
+    const ny = ax / al;
+    const w = Math.max(w1, w0 * (1 - t ** 1.4) + w1 * t);
+    const n = Math.max(1, Math.round(w));
+    for (let k = 0; k < n; k++) {
+      const u = n === 1 ? 0 : k / (n - 1);
+      const off = (u - 0.5) * (n - 1) + wcut * t;
+      const col = band ? band(i, t, k, n) : k === 0 ? edge : k === n - 1 ? back : body;
+      p(Math.round(x + nx * off), Math.round(y + ny * off), col);
+    }
+  }
+  const nx = -dy;
+  const ny = dx;
+  for (let k = -2; k <= 2; k++) p(Math.round(x0 + nx * k), Math.round(y0 + ny * k), Math.abs(k) === 2 ? pommel : guard);
+  for (let k = 1; k <= 3; k++) p(Math.round(x0 - dx * (k + 1)), Math.round(y0 - dy * (k + 1)), grip);
+  p(Math.round(x0 - dx * 5), Math.round(y0 - dy * 5), pommel);
+};
+
+const restripe = (rows, from, to, fn) => rows.map((r, y) => [...r].map((ch, x) => (ch === from && fn(x, y) ? to : ch)).join(''));
+
+ART.tigerclaws = draw((p, line) => {
+  const band = (i, t, k, n) => (i % 8 < 4 ? (k === 0 ? 'X' : 'U') : k === 0 ? 'X' : 'k');
+  sabre(p, line, 2, 14, 3, 7, 9, 1, { band, guard: 'k', grip: 'U', pommel: 'k', w0: 4, w1: 1 });
+  sabre(p, line, 8, 15, 10, 9, 15, 4, { band, guard: 'k', grip: 'U', pommel: 'k', w0: 4, w1: 1 });
+});
+ART.tigershortbow = restripe(shortbow('U', 'k', 'X', 'B', 'X'), 'U', 'k', (x, y) => y % 3 === 0);
+ART.tigerspear = restripe(spear('X', 'w', 'k', 'U', 'w'), 'U', 'k', (x, y) => (x + y) % 3 === 0);
+
+ART.raptorsaber = draw((p, line) => {
+  const band = (i, t, k, n) => (t < 0.22 ? (k === 0 ? 'a' : 'x') : k === 0 ? 'w' : k === n - 1 ? 'a' : 'X');
+  sabre(p, line, 3, 13, 9, 12, 14, 1, { band, guard: 'G', grip: 'A', pommel: 'x', w0: 5, w1: 1 });
+});
+ART.raptorcrossbow = recolor(ART.crossbow, { l: 'X', b: 'A', y: 'a' });
+ART.raptorscythe = recolor(ART.darkscythe, { l: 'w', g: 'X', G: 'a', V: 'x', n: 'x', m: 'U', v: 'A' });
+
+ART.piratecutlass = draw((p, line) => {
+  sabre(p, line, 4, 12, 9, 11, 14, 1, { body: 'L', edge: 'w', back: 'T', guard: 'H', grip: 'B', pommel: 'y', w0: 3, w1: 1 });
+  line(3, 10, 3, 14, 'H');
+});
+ART.piratedual = draw((p, line) => {
+  sabre(p, line, 2, 13, 5, 10, 8, 1, { body: 'L', edge: 'w', back: 'T', guard: 'H', grip: 'B', pommel: 'y', w0: 3, w1: 1 });
+  sabre(p, line, 13, 13, 11, 10, 6, 1, { body: 'L', edge: 'T', back: 'w', guard: 'H', grip: 'B', pommel: 'y', w0: 3, w1: 1 });
+});
+ART.piratecleaver = draw((p, line) => {
+  sabre(p, line, 4, 12, 10, 12, 14, 0, { body: 'L', edge: 'w', back: 'T', guard: 'H', grip: 'R', pommel: 'y', w0: 5, w1: 1 });
+  line(3, 9, 3, 15, 'H');
+  line(4, 9, 4, 15, 'y');
+});
+ART.buccaneergun = draw((p, line) => {
+  line(2, 6, 13, 6, 'L');
+  line(7, 4, 7, 9, 'H');
+  line(1, 7, 9, 7, 'b');
+  line(1, 8, 9, 8, 'B');
+  line(8, 7, 8, 12, 'b');
+  line(3, 7, 3, 8, 'H');
+  line(5, 7, 5, 8, 'H');
+  line(10, 7, 14, 4, 'L');
+  line(11, 8, 15, 5, 'w');
+  line(10, 5, 10, 8, 'H');
+  line(3, 3, 3, 10, 'g');
+  line(12, 3, 12, 6, 'g');
+});
+ART.cursedblade = draw((p, line) => {
+  const band = (i, t, k, n) => (k === 1 && i % 5 === 2 ? 'D' : k === 0 ? 'Q' : k === n - 1 ? 'W' : i % 7 === 3 ? 'M' : 'Q');
+  sabre(p, line, 4, 12, 9, 11, 14, 1, { band, guard: 'X', grip: 'X', pommel: 'X', w0: 4, w1: 1 });
+});
+ART.bonestaff = [
+  '.....D..........',
+  '....DD.D........',
+  '..X.XXXXX.X.....',
+  '...XXXXXXXX.....',
+  '....XkXXkX......',
+  '....XDXXDX......',
+  '.....XXXX.......',
+  '......HH........',
+  '.....HH.........',
+  '....Xa..........',
+  '...Xa...........',
+  '..Xa............',
+  '.Xa.............',
+  '.MM.............',
+  'MM..............',
+  '................',
+];
 
 ART.stats = draw((p, line) => {
   for (let y = 11; y <= 13; y++) for (let x = 2; x <= 4; x++) p(x, y, y === 11 ? 'h' : 'y');

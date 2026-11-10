@@ -4,6 +4,7 @@ import * as frostMetal from './armorFrost.js';
 import { makeSoftArmor } from './armorSoft.js';
 import { withDetail } from './armorDetail.js';
 import { demonPlate, holyPlate } from './armorKnights.js';
+import { JUNGLE_SETS, makeJungleArmor } from './armorJungle.js';
 
 const CACHE = {};
 const BUILD = {
@@ -18,6 +19,7 @@ const BUILD = {
   darkcloth: () => makeSoftArmor('darkcloth'),
   yetileather: () => makeSoftArmor('yetileather'),
   yeticloth: () => makeSoftArmor('yeticloth'),
+  ...Object.fromEntries(JUNGLE_SETS.map((id) => [id, () => makeJungleArmor(id)])),
 };
 
 /** Painter module {paintHelm, paintChest, paintArm, paintLeg} for a set id. */

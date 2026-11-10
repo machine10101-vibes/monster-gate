@@ -21,9 +21,16 @@ export const MATERIALS = {
   yetifang: { name: 'Yeti Fang', desc: 'A cream-white fang with a rime of frost along the root.' },
   frostshard: { name: 'Frost Shard', desc: 'A spike of living ice from a yeti\'s back. It never melts.' },
   frostheart: { name: 'Frostheart', desc: 'A palm-sized crystal that beats once a minute, long after its owner is gone.' },
+  tigerskin: { name: 'Tiger Skin', desc: 'Orange hide banded in black, with a white belly. Heavy, warm and unmistakable.' },
+  tigerclaw: { name: 'Tiger Claw', desc: 'A hooked claw as long as a finger, still sharp enough to scratch steel.' },
+  raptorskin: { name: 'Raptor Skin', desc: 'Olive and tan scaled hide in a mosaic pattern. Tougher than it looks.' },
+  raptorclaw: { name: 'Raptor Claw', desc: 'A curved sickle claw from a raptor\'s foot.' },
+  scimitar: { name: 'Pirate Scimitar', desc: 'A curved cutlass blade with a brass guard. Salt-stained but sharp.' },
+  pirategold: { name: 'Pirate Gold', desc: 'A fistful of doubloons and gold buttons. Spends the same on land.' },
+  piratebone: { name: 'Pirate Bones', desc: 'Yellowed bones from a pirate who never made port.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -50,6 +57,24 @@ export const DROPS = {
     { id: 'glacierclaw', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
     { id: 'yetifang', chance: 0.5, qty: [1, 2], rate: 'Uncommon' },
     { id: 'frostheart', chance: 0.25, qty: [1, 1], rate: 'Rare' },
+  ],
+  tiger: [
+    { id: 'tigerskin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'tigerclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
+  ],
+  raptor: [
+    { id: 'raptorskin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'raptorclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
+  ],
+  pirate: [
+    { id: 'scimitar', chance: 0.6, qty: [1, 1], rate: 'Common' },
+    { id: 'pirategold', chance: 0.9, qty: [1, 3], rate: 'Common' },
+    { id: 'piratebone', chance: 0.4, qty: [1, 2], rate: 'Uncommon' },
+  ],
+  cursedpirate: [
+    { id: 'piratebone', chance: 1, qty: [2, 4], rate: 'Common' },
+    { id: 'pirategold', chance: 0.8, qty: [1, 3], rate: 'Common' },
+    { id: 'scimitar', chance: 0.45, qty: [1, 1], rate: 'Uncommon' },
   ],
 };
 
@@ -95,6 +120,22 @@ export const MONSTERS = [
     id: 'holyknight', name: 'Holy Knight', level: 11, temper: 'Righteous', style: 'Brawler', habitat: 'The white castle on tile 23, in the volcanic wasteland',
     desc: 'A giant knight in white and gold plate with glowing blue crosses and a ragged gold-trimmed cape. It smashes the ground with a rune-lit stone war hammer and calls pillars of holy light down on wherever you stand. It drops no parts, only whole pieces of its own gear, and rarely.',
     lore: KNIGHT_LORE.holyknight,
+  },
+  {
+    id: 'tiger', name: 'Bengal Tiger', level: 6, temper: 'Stalking', style: 'Pouncer', habitat: 'The jungle oasis, west of Brookside',
+    desc: 'An orange and black striped cat with white paws and yellow eyes. It creeps low through the undergrowth, then pounces from a distance and rakes with both paws. If you roll away it lunges again. Hit it during its crouch to knock it off the pounce.',
+  },
+  {
+    id: 'raptor', name: 'Battle Raptor', level: 6, temper: 'Savage', style: 'Pack Hunter', habitat: 'The jungle oasis, west of Brookside',
+    desc: 'A scarred, olive-scaled raptor with a ridge of grey spikes and an orange eye. It hunts in packs, snaps with a mouthful of teeth and leaps with its sickle claws. One alone is a fight and three is a problem.',
+  },
+  {
+    id: 'pirate', name: 'Pirate', level: 5, temper: 'Greedy', style: 'Melee', habitat: 'The shipyard docks and the jungle gate on the western coast',
+    desc: 'A cutthroat in a navy coat, tricorn hat and red bandana. It swings a curved cutlass and lunges when you are out of reach.',
+  },
+  {
+    id: 'cursedpirate', name: 'Cursed Pirate', level: 7, temper: 'Vengeful', style: 'Melee', habitat: 'Deep in the jungle oasis, west of Brookside',
+    desc: 'A skeleton in a rotted tricorn, red bandana and navy coat, still gripping a bloody cutlass. It hits harder than a living pirate and does not stay down for long.',
   },
 ];
 
@@ -328,6 +369,81 @@ armorSet(YETI_ARMOR, 'yeticloth', [
   ['book', 'yetibook', 'Frostheart Grimoire', 0, 'A hide-bound tome rimed with frost and clasped with a fang. A caged frostheart pulses on its cover.', { frostheart: 1, rimefur: 3, yetifang: 1, yetihide: 1 }, { mana: 24, spell: 0.07 }],
 ]);
 
+const TIGER = 'tiger';
+const RAPTOR = 'raptor';
+const PIRATE = 'pirate';
+const CURSED = 'cursedpirate';
+
+GEAR.push(
+  weapon('tigerclaws', 'dual', 'Twin Tigerclaws', TIGER, 'Two curved claw blades banded in orange and black, each in a hide-wrapped grip. They rake in quick pairs.', { tigerclaw: 4, tigerskin: 2 }, M('dual', 11, 2.2, 1.8, 0.27, 0.11, 6, 3, 'Dual swords. Banded tiger claws.')),
+  weapon('tigershortbow', 'shortbow', 'Stalker Shortbow', TIGER, 'A compact bow wound in striped hide, with a hooked claw at each tip. Built for ambushes at close range.', { tigerskin: 2, tigerclaw: 2 }, R('shortbow', 12, 0.34, 5, 'A short bow. Quick, quiet draws.')),
+  weapon('tigerspear', 'spear', 'Pounce Spear', TIGER, 'A hooked tiger-claw head on a shaft wrapped in striped hide, with a tuft of white fur at the collar.', { tigerclaw: 3, tigerskin: 2 }, M('twohand', 18, 3.4, 1.0, 0.45, 0.2, 10, 4, 'Two-handed. A long, springing thrust.')),
+
+  weapon('raptorsaber', 'onesword', 'Sickleclaw Saber', RAPTOR, 'A single great raptor claw, ground into a curved saber and set in an olive and tan scale-wrapped grip.', { raptorclaw: 3, raptorskin: 2 }, M('swordshield', 16, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. A curved sickle blade.')),
+  weapon('raptorcrossbow', 'crossbow', 'Talonlock Crossbow', RAPTOR, 'A stock of mosaic raptor scales and a pair of sickle-claw prod arms. It throws a bolt like a pouncing talon.', { raptorskin: 3, raptorclaw: 2 }, R('crossbow', 17, 0.64, 8, 'A crossbow. Talon-tipped bolts.')),
+  weapon('raptorscythe', 'scythe', 'Sicklefoot Scythe', RAPTOR, 'A huge sickle claw on a scale-wrapped haft. It sweeps the way a raptor kills: wide, and all at once.', { raptorclaw: 4, raptorskin: 2 }, M('twohand', 18, 2.9, 2.7, 0.56, 0.24, 12, 6, 'Two-handed. Long reach, wide sweep.')),
+
+  weapon('piratecutlass', 'onesword', 'Buccaneer Cutlass', PIRATE, 'A curved steel blade under a gold shell guard, in a grip wrapped with brown leather. Every dock rat has one.', { scimitar: 2, pirategold: 1 }, M('swordshield', 16, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. A quick, curved cutlass.')),
+  weapon('piratedual', 'dual', 'Twin Scimitars', PIRATE, 'Two curved scimitars with gold guards and brown-wrapped grips. A cutthroat never fights with just one.', { scimitar: 3, pirategold: 2 }, M('dual', 11, 2.3, 1.9, 0.27, 0.11, 6, 3, 'Dual swords. Matched scimitars.')),
+  weapon('piratecleaver', 'twosword', 'Captain\'s Greatcutlass', PIRATE, 'A big curved two-handed blade with a gold shell guard and a red-wrapped grip. A captain\'s blade, and it shows.', { scimitar: 3, pirategold: 2, piratebone: 1 }, M('twohand', 23, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A captain\'s heavy blade.')),
+  weapon('buccaneergun', 'crossbow', 'Buccaneer Crossbow', PIRATE, 'A brass-banded stock with gold trim and a scimitar blade lashed on as a bayonet. It shoots, and it stabs.', { scimitar: 1, pirategold: 3, piratebone: 1 }, R('crossbow', 17, 0.64, 8, 'A crossbow. Bayonet-fitted.')),
+
+  weapon('cursedblade', 'onesword', 'Cursed Cutlass', CURSED, 'A rusty, blood-stained blade with a faint green glow in the fuller and a grip of yellowed bone. It has never been cleaned, and it has never needed to be.', { scimitar: 1, piratebone: 3, pirategold: 1 }, M('swordshield', 17, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Cursed, rusted steel.')),
+  weapon('bonestaff', 'staff', 'Deadman\'s Staff', CURSED, 'A skull and crossbones atop a shaft of bone, ringed in gold and trailing a green wisp. It throws spectral orbs.', { piratebone: 4, pirategold: 2 }, R('staff', 12, 0.56, 6, 'A war staff. Spectral orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' })),
+);
+
+GEAR.push(
+  { id: 'pirateshield', type: 'armor', slot: 'shield', name: 'Buccaneer Buckler', monster: PIRATE, set: 'pirateset', def: 2, desc: 'A round buckler of planked wood in an iron rim, with a gold skull riveted to the boss.', recipe: { scimitar: 3, pirategold: 2, piratebone: 1 } },
+);
+
+armorSet(TIGER, 'tigerleather', [
+  ['helm', 'tigerleatherhelm', 'Tigerskin Cowl', 1, 'A close hide cowl with two black-tipped tiger ears and striped brow bands.', { tigerskin: 2, tigerclaw: 1 }],
+  ['chest', 'tigerleatherchest', 'Tigerskin Jerkin', 2, 'A striped orange and black jerkin with a white fur ruff at the chest and a claw-toggle lace.', { tigerskin: 6, tigerclaw: 1 }],
+  ['arms', 'tigerleathergloves', 'Tigerskin Bracers', 1, 'Striped hide gloves with a hooked claw on each bracer.', { tigerskin: 2, tigerclaw: 1 }],
+  ['legs', 'tigerleatherlegs', 'Tigerskin Leggings', 2, 'Banded leggings in orange and black, strapped at the knee.', { tigerskin: 4, tigerclaw: 1 }],
+  ['boots', 'tigerleatherboots', 'Pawfall Boots', 1, 'Soft-soled hide boots with white paw toes. They make no sound at all.', { tigerskin: 2, tigerclaw: 1 }],
+]);
+armorSet(TIGER, 'tigercloth', [
+  ['helm', 'tigerclothhood', 'Stripeweave Hood', 1, 'An orange hood with black stripes, a pale brow and two small ear points.', { tigerskin: 2, tigerclaw: 1 }],
+  ['chest', 'tigerclothrobe', 'Stripeweave Robe', 2, 'Flowing orange robes striped in black, with a white collar and a claw clasp.', { tigerskin: 5, tigerclaw: 2 }],
+  ['arms', 'tigerclothgloves', 'Stripeweave Gloves', 0, 'Soft striped gloves under wide cuffs with a pale fur edge.', { tigerskin: 2, tigerclaw: 1 }],
+  ['legs', 'tigerclothlegs', 'Stripeweave Trousers', 1, 'Striped trousers tied at the knee with black cord.', { tigerskin: 3, tigerclaw: 1 }],
+  ['boots', 'tigerclothboots', 'Stripeweave Slippers', 0, 'Silent slippers with white toes, striped like the rest.', { tigerskin: 2, tigerclaw: 1 }],
+  ['book', 'tigerbook', 'Tigerclaw Grimoire', 0, 'A striped hide cover with a claw clasp and one watchful yellow eye.', { tigerskin: 2, tigerclaw: 2 }, { mana: 14, spell: 0.045 }],
+]);
+
+armorSet(RAPTOR, 'raptorleather', [
+  ['helm', 'raptorleatherhelm', 'Raptorhide Cowl', 1, 'A mosaic-scaled hood with a grey crest of spikes running over the crown.', { raptorskin: 2, raptorclaw: 1 }],
+  ['chest', 'raptorleatherchest', 'Raptorhide Jerkin', 2, 'Olive and tan mosaic hide with grey spike-ridge shoulders and a laced front.', { raptorskin: 6, raptorclaw: 1 }],
+  ['arms', 'raptorleathergloves', 'Raptorhide Gloves', 1, 'Mosaic hide gloves with a sickle claw on each bracer.', { raptorskin: 2, raptorclaw: 1 }],
+  ['legs', 'raptorleatherlegs', 'Raptorhide Leggings', 2, 'Scaled leggings in olive and tan with grey knee spikes.', { raptorskin: 4, raptorclaw: 1 }],
+  ['boots', 'raptorleatherboots', 'Raptorhide Boots', 1, 'Three-toed hide boots with a sickle claw on each heel.', { raptorskin: 2, raptorclaw: 1 }],
+]);
+armorSet(RAPTOR, 'raptorcloth', [
+  ['helm', 'raptorclothhood', 'Mosaicweave Hood', 1, 'A tan and olive hood with a small grey crest and an orange eye-stud at the brow.', { raptorskin: 2, raptorclaw: 1 }],
+  ['chest', 'raptorclothrobe', 'Mosaicweave Robe', 2, 'Robes woven in a scale mosaic of olive and tan, with a grey spiked collar.', { raptorskin: 5, raptorclaw: 2 }],
+  ['arms', 'raptorclothgloves', 'Mosaicweave Gloves', 0, 'Scale-patterned gloves under flared grey-edged cuffs.', { raptorskin: 2, raptorclaw: 1 }],
+  ['legs', 'raptorclothlegs', 'Mosaicweave Trousers', 1, 'Mosaic trousers tied at the knee with olive cord.', { raptorskin: 3, raptorclaw: 1 }],
+  ['boots', 'raptorclothboots', 'Mosaicweave Slippers', 0, 'Soft scale-patterned slippers with a tiny claw toe.', { raptorskin: 2, raptorclaw: 1 }],
+  ['book', 'raptorbook', 'Raptorclaw Grimoire', 0, 'A mosaic-scale cover with a sickle-claw clasp and an orange eye.', { raptorskin: 2, raptorclaw: 2 }, { mana: 14, spell: 0.045 }],
+]);
+
+armorSet(PIRATE, 'pirateset', [
+  ['helm', 'piratehelm', 'Buccaneer Tricorn', 2, 'A navy plate tricorn with a gold-trimmed brim, a red bandana beneath and a gold skull badge.', { scimitar: 2, pirategold: 1 }],
+  ['chest', 'piratechest', 'Buccaneer Coat', 3, 'A navy plate coat with a double row of gold buttons, gold cuffs and a brown belt with a gold buckle.', { scimitar: 5, pirategold: 2 }],
+  ['arms', 'piratearms', 'Buccaneer Gauntlets', 2, 'Navy plate gauntlets with wide gold cuffs and a gold-rimmed pauldron.', { scimitar: 2, pirategold: 1 }],
+  ['legs', 'piratelegs', 'Buccaneer Greaves', 2, 'Navy plate greaves with brown straps and gold knee caps.', { scimitar: 4, pirategold: 1 }],
+  ['boots', 'pirateboots', 'Buccaneer Boots', 1, 'Tall navy boots with folded cuffs and a gold buckle on each.', { scimitar: 2, pirategold: 1 }],
+]);
+armorSet(CURSED, 'piratecloth', [
+  ['helm', 'pirateclothhood', 'Deadman Bandana', 1, 'A red bandana knotted over a black hood, with a small gold skull pin.', { piratebone: 2, pirategold: 1 }],
+  ['chest', 'pirateclothrobe', 'Deadman Coat', 3, 'A black-red coat robe with bone buttons and a bone-and-gold trim along the hem.', { piratebone: 5, pirategold: 2, scimitar: 1 }],
+  ['arms', 'pirateclothgloves', 'Deadman Gloves', 0, 'Black gloves under red cuffs with a bone stud and a gold edge.', { piratebone: 2, pirategold: 1 }],
+  ['legs', 'pirateclothlegs', 'Deadman Trousers', 1, 'Black trousers with a red sash and bone toggles at the knee.', { piratebone: 3, pirategold: 1 }],
+  ['boots', 'pirateclothboots', 'Deadman Slippers', 0, 'Black slippers with a bone toe and a gold buckle.', { piratebone: 2, pirategold: 1 }],
+  ['book', 'piratebook', 'Cursed Logbook', 0, 'A black and red logbook with a skull clasp that glows a faint, sickly green.', { piratebone: 3, pirategold: 2 }, { mana: 22, spell: 0.065 }],
+]);
+
 
 const DEMON_K = 'demonknight';
 const HOLY_K = 'holyknight';
@@ -377,6 +493,12 @@ export const SETS = [
   set('yetiset', 'Glacierplate', YETI_ARMOR, 'metal', 'Warrior', { hp: 4, stamina: 10 }, 'Full set: +4 max health (2 hearts) and +10 max stamina.'),
   set('yetileather', 'Rimehide Leathers', YETI_ARMOR, 'leather', 'Ranger', { stamina: 30, ranged: 0.08 }, 'Full set: +30 max stamina and +8% ranged damage.'),
   set('yeticloth', 'Frostweave Robes', YETI_ARMOR, 'cloth', 'Mage', { mana: 36, spell: 0.1 }, 'Full set: +36 max mana and +10% spell damage.'),
+  set('tigerleather', 'Tigerskin Leathers', TIGER, 'leather', 'Ranger', { stamina: 24, ranged: 0.07 }, 'Full set: +24 max stamina and +7% ranged damage.'),
+  set('tigercloth', 'Stripeweave Robes', TIGER, 'cloth', 'Mage', { mana: 28, spell: 0.08 }, 'Full set: +28 max mana and +8% spell damage.'),
+  set('raptorleather', 'Raptorhide Leathers', RAPTOR, 'leather', 'Ranger', { stamina: 22, crit: 0.05 }, 'Full set: +22 max stamina and +5% critical chance.'),
+  set('raptorcloth', 'Mosaicweave Robes', RAPTOR, 'cloth', 'Mage', { mana: 26, spell: 0.07 }, 'Full set: +26 max mana and +7% spell damage.'),
+  set('pirateset', 'Buccaneer Plate', PIRATE, 'metal', 'Warrior', { hp: 4, stamina: 6 }, 'Full set: +4 max health (2 hearts) and +6 max stamina.'),
+  set('piratecloth', 'Deadman Robes', CURSED, 'cloth', 'Mage', { mana: 32, spell: 0.09 }, 'Full set: +32 max mana and +9% spell damage.'),
   set('demonset', 'Hellforged Plate', DEMON_K, 'metal', 'Warrior', { hp: 6, stamina: 10 }, 'Full set: +6 max health (3 hearts) and +10 max stamina.'),
   set('holyset', 'Radiant Plate', HOLY_K, 'metal', 'Warrior', { hp: 6, mana: 20 }, 'Full set: +6 max health (3 hearts) and +20 max mana.'),
 ];

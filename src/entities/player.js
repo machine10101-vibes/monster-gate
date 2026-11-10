@@ -458,7 +458,7 @@ export class Player {
       case 'attack': {
         const it = this.attackItem;
         const t = this.stateT / this.stateDur;
-        const hitT = it.hit / it.dur;
+        const hitT = (it.hit ?? it.dur * 0.6) / it.dur;
         if (!this.attackHit && t >= hitT) {
           this.attackHit = true;
           this.doAttackHit(it);
@@ -1306,9 +1306,9 @@ export class Player {
 }
 
 /** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
-const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow']);
+const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow', 'raptorcrossbow', 'buccaneergun']);
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer']);
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer', 'tigerclaws', 'tigerspear', 'raptorsaber', 'raptorscythe', 'piratecutlass', 'piratedual', 'piratecleaver', 'cursedblade']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -1332,6 +1332,14 @@ const TRAIL_SPEC = {
   yetihammer: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0x9fdcff, hot: 0xf2fbff },
   yetispear: { b: [0, 0, 1.6], t: [0, 0, 2.3], col: 0x9fdcff, hot: 0xf2fbff },
   yetiscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0x9fdcff, hot: 0xf2fbff },
+  tigerclaws: { b: [0, 0, 0.25], t: [-0.3, 0, 1.05], col: 0xff9a3a, hot: 0xfff0c0 },
+  tigerspear: { b: [0, 0, 1.6], t: [-0.1, 0, 2.35], col: 0xff9a3a, hot: 0xfff0c0 },
+  raptorsaber: { b: [0, 0, 0.35], t: [-0.33, 0, 1.42], col: 0xd2da72, hot: 0xfff6d0 },
+  raptorscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0xd2da72, hot: 0xfff6d0 },
+  piratecutlass: { b: [0, 0, 0.3], t: [-0.18, 0, 1.3], col: 0xdfe8f5, hot: 0xffd95a },
+  piratedual: { b: [0, 0, 0.2], t: [-0.24, 0, 1.05], col: 0xdfe8f5, hot: 0xffd95a },
+  piratecleaver: { b: [0, 0, 0.5], t: [-0.21, 0, 1.86], col: 0xdfe8f5, hot: 0xffd95a },
+  cursedblade: { b: [0, 0, 0.3], t: [-0.15, 0, 1.38], col: 0x5cff9a, hot: 0xd8ffe4 },
   demonsword: { b: [0, 0, 0.55], t: [0, 0, 2.2], col: 0xff3a1a, hot: 0xffb070 },
   holyhammer: { b: [0, 0, 1.0], t: [0, 0, 1.7], col: 0x9fd0ff, hot: 0xffffff },
 };

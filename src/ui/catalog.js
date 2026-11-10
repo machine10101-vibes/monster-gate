@@ -35,7 +35,7 @@ function buildSubject(spec, silhouette) {
   } else if (spec.kind === 'good') {
     const [gm, size, ox, oy, oz] = goodsVoxels(spec.id);
     tilt.add(meshFrom(gm, ox, oy, oz, toonMaterial({ vertexColors: true }), size));
-    const fishy = spec.id === 'burnt_fish' || spec.id.startsWith('cooked_') || spec.id === 'shrimp' || spec.id === 'trout' || spec.id === 'pikeminnow' || spec.id === 'salmon' || spec.id === 'pike' || spec.id === 'sturgeon';
+    const fishy = spec.id === 'burnt_fish' || spec.id.startsWith('cooked_') || spec.id === 'shrimp' || spec.id === 'trout' || spec.id === 'pikeminnow' || spec.id === 'salmon' || spec.id === 'pike' || spec.id === 'sturgeon' || spec.id === 'tuna' || spec.id === 'stingray' || spec.id === 'tigershark';
     yaw = fishy ? 0.75 : 0.6;
     pitch = fishy ? 0.3 : 0.24;
   } else if (spec.kind === 'weapon') {
@@ -166,7 +166,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'tiger' || spec.id === 'raptor' ? 0.78 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 
@@ -309,6 +309,8 @@ function el(tag, cls, html) {
 const SET_HELD = {
   budgeset: 'budgeblade', darksyceset: 'darkscythe', budgeleather: 'budgecrossbow', darkleather: 'darkcrossbow', budgecloth: 'budgestaff', darkcloth: 'darkstaff',
   yetiset: 'yetigreatsword', yetileather: 'yeticrossbow', yeticloth: 'yetistaff',
+  tigerleather: 'tigerspear', tigercloth: 'tigerclaws', raptorleather: 'raptorcrossbow', raptorcloth: 'raptorsaber',
+  pirateset: 'piratecutlass', piratecloth: 'bonestaff',
   demonset: 'demonsword', holyset: 'holyhammer',
 };
 
@@ -323,6 +325,12 @@ const SET_BLURB = {
   darkcloth: 'Dusk-silk robes with glowing hems: a gem-browed hood, core-clasped robe, flared cuffs, sashed trousers and silent slippers, plus a humming grimoire. The mage set.',
   yetiset: 'Frost-shard plate under rime fur and brown leather straps: a crystal-crested yeti helm with glowing eyes, a frostheart cuirass, claw-knuckled gauntlets, heavy greaves and ice-clawed boots, with a glacier shield. The warrior set.',
   yetileather: 'Frost-stiff yeti hide with shaggy collars and crossed straps: a fur hood, jerkin, claw-bracer gloves, banded leggings and deep-furred boots. Built for the long cold. The ranger set.',
+  tigerleather: 'Orange hide banded in black: a tiger-eared cowl, a striped jerkin with a white fur ruff, claw-bracer gloves, banded leggings and white paw-toed boots. Quiet, quick and unmistakable. The ranger set.',
+  tigercloth: 'Orange robes striped in black with a white collar: an eared hood, claw-clasped robe, pale-edged cuffs, striped trousers and white-toed slippers, plus a grimoire with a watchful yellow eye. The mage set.',
+  raptorleather: 'Olive and tan mosaic hide with grey spike ridges: a crested cowl, a laced jerkin with spiked shoulders, sickle-claw gloves, scaled leggings and three-toed boots. Built for the pack hunt. The ranger set.',
+  raptorcloth: 'Robes woven in an olive and tan scale mosaic with grey spiked collars: a small-crested hood, flared cuffs, mosaic trousers and scaled slippers, plus a claw-clasped grimoire with an orange eye. The mage set.',
+  pirateset: 'Navy plate cut like a captain\'s coat: a gold-trimmed tricorn over a red bandana, a gold-buttoned coat with a buckled belt, gold-cuffed gauntlets, strapped greaves and gold-buckled boots, with a round skull-boss buckler. The warrior set.',
+  piratecloth: 'A black and red coat robe with bone buttons and bone-and-gold trim: a knotted bandana hood, flared red cuffs, bone-toggled trousers and black slippers, plus a logbook with a glowing green skull clasp. The mage set.',
   yeticloth: 'Layered rime-fur robes with frost-silk sashes and a hem of icicles: a shard-browed hood, frostheart-clasped robe, flared cuffs, sashed trousers and silent slippers, plus a frost-rimed grimoire. The mage set.',
 };
 

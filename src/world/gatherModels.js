@@ -526,6 +526,121 @@ function sturgeonModel() {
   return [M, 0.05, 25, cy, cz];
 }
 
+
+function tunaModel() {
+  const L = 36;
+  const { M, x0, cy, cz } = fishBody({
+    L, rh: 7, wide: 0.6, sz: 12, seed: 91, tailLen: 10,
+    prof: (t) => 6.2 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.62) + 0.7,
+    paint: (u, t, x, y, z) => {
+      if (u > 0.5) return hash3(x, y, z, 92) > 0.84 ? 0x14284a : 0x1f3d66;
+      if (u > 0.12) return hash3(x >> 1, y, z, 93) > 0.8 ? 0x4a78a8 : 0x5b8bb8;
+      if (u > -0.08 && t > 0.2 && t < 0.88) return 0xe8c43a;
+      if (u > -0.5) return 0xc8d6de;
+      return hash3(x >> 1, y, z, 94) > 0.82 ? 0xb8c4cc : 0xe8eef0;
+    },
+  });
+  for (let k = 0; k < 6; k++) for (const z of [5, 6]) M.set(x0 + 11 + k, cy + 6 + Math.round(3.2 - Math.abs(k - 1.5) * 1.0), z, J(0xe8c43a, k, 0, z, 95, 0.05));
+  for (let k = 0; k < 10; k++) for (const z of [5, 6]) M.set(x0 + L - 14 + k, cy + 6 + Math.round(3 - k * 0.3), z, J(0xf0d24a, k, 1, z, 96, 0.05));
+  for (let k = 0; k < 10; k++) for (const z of [5, 6]) M.set(x0 + L - 13 + k, cy - 6 - Math.round(2.4 - k * 0.2), z, J(0xf0d24a, k, 2, z, 97, 0.05));
+  for (let k = 0; k < 5; k++) for (const z of [5, 6]) {
+    M.set(x0 + L - 4 + k, cy + 5 - Math.floor(k * 0.3), z, 0xf5d83a);
+    M.set(x0 + L - 4 + k, cy - 5 + Math.floor(k * 0.3), z, 0xf5d83a);
+  }
+  fishFin(M, x0 + 12, cy - 6, 7, 0x4a6a8c, -1, 98, [5, 6], 0.3);
+  for (const dz of [2, 9]) for (let k = 0; k < 6; k++) M.set(x0 + 9 + k, cy - 3 - Math.floor(k * 0.5), dz, J(0x9fb4c4, k, 3, dz, 99, 0.05));
+  for (const z of [4, 5, 6, 7]) M.set(x0, cy - 1, z, 0x1a2230);
+  fishTail(M, x0 + L, cy, [5, 6], 9, 9, 9, 0x2a4a6c, 100);
+  fishEyes(M, x0 + 4, cy + 1, 0x0a0a0a, 0xe8e8e8);
+  return [M, 0.058, 20, cy, cz];
+}
+
+function tigerSharkModel() {
+  const L = 50;
+  const { M, x0, cy, cz } = fishBody({
+    L, rh: 8, wide: 0.72, sz: 14, seed: 101, tailLen: 14,
+    prof: (t) => 7 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.58) + 0.8,
+    paint: (u, t, x, y, z) => {
+      if (u > 0.1) {
+        const bar = (x + Math.floor(u * 2)) % 6 < 2 && t > 0.2 && t < 0.88;
+        return bar ? 0x35434f : hash3(x, y, z, 102) > 0.9 ? 0x5a6c7a : 0x6e8392;
+      }
+      if (u > -0.35) {
+        const bar = (x + 3) % 6 < 1 && t > 0.3 && t < 0.8;
+        return bar ? 0x6a7c8a : 0x93a4b0;
+      }
+      return hash3(x >> 1, y, z, 103) > 0.9 ? 0xdde4e6 : 0xf0f3f2;
+    },
+  });
+  const mid = [6, 7];
+  for (let k = 0; k < 12; k++) {
+    const h = Math.round(9 * (1 - k / 12) ** 1.3);
+    for (let d = 0; d < h; d++) for (const z of mid) M.set(x0 + 14 + k - Math.floor(d * 0.5), cy + 8 + d, z, J(d > h - 2 ? 0x2c3842 : 0x586a78, k, d, z, 104, 0.05));
+  }
+  for (let k = 0; k < 6; k++) for (const z of mid) for (let d = 0; d < Math.max(1, 4 - k); d++) M.set(x0 + L - 12 + k, cy + 7 + d, z, J(0x4a5c6a, k, d, z, 105, 0.05));
+  for (const z of [1, 12]) {
+    for (let k = 0; k < 11; k++) {
+      const span = 5 - Math.floor(k * 0.4);
+      for (let w = 0; w < span; w++) M.set(x0 + 14 + k, cy - 3 - Math.floor(k * 0.55) - w, z, J(k < 4 ? 0x7c8f9e : 0x6a7e8c, k, w, z, 106, 0.05));
+    }
+  }
+  for (let k = 0; k < 7; k++) for (const z of [6, 7]) M.set(x0 + L - 20 + k, cy - 6 - Math.round(2.4 - Math.abs(k - 2) * 0.5), z, J(0x7a8e9c, k, 0, z, 107, 0.05));
+  for (const gx of [8, 10, 12]) for (let y = cy - 3; y <= cy + 3; y++) for (const z of [1, 12]) if (M.has(x0 + gx, y, z)) M.set(x0 + gx, y, z, 0x20282e);
+  for (let k = 0; k < 9; k++) for (const z of [4, 5, 6, 7, 8, 9]) if (!M.has(x0 + 1 + k, cy - 4, z) && M.has(x0 + 1 + k, cy - 3, z)) M.set(x0 + 1 + k, cy - 4, z, k % 2 === 0 ? 0xf6f6f0 : 0x7a2a2a);
+  for (let z = 4; z <= 9; z++) M.set(x0 + 1, cy - 2, z, 0x1b1f22);
+  fishTail(M, x0 + L, cy, [6, 7], 13, 15, 6, 0x4a5c6a, 108);
+  fishEyes(M, x0 + 5, cy + 2, 0x050505, 0xf0e8b0);
+  return [M, 0.05, 25, cy, cz];
+}
+
+function stingrayModel() {
+  const M = new VoxelModel(52, 12, 38);
+  const cx = 17;
+  const cz = 19;
+  for (let z = 0; z < 38; z++)
+    for (let x = 0; x < 36; x++) {
+      const dx = (x + 0.5 - cx) / (x < cx ? 13 : 17);
+      const dz = (z + 0.5 - cz) / 18;
+      const d2 = dx * dx + dz * dz;
+      const wob = (hash3(x, 0, z, 111) - 0.5) * 0.08;
+      if (d2 > 1 + wob) continue;
+      const wing = Math.abs(dz);
+      const lift = wing > 0.62 ? Math.round((wing - 0.62) * 5) : 0;
+      const top = 3 + Math.round(3 * (1 - d2) ** 0.8) + lift - (wing > 0.9 ? 1 : 0);
+      for (let y = 1; y <= top; y++) {
+        let c;
+        if (y === 1) c = hash3(x >> 1, 0, z >> 1, 112) > 0.88 ? 0xd9cfba : 0xf1ecde;
+        else if (y < top) c = 0xb8a98c;
+        else {
+          const spot = hash3(x >> 1, y, z >> 1, 113) > 0.86;
+          const ring = d2 > 0.8;
+          c = spot ? 0xd8c9a0 : ring ? 0x6a5a44 : hash3(x, y, z, 114) > 0.5 ? 0x8a7656 : 0x7d6a4c;
+        }
+        M.set(x, y, z, J(c, x, y, z, 115, 0.04));
+      }
+    }
+  for (const side of [-1, 1]) {
+    const z = cz + side * 3;
+    for (let dy = 0; dy < 2; dy++) {
+      M.set(6, 7 + dy, z, 0xf0e8c8);
+      M.set(7, 7 + dy, z, 0x0e0e0e);
+    }
+    M.set(11, 7, cz + side * 5, 0x3a2e22);
+    M.set(11, 6, cz + side * 5, 0x3a2e22);
+  }
+  for (let k = 0; k < 16; k++) {
+    const t = k / 15;
+    const w = t < 0.5 ? 2 : 1;
+    const ring = Math.floor(k / 2) % 2 === 0;
+    for (let z = cz - w; z < cz + w; z++) M.set(34 + k, 3 - (k > 12 ? 1 : 0), z, J(ring ? 0x3a2e22 : 0x8a7656, k, 0, z, 116, 0.04));
+    if (w === 2) for (let z = cz - w; z < cz + w; z++) M.set(34 + k, 2, z, 0xe8e0cc);
+  }
+  for (let k = 0; k < 6; k++) M.set(41 + k, 4 + (k > 3 ? 1 : 0), cz, 0x20201a);
+  M.set(42, 5, cz, 0x20201a);
+  for (let z = cz - 2; z < cz + 2; z++) M.set(2, 1, z, 0x3a2418);
+  return [M, 0.058, 17, 3, cz];
+}
+
 const WOOD = {
   birch: { bark: 0xf3eee4, barkHi: 0xfffaf0, cut: 0xf6e7c0, heart: 0xe7c98a, ring: 0x2a2622 },
   oak: { bark: 0x6a4529, barkHi: 0x8a5a34, cut: 0xd9b27a, heart: 0xc49555, ring: 0x8a5a30 },
@@ -653,12 +768,18 @@ const GOODS_MODELS = {
   salmon: salmonModel,
   pike: pikeModel,
   sturgeon: sturgeonModel,
+  tuna: tunaModel,
+  stingray: stingrayModel,
+  tigershark: tigerSharkModel,
   cooked_shrimp: () => tintFish('shrimp', 'cooked'),
   cooked_trout: () => tintFish('trout', 'cooked'),
   cooked_pikeminnow: () => tintFish('pikeminnow', 'cooked'),
   cooked_salmon: () => tintFish('salmon', 'cooked'),
   cooked_pike: () => tintFish('pike', 'cooked'),
   cooked_sturgeon: () => tintFish('sturgeon', 'cooked'),
+  cooked_tuna: () => tintFish('tuna', 'cooked'),
+  cooked_stingray: () => tintFish('stingray', 'cooked'),
+  cooked_tigershark: () => tintFish('tigershark', 'cooked'),
   burnt_fish: () => tintFish('trout', 'burnt'),
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),

@@ -906,7 +906,7 @@ export class Gathering {
     }
     const mesh = this.models[id].clone();
     const fishish = FISH[id] || id.startsWith('cooked_') || id === 'burnt_fish';
-    mesh.scale.setScalar(fishish ? (id.endsWith('sturgeon') ? 0.75 : 0.9) : id.endsWith('_logs') ? 0.62 : 0.75);
+    mesh.scale.setScalar(fishish ? (id.endsWith('sturgeon') || id.endsWith('tigershark') ? 0.7 : 0.9) : id.endsWith('_logs') ? 0.62 : 0.75);
     g.scene.add(mesh);
     this.flyers.push({ mesh, x0, y0, z0, x1, y1, z1, t: 0, dur, spin: rand(4, 9), id });
   }
