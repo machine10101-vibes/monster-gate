@@ -1,4 +1,4 @@
-import { GOODS, SHAFT_LOGS, SHAFTS_PER_LOG } from '../data/gathering.js';
+import { GOODS, SHAFT_FROM_LOG, SHAFT_IDS, SHAFT_LOGS, SHAFTS_PER_LOG } from '../data/gathering.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 /** Copper and tin become iron bars. Nothing else is smelted here. */
@@ -77,7 +77,7 @@ export function mountCarve(body, game) {
     const pr = game.progress;
     const intro = document.createElement('p');
     intro.className = 'alc-intro';
-    intro.innerHTML = `<b>Carving knife</b>One log becomes ${SHAFTS_PER_LOG} arrow shafts. Head them at Bram's forge.`;
+    intro.innerHTML = `<b>Carving knife</b>One log becomes ${SHAFTS_PER_LOG} shafts of that wood. Fletch them with a feather and an arrowhead at Bram's forge.`;
     body.appendChild(intro);
     let any = false;
     for (const id of SHAFT_LOGS) {
@@ -92,7 +92,8 @@ export function mountCarve(body, game) {
       row.appendChild(holder);
       const info = document.createElement('div');
       info.className = 'alc-info';
-      info.innerHTML = `<b>${GOODS[id].name}</b><span>${n} in the bag · ${n * SHAFTS_PER_LOG} shafts</span>`;
+      const shaft = GOODS[SHAFT_FROM_LOG[id]];
+      info.innerHTML = `<b>${GOODS[id].name}</b><span>${n} in the bag · ${n * SHAFTS_PER_LOG} ${shaft.name.toLowerCase()}s</span>`;
       row.appendChild(info);
       const col = document.createElement('div');
       col.className = 'smith-acts';
@@ -113,12 +114,12 @@ export function mountCarve(body, game) {
     if (!any) {
       const note = document.createElement('p');
       note.className = 'cat-muted';
-      note.textContent = 'No logs in the bag. Birch, oak and maple all carve the same.';
+      note.textContent = 'No logs in the bag. Birch, oak and maple each make their own shafts.';
       body.appendChild(note);
     }
     const have = document.createElement('p');
     have.className = 'alc-gold';
-    have.textContent = `Arrow shafts: ${pr.good('arrow_shaft')}`;
+    have.textContent = [...SHAFT_IDS.map((id) => `${GOODS[id].name}s ${pr.good(id)}`), `Feathers ${pr.good('feather')}`].join(' · ');
     body.appendChild(have);
     flushThumbs(200);
   };
@@ -126,7 +127,7 @@ export function mountCarve(body, game) {
     const n = game.progress.carveShafts(id, all);
     if (!n) return;
     game.audio.quest();
-    game.hud.toast(`Carved ${n} arrow shafts`, 1600);
+    game.hud.toast(`Carved ${n} ${GOODS[SHAFT_FROM_LOG[id]].name.toLowerCase()}s`, 1600);
     paint();
   };
   paint();

@@ -1357,7 +1357,7 @@ class Game {
       const each = Math.ceil(n / coins);
       for (let i = 0; i < coins; i++) this.dropCoin(m.x, m.y + 0.6, m.z, each);
     }
-    if (Math.random() < 0.18) this.dropCoin(m.x, m.y + 0.6, m.z, 0, 'heart');
+    if (m.type !== 'chicken' && Math.random() < 0.18) this.dropCoin(m.x, m.y + 0.6, m.z, 0, 'heart');
     for (const d of GEAR_DROPS[m.type] || []) if (Math.random() < d.chance) this.dropGear(d.id, m.x, m.y + 0.9, m.z);
     const hadPoints = this.progress.classId ? this.progress.skillPoints().earned : 0;
     const fresh = !this.progress.seen(m.type);
@@ -1366,12 +1366,13 @@ class Game {
       this.hud.toast('Skill point earned. Press K.', 2200);
     }
     if (parts.length) {
-      const line = parts.map((d) => `+${d.n} ${MATERIALS[d.id].name}`).join('   ');
+      const line = parts.map((d) => `+${d.n} ${MATERIALS[d.id]?.name || GOODS[d.id]?.name || d.id}`).join('   ');
       this.hud.toast(line, 2600);
       this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.map((d) => `+${d.n}`).join(' '), 'gold');
       this.fx.burst(m.x, m.y + 1, m.z, [0x6fd45a, 0xf1e6c6, 0xffd23f], 12, 3.5, 0.1, 0.8);
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
+    if (m.type === 'chicken') return;
     this.quest.n++;
     if (this.quest.n >= this.quest.total) this.completeQuest();
     else this.hud.setQuest(this.quest.text, this.quest.n, this.quest.total);

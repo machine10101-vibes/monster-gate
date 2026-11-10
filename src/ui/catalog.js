@@ -6,7 +6,7 @@ import { TALL_KINDS, buildBookModel, buildShieldModel, gripRoll } from '../entit
 import { toonMaterial } from '../engine/materials.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
 import { goodsVoxels } from '../world/gatherModels.js';
-import { GOODS, HEADS_PER_BAR } from '../data/gathering.js';
+import { GOODS, HEADS_PER_BAR, SHAFT_IDS } from '../data/gathering.js';
 
 /* ------------------------------------------------------------------ */
 /* Offscreen 3D stage: renders the same in-game models to 2D canvases   */
@@ -436,7 +436,7 @@ export class Catalog {
     }
     root.appendChild(tabs);
     if (this.forge) {
-      root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Iron bars from the smithy outside town become armor, weapons, a carving knife and arrowheads. Head the shafts here, then wear a quiver.`));
+      root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Iron bars from the smithy outside town become armor, weapons and arrowheads. Fletch a shaft with a feather and an arrowhead here, then wear a quiver. The carving knife is already in your bag.`));
       root.appendChild(this.forgeBench());
     }
 
@@ -589,13 +589,22 @@ export class Catalog {
     }
     const drops = DROPS[m.id];
     if (drops) {
-      info.appendChild(el('h4', null, 'Parts'));
+      info.appendChild(el('h4', null, 'Drops'));
       const row = el('div', 'cat-parts');
-      for (const d of drops) row.appendChild(this.partChip(d.id, `${d.rate}`, RATE_CLASS[d.rate], true));
+      for (const d of drops) {
+        if (MATERIALS[d.id]) row.appendChild(this.partChip(d.id, `${d.rate}`, RATE_CLASS[d.rate], true));
+        else {
+          const chip = this.goodChip(d.id, d.rate);
+          chip.appendChild(el('em', null, `x${pr.good(d.id)}`));
+          row.appendChild(chip);
+        }
+      }
       info.appendChild(row);
+      const made = GEAR.filter((x) => x.monster === m.id);
+      if (!made.length) return;
       info.appendChild(el('h4', null, 'Can be crafted into'));
       const mk = el('div', 'cat-made');
-      for (const g of GEAR.filter((x) => x.monster === m.id)) {
+      for (const g of made) {
         const c = el('button', 'cat-mini' + (pr.crafted(g.id) ? ' done' : ''));
         c.type = 'button';
         c.appendChild(getStage().thumb({ kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id }, false, 96));
@@ -664,7 +673,7 @@ export class Catalog {
     };
     const bars = pr.good('iron_bar');
     const heads = pr.good('arrowhead');
-    const shafts = pr.good('arrow_shaft');
+    const feathers = pr.good('feather');
     box.appendChild(row(
       'Arrowheads',
       `1 iron bar makes ${HEADS_PER_BAR}. You have ${bars} ${bars === 1 ? 'bar' : 'bars'} and ${heads} heads.`,
@@ -673,21 +682,19 @@ export class Catalog {
         { label: 'Forge all', on: bars >= 1, run: () => this.madeHeads(true) },
       ],
     ));
-    const pair = Math.min(heads, shafts);
-    box.appendChild(row(
-      'Head the shafts',
-      `1 arrowhead and 1 shaft make an iron arrow. ${heads} heads, ${shafts} shafts.`,
-      [
-        { label: 'Make 1', on: pair >= 1, run: () => this.madeArrows(false) },
-        { label: 'Make all', on: pair >= 1, run: () => this.madeArrows(true) },
-      ],
-    ));
-    const hasKnife = pr.crafted('knife');
-    box.appendChild(row(
-      'Carving knife',
-      hasKnife ? 'In your tools. Use it on logs anywhere to shave arrow shafts.' : 'One iron bar. Carve shafts from logs wherever you stand.',
-      [{ label: hasKnife ? 'Forged' : 'Forge knife', on: !hasKnife && bars >= 1, run: () => this.madeKnife() }],
-    ));
+    for (const shaftId of SHAFT_IDS) {
+      const shafts = pr.good(shaftId);
+      const pair = Math.min(heads, shafts, feathers);
+      const wood = GOODS[shaftId].name.toLowerCase();
+      box.appendChild(row(
+        `Fletch ${wood}s`,
+        `1 arrowhead, 1 shaft and 1 feather. ${heads} heads, ${shafts} shafts, ${feathers} feathers.`,
+        [
+          { label: 'Make 1', on: pair >= 1, run: () => this.madeArrows(shaftId, false) },
+          { label: 'Make all', on: pair >= 1, run: () => this.madeArrows(shaftId, true) },
+        ],
+      ));
+    }
     return box;
   }
 
@@ -700,21 +707,13 @@ export class Catalog {
     this.render();
   }
 
-  madeArrows(all) {
-    const n = this.progress.fletchArrows(all);
+  madeArrows(shaftId, all) {
+    const n = this.progress.fletchArrows(shaftId, all);
     if (!n) return;
     this.game.audio.quest();
     const load = this.progress.data.quiverLoad;
     const pocket = load?.id === 'iron_arrow' ? load.n : 0;
     this.game.hud.toast(pocket ? `Made ${n} iron arrows · ${pocket} in the quiver` : `Made ${n} iron arrows`, 1800);
-    this.sparkForge();
-    this.render();
-  }
-
-  madeKnife() {
-    if (!this.progress.craftKnife()) return;
-    this.game.audio.quest();
-    this.game.hud.toast('Forged a carving knife', 1600);
     this.sparkForge();
     this.render();
   }

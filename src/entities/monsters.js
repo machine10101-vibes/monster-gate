@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildSlime, buildBoar, buildWraith, buildBudgeDragon } from './creatures.js';
+import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildFowl } from './creatures.js';
 import { buildDarksycleDragon } from './darksycle.js';
 import { buildOrcScout } from './orc.js';
 import { buildSnowYeti } from './yeti.js';
@@ -29,7 +29,7 @@ function easeOutBack(x) {
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
-const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1, orcscout: 1.25, snowyeti: 2.3, demonknight: 2.2, holyknight: 2.2 };
+const DEATH_DUR = { slime: 0.6, voidslime: 0.65, boar: 1.3, wraith: 0.9, budgedragon: 1.8, darksycledragon: 2.1, orcscout: 1.25, snowyeti: 2.3, demonknight: 2.2, holyknight: 2.2, chicken: 0.65 };
 const TELE_COL = { boar: 0xff5a3a, budgedragon: 0xff7a2a, darksycledragon: 0xb25cff, wraith: 0xc27bff, orcscout: 0xc45a2a, snowyeti: 0x7fd0ff, demonknight: 0xff3a1a, holyknight: 0x6fb8ff };
 
 const DRAGON_HOVER = 1.0;
@@ -46,7 +46,14 @@ const DRAGON_AIR_PLAN = [
 ];
 const AIR_STATES = new Set(['ascend', 'air', 'descend']);
 
+const CHICKEN_NESTS = [
+  [93, 88], [97, 91], [101, 88], [105, 91], [94, 94], [99, 95], [103, 95],
+  [70, 96], [64, 98], [86, 98], [78, 106], [56, 94],
+];
+const CHICKEN_RESPAWN = 4;
+
 const DEFS = {
+  chicken: { name: 'Chicken', hp: 8, radius: 0.42, speed: 3.4, dmg: 0, gold: [1, 2], aggro: 0, build: buildFowl },
   slime: { name: 'Gate Slime', hp: 18, radius: 0.5, speed: 2.6, dmg: 2, gold: [2, 5], aggro: 9, build: () => buildSlime('green') },
   voidslime: { name: 'Void Slime', hp: 26, radius: 0.55, speed: 3.0, dmg: 3, gold: [4, 8], aggro: 11, build: () => buildSlime('purple') },
   boar: { name: 'Thorn Boar', hp: 38, radius: 0.7, speed: 2.5, dmg: 3, gold: [5, 10], aggro: 10, build: buildBoar },
@@ -269,11 +276,11 @@ export class Monster {
     const hx = this.x;
     const hy = this.y + 0.7 + this.hover;
     const hz = this.z;
-    const sparkCol = ffx ? ffx.spark : this.type === 'slime' ? [0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xdcb4ff, 0xffffff] : dusk ? [0xd8b0ff, 0xffffff] : yeti ? [0xe6f9ff, 0x9fdcff, 0xffffff] : this.type === 'demonknight' ? [0xff8a4a, 0xff3a1a, 0xffffff] : this.type === 'holyknight' ? [0xfff0b0, 0x9fd0ff, 0xffffff] : [0xfff2c0, 0xffb347, 0xffffff];
+    const sparkCol = ffx ? ffx.spark : this.type === 'chicken' ? [0xfffaf0, 0xf59a2a] : this.type === 'slime' ? [0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xdcb4ff, 0xffffff] : dusk ? [0xd8b0ff, 0xffffff] : yeti ? [0xe6f9ff, 0x9fdcff, 0xffffff] : this.type === 'demonknight' ? [0xff8a4a, 0xff3a1a, 0xffffff] : this.type === 'holyknight' ? [0xfff0b0, 0x9fd0ff, 0xffffff] : [0xfff2c0, 0xffb347, 0xffffff];
     g.fx.impact(hx - dx * this.radius * 0.6, hy + 0.2, hz - dz * this.radius * 0.6, dx, dz, sparkCol, (crit ? 1.7 : 1) * Math.min(1.8, 0.6 + dmg / 18));
-    g.fx.burst(hx, hy, hz, ffx ? ffx.burst : this.type === 'slime' ? [0x57d46c, 0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xc27bff, 0x8c52da, 0xffffff] : dusk ? [0xb25cff, 0x4b3f8c, 0xffffff] : yeti ? [0xb4d0e6, 0xdcecf8, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0x6a6a74, 0xff3a1a] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0xffffff] : [0xc9967a, 0xff5a46, 0xffffff], crit ? 12 : 6, 3.8, 0.1, 0.5);
+    g.fx.burst(hx, hy, hz, ffx ? ffx.burst : this.type === 'chicken' ? [0xfffaf0, 0xf59a2a, 0xe03a3a, 0xffffff] : this.type === 'slime' ? [0x57d46c, 0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xc27bff, 0x8c52da, 0xffffff] : dusk ? [0xb25cff, 0x4b3f8c, 0xffffff] : yeti ? [0xb4d0e6, 0xdcecf8, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0x6a6a74, 0xff3a1a] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0xffffff] : [0xc9967a, 0xff5a46, 0xffffff], crit ? 12 : 6, 3.8, 0.1, 0.5);
     g.hud.floatText(...g.screenOf(hx, hy + 0.9, hz), String(dmg) + (crit ? '!' : ''), crit ? 'crit' : '');
-    if (this.state === 'idle' || this.state === 'wander') this.state = 'chase';
+    if ((this.state === 'idle' || this.state === 'wander' || this.state === 'peck') && this.type !== 'chicken') this.state = 'chase';
     if (this.hp <= 0) this.die();
   }
 
@@ -989,6 +996,47 @@ export class Monster {
           }
           break;
         }
+        case 'chicken': {
+          const flee = dist < 3.6 && !P.dead;
+          if (flee) {
+            this.state = 'flee';
+            const d = Math.max(0.2, dist);
+            mvx = (-dx / d) * 3.6;
+            mvz = (-dz / d) * 3.6;
+            this.yaw += angDiff(this.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 10);
+          } else {
+            this.wanderT -= dt;
+            if (this.wanderT <= 0) {
+              this.wanderT = 1.1 + Math.random() * 2.4;
+              if (Math.random() < 0.5) {
+                this.state = 'peck';
+              } else {
+                this.state = 'wander';
+                const a = Math.random() * TAU;
+                const rr = 1.2 + Math.random() * 2.4;
+                this.target = { x: this.home.x + Math.cos(a) * rr, z: this.home.z + Math.sin(a) * rr };
+              }
+            }
+            if (this.state !== 'peck' && this.target) {
+              const tx = this.target.x - this.x;
+              const tz = this.target.z - this.z;
+              const td = Math.hypot(tx, tz);
+              if (td > 0.3) {
+                mvx = (tx / td) * 0.95;
+                mvz = (tz / td) * 0.95;
+                this.yaw += angDiff(this.yaw, Math.atan2(tx, tz)) * Math.min(1, dt * 7);
+              }
+            }
+          }
+          const hx = this.home.x - this.x;
+          const hz = this.home.z - this.z;
+          const hd = Math.hypot(hx, hz);
+          if (hd > 6) {
+            mvx = (hx / hd) * 2.4;
+            mvz = (hz / hd) * 2.4;
+          }
+          break;
+        }
         default: {
           const fam = FAMILY_BY_TYPE.get(this.type);
           if (fam) [mvx, mvz] = fam.think(this, dt, { g, P, dx, dz, dist, sees, toP });
@@ -1411,6 +1459,17 @@ export class Monster {
       p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * (diving ? 14 : 8));
       p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04;
       o.scale.setScalar(spawnS * this.baseScale);
+    } else if (this.type === 'chicken') {
+      const b = m.body;
+      const fleeing = this.state === 'flee';
+      const walking = spd > 0.2 && !fleeing;
+      const peck = this.state === 'peck' ? Math.sin(t * 16) * 0.4 + 0.12 : fleeing ? -0.22 : 0;
+      const bob = fleeing ? Math.sin(t * 22) * 0.12 : walking ? Math.sin(t * 10) * 0.06 : 0;
+      if (b) {
+        b.rotation.x += (peck - b.rotation.x) * Math.min(1, dt * 10);
+        b.rotation.z = bob;
+      }
+      o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'wraith') {
       const b = m.body;
       const speedLean = clamp(spd * 0.07, 0, 0.22);
@@ -1436,7 +1495,7 @@ export class Monster {
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'darksycledragon' && this.airCharge) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 6.0 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 6.0 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
       g.hud.plate(this.id, `${this.name}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
@@ -1653,6 +1712,14 @@ export class Monster {
       if (u > 0.1) m.mat.emissive.setRGB(flick * 0.5, 0.02, flick * 0.8);
       const k2 = dissolve(1.3, 0.75, [0xb25cff, 0xd8d3ee, 0x2b2450], 3);
       o.scale.setScalar(bs * (1 - k2 * k2));
+    } else if (this.type === 'chicken') {
+      const k = ease(clamp(u / 0.22, 0, 1));
+      o.position.set(this.x, this.y, this.z);
+      o.rotation.set(0, this.yaw, side * k * 1.45);
+      m.root.position.y = 0.1 * k;
+      if (m.body) m.body.rotation.x = 0.35 * k;
+      const k2 = dissolve(0.22, 0.4, [0xfffaf0, 0xf59a2a, 0xe03a3a, 0xffffff]);
+      o.scale.setScalar(bs * (1 - k2 * k2));
     } else {
       const k = clamp(u / dur, 0, 1);
       this.yaw += dt * (10 + 22 * k);
@@ -1688,6 +1755,7 @@ export class Spawner {
     this.timer = 1;
     this.rng = new RNG(4242);
     this.max = 9;
+    this.nests = CHICKEN_NESTS.map(([x, z]) => ({ x, z, t: 0 }));
   }
 
   populate() {
@@ -1698,6 +1766,7 @@ export class Spawner {
       ['budgedragon', 120, 74],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
+    this.fillChickens(99);
     const camp = w.orcCamp;
     if (camp) {
       const pack = [[-2.2, 0.6], [1.8, -1.1], [0.3, 2.5], [8.2, 4.8], [-6.4, 6.6], [2.4, -9.2]];
@@ -1769,6 +1838,7 @@ export class Spawner {
 
   update(dt) {
     if (this.game.net?.role === 'guest') return;
+    this.fillChickens(dt);
     if (this.game.world?.realm === 'cave') return;
     const g = this.game;
     this.timer -= dt;
@@ -1778,7 +1848,7 @@ export class Spawner {
     this.fillYetis();
     this.fillKnights();
     this.fillJungle();
-    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'orcscout' && m.type !== 'snowyeti' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
+    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
     if (alive >= this.max) return;
     const spot = this.pickSpot();
     if (!spot) return;
@@ -1791,6 +1861,39 @@ export class Spawner {
     if (!spot.nearGate && drakes < 2 && this.rng.next() < 0.3) type = 'budgedragon';
     this.spawn(type, spot.x, spot.z);
     if (spot.nearGate) g.audio.portal();
+  }
+
+  fillChickens(dt) {
+    const g = this.game;
+    const P = g.player?.pos;
+    const w = g.world;
+    if (!P || !w || !this.nests) return;
+    for (const nest of this.nests) {
+      const live = g.monsters.some((m) => m.nest === nest && !m.dead);
+      if (live) {
+        nest.t = 0;
+        continue;
+      }
+      nest.t += dt;
+      if (nest.t < CHICKEN_RESPAWN) continue;
+      let x = nest.x;
+      let z = nest.z;
+      if (Math.hypot(P.x - x, P.z - z) < 1.5) {
+        const a = Math.atan2(z - P.z, x - P.x);
+        x += Math.cos(a) * 1.4;
+        z += Math.sin(a) * 1.4;
+      }
+      if (!w.playable(x, z) || w.heightAt(x, z) < 0.6) {
+        x = nest.x;
+        z = nest.z;
+      }
+      if (!w.playable(x, z)) continue;
+      nest.t = 0;
+      const hen = this.spawn('chicken', x, z, false);
+      hen.nest = nest;
+      hen.home.x = nest.x;
+      hen.home.z = nest.z;
+    }
   }
 
   fillYetis() {

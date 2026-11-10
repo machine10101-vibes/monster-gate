@@ -252,10 +252,6 @@ export function createAmbient(game) {
   const rng = new RNG(31337);
   const npcs = NPC_DEFS.map((d) => new NPC(game, d));
   const fowl = [];
-  const spots = [[70, 94], [74, 96], [68, 98], [96, 78], [98, 74], [58, 92], [62, 96], [86, 96], [80, 70], [66, 80], [76, 104], [48, 80]];
-  spots.forEach(([x, z]) => {
-    if (game.world.heightAt(x, z) > 0.8) fowl.push(new Fowl(game, x + rng.range(-1, 1), z + rng.range(-1, 1)));
-  });
   const butterflies = [];
   const colors = [0xffd23f, 0xff7aa8, 0x7fd0ff, 0xffffff, 0xff9a3a, 0xc27bff];
   for (let i = 0; i < 16; i++) {
