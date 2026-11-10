@@ -3,7 +3,8 @@ import { GOODS } from '../data/gathering.js';
 import { mountStats } from './stats.js';
 import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
-import { GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
+import { FARM, GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
+import { TILE_SIZE } from '../world/tiles.js';
 import { CAVE_MOUTH } from '../world/southford.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
@@ -37,6 +38,40 @@ export const POTION_SHOP = {
   potion: { price: 6, max: 20 },
   manapotion: { price: 8, max: 20 },
 };
+
+const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire']);
+
+/** Area and city names for the map the player opens. */
+function landMapLabels(world) {
+  const labels = [];
+  for (const land of world.lands || []) {
+    if (land.role === 'oak') continue;
+    const name = land.banner?.[1];
+    if (!name) continue;
+    labels.push({
+      name,
+      x: land.x0 + TILE_SIZE / 2,
+      z: land.z0 + TILE_SIZE / 2,
+      city: CITY_NAMES.has(name),
+    });
+  }
+  labels.push(
+    { name: 'Monster Gate', x: GATE.x, z: GATE.z - 14 },
+    { name: 'Greyrock Pit', x: MINE.x + 4, z: MINE.z - 14 },
+    { name: 'Oakhollow', x: TOWN.x - 10, z: TOWN.z + 18, city: true },
+    { name: "Tobin's Farm", x: FARM.x1 + 22, z: FARM.z1 + 16 },
+    { name: 'Mirrormere', x: LAKE.x - 32, z: LAKE.z + 34 },
+    { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24 },
+  );
+  return labels;
+}
+
+function caveMapLabels(cave) {
+  return [
+    { name: "Dragon's Nest", x: cave.nest.x, z: cave.nest.z - 3 },
+    { name: 'Darksycle Den', x: cave.origin.x + cave.w / 2, z: cave.origin.z + cave.d * 0.62, city: true },
+  ];
+}
 
 export class HUD {
   constructor() {
@@ -356,7 +391,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'storage' || name === 'smithy' || name === 'carve');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -368,7 +403,7 @@ export class HUD {
     };
     if (name === 'map') {
       const inCave = game.world.realm === 'cave';
-      title.textContent = inCave ? 'Darksycle Den' : 'Oakhollow and the nearby tiles';
+      title.textContent = inCave ? 'Darksycle Den' : 'Map';
       const c = document.createElement('canvas');
       c.className = 'bigmap';
       const src = inCave ? game.world.cave.minimap : game.world.minimapCanvas;
@@ -394,7 +429,19 @@ export class HUD {
       ctx.fillRect(mx - 2, mz - 2, 4, 4);
       ctx.fillStyle = '#000';
       ctx.fillRect(mx - 1, mz - 1, 2, 2);
-      body.appendChild(c);
+      const frame = document.createElement('div');
+      frame.className = 'playmap';
+      frame.appendChild(c);
+      const labels = inCave ? caveMapLabels(game.world.cave) : landMapLabels(game.world);
+      for (const label of labels) {
+        const b = document.createElement('b');
+        b.className = 'playmap-label' + (label.city ? ' city' : '');
+        b.textContent = label.name;
+        b.style.left = ((label.x - ox) / src.width * 100).toFixed(2) + '%';
+        b.style.top = ((label.z - oz) / src.height * 100).toFixed(2) + '%';
+        frame.appendChild(b);
+      }
+      body.appendChild(frame);
       if (!inCave) {
         if (game.world.waygate) {
           ctx.fillStyle = '#7ef6ff';
@@ -412,8 +459,8 @@ export class HUD {
         ctx.fillRect(LAKE.x - ox - 2, LAKE.z - oz - 2, 5, 5);
       }
       add(inCave
-        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Violet marks the dragon\'s nest. Walk back down the tunnel to return to the vale. White: you.</p>'
-        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold square: Hunter Guild. Purple: the Monster Gate. Cyan: the Waygate. White: a teleportation portal. Ember: the smithy. Orange: the Greyrock Pit. Light blue: Mirrormere. The map shows Oakhollow and the eight tiles around it. Violet in Southford is the Darksycle Cave. White dot: you.</p>');
+        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
+        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
     } else if (name === 'quest') {
       title.textContent = 'Hunt Log';
       const q = game.quest;
