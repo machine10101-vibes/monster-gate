@@ -4,6 +4,7 @@ import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
 import { YETI } from '../data/yeti.js';
 import { holyHammerVoxels, demonSwordVoxels, demonShieldVoxels } from './knightWeapons.js';
+import { jungleWeapons, jungleShield, jungleBook, JUNGLE_DUAL, JUNGLE_TALL, JUNGLE_EDGE, JUNGLE_SHIELD_SETS, JUNGLE_BOOK_SETS } from './weaponsJungle.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
 export const WEAPON_SIZE = 0.015;
@@ -12,9 +13,9 @@ const J = (c, x, y, z, s = 0, a = 0.04) => jitter(c, a, hash3(x, y, z, s));
 const lerp = (a, b, t) => a + (b - a) * t;
 
 /** Held kinds that wield a matching blade in each hand. */
-export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual', 'yetidual']);
+export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual', 'yetidual', ...JUNGLE_DUAL]);
 /** Held kinds whose model is taller than wide (bows). */
-export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow']);
+export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow', ...JUNGLE_TALL]);
 
 /**
  * Swords are sculpted flat in the horizontal plane. Rolled a quarter turn,
@@ -27,6 +28,7 @@ const EDGE_HOLD = new Set([
   'orcblade',
   'yetisword', 'yetigreatsword', 'yetidual',
   'demonsword',
+  ...JUNGLE_EDGE,
 ]);
 
 /** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
@@ -104,6 +106,10 @@ function ctx() {
       cells.set(key(x, y, z), [x, y, z, col, glow]);
     },
     has: (x, y, z) => cells.has(key(Math.floor(x), Math.floor(y), Math.floor(z))),
+    get: (x, y, z) => cells.get(key(Math.floor(x), Math.floor(y), Math.floor(z)))?.[3],
+    each(fn) {
+      for (const cell of [...cells.values()]) fn(cell[0], cell[1], cell[2], cell[3], cell[4]);
+    },
     clear: (x, y, z) => cells.delete(key(Math.floor(x), Math.floor(y), Math.floor(z))),
     done(pad = 1) {
       let mnx = 1e9, mny = 1e9, mnz = 1e9, mxx = -1e9, mxy = -1e9, mxz = -1e9;
@@ -520,7 +526,7 @@ function fishingNet() {
   return c.done();
 }
 
-function scythe(T = THEMES.dark) {
+function scythe(T = THEMES.dark, o = {}) {
   const c = ctx();
   haft(c, T, -14, 88, 2, T.wrapLo, 0);
   wrapRod(c, T, -10, 22, 2.2);
@@ -556,8 +562,8 @@ function scythe(T = THEMES.dark) {
         if (spine) col = J(T.dark, px, yy, pz, 46, 0.03);
         else if (lip) col = J(T.edge, px, yy, pz, 47, 0.02);
         else if (Math.abs(d - Math.min(wd * 0.45, 5)) < 0.55 && f > 0.1 && f < 0.82) {
-          col = T.glow;
-          g = ((px + pz) & 1) === 0 || f < 0.55;
+          col = o.plain ? J(shade(T.blade, 0.8), px, yy, pz, 49, 0.03) : T.glow;
+          g = !o.plain && (((px + pz) & 1) === 0 || f < 0.55);
         } else col = J(shade(T.blade, d < wd * 0.5 ? 1.02 : 0.9), px, yy, pz, 48, 0.03);
         c.set(px, yy, pz, col, g);
       }
@@ -566,6 +572,7 @@ function scythe(T = THEMES.dark) {
     z += Math.sin(th) * ds;
     th -= dth * ds;
   }
+  if (o.after) o.after(c);
   return c.done();
 }
 
@@ -774,7 +781,7 @@ function fieldTome() {
  * and the string drawn straight behind at -z (the archer).
  */
 function bow(T, o) {
-  const { L, D, recurve = 6, grip = 6, style = 'wood', nock = null } = o;
+  const { L, D, recurve = 6, grip = 6, style = 'wood', nock = null, after = null } = o;
   const c = ctx();
   const stringZ = -D + recurve - 1;
   for (let y = -L; y <= L; y++) {
@@ -816,6 +823,7 @@ function bow(T, o) {
   for (let z = 1; z <= 4; z++) for (const x of [-2, 1]) c.set(x, 2, z, J(T.guard, x, 2, z, 96, 0.04));
   c.set(0, 0, 3, J(T.guardHi, 0, 0, 3, 97, 0.03));
   for (const y of [-2, 1]) for (let z = 0; z < 2; z++) c.set(-1, y, 2 + z, T.glow, style !== 'wood');
+  if (after) after(c);
   return c.done();
 }
 
@@ -831,7 +839,7 @@ const BOWS = {
 
 /* ----------------------------- crossbows ---------------------------- */
 
-function crossbow(T, style) {
+function crossbow(T, style, after = null) {
   const c = ctx();
   const budge = style === 'budge';
   const iron = style === 'iron';
@@ -905,6 +913,7 @@ function crossbow(T, style) {
   }
   if (style === 'dark') for (let z = 24; z < 56; z += 4) c.set(-1, 3, z, T.glow, true);
   else if (budge) for (let z = 26; z < 56; z += 6) c.set(-1, 3, z, T.glow, true);
+  if (after) after(c);
   return c.done();
 }
 
@@ -925,8 +934,11 @@ function tinderbox() {
 
 /* ------------------------------ registry ---------------------------- */
 
+const KIT = { ctx, rod, ball, orb, ringAt, wrapRod, haft, pathRod, spike, blade, leaf, crossguard, pommelAt, sword, scythe, bow, crossbow, spearShaft: spear };
+
 const BUILDERS = {
   ...SWORDS,
+  ...jungleWeapons(KIT),
   ...BOWS,
   axe: ironAxe,
   pick: ironPick,
@@ -970,6 +982,7 @@ const themeOf = (setId) => (setId === 'iron' ? THEMES.iron : setId.startsWith('d
 /** Flat shield (face up on +y), 48 wide and deep with raised rim, boss and relief. */
 export function buildShieldModel(setId) {
   if (setId === 'demonset') return demonShieldVoxels();
+  if (JUNGLE_SHIELD_SETS.has(setId)) return jungleShield(KIT, setId);
   const T = themeOf(setId);
   const dark = T === THEMES.dark || T === THEMES.frost;
   const c = ctx();
@@ -1017,6 +1030,7 @@ export function buildShieldModel(setId) {
 
 /** Closed spell book lying flat; spine on -x, length along +z. */
 export function buildBookModel(setId) {
+  if (JUNGLE_BOOK_SETS.has(setId)) return jungleBook(KIT, setId);
   const T = themeOf(setId);
   const dark = T === THEMES.dark || T === THEMES.frost;
   const c = ctx();

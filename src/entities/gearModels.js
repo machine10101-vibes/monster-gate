@@ -4,6 +4,7 @@ import { meshFrom } from './humanoid.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
 import { YETI } from '../data/yeti.js';
+import { JUNGLE_MATERIALS } from './materialsJungle.js';
 
 const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
 const SZ = 0.06;
@@ -314,6 +315,7 @@ const DUSK_HIDE = { scale: 0x3b3268, scaleLo: 0x251f48, scaleHi: 0x574c9c, horn:
 const BUDGE_MEMBRANE = { membrane: BUDGE.membrane, membraneHi: BUDGE.membraneHi, glow: BUDGE.vein, scaleHi: BUDGE.scaleHi };
 
 const BUILDERS = {
+  ...JUNGLE_MATERIALS,
   budgemembrane: (mat) => membraneModel(mat, BUDGE_MEMBRANE),
   yetihide: (mat) => hideModel(mat, YETI_HIDE),
   rimefur: furModel, glacierclaw: yetiClawModel, yetifang: yetiFangModel, frostshard: frostShardModel, frostheart: frostHeartModel,
