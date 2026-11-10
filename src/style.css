@@ -1852,17 +1852,35 @@ body.touch .how {
 .cat-btn:disabled {
   opacity: 0.6;
 }
-@media (max-height: 520px), (max-width: 640px) {
+@media (max-height: 520px) {
   .cat-detail {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: 10px;
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+    gap: 8px;
   }
   .cat-viewer {
-    max-height: 70vh;
+    max-height: 42vh;
+    aspect-ratio: 4 / 3;
   }
   .cat-grid {
-    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 6px;
+  }
+  .cat-card b {
+    font-size: 13px;
+  }
+}
+@media (max-width: 700px) and (max-aspect-ratio: 1/1) {
+  .cat-detail {
+    grid-template-columns: 1fr;
     gap: 8px;
+  }
+  .cat-viewer {
+    max-height: 26vh;
+    aspect-ratio: 16 / 9;
+  }
+  .cat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 6px;
   }
   .cat-card b {
     font-size: 13px;
@@ -2014,6 +2032,7 @@ body.touch .how {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 12px;
+  container-type: inline-size;
 }
 .tt-tree {
   display: flex;
@@ -2202,8 +2221,16 @@ body.touch .how {
 .tt-acts span { color: #9aa4b2; font-size: 12px; }
 .tt-acts .tt-ok { color: #8dcb8a; }
 .tt-acts .tt-lock { color: #c9a56a; }
-@media (max-width: 800px) {
-  .sk-pick, .tt-trees, .tt-extra { grid-template-columns: 1fr; }
+@media (max-width: 520px) {
+  .sk-pick, .tt-extra { grid-template-columns: 1fr; }
+  .sk-class { min-height: 0; padding: 8px 10px; }
+  .sk-bubble { gap: 4px; padding: 4px 6px 4px 4px; }
+  .sk-bubble canvas { width: 28px; height: 28px; }
+  .sk-bubble span {
+    white-space: normal;
+    font-size: 11px;
+    line-height: 1.15;
+  }
 }
 
 /* character, bag, skill book ------------------------------------------- */
@@ -2372,7 +2399,7 @@ body.touch .how {
   font-family: var(--font-px);
   font-size: 8px;
 }
-.cg-pop-list { max-height: 300px; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.cg-pop-list { max-height: min(300px, 42vh); overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 .cg-pop-empty { margin: 0; color: #b7c0b4; font-size: 13px; }
 .cg-item {
   display: flex;
@@ -2625,7 +2652,7 @@ body.touch .stash-slot.holding {
   border: none;
   font-size: 20px;
 }
-@media (max-width: 720px) {
+@media (max-width: 720px) and (max-aspect-ratio: 1/1) {
   .stash-cols { grid-template-columns: 1fr; }
   .stash-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
@@ -2709,12 +2736,21 @@ body.touch .stash-slot.holding {
   border-radius: 4px;
 }
 .book section { margin-bottom: 12px; }
-@media (max-width: 800px) {
+@media (max-width: 800px) and (max-aspect-ratio: 1/1) {
   .cg { grid-template-columns: 1fr; }
-  .cg-stage { grid-template-columns: 62px minmax(0, 1fr) 62px; }
-  .cg-col, .cg-view { height: 280px; }
+  .cg-stage { grid-template-columns: 52px minmax(0, 1fr) 52px; }
+  .cg-col, .cg-view { height: min(36vh, 240px); }
+  .cg-slot { width: 52px; height: 52px; }
   .bag-stage { grid-template-columns: 1fr; }
-  .bag-detail { position: static; }
+  .bag-detail {
+    position: sticky;
+    top: auto;
+    bottom: 0;
+    z-index: 2;
+    min-height: 0;
+    max-height: 34vh;
+    overflow: auto;
+  }
 }
 
 /* hunter stats ---------------------------------------------------------- */
@@ -2818,14 +2854,14 @@ body.touch .stash-slot.holding {
 .wm-cell.sel { outline: 2px solid #fff6d0; outline-offset: 1px; z-index: 1; }
 .wm-shot { width: 100%; height: auto; background: #0c1014; border: 2px solid #3a3f4a; border-radius: 6px; }
 .wm-cap { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #8a94a6; }
-@media (max-width: 800px) {
+@media (max-width: 800px) and (max-aspect-ratio: 1/1) {
   .st-split { grid-template-columns: 1fr; }
   .st-side { position: static; }
 }
-@media (max-width: 980px) {
+@media (max-width: 980px) and (max-aspect-ratio: 1/1) {
   .wm { grid-template-columns: 1fr; }
 }
-@media (max-width: 720px) {
+@media (max-width: 720px) and (max-aspect-ratio: 1/1) {
   .set-jumps { grid-template-columns: 1fr; }
 }
 
@@ -3394,4 +3430,223 @@ body.selecting #btn-fs { display: none; }
   .cs-form { padding: 10px; }
   .cs-label { margin: 6px 0 4px; }
   .cs-blurb { min-height: 0; font-size: 13px; }
+}
+
+/* phone + tablet menus: fill the screen and drop the desktop gutters ------ */
+body.touch #dialog { z-index: 55; }
+body.touch #panel { z-index: 62; }
+body.touch #faint { z-index: 63; }
+body.touch .stash-ask-back,
+body.touch .stash-ask { z-index: 70; }
+body.touch #panel {
+  padding:
+    max(4px, var(--safe-t))
+    max(4px, var(--safe-r))
+    max(4px, var(--safe-b))
+    max(4px, var(--safe-l));
+  align-items: stretch;
+  justify-content: stretch;
+}
+body.touch .panel-card,
+body.touch .panel-card.wide {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  border-radius: 8px;
+  padding-bottom: 8px;
+  box-shadow: 0 0 0 2px #0a0b0d, 0 10px 28px rgba(0, 0, 0, 0.65);
+}
+body.touch .panel-card h2 {
+  padding: 9px 40px 6px 10px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+body.touch #panel-body { padding: 8px 8px 2px; }
+body.touch #panel-close {
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+}
+body.touch .panel-card p,
+body.touch .panel-card li { font-size: 14px; line-height: 1.35; }
+body.touch .panel-help { margin-top: 8px; font-size: 12px; }
+body.touch .panel-row { margin-bottom: 4px; padding: 6px 8px; font-size: 14px; }
+body.touch .cat-tabs { gap: 4px; margin-bottom: 8px; padding-right: 28px; }
+body.touch .cat-tab { padding: 6px 4px; }
+body.touch .cat-card { padding: 4px 4px 6px; }
+body.touch .cat-grid { gap: 6px; }
+body.touch .cat-info h4 { margin: 8px 0 4px; }
+body.touch .cat-stats { gap: 4px; margin: 6px 0; }
+body.touch .cat-actions { margin-top: 8px; }
+body.touch .bag-tabs { gap: 4px; margin-bottom: 6px; }
+body.touch .bag section { margin-bottom: 8px; }
+body.touch .bag-grid { gap: 6px; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+body.touch .bag-cell { min-height: 0; padding: 4px; }
+body.touch .bag-cell canvas { width: 44px; height: 44px; }
+body.touch .bag-detail { gap: 4px; min-height: 0; padding: 8px; }
+body.touch .bag-detail canvas { width: 56px; height: 56px; }
+body.touch .bag-stats div { padding: 2px 0; }
+body.touch .cg { gap: 8px; }
+body.touch .cg-title { margin-bottom: 6px; padding: 4px 8px; }
+body.touch .cg-info { gap: 6px; }
+body.touch .cg-info section { padding: 6px 8px; }
+body.touch .sk-bubbles { gap: 6px; margin-bottom: 8px; }
+body.touch .sk-intro, body.touch .sk-note { margin-bottom: 6px; }
+body.touch .sk-pick { gap: 6px; }
+body.touch .tt-trees { gap: 6px; margin-bottom: 8px; }
+body.touch .tt-detail { gap: 8px; margin: 0; padding: 8px; bottom: -8px; }
+body.touch .tt-dico { width: 44px; height: 44px; }
+body.touch .tt-info b { font-size: 14px; }
+body.touch .tt-info p { font-size: 13px; margin: 2px 0 4px; }
+body.touch .st-split { gap: 8px; }
+body.touch .stats { gap: 8px; }
+body.touch .st-detail { padding: 8px; }
+body.touch .wm { gap: 8px; }
+body.touch .wm-note, body.touch .wm-blurb { margin-bottom: 4px; }
+body.touch .set-jumps { gap: 6px; margin-bottom: 8px; }
+body.touch .set-jump { padding: 8px; }
+body.touch .smith-bench { gap: 6px; margin-bottom: 8px; }
+body.touch .smith-row, body.touch .alc-row { padding: 6px 8px; gap: 8px; }
+body.touch .alc-intro, body.touch .cat-forge { margin-bottom: 8px; padding: 8px; }
+body.touch .book-bar { gap: 6px; margin: 6px 0 8px; }
+body.touch .book-slot { min-height: 46px; padding: 4px 8px 4px 4px; }
+body.touch .book-list, body.touch .book-passives { gap: 6px; }
+body.touch .stash-cols { gap: 8px; }
+body.touch .stash-help { margin-bottom: 6px; }
+body.touch #dialog {
+  width: min(440px, calc(100vw - 20px - var(--safe-l) - var(--safe-r)));
+  bottom: calc(200px + var(--safe-b));
+  padding: 8px 10px 6px;
+}
+body.touch #dialog b { margin-bottom: 4px; }
+body.touch #dialog p { font-size: 14px; margin-bottom: 4px; }
+body.touch #faint { gap: 8px; padding: 12px; }
+body.touch .cs-confirm { padding: 10px; }
+body.touch .cs-confirm-box { padding: 12px; }
+body.touch .cs-confirm-box p { margin-bottom: 10px; font-size: 15px; }
+body.touch .stash-ask { padding: 8px 8px 8px; }
+body.touch .stash-ask b { margin-bottom: 4px; }
+body.touch .stash-ask p { margin-bottom: 6px; }
+body.touch .stash-ask-row button,
+body.touch .stash-ask-custom button,
+body.touch .stash-ask input { min-height: 40px; }
+
+/* Three skill paths stay side by side; the nodes scale down to the row. */
+@container (max-width: 780px) {
+  .tt-grid { zoom: 0.82; }
+  .tt-head { gap: 6px; margin-bottom: 8px; padding: 4px 6px; }
+  .tt-head b { font-size: 13px; }
+  .tt-hico { width: 30px; height: 30px; }
+}
+@container (max-width: 520px) {
+  .tt-grid { zoom: 0.56; }
+  .tt-tree { overflow: hidden; }
+  .tt-head b { font-size: 11px; line-height: 1.2; }
+  .tt-hico { width: 24px; height: 24px; }
+  .tt-head i { left: 16px; top: 16px; }
+}
+
+/* Landscape: short screen, keep columns, shrink the paper doll and the talk box. */
+@media (max-height: 520px) {
+  body.touch .panel-card { display: flex; flex-direction: column; overflow: hidden; }
+  body.touch #panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  body.touch #panel-body:has(.cg) { display: flex; flex-direction: column; }
+  body.touch .cg { flex: 1; min-height: 0; }
+  body.touch #panel {
+    padding:
+      max(3px, var(--safe-t))
+      max(3px, var(--safe-r))
+      max(3px, var(--safe-b))
+      max(3px, var(--safe-l));
+  }
+  body.touch .panel-card h2 { padding: 6px 34px 4px 8px; }
+  body.touch #panel-body { padding: 6px 6px 2px; }
+  body.touch .cg { grid-template-columns: minmax(0, 1fr) minmax(148px, 210px); align-items: stretch; }
+  body.touch .cg-stage { grid-template-columns: 46px minmax(0, 1fr) 46px; gap: 6px; }
+  body.touch .cg-col, body.touch .cg-view { height: min(40vh, 132px); }
+  body.touch .cg-info { max-height: none; min-height: 0; overflow: auto; }
+  body.touch .cg-slot { width: 46px; height: 46px; }
+  body.touch .cg-slot canvas { width: 36px; height: 36px; }
+  body.touch .bag-stage { grid-template-columns: minmax(0, 1fr) minmax(136px, 190px); gap: 6px; }
+  body.touch .bag-detail { position: sticky; top: 0; bottom: auto; max-height: none; }
+  body.touch .bag-detail canvas { width: 44px; height: 44px; }
+  body.touch .st-split { grid-template-columns: minmax(0, 1.15fr) minmax(150px, 0.85fr); }
+  body.touch .st-side { position: sticky; top: 4px; }
+  body.touch .wm { grid-template-columns: minmax(0, 1fr) minmax(150px, 220px); }
+  body.touch .sk-class { min-height: 0; padding: 6px 8px; gap: 4px; }
+  body.touch .sk-head { margin-bottom: 4px; }
+  body.touch .sk-wrap:has(.tt-trees) { position: relative; }
+  body.touch .sk-wrap:has(.tt-trees) .sk-bubbles,
+  body.touch .sk-wrap:has(.tt-trees) .tt-trees { margin-right: 230px; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-trees { margin-bottom: 0; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-grid { zoom: 0.6; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-detail {
+    position: absolute;
+    top: 46px;
+    right: 0;
+    width: 210px;
+    max-height: 48%;
+    margin: 0;
+    overflow: auto;
+  }
+  body.touch .sk-wrap:has(.tt-trees) .tt-extra {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 210px;
+    margin: 0;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  body.touch .sk-wrap:has(.tt-trees) .tt-band { padding: 4px 6px 6px; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-band h3 { margin-bottom: 4px; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-row { gap: 6px; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-extra .tt-node { width: 40px; height: 40px; }
+  body.touch .sk-wrap:has(.tt-trees) .tt-extra .tt-node canvas { inset: 4px; width: 28px; height: 28px; }
+  body.touch .cat-thumb { aspect-ratio: 5 / 3; }
+  body.touch .sk-class b { font-size: 14px; }
+  body.touch .book-list, body.touch .book-passives { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+  body.touch .book-slot canvas { width: 32px; height: 32px; }
+  body.touch #dialog {
+    left: calc(50% - 36px);
+    width: min(300px, 36vw);
+    bottom: calc(88px + var(--safe-b));
+    padding: 6px 8px 4px;
+  }
+  body.touch #dialog p { font-size: 13px; line-height: 1.3; }
+  body.touch #faint b { font-size: 16px; }
+  body.touch #faint span { font-size: 13px; }
+  body.touch #title .title-inner { padding: 12px 16px; }
+  body.touch #title h1 { margin: 4px 0 8px; font-size: clamp(20px, 5vw, 32px); }
+  body.touch .wallet-status { margin-bottom: 8px; font-size: 13px; }
+  body.touch .account-panel { margin-bottom: 6px; padding: 8px 10px 6px; }
+  body.touch .account-input { margin-bottom: 6px; padding: 7px 8px; }
+  body.touch .touch-only { margin-top: 8px; font-size: 12px; }
+  body.touch .cs-confirm-box { padding: 10px; }
+  body.touch .cs-confirm-box p { margin-bottom: 8px; font-size: 14px; }
+}
+
+@media (max-height: 520px) and (min-width: 720px) {
+  body.touch .set-jumps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Portrait: the talk box sits above the fight buttons, and the doll stays short. */
+@media (max-aspect-ratio: 1/1) {
+  body.touch .cg-col, body.touch .cg-view { height: min(34vh, 220px); }
+  body.touch .cg-slot { width: 48px; height: 48px; }
+  body.touch .cg-stage { grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 6px; }
+  body.touch #dialog {
+    width: min(460px, calc(100vw - 16px - var(--safe-l) - var(--safe-r)));
+    bottom: calc(222px + var(--safe-b));
+  }
+  body.touch #title .title-inner {
+    padding: calc(16px + var(--safe-t)) 14px calc(16px + var(--safe-b));
+  }
+  body.touch .wallet-status { font-size: 14px; margin-bottom: 8px; }
+  body.touch .account-panel { padding: 8px 10px 6px; }
+  body.touch .account-input { padding: 8px 10px; margin-bottom: 6px; }
 }

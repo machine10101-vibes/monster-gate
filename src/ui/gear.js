@@ -205,7 +205,8 @@ export function mountGear(body, game) {
     pop.className = 'cg-pop';
     const rr = pop.parentElement.getBoundingClientRect();
     const br = btn.getBoundingClientRect();
-    pop.style.top = Math.max(0, Math.min(rr.height - 340, br.top - rr.top - 24)) + 'px';
+    const room = Math.min(300, Math.max(148, rr.height * 0.62));
+    pop.style.top = Math.max(0, Math.min(Math.max(0, rr.height - room), br.top - rr.top - 8)) + 'px';
 
     const head = document.createElement('div');
     head.className = 'cg-pop-head';
