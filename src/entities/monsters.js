@@ -1857,6 +1857,7 @@ export class Spawner {
       if (!w.playable(x, z) || w.isWater(x, z)) continue;
       const h = w.heightAt(x, z);
       if (h < 0.9 || h > 6.5 || !w.free(x, z, 1.1)) continue;
+      if (type !== 'pirate' && (h < 1.8 || w.zoneAt(x, z) !== ZONE.FOREST)) continue;
       if (minFromPlayer && Math.hypot(x - P.x, z - P.z) < minFromPlayer) continue;
       return { x, z };
     }

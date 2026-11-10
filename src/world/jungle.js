@@ -217,8 +217,8 @@ export function paintJungleCell(out, H, x, z, kind, isPath, n, spec) {
   const dense = slope > 1.2 && nA > 0.4;
   if (dense) set(ZONE.FOREST, TILE.MOSS_STONE, 0.72, 0.9, 0.7);
   else if (nB > 0.82) set(ZONE.FOREST, TILE.DIRT, 0.68, 0.6, 0.42);
-  else if (n > 0.62 && h < 5) set(ZONE.FOREST, TILE.FLOWER_GRASS, 0.5 + nA * 0.14, 0.84, 0.4);
-  else set(ZONE.FOREST, TILE.GRASS, 0.3 + nA * 0.16, 0.66 + (1 - nA) * 0.16, 0.28 + nA * 0.1);
+  else if (n > 0.62 && h < 5) set(ZONE.FOREST, TILE.FLOWER_GRASS, 0.4 + nA * 0.1, 0.7, 0.34);
+  else set(ZONE.FOREST, TILE.GRASS, 0.22 + nA * 0.1, 0.52 + (1 - nA) * 0.14, 0.24 + nA * 0.08);
 }
 
 /* ------------------------------ dressing ------------------------------ */
@@ -229,7 +229,7 @@ const DRESS_MODEL = {
   bushes: 'tropBush', rocks: 'mossRocks', boulders: 'mossBoulders', driftwood: 'driftwood', shells: 'shells', starfish: 'starfish',
   beachRocks: 'beachRocks', crabs: 'crabs',
 };
-const VEG_VERTS = 1100000;
+const VEG_VERTS = 1300000;
 
 const vertsOf = (arr) => {
   if (!arr || !arr.length) return 0;
@@ -242,7 +242,7 @@ const vertsOf = (arr) => {
 function budgeted(dress, J) {
   let est = 0;
   for (const [k, n] of Object.entries(dress)) est += n * vertsOf(J[DRESS_MODEL[k]]);
-  const f = Math.min(1, VEG_VERTS / Math.max(1, est));
+  const f = Math.min(2.2, VEG_VERTS / Math.max(1, est));
   const out = {};
   for (const [k, n] of Object.entries(dress)) out[k] = n === 0 ? 0 : Math.max(1, Math.round(n * f));
   return out;
@@ -520,6 +520,7 @@ function buildPier(world, land, spec, J, p, place, jun) {
   const end = pick(J.pierEnd, 0);
   if (!seg) return;
   const px = land.x0 + p.x + 0.5;
+  jun.yards.push({ x: px, z: land.z0 + p.z0 - 4, r: 9 });
   const zs = land.z0 + p.z0;
   const ze = land.z0 + p.z1;
   const n = Math.max(1, Math.round((ze - zs) / 8));
