@@ -1675,7 +1675,7 @@ export class Monster {
     this.game.scene.remove(this.obj);
     this.game.hud.removePlate(this.id);
     this.obj.traverse((o) => {
-      if (o.isMesh && o.geometry) o.geometry.dispose();
+      if (o.isMesh && o.geometry && !o.userData.sharedGeo) o.geometry.dispose();
     });
   }
 }

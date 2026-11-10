@@ -33,6 +33,8 @@ export class World {
     this.animated = [];
     this.occupied = new Map();
     this.batches = new Map();
+    this.instances = new Map();
+    this.instanceProps = false;
     this.rng = new RNG(20260711);
     this.realm = 'over';
   }
@@ -192,15 +194,35 @@ export class World {
   }
 
   place(parts, x, y, z, rotY = 0, scale = 1, opts = {}) {
-    const b = this.batchFor(x, z);
     const m = new THREE.Matrix4().compose(
       new THREE.Vector3(x, y, z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY),
       new THREE.Vector3(scale, opts.scaleY ?? scale, scale)
     );
+    if (this.instanceProps && !opts.tint) {
+      this.instancePlace(parts, m, x, z, opts);
+      return;
+    }
+    const b = this.batchFor(x, z);
     for (const p of parts) {
       const target = p.kind === 'solid' ? (opts.cover ? b.cover : b.solid) : b[p.kind];
       target.add(p.geo, m, opts.tint || null);
+    }
+  }
+
+  /** Keep one copy of a prop and stamp it with a matrix. A baked copy of every palm is what runs the tablet out of memory at the loading screen. */
+  instancePlace(parts, matrix, x, z, opts) {
+    const tile = Math.floor(x / 144) + ',' + Math.floor(z / 144);
+    for (const p of parts) {
+      if (!p?.geo) continue;
+      const kind = p.kind === 'solid' && opts.cover ? 'cover' : p.kind;
+      const key = tile + '|' + kind + '|' + p.geo.uuid;
+      let bucket = this.instances.get(key);
+      if (!bucket) {
+        bucket = { geo: p.geo, kind, matrices: [] };
+        this.instances.set(key, bucket);
+      }
+      bucket.matrices.push(matrix.clone());
     }
   }
 
@@ -903,6 +925,23 @@ export class World {
     this.circle(x, z, 0.5 * s);
   }
 
+  flushInstances() {
+    for (const b of this.instances.values()) {
+      const mat = b.kind === 'solid' ? this.mats.solid : b.kind === 'cover' ? this.mats.cover : this.mats[b.kind];
+      if (!mat || !b.matrices.length) continue;
+      const mesh = new THREE.InstancedMesh(b.geo, mat, b.matrices.length);
+      for (let i = 0; i < b.matrices.length; i++) mesh.setMatrixAt(i, b.matrices[i]);
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.castShadow = b.kind === 'solid';
+      mesh.receiveShadow = b.kind === 'solid' || b.kind === 'cover';
+      mesh.matrixAutoUpdate = false;
+      mesh.computeBoundingSphere();
+      this.group.add(mesh);
+      this.chunkMeshes.push(mesh);
+    }
+    this.instances.clear();
+  }
+
   /* -------------------------------- finalize ------------------------------- */
   finalize() {
     this.chunkMeshes = [];
@@ -910,6 +949,10 @@ export class World {
       for (const kind of ['solid', 'cover', 'glow', 'window']) {
         if (b[kind].empty) continue;
         const geo = b[kind].toGeometry();
+        b[kind].p = null;
+        b[kind].n = null;
+        b[kind].c = null;
+        b[kind].i = null;
         const mat = kind === 'solid' ? this.mats.solid : kind === 'cover' ? this.mats.cover : this.mats[kind];
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = kind === 'solid';
@@ -920,6 +963,7 @@ export class World {
       }
     }
     this.batches.clear();
+    this.flushInstances();
 
     const spots = this.lightSpots;
     const pos = new Float32Array(spots.length * 3);

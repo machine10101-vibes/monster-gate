@@ -301,7 +301,7 @@ export class Rig {
 
 /**
  * Turns a rig into reusable geometry. spec: [{ id, parent, pivot:[x,y,z] }] listed parent first.
- * Geometry is built once per creature kind; every spawn clones the buffers.
+ * Geometry is built once per creature kind and shared by every spawn.
  */
 export function makeKind(rig, spec, size) {
   const geos = {};
@@ -331,7 +331,8 @@ export function instantiate(kind, mat) {
     if (!geo) continue;
     for (const kk of ['solid', 'glow']) {
       if (!geo[kk]) continue;
-      const mesh = new THREE.Mesh(geo[kk].clone(), kk === 'solid' ? mat : glowMat);
+      const mesh = new THREE.Mesh(geo[kk], kk === 'solid' ? mat : glowMat);
+      mesh.userData.sharedGeo = true;
       mesh.castShadow = kk === 'solid';
       g.add(mesh);
     }
