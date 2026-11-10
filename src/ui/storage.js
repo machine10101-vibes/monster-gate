@@ -15,13 +15,173 @@ const TABS = [
   ['potions', 'Potions'],
 ];
 
+const HOLD_MS = 450;
+let askEl = null;
+let pending = [];
+
+function isTouch() {
+  return document.body.classList.contains('touch') || window.matchMedia('(pointer: coarse)').matches;
+}
+
+function clearPending() {
+  for (const id of pending) clearTimeout(id);
+  pending = [];
+}
+
+function closeAsk() {
+  askEl?.remove();
+  askEl = null;
+}
+
+/** One, all, or a typed count. `run` receives the chosen amount. */
+function openAsk(anchor, { name, max, verb, run, done }) {
+  closeAsk();
+  const back = document.createElement('div');
+  back.className = 'stash-ask-back';
+  const card = document.createElement('div');
+  card.className = 'stash-ask';
+
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'stash-ask-x';
+  x.textContent = '×';
+  x.onclick = () => closeAsk();
+
+  const title = document.createElement('b');
+  title.textContent = name;
+  const hint = document.createElement('p');
+  hint.textContent = max > 1 ? `${verb} how many? You have ${max}.` : `${verb} this?`;
+
+  const row = document.createElement('div');
+  row.className = 'stash-ask-row';
+  const one = document.createElement('button');
+  one.type = 'button';
+  one.textContent = 'One';
+  one.onclick = () => choose(1);
+  const all = document.createElement('button');
+  all.type = 'button';
+  all.textContent = 'All';
+  all.onclick = () => choose(max);
+  row.append(one, all);
+
+  const custom = document.createElement('div');
+  custom.className = 'stash-ask-custom';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'numeric';
+  input.min = '1';
+  input.max = String(max);
+  input.placeholder = 'Number';
+  input.enterKeyHint = 'done';
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.textContent = verb;
+  const submitCustom = () => {
+    const n = input.valueAsNumber;
+    if (!Number.isFinite(n)) return;
+    choose(Math.max(1, Math.min(max, Math.floor(n))));
+  };
+  go.onclick = submitCustom;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitCustom();
+    }
+  });
+  input.addEventListener('focus', () => {
+    card.style.top = '12px';
+    card.style.left = Math.max(8, (window.innerWidth - card.offsetWidth) / 2) + 'px';
+  });
+  custom.append(input, go);
+  card.append(x, title, hint, row, custom);
+  back.appendChild(card);
+  document.body.appendChild(back);
+  askEl = back;
+  card.style.pointerEvents = 'none';
+  const arm = () => {
+    if (askEl !== back) return;
+    card.style.pointerEvents = '';
+    window.removeEventListener('pointerup', arm, true);
+    window.removeEventListener('pointercancel', arm, true);
+  };
+  window.addEventListener('pointerup', arm, true);
+  window.addEventListener('pointercancel', arm, true);
+
+  const r = anchor.getBoundingClientRect();
+  const c = card.getBoundingClientRect();
+  let left = r.left + r.width / 2 - c.width / 2;
+  let top = r.bottom + 8;
+  left = Math.max(8, Math.min(left, window.innerWidth - c.width - 8));
+  if (top + c.height > window.innerHeight - 8) top = Math.max(8, r.top - c.height - 8);
+  card.style.left = left + 'px';
+  card.style.top = top + 'px';
+
+  back.addEventListener('pointerdown', (e) => {
+    if (e.target === back) closeAsk();
+  });
+
+  function choose(n) {
+    closeAsk();
+    if (n >= 1) run(n);
+    done();
+  }
+}
+
+/** Touch: a tap moves the whole stack. A hold opens the amount window. */
+function bindHold(button, spec) {
+  let timer = 0;
+  let suppress = false;
+  let sx = 0;
+  let sy = 0;
+  const stop = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+    }
+    button.classList.remove('holding');
+  };
+  button.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    suppress = false;
+    sx = e.clientX;
+    sy = e.clientY;
+    button.classList.add('holding');
+    timer = setTimeout(() => {
+      timer = 0;
+      suppress = true;
+      button.classList.remove('holding');
+      openAsk(button, spec);
+    }, HOLD_MS);
+    pending.push(timer);
+  });
+  button.addEventListener('pointermove', (e) => {
+    if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 14) stop();
+  });
+  button.addEventListener('pointerup', stop);
+  button.addEventListener('pointercancel', stop);
+  button.addEventListener('contextmenu', (e) => e.preventDefault());
+  button.addEventListener('click', (e) => {
+    if (suppress) {
+      suppress = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    spec.run(spec.max);
+    spec.done();
+  });
+}
+
 /** The town crate. The bag is on the left, thirty storage slots on the right. */
 export function mountStorage(body, game) {
   let tab = 'goods';
   let sel = null;
   let slot = null;
+  const touch = isTouch();
 
   const paint = () => {
+    clearPending();
+    closeAsk();
     const groups = collect(game);
     if (!groups[tab].some((it) => it.key === sel)) sel = groups[tab][0]?.key || null;
     const slots = game.progress.data.storage;
@@ -33,7 +193,9 @@ export function mountStorage(body, game) {
 
     const help = document.createElement('p');
     help.className = 'stash-help';
-    help.textContent = 'Thirty slots, shared with this hunter. Choose something you are carrying and store it. Choose a stored stack to take it back.';
+    help.textContent = touch
+      ? 'Tap an item to store all of it. Hold an item to store one, all, or a number you choose. Tap a stored stack to take it out, or hold it to choose how many.'
+      : 'Thirty slots, shared with this hunter. Choose something you are carrying and store it. Choose a stored stack to take it back.';
     root.appendChild(help);
 
     const cols = document.createElement('div');
@@ -78,7 +240,8 @@ export function mountStorage(body, game) {
         i.textContent = it.badge;
         b.appendChild(i);
       }
-      b.onclick = () => {
+      if (touch) bindHold(b, { name: it.name, max: it.n, verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n), done: () => paint() });
+      else b.onclick = () => {
         sel = it.key;
         paint();
       };
@@ -87,7 +250,7 @@ export function mountStorage(body, game) {
     left.appendChild(grid);
 
     const current = list.find((it) => it.key === sel);
-    if (current) {
+    if (!touch && current) {
       const row = document.createElement('div');
       row.className = 'bag-acts';
       const all = document.createElement('button');
@@ -135,7 +298,15 @@ export function mountStorage(body, game) {
         const i = document.createElement('i');
         i.textContent = s.k === 'gear' ? '' : String(s.n);
         if (s.k !== 'gear') b.appendChild(i);
-        b.onclick = () => {
+        if (touch) {
+          bindHold(b, {
+            name: labelOf(s),
+            max: s.n,
+            verb: 'Take',
+            run: (n) => game.takeFromCrate(index, n),
+            done: () => paint(),
+          });
+        } else b.onclick = () => {
           slot = index;
           paint();
         };
@@ -144,7 +315,7 @@ export function mountStorage(body, game) {
     });
     right.appendChild(hold);
     const picked = slot != null ? slots[slot] : null;
-    if (picked) {
+    if (!touch && picked) {
       const row = document.createElement('div');
       row.className = 'bag-acts';
       const all = document.createElement('button');
@@ -177,7 +348,10 @@ export function mountStorage(body, game) {
   };
 
   paint();
-  return () => {};
+  return () => {
+    clearPending();
+    closeAsk();
+  };
 }
 
 function collect(game) {
