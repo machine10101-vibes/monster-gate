@@ -104,7 +104,7 @@ export const MONSTERS = [
     desc: 'A tusked scout in hide and fur. They keep to their camp and the ground around it, and they swing a notched blade.',
   },
   {
-    id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
+    id: 'darksycledragon', name: 'Darksycle Dragon', level: 200, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
     desc: 'A graphite-scaled dragon with violet wings, a blue crystal crest and a glowing chest core. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Every so often it beats its wings and climbs high for about four seconds, raining crescents, gloom and crystal strikes from the air before diving at your position. Melee cannot reach it up there, so dodge the marked circles and use ranged attacks. Hit its wind-up hard to stagger it.',
   },
   {
@@ -208,45 +208,45 @@ export const GEAR = [
     id: 'darkscythe', type: 'weapon', wtype: 'scythe', name: 'Darksycle Scythe', monster: 'darksycledragon', held: 'darkscythe',
     desc: 'A horn-blade scythe on a scale-wrapped haft, with a gloom crystal set where the blade meets the shaft. Long reach, wide sweep.',
     recipe: { scythehorn: 3, duskscale: 2, duskclaw: 1 },
-    item: { id: 'darkscythe', icon: 'darkscythe', name: 'Darksycle Scythe', kind: 'melee', style: 'twohand', dmg: 17, reach: 2.9, arc: 2.7, dur: 0.56, hit: 0.24, stam: 12, knock: 6, held: 'darkscythe', desc: 'Two-handed. Long reach, wide sweep.' },
-    stats: [['Damage', 17], ['Reach', '2.9'], ['Style', 'Two-Handed']],
+    item: { id: 'darkscythe', icon: 'darkscythe', name: 'Darksycle Scythe', kind: 'melee', style: 'twohand', dmg: 34, reach: 2.9, arc: 2.7, dur: 0.56, hit: 0.24, stam: 12, knock: 6, held: 'darkscythe', desc: 'Two-handed. Long reach, wide sweep.' },
+    stats: [['Damage', 34], ['Reach', '2.9'], ['Style', 'Two-Handed']],
   },
   {
     id: 'darkbow', type: 'weapon', wtype: 'longbow', name: 'Crescent Wingbow', monster: 'darksycledragon', held: 'darkbow',
     desc: 'Bowed from two scythe horns and strung with membrane. It does not shoot arrows. It throws spinning crescents that slice through everything in a line.',
     recipe: { scythehorn: 2, gloommembrane: 2, duskclaw: 1 },
-    item: { id: 'darkbow', icon: 'darkbow', name: 'Crescent Wingbow', kind: 'ranged', style: 'longbow', proj: 'crescent', dmg: 14, dur: 0.5, stam: 8, held: 'darkbow', desc: 'A longbow that throws piercing crescents.' },
-    stats: [['Damage', 14], ['Shot', 'Piercing'], ['Style', 'Longbow']],
+    item: { id: 'darkbow', icon: 'darkbow', name: 'Crescent Wingbow', kind: 'ranged', style: 'longbow', proj: 'crescent', dmg: 28, dur: 0.5, stam: 8, held: 'darkbow', desc: 'A longbow that throws piercing crescents.' },
+    stats: [['Damage', 28], ['Shot', 'Piercing'], ['Style', 'Longbow']],
   },
   {
     id: 'darkstaff', type: 'weapon', wtype: 'staff', name: 'Gloomcore Staff', monster: 'darksycledragon', held: 'darkstaff',
     desc: 'A staff crowned with a gloom crystal between two sickle blades. It fires dark orbs that curve toward the nearest monster.',
     recipe: { gloomcore: 1, scythehorn: 1, duskscale: 3, gloommembrane: 1 },
-    item: { id: 'darkstaff', icon: 'darkstaff', name: 'Gloomcore Staff', kind: 'ranged', style: 'staff', spell: true, proj: 'gloom', dmg: 11, dur: 0.62, stam: 6, held: 'darkstaff', desc: 'A staff. Homing gloom orbs.' },
-    stats: [['Damage', 11], ['Shot', 'Homing'], ['Style', 'Staff']],
+    item: { id: 'darkstaff', icon: 'darkstaff', name: 'Gloomcore Staff', kind: 'ranged', style: 'staff', spell: true, proj: 'gloom', dmg: 22, dur: 0.62, stam: 6, held: 'darkstaff', desc: 'A staff. Homing gloom orbs.' },
+    stats: [['Damage', 22], ['Shot', 'Homing'], ['Style', 'Staff']],
   },
   {
-    id: 'darkhelm', type: 'armor', slot: 'helm', name: 'Duskscale Helm', monster: 'darksycledragon', set: 'darksyceset', def: 1,
+    id: 'darkhelm', type: 'armor', slot: 'helm', name: 'Duskscale Helm', monster: 'darksycledragon', set: 'darksyceset', def: 2,
     desc: 'A sleek dragon-skull helm with two sickle horns sweeping back and a glowing magenta visor.',
     recipe: { duskscale: 3, scythehorn: 2 },
   },
   {
-    id: 'darkchest', type: 'armor', slot: 'chest', name: 'Duskscale Cuirass', monster: 'darksycledragon', set: 'darksyceset', def: 3,
+    id: 'darkchest', type: 'armor', slot: 'chest', name: 'Duskscale Cuirass', monster: 'darksycledragon', set: 'darksyceset', def: 6,
     desc: 'Indigo scale plate with a gloom core burning at the sternum and blade fins down the spine.',
     recipe: { duskscale: 8, gloommembrane: 3, gloomcore: 1 },
   },
   {
-    id: 'darkarms', type: 'armor', slot: 'arms', name: 'Duskscale Gauntlets', monster: 'darksycledragon', set: 'darksyceset', def: 1,
+    id: 'darkarms', type: 'armor', slot: 'arms', name: 'Duskscale Gauntlets', monster: 'darksycledragon', set: 'darksyceset', def: 2,
     desc: 'Rune-lit vambraces under a pauldron that carries a curved scythe blade.',
     recipe: { duskscale: 4, duskclaw: 2, scythehorn: 1 },
   },
   {
-    id: 'darklegs', type: 'armor', slot: 'legs', name: 'Duskscale Greaves', monster: 'darksycledragon', set: 'darksyceset', def: 2,
+    id: 'darklegs', type: 'armor', slot: 'legs', name: 'Duskscale Greaves', monster: 'darksycledragon', set: 'darksyceset', def: 4,
     desc: 'Lean scale greaves with a glowing knee rune and a silver knee blade.',
     recipe: { duskscale: 5, gloommembrane: 2 },
   },
   {
-    id: 'darkboots', type: 'armor', slot: 'boots', name: 'Duskscale Boots', monster: 'darksycledragon', set: 'darksyceset', def: 1,
+    id: 'darkboots', type: 'armor', slot: 'boots', name: 'Duskscale Boots', monster: 'darksycledragon', set: 'darksyceset', def: 2,
     desc: 'Talon-toed boots with a violet glow line along the sole. They make no sound at all.',
     recipe: { duskscale: 3, duskclaw: 2 },
   },
@@ -278,14 +278,14 @@ GEAR.push(
   weapon('budgeshortbow', 'shortbow', 'Scalebound Shortbow', 'budgedragon', 'A compact hide-and-claw bow made for fast, close shooting.', { budgehide: 2, budgefang: 1, budgeclaw: 1 }, R('shortbow', 9, 0.34, 5, 'A short bow. Quick draws.')),
   weapon('budgecrossbow', 'crossbow', 'Hornlock Crossbow', 'budgedragon', 'A scale-plated stock, a horn prod and a claw trigger. It lands a bolt like a thrown anvil.', { budgehorn: 1, budgescale: 3, budgehide: 2, budgeclaw: 1 }, R('crossbow', 14, 0.66, 8, 'A crossbow. Slow and heavy.')),
 
-  weapon('darksword', 'onesword', 'Duskblade Saber', 'darksycledragon', 'A swept saber of scythe horn with a violet rune burning along the spine and wing-shaped guards.', { scythehorn: 2, duskscale: 2, duskclaw: 1 }, M('swordshield', 16, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Curved dusk steel.')),
-  weapon('darkgreatsword', 'twosword', 'Gloomreaver Greatsword', 'darksycledragon', 'A sickle-curved greatsword with a glowing notch where the blade begins to bend.', { scythehorn: 4, duskscale: 3, gloommembrane: 1 }, M('twohand', 24, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A curved greatsword of dusk.')),
-  weapon('darkdual', 'dual', 'Twin Crescents', 'darksycledragon', 'Two hooked crescent blades that sing as they cut. Their edges drink the light.', { scythehorn: 3, duskscale: 1, duskclaw: 2 }, M('dual', 11, 2.3, 1.9, 0.27, 0.11, 6, 3, 'Dual swords. Hooked crescent blades.')),
-  weapon('darkhammer', 'hammer', 'Duskbreaker War Hammer', 'darksycledragon', 'A dusk-scale head with a blade spike on both faces and a gloom core humming at its centre.', { scythehorn: 1, duskscale: 5, gloomcore: 1 }, M('twohand', 27, 2.6, 2.4, 0.76, 0.36, 17, 11, 'Two-handed. Shatters armor and bone.')),
-  weapon('darkspear', 'spear', 'Scytheleaf Spear', 'darksycledragon', 'A double-bladed horn head with a trailing membrane pennant. It strikes before the target sees it.', { scythehorn: 2, duskscale: 2, gloommembrane: 1, duskclaw: 1 }, M('twohand', 18, 3.5, 1.0, 0.44, 0.19, 10, 4, 'Two-handed. Longest reach of any blade.')),
-  weapon('darkwand', 'wand', 'Gloomshard Wand', 'darksycledragon', 'A scale-wrapped grip holding a shard of gloom core that spits violet orbs.', { gloomcore: 1, duskclaw: 1, gloommembrane: 1 }, R('wand', 9, 0.32, 4, 'A wand. Rapid gloom orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' })),
-  weapon('darkshortbow', 'shortbow', 'Crescent Shortbow', 'darksycledragon', 'A compact horn bow that throws small piercing crescents in quick succession.', { gloommembrane: 2, duskclaw: 1, duskscale: 1 }, R('shortbow', 10, 0.36, 5, 'A short bow. Piercing crescents.', { proj: 'crescent', shotLabel: 'Piercing' })),
-  weapon('darkcrossbow', 'crossbow', 'Gloomlock Crossbow', 'darksycledragon', 'Blade-tipped prod arms, a dusk-scale stock and a rune that lights the bolt as it leaves.', { scythehorn: 1, duskscale: 3, gloommembrane: 2, duskclaw: 1 }, R('crossbow', 16, 0.64, 8, 'A crossbow. Rune-lit bolts.')),
+  weapon('darksword', 'onesword', 'Duskblade Saber', 'darksycledragon', 'A swept saber of scythe horn with a violet rune burning along the spine and wing-shaped guards.', { scythehorn: 2, duskscale: 2, duskclaw: 1 }, M('swordshield', 32, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Curved dusk steel.')),
+  weapon('darkgreatsword', 'twosword', 'Gloomreaver Greatsword', 'darksycledragon', 'A sickle-curved greatsword with a glowing notch where the blade begins to bend.', { scythehorn: 4, duskscale: 3, gloommembrane: 1 }, M('twohand', 48, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A curved greatsword of dusk.')),
+  weapon('darkdual', 'dual', 'Twin Crescents', 'darksycledragon', 'Two hooked crescent blades that sing as they cut. Their edges drink the light.', { scythehorn: 3, duskscale: 1, duskclaw: 2 }, M('dual', 22, 2.3, 1.9, 0.27, 0.11, 6, 3, 'Dual swords. Hooked crescent blades.')),
+  weapon('darkhammer', 'hammer', 'Duskbreaker War Hammer', 'darksycledragon', 'A dusk-scale head with a blade spike on both faces and a gloom core humming at its centre.', { scythehorn: 1, duskscale: 5, gloomcore: 1 }, M('twohand', 54, 2.6, 2.4, 0.76, 0.36, 17, 11, 'Two-handed. Shatters armor and bone.')),
+  weapon('darkspear', 'spear', 'Scytheleaf Spear', 'darksycledragon', 'A double-bladed horn head with a trailing membrane pennant. It strikes before the target sees it.', { scythehorn: 2, duskscale: 2, gloommembrane: 1, duskclaw: 1 }, M('twohand', 36, 3.5, 1.0, 0.44, 0.19, 10, 4, 'Two-handed. Longest reach of any blade.')),
+  weapon('darkwand', 'wand', 'Gloomshard Wand', 'darksycledragon', 'A scale-wrapped grip holding a shard of gloom core that spits violet orbs.', { gloomcore: 1, duskclaw: 1, gloommembrane: 1 }, R('wand', 18, 0.32, 4, 'A wand. Rapid gloom orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' })),
+  weapon('darkshortbow', 'shortbow', 'Crescent Shortbow', 'darksycledragon', 'A compact horn bow that throws small piercing crescents in quick succession.', { gloommembrane: 2, duskclaw: 1, duskscale: 1 }, R('shortbow', 20, 0.36, 5, 'A short bow. Piercing crescents.', { proj: 'crescent', shotLabel: 'Piercing' })),
+  weapon('darkcrossbow', 'crossbow', 'Gloomlock Crossbow', 'darksycledragon', 'Blade-tipped prod arms, a dusk-scale stock and a rune that lights the bolt as it leaves.', { scythehorn: 1, duskscale: 3, gloommembrane: 2, duskclaw: 1 }, R('crossbow', 32, 0.64, 8, 'A crossbow. Rune-lit bolts.')),
 
   weapon('yetisword', 'onesword', 'Frostfang Saber', 'snowyeti', 'A curved saber of yeti fang, rimed white along the spine, with a claw-hooked guard and a fur-wrapped grip.', { yetifang: 3, rimefur: 2, glacierclaw: 1 }, M('swordshield', 19, 2.6, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. Frostbitten fang steel.')),
   weapon('yetigreatsword', 'twosword', 'Glacierfall Greatsword', 'snowyeti', 'A slab of blue ice-steel with a serrated fang edge and a pair of claw quillons. It leaves a trail of frost.', { yetifang: 4, frostshard: 2, rimefur: 3, yetihide: 1 }, M('twohand', 27, 3.0, 2.6, 0.6, 0.27, 14, 9, 'Two-handed. A glacier of a blade.')),
@@ -311,7 +311,7 @@ function armorSet(monster, set, defs) {
 
 GEAR.push(
   { id: 'budgeshield', type: 'armor', slot: 'shield', name: 'Budgescale Shield', monster: BUDGE_ARMOR, set: 'budgeset', def: 2, desc: 'A scale-faced kite shield with a horn boss and a gold-banded rim.', recipe: { budgescale: 5, budgehorn: 1, budgehide: 1 } },
-  { id: 'darkshield', type: 'armor', slot: 'shield', name: 'Duskscale Shield', monster: DARK_ARMOR, set: 'darksyceset', def: 2, desc: 'An indigo scale shield with a gloom gem and a silver blade fin on each side.', recipe: { duskscale: 5, scythehorn: 1, gloommembrane: 1 } },
+  { id: 'darkshield', type: 'armor', slot: 'shield', name: 'Duskscale Shield', monster: DARK_ARMOR, set: 'darksyceset', def: 4, desc: 'An indigo scale shield with a gloom gem and a silver blade fin on each side.', recipe: { duskscale: 5, scythehorn: 1, gloommembrane: 1 } },
   { id: 'yetishield', type: 'armor', slot: 'shield', name: 'Glacierplate Shield', monster: YETI_ARMOR, set: 'yetiset', def: 3, desc: 'A slab of frost-shard plate in a rime-fur rim, with a frostheart blue boss and a claw fin on each side.', recipe: { frostshard: 4, rimefur: 3, frostheart: 1 } },
 );
 
@@ -331,19 +331,19 @@ armorSet(BUDGE_ARMOR, 'budgecloth', [
   ['book', 'budgebook', 'Budgefang Grimoire', 0, 'A scale-bound spellbook with a fang clasp. Its pages smell of smoke.', { budgemembrane: 2, budgehorn: 1, budgefang: 1, budgehide: 1 }, { mana: 12, spell: 0.04 }],
 ]);
 armorSet(DARK_ARMOR, 'darkleather', [
-  ['helm', 'darkleatherhelm', 'Duskhide Cowl', 1, 'A close-fitting indigo cowl with a swept violet fin.', { duskhide: 3, duskclaw: 1 }],
-  ['chest', 'darkleatherchest', 'Duskhide Jerkin', 2, 'Indigo hide with violet lacing and a scale collar. Quiet as a shadow.', { duskhide: 6, duskscale: 3 }],
-  ['arms', 'darkleathergloves', 'Duskhide Gloves', 1, 'Dark hide gloves with silver talon-bone bracers.', { duskhide: 2, duskclaw: 1 }],
-  ['legs', 'darkleatherlegs', 'Duskhide Leggings', 1, 'Fitted dark leggings with violet-stitched straps and scale knee patches.', { duskhide: 4, duskscale: 2 }],
-  ['boots', 'darkleatherboots', 'Duskhide Boots', 1, 'Soft-soled boots with a silver talon toe cap.', { duskhide: 2, duskclaw: 1 }],
+  ['helm', 'darkleatherhelm', 'Duskhide Cowl', 2, 'A close-fitting indigo cowl with a swept violet fin.', { duskhide: 3, duskclaw: 1 }],
+  ['chest', 'darkleatherchest', 'Duskhide Jerkin', 4, 'Indigo hide with violet lacing and a scale collar. Quiet as a shadow.', { duskhide: 6, duskscale: 3 }],
+  ['arms', 'darkleathergloves', 'Duskhide Gloves', 2, 'Dark hide gloves with silver talon-bone bracers.', { duskhide: 2, duskclaw: 1 }],
+  ['legs', 'darkleatherlegs', 'Duskhide Leggings', 2, 'Fitted dark leggings with violet-stitched straps and scale knee patches.', { duskhide: 4, duskscale: 2 }],
+  ['boots', 'darkleatherboots', 'Duskhide Boots', 2, 'Soft-soled boots with a silver talon toe cap.', { duskhide: 2, duskclaw: 1 }],
 ]);
 armorSet(DARK_ARMOR, 'darkcloth', [
-  ['helm', 'darkclothhood', 'Gloomweave Hood', 1, 'A deep violet hood with a glowing brow gem and a trailing point.', { gloommembrane: 2, duskhide: 1 }],
-  ['chest', 'darkclothrobe', 'Gloomweave Robe', 2, 'Dusk-silk robes with a gloom core clasp and glowing hem stitching.', { gloommembrane: 5, duskhide: 2, gloomcore: 1 }],
+  ['helm', 'darkclothhood', 'Gloomweave Hood', 2, 'A deep violet hood with a glowing brow gem and a trailing point.', { gloommembrane: 2, duskhide: 1 }],
+  ['chest', 'darkclothrobe', 'Gloomweave Robe', 4, 'Dusk-silk robes with a gloom core clasp and glowing hem stitching.', { gloommembrane: 5, duskhide: 2, gloomcore: 1 }],
   ['arms', 'darkclothgloves', 'Gloomweave Gloves', 0, 'Violet silk gloves under flared cuffs with glowing thread.', { gloommembrane: 2, duskclaw: 1 }],
-  ['legs', 'darkclothlegs', 'Gloomweave Trousers', 1, 'Dusk-silk trousers with a violet sash at each knee.', { gloommembrane: 3, duskhide: 1 }],
+  ['legs', 'darkclothlegs', 'Gloomweave Trousers', 2, 'Dusk-silk trousers with a violet sash at each knee.', { gloommembrane: 3, duskhide: 1 }],
   ['boots', 'darkclothboots', 'Gloomweave Slippers', 0, 'Silent silk slippers that glow faintly at the heel.', { gloommembrane: 2, duskhide: 1 }],
-  ['book', 'darkbook', 'Gloomcore Grimoire', 0, 'A membrane-bound tome that hums with a caged gloom core.', { gloomcore: 1, gloommembrane: 2, scythehorn: 1, duskhide: 1 }, { mana: 20, spell: 0.06 }],
+  ['book', 'darkbook', 'Gloomcore Grimoire', 0, 'A membrane-bound tome that hums with a caged gloom core.', { gloomcore: 1, gloommembrane: 2, scythehorn: 1, duskhide: 1 }, { mana: 40, spell: 0.12 }],
 ]);
 
 armorSet(YETI_ARMOR, 'yetiset', [
@@ -487,9 +487,9 @@ export const SETS = [
   set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 4 }, 'Full set: +4 max health (2 hearts).'),
   set('budgeleather', 'Budgehide Leathers', BUDGE_ARMOR, 'leather', 'Ranger', { stamina: 20, ranged: 0.06 }, 'Full set: +20 max stamina and +6% ranged damage.'),
   set('budgecloth', 'Emberweave Robes', BUDGE_ARMOR, 'cloth', 'Mage', { mana: 20, spell: 0.06 }, 'Full set: +20 max mana and +6% spell damage.'),
-  set('darksyceset', 'Duskscale Plate', DARK_ARMOR, 'metal', 'Warrior', { hp: 2, mana: 20 }, 'Full set: +2 max health (1 heart) and +20 max mana.'),
-  set('darkleather', 'Duskhide Leathers', DARK_ARMOR, 'leather', 'Ranger', { stamina: 20, crit: 0.04 }, 'Full set: +20 max stamina and +4% critical chance.'),
-  set('darkcloth', 'Gloomweave Robes', DARK_ARMOR, 'cloth', 'Mage', { mana: 30, spell: 0.08 }, 'Full set: +30 max mana and +8% spell damage.'),
+  set('darksyceset', 'Duskscale Plate', DARK_ARMOR, 'metal', 'Warrior', { hp: 4, mana: 40 }, 'Full set: +4 max health (2 hearts) and +40 max mana.'),
+  set('darkleather', 'Duskhide Leathers', DARK_ARMOR, 'leather', 'Ranger', { stamina: 40, crit: 0.08 }, 'Full set: +40 max stamina and +8% critical chance.'),
+  set('darkcloth', 'Gloomweave Robes', DARK_ARMOR, 'cloth', 'Mage', { mana: 60, spell: 0.16 }, 'Full set: +60 max mana and +16% spell damage.'),
   set('yetiset', 'Glacierplate', YETI_ARMOR, 'metal', 'Warrior', { hp: 4, stamina: 10 }, 'Full set: +4 max health (2 hearts) and +10 max stamina.'),
   set('yetileather', 'Rimehide Leathers', YETI_ARMOR, 'leather', 'Ranger', { stamina: 30, ranged: 0.08 }, 'Full set: +30 max stamina and +8% ranged damage.'),
   set('yeticloth', 'Frostweave Robes', YETI_ARMOR, 'cloth', 'Mage', { mana: 36, spell: 0.1 }, 'Full set: +36 max mana and +10% spell damage.'),
