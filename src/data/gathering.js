@@ -22,7 +22,7 @@ export function levelForXp(xp) {
   return lvl;
 }
 
-export const SKILL_ORDER = ['strength', 'agility', 'stamina', 'mining', 'fishing', 'woodcutting', 'firemaking'];
+export const SKILL_ORDER = ['strength', 'agility', 'stamina', 'mining', 'fishing', 'cooking', 'woodcutting', 'firemaking'];
 
 export const LEVEL_SKILLS = {
   strength: {
@@ -84,11 +84,10 @@ export const LEVEL_SKILLS = {
     id: 'fishing',
     name: 'Fishing',
     color: '#4ec8ff',
-    blurb: 'Fish Mirrormere from the dock and work the Silverrun river with a net or pole. Ice holes on the Glimmerfrost lake give up pike and sturgeon, and the long pirate dock on the jungle coast gives up tuna, stingray and tiger shark. Cook a catch on a campfire for more healing. Higher Fishing burns less, and lower-level fish burn least, though a little chance always remains.',
+    blurb: 'Fish Mirrormere from the dock and work the Silverrun river with a net or pole. Ice holes on the Glimmerfrost lake give up pike and sturgeon, and the long pirate dock on the jungle coast gives up tuna, stingray and tiger shark. Cook a catch on a campfire for Cooking experience and a stronger meal.',
     effect: (lvl) => `${Math.round(fishChance(FISH.shrimp, lvl) * 100)}% shrimp catch chance`,
     unlocks: [
       [1, 'Shrimp (small net)'],
-      [1, 'Cook fish on a fire'],
       [3, 'Trout (fishing pole)'],
       [8, 'Pike minnow (small net, river)'],
       [12, 'Salmon (fishing pole, river)'],
@@ -99,6 +98,19 @@ export const LEVEL_SKILLS = {
       [30, 'Sturgeon (ice fishing hole)'],
       [34, 'Tiger shark (fishing pole, pirate dock)'],
       [30, 'Keener line work'],
+    ],
+  },
+  cooking: {
+    id: 'cooking',
+    name: 'Cooking',
+    color: '#f0a04a',
+    blurb: 'Cook a raw catch on a campfire. A cooked fish heals more than it did raw. Higher Cooking burns less and finishes sooner. Lower-level fish burn least, though a little chance always remains.',
+    effect: (lvl) => `${Math.round(burnChance(FISH.shrimp, lvl) * 100)}% chance to burn a shrimp`,
+    unlocks: [
+      [1, 'Cook any catch on a fire'],
+      [10, 'Quicker cooking'],
+      [25, 'Fewer burnt fish'],
+      [50, 'A steady hand at the fire'],
     ],
   },
   woodcutting: {
@@ -397,12 +409,12 @@ export function mineSwingTime(level) {
 }
 
 /**
- * Chance one fish burns on the fire. It is highest when Fishing is at or under
- * the fish's own level, and it falls by 1.1% for every Fishing level above that.
+ * Chance one fish burns on the fire. It is highest when Cooking is at or under
+ * the fish's own level, and it falls by 1.1% for every Cooking level above that.
  * It never drops under 4%, so there is always a chance to burn.
  */
-export function burnChance(fish, fishingLevel) {
-  const gap = fishingLevel - fish.level;
+export function burnChance(fish, cookingLevel) {
+  const gap = cookingLevel - fish.level;
   return Math.max(0.04, Math.min(0.7, 0.5 - gap * 0.011));
 }
 

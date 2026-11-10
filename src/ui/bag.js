@@ -189,7 +189,7 @@ function collect(game) {
     let run = null;
     if (fish) {
       const cooked = GOODS[fish.cooked];
-      const burn = Math.round(burnChance(fish, game.progress.level('fishing')) * 100);
+      const burn = Math.round(burnChance(fish, game.progress.level('cooking')) * 100);
       sub = `Eat for ${g.heal} health. Cook on a fire for ${cooked.heal} health, with a ${burn}% chance to burn. You have ${n}.`;
       actions = [
         { label: 'Eat', run: (paint) => { if (game.eatGood(id)) paint(); } },

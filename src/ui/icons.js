@@ -964,6 +964,30 @@ ART.woodcutting = draw((p, line) => {
   line(5, 7, 5, 14, 'b');
 });
 
+ART.cooking = draw((p, line) => {
+  line(1, 8, 5, 8, 'B');
+  line(1, 9, 5, 9, 'b');
+  line(5, 6, 14, 6, 's');
+  line(5, 11, 14, 11, 'S');
+  line(5, 6, 5, 11, 's');
+  line(14, 6, 14, 11, 'S');
+  for (let y = 7; y <= 10; y++) for (let x = 6; x <= 13; x++) p(x, y, 'G');
+  line(7, 8, 12, 8, 'o');
+  line(7, 9, 12, 9, 'O');
+  p(12, 8, 'y');
+  p(8, 2, 'h');
+  p(9, 2, 'w');
+  p(10, 2, 'h');
+  p(7, 3, 'y');
+  p(8, 3, 'o');
+  p(9, 3, 'h');
+  p(10, 3, 'y');
+  p(11, 3, 'o');
+  p(8, 4, 'O');
+  p(9, 4, 'y');
+  p(10, 4, 'O');
+});
+
 ART.firemaking = draw((p, line) => {
   line(2, 13, 13, 10, 'B');
   line(2, 14, 13, 11, 'b');

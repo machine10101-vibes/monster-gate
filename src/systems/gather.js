@@ -267,7 +267,7 @@ export class Gathering {
       else if (s.kind === 'light') what = `Lighting ${GOODS[s.log].name.toLowerCase()}`;
       else if (s.kind === 'cook') {
         what = `Cooking ${s.fish.name.toLowerCase()}`;
-        if (s.ready) note = `${Math.round(burnChance(s.fish, g.progress.level('fishing')) * 100)}% chance to burn · move to stop`;
+        if (s.ready) note = `${Math.round(burnChance(s.fish, g.progress.level('cooking')) * 100)}% chance to burn · move to stop`;
         else note = 'Walking to the fire…';
       } else what = s.node.catches.length > 1 ? 'Ice fishing' : s.kind === 'net' ? `Netting ${s.fish.name.toLowerCase()}` : `Fishing for ${s.fish.name.toLowerCase()}`;
       g.hud.plate('gather', `${what}<small>${note}</small>`);
@@ -298,7 +298,7 @@ export class Gathering {
         s.prevU = 0;
       } else return;
     }
-    const skill = s.kind === 'mine' ? 'mining' : s.kind === 'chop' ? 'woodcutting' : s.kind === 'light' ? 'firemaking' : 'fishing';
+    const skill = s.kind === 'mine' ? 'mining' : s.kind === 'chop' ? 'woodcutting' : s.kind === 'light' ? 'firemaking' : s.kind === 'cook' ? 'cooking' : 'fishing';
     const lvl = g.progress.level(skill);
     if (s.kind === 'mine') this.runMine(s, dt, lvl);
     else if (s.kind === 'chop') this.runChop(s, dt, lvl);
@@ -737,7 +737,7 @@ export class Gathering {
       g.audio.noise(0.16, 0.12, 500, 0.7);
       g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0x2a2a2a, 0x6a6a6a, 0xffe0b0], 10, 1.8, 0.07, 0.6, 2, 1.4);
     } else {
-      this.train('fishing', fish.cookXp, true);
+      this.train('cooking', fish.cookXp, true);
       g.hud.toast(`You cook the ${fish.name.toLowerCase()}.`, 1600);
       g.audio.tone(520, 0.08, 'triangle', 0.08, 240);
       g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0xfff2a0, 0xff8a22, 0xffe0b0], 10, 1.8, 0.06, 0.6, 2, 1.4);
