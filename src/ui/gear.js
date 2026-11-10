@@ -56,7 +56,7 @@ export function mountGear(body, game) {
     return gearById(slot === 'weapon' ? d.weapon : d.armor[slot]);
   };
   const ownedFor = (slot) =>
-    GEAR.filter((g) => game.progress.crafted(g.id) && (slot === 'weapon' ? g.type === 'weapon' : g.type === 'armor' && g.slot === slot));
+    GEAR.filter((g) => game.progress.crafted(g.id) && !game.progress.storedGear(g.id) && (slot === 'weapon' ? g.type === 'weapon' : g.type === 'armor' && g.slot === slot));
 
   const paint = () => {
     game.catalog.stopViewer();

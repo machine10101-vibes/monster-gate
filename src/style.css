@@ -2443,6 +2443,121 @@ body.touch .how {
   border-radius: 4px;
 }
 .bag-gold { margin: 0 0 8px; color: #ffe27a; font-family: var(--font-px); font-size: 11px; }
+.stash-help { margin: 0 0 10px; color: #c9c3b4; font-size: 13px; }
+.stash-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+.stash-count { margin: 0 0 8px; color: #ffe7a0; font-family: var(--font-px); font-size: 10px; }
+.stash-slots {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.stash-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 2px;
+  background: #1b1e24;
+  border: 2px solid #6a5a32;
+  border-radius: 6px;
+}
+.stash-slot canvas { width: 100%; height: 100%; }
+.stash-slot i {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-style: normal;
+  font-family: var(--font-px);
+  font-size: 8px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+.stash-slot.empty {
+  border-style: dashed;
+  border-color: #3b3f4a;
+  background: #14161a;
+}
+.stash-slot.sel { border-color: #ffd23f; box-shadow: 0 0 0 1px #ffd23f; }
+.stash-bag .bag-acts, .stash-hold .bag-acts { margin-top: 8px; }
+body.touch .stash-bag .bag-cell,
+body.touch .stash-slot {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+body.touch .stash-bag .bag-cell.holding,
+body.touch .stash-slot.holding {
+  border-color: #ffd23f;
+  box-shadow: 0 0 0 1px #ffd23f;
+}
+.stash-ask-back {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.stash-ask {
+  position: fixed;
+  width: min(260px, calc(100vw - 16px));
+  padding: 12px 12px 10px;
+  background: linear-gradient(#24262d, #14161b);
+  border: 2px solid #e2b84a;
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px #0a0b0d, 0 14px 32px rgba(0, 0, 0, 0.7);
+}
+.stash-ask b {
+  display: block;
+  margin: 0 28px 6px 0;
+  color: #ffe7a0;
+  font-family: var(--font-px);
+  font-size: 10px;
+}
+.stash-ask p { margin: 0 0 8px; color: #c9c3b4; font-size: 13px; }
+.stash-ask-row, .stash-ask-custom { display: flex; gap: 6px; }
+.stash-ask-custom { margin-top: 6px; }
+.stash-ask-row button,
+.stash-ask-custom button {
+  flex: 1;
+  min-height: 44px;
+  font-family: var(--font-px);
+  font-size: 9px;
+  color: #1a1408;
+  background: linear-gradient(#ffe7a0, #e2b84a);
+  border: 2px solid #fff1b8;
+  border-radius: 4px;
+}
+.stash-ask input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 16px;
+  color: #fff;
+  background: #0e1014;
+  border: 2px solid #6a5a32;
+  border-radius: 4px;
+}
+.stash-ask-x {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 36px;
+  min-height: 36px;
+  color: #ffe7a0;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+}
+@media (max-width: 720px) {
+  .stash-cols { grid-template-columns: 1fr; }
+  .stash-slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
 .bag section { margin-bottom: 14px; }
 .bag-cell { min-height: 72px; justify-content: center; }
 .bag-cell.sel { border-color: #ffd23f; box-shadow: 0 0 0 1px #ffd23f; }

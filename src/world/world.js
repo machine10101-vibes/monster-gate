@@ -13,6 +13,7 @@ import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
 import { buildJungleModels } from './jungleModels.js';
+import { buildStorageCrate as makeStorageCrate } from './storageCrate.js';
 import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
@@ -610,6 +611,7 @@ export class World {
     this.circle(63.4, 86.1, 0.42);
     this.lightSpots.push({ x: FX + 0.7, y: fy + 0.9, z: FZ, color: 0xff7a22 });
     this.forge = { x: FX, y: fy, z: FZ, anvil: { x: 63.4, z: 86.1 } };
+    this.buildStorageCrate();
 
     this.npcSpots = {
       guild: { x: GUILD.x - 1.4, z: GUILD.z + 3.5 },
@@ -618,6 +620,40 @@ export class World {
       farmer: { x: 90, z: 82 },
       child: { x: 72, z: 80.5 },
     };
+  }
+
+  buildStorageCrate() {
+    const kit = makeStorageCrate(7);
+    const x = 67.4;
+    const z = 74.2;
+    const y = this.heightAt(x, z);
+    const g = new THREE.Group();
+    g.name = 'storage-crate';
+    g.position.set(x, y, z);
+    g.rotation.y = Math.PI / 2;
+    const add = (parts, parent) => {
+      for (const p of parts) {
+        const mat = p.kind === 'solid' ? this.mats.solid : p.kind === 'glow' ? this.mats.glow : this.mats.window;
+        const mesh = new THREE.Mesh(p.geo, mat);
+        mesh.castShadow = p.kind === 'solid';
+        mesh.receiveShadow = p.kind === 'solid';
+        parent.add(mesh);
+      }
+    };
+    add(kit.body, g);
+    const lid = new THREE.Group();
+    lid.position.set(kit.hinge.x, kit.hinge.y, kit.hinge.z);
+    add(kit.lid, lid);
+    g.add(lid);
+    const flag = new THREE.Group();
+    flag.position.set(kit.flagAt.x, kit.flagAt.y, kit.flagAt.z);
+    add(kit.flag, flag);
+    lid.add(flag);
+    this.group.add(g);
+    this.box(x, z, 1.15, 1.35);
+    this.occupy(x, z, 1.6);
+    this.lightSpots.push({ x: x + 1.15, y: y + 1.15, z, color: 0xffc866 });
+    this.storage = { x, y, z, group: g, lid, flag, open: false };
   }
 
   buildGate() {
@@ -1089,6 +1125,10 @@ export class World {
       octx.fillStyle = '#7a5230';
       octx.fillRect(Math.floor(this.dock.x0), Math.floor(this.dock.z - this.dock.hw), Math.ceil(this.dock.x1 - this.dock.x0), 2);
     }
+    if (this.storage) {
+      octx.fillStyle = '#3f7d79';
+      octx.fillRect(Math.floor(this.storage.x) - 2, Math.floor(this.storage.z) - 2, 5, 4);
+    }
     octx.fillStyle = '#6b4a2b';
     for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
       octx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);
@@ -1112,6 +1152,12 @@ export class World {
 
   update(dt, t) {
     if (this.windmillSails) this.windmillSails.rotation.z += dt * 0.5;
+    const crate = this.storage;
+    if (crate) {
+      const target = crate.open ? -1.12 : 0;
+      crate.lid.rotation.x += (target - crate.lid.rotation.x) * Math.min(1, dt * 5);
+      crate.flag.rotation.y = Math.PI / 2 + Math.sin(t * 1.7) * 0.45;
+    }
     this.waterMat.uniforms.uTime.value = t;
     this.portalMat.uniforms.uTime.value = t;
     this.haloMat.uniforms.uTime.value = t;

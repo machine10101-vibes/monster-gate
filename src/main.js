@@ -1127,6 +1127,10 @@ class Game {
   wearPiece(id) {
     const g = gearById(id);
     if (!g || !this.progress.crafted(id)) return false;
+    if (this.progress.storedGear(id)) {
+      this.hud.toast('That is in the storage crate', 1400);
+      return false;
+    }
     const was = this.progress.worn(id);
     this.progress.toggleWear(id);
     this.applyGear();
@@ -1728,6 +1732,16 @@ class Game {
     const npcNear = this.ambient.npcs.find((n) => n.near);
     const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
     if (!this.talkNpc && this.gather.interact()) return;
+    const crate = this.world.storage;
+    const sd = crate ? Math.hypot(p.x - crate.x, p.z - crate.z) : 99;
+    const closerThanShops = () => {
+      const shop = (spot) => (spot ? Math.hypot(p.x - spot.x, p.z - spot.z) : 99);
+      return sd <= shop(this.world.market) && sd <= shop(this.world.alchemy) && sd <= shop(this.world.forge) && sd <= wd;
+    };
+    if (!this.talkNpc && this.storageNear && !npcNear && closerThanShops()) {
+      this.openStorage();
+      return;
+    }
     if (!this.talkNpc && this.marketNear && !npcNear) {
       this.openMarket();
       return;
@@ -1891,6 +1905,138 @@ class Game {
     } else this.hud.removePlate('market');
   }
 
+  openStorage() {
+    this.hud.openPanel('storage', this);
+    this.hud.panelId = 'storage';
+    this.audio.select();
+    const c = this.world.storage;
+    if (c) {
+      c.open = true;
+      this.fx.burst(c.x, c.y + 1.2, c.z, [0x3f7d79, 0xe6b73c, 0xfff3c4], 12, 1.6, 0.07, 0.7, 2, 1.4);
+    }
+  }
+
+  updateStorage() {
+    const c = this.world.storage;
+    if (!c) return;
+    const P = this.player.pos;
+    const d = Math.hypot(P.x - c.x, P.z - c.z);
+    this.storageNear = d < 3.6 && this.started;
+    if (this.storageNear && !this.storageHinted) {
+      this.storageHinted = true;
+      this.hud.toast('Storage Crate — press F, or click it, to store items', 2600);
+    }
+    if (this.storageNear) {
+      const [sx, sy, vis] = this.screenOf(c.x, c.y + 2.2, c.z, true);
+      this.hud.plate('storage', 'Storage Crate<small>F · store items</small>');
+      this.hud.placePlate('storage', sx, sy, vis);
+    } else this.hud.removePlate('storage');
+    const showing = this.hud.panelId === 'storage' && this.hud.panelOpen;
+    c.open = showing && d < 4.8;
+    if (showing && d > 4.8) this.hud.closePanel();
+  }
+
+  clickStorage() {
+    const c = this.world.storage;
+    const aim = this.input.aim;
+    if (!c || !this.started || !aim.has || this.input.touch) return false;
+    const P = this.player.pos;
+    if (Math.hypot(P.x - c.x, P.z - c.z) > 4.2) return false;
+    const hits = this.ray.intersectObject(c.group, true);
+    if (!hits.length) return false;
+    this.openStorage();
+    return true;
+  }
+
+  storeInCrate(k, id, n) {
+    n = n | 0;
+    if (n < 1) return false;
+    const pr = this.progress;
+    if (k === 'gear' && pr.storedGear(id)) {
+      this.hud.toast('That is already in the crate', 1400);
+      return false;
+    }
+    if (!pr.canFitStorage(k, id)) {
+      this.hud.toast('The crate is full', 1400);
+      return false;
+    }
+    const refund = () => {
+      if (k === 'good') pr.addGood(id, n);
+      else if (k === 'part') {
+        pr.data.materials[id] = pr.count(id) + n;
+        pr.save();
+      } else if (k === 'potion') {
+        const it = this.items.find((i) => i.id === id);
+        if (it) {
+          it.count += n;
+          pr.setStock(id, it.count);
+          this.itemsChanged();
+        }
+      }
+    };
+    if (k === 'good') {
+      if (!pr.takeGood(id, n)) return false;
+    } else if (k === 'part') {
+      if (pr.count(id) < n) return false;
+      pr.data.materials[id] = pr.count(id) - n;
+      pr.save();
+    } else if (k === 'gear') {
+      if (!pr.crafted(id)) return false;
+      const g = gearById(id);
+      if (pr.worn(id)) {
+        pr.toggleWear(id);
+        this.applyGear();
+        if (g?.type === 'weapon') this.selectSlot(0, true);
+      }
+    } else if (k === 'potion') {
+      const it = this.items.find((i) => i.id === id);
+      if (!it || it.count < n) return false;
+      it.count -= n;
+      pr.setStock(id, it.count);
+      this.itemsChanged();
+    } else return false;
+    if (!pr.putStorage(k, id, n)) {
+      refund();
+      this.hud.toast('The crate is full', 1400);
+      return false;
+    }
+    this.audio.select();
+    return true;
+  }
+
+  takeFromCrate(index, n) {
+    const pr = this.progress;
+    const s = pr.data.storage[index];
+    if (!s) return false;
+    let want = n == null ? s.n : Math.min(s.n, n | 0);
+    if (want < 1) return false;
+    if (s.k === 'potion') {
+      const it = this.items.find((i) => i.id === s.id);
+      const room = (POTION_SHOP[s.id]?.max ?? 99) - (it?.count | 0);
+      if (room < 1) {
+        this.hud.toast('Your belt is full of those', 1400);
+        return false;
+      }
+      want = Math.min(want, room);
+    }
+    const out = pr.pullStorage(index, want);
+    if (!out) return false;
+    if (out.k === 'good') pr.addGood(out.id, out.n);
+    else if (out.k === 'part') {
+      pr.data.materials[out.id] = pr.count(out.id) + out.n;
+      pr.save();
+    } else if (out.k === 'potion') {
+      const it = this.items.find((i) => i.id === out.id);
+      if (it) {
+        it.count += out.n;
+        pr.setStock(out.id, it.count);
+        this.itemsChanged();
+      }
+    }
+    this.audio.select();
+    return true;
+  }
+
   openForge() {
     this.hud.openPanel('forge', this);
     this.hud.panelId = 'forge';
@@ -1967,7 +2113,9 @@ class Game {
     if (inp.take('talk')) {
       if (!blocked) this.tryTalk();
     }
-    if (inp.take('attack') && !blocked) this.doAttack();
+    if (inp.take('attack') && !blocked) {
+      if (!this.clickStorage()) this.doAttack();
+    }
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
     if (inp.take('evade') && !blocked) this.doEvade();
@@ -2200,9 +2348,10 @@ class Game {
     this.updateForge(dt);
     this.updateAlchemy(dt);
     this.updateMarket();
+    this.updateStorage();
     updateGatherSites(this.world, dt, t, this);
     this.gather.update(dt);
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear || this.alchemyNear || this.marketNear || !!this.gather.near || this.gather.active;
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.forgeNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }

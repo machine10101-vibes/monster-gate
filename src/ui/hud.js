@@ -9,6 +9,7 @@ import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
 import { mountGear } from './gear.js';
 import { mountBag } from './bag.js';
+import { mountStorage } from './storage.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
 import { shortAddress } from '../wallet/klever.js';
@@ -341,7 +342,7 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world');
+    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'storage');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -401,6 +402,9 @@ export class HUD {
     } else if (name === 'bag') {
       title.textContent = 'Inventory';
       this.cleanup = mountBag(body, game);
+    } else if (name === 'storage') {
+      title.textContent = 'Storage Crate';
+      this.cleanup = mountStorage(body, game);
     } else if (name === 'gear') {
       title.textContent = 'Character';
       this.cleanup = mountGear(body, game);
