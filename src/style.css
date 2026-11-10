@@ -2492,6 +2492,16 @@ body.touch .how {
 .bag-detail canvas { width: 84px; height: 84px; background: #0e1210; border-radius: 8px; }
 .bag-detail b { font-size: 15px; }
 .bag-detail span, .bag-detail small { color: #b7c0b4; font-size: 13px; }
+.bag-stats { display: flex; flex-direction: column; width: 100%; margin-top: 2px; }
+.bag-stats div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid #2c322c;
+}
+.bag-stats b { font-size: 13px; color: #f4f0e2; text-align: right; }
+.bag-set { margin: 2px 0 0; color: #d7c48a; font-size: 12px; line-height: 1.35; }
 .bag-acts { display: flex; gap: 6px; margin-top: 4px; }
 .bag-act {
   margin-top: 0;
