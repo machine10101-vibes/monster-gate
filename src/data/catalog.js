@@ -21,21 +21,16 @@ export const MATERIALS = {
   yetifang: { name: 'Yeti Fang', desc: 'A cream-white fang with a rime of frost along the root.' },
   frostshard: { name: 'Frost Shard', desc: 'A spike of living ice from a yeti\'s back. It never melts.' },
   frostheart: { name: 'Frostheart', desc: 'A palm-sized crystal that beats once a minute, long after its owner is gone.' },
-  tigerpelt: { name: 'Tiger Pelt', desc: 'Orange fur banded in black. Heavy, warm and unmistakable.' },
-  tigerfang: { name: 'Tiger Fang', desc: 'A curved ivory fang as long as a finger.' },
-  tigerclaw: { name: 'Tiger Claw', desc: 'A hooked claw, still sharp enough to scratch steel.' },
-  raptorscale: { name: 'Raptor Scale', desc: 'Olive and tan scale in a mosaic pattern. Tougher than it looks.' },
-  raptorclaw: { name: 'Raptor Sickle Claw', desc: 'A curved killing claw from a raptor\'s foot.' },
-  raptorspike: { name: 'Raptor Back Spike', desc: 'A grey bone spike from the ridge of a battle raptor.' },
-  piratebandana: { name: 'Red Bandana', desc: 'A faded red bandana with a salt-stained knot.' },
-  brassbutton: { name: 'Gold Button', desc: 'A gold coat button stamped with an anchor.' },
-  cutlassscrap: { name: 'Cutlass Shard', desc: 'A chipped curved blade fragment. Good scrap iron.' },
-  cursedbone: { name: 'Cursed Bone', desc: 'A yellowed bone that is still cold from the grave.' },
-  cursedcoin: { name: 'Cursed Doubloon', desc: 'A tarnished doubloon. It is never quite where you left it.' },
-  tatteredsail: { name: 'Tattered Sailcloth', desc: 'Rotted canvas from a ghost ship.' },
+  tigerskin: { name: 'Tiger Skin', desc: 'Orange hide banded in black, with a white belly. Heavy, warm and unmistakable.' },
+  tigerclaw: { name: 'Tiger Claw', desc: 'A hooked claw as long as a finger, still sharp enough to scratch steel.' },
+  raptorskin: { name: 'Raptor Skin', desc: 'Olive and tan scaled hide in a mosaic pattern. Tougher than it looks.' },
+  raptorclaw: { name: 'Raptor Claw', desc: 'A curved sickle claw from a raptor\'s foot.' },
+  scimitar: { name: 'Pirate Scimitar', desc: 'A curved cutlass blade with a brass guard. Salt-stained but sharp.' },
+  pirategold: { name: 'Pirate Gold', desc: 'A fistful of doubloons and gold buttons. Spends the same on land.' },
+  piratebone: { name: 'Pirate Bones', desc: 'Yellowed bones from a pirate who never made port.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerpelt', 'tigerfang', 'tigerclaw', 'raptorscale', 'raptorclaw', 'raptorspike', 'piratebandana', 'brassbutton', 'cutlassscrap', 'cursedbone', 'cursedcoin', 'tatteredsail'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -64,24 +59,22 @@ export const DROPS = {
     { id: 'frostheart', chance: 0.25, qty: [1, 1], rate: 'Rare' },
   ],
   tiger: [
-    { id: 'tigerpelt', chance: 1, qty: [1, 2], rate: 'Common' },
-    { id: 'tigerfang', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
-    { id: 'tigerclaw', chance: 0.5, qty: [1, 3], rate: 'Uncommon' },
+    { id: 'tigerskin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'tigerclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
   ],
   raptor: [
-    { id: 'raptorscale', chance: 1, qty: [2, 3], rate: 'Common' },
-    { id: 'raptorclaw', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
-    { id: 'raptorspike', chance: 0.35, qty: [1, 2], rate: 'Rare' },
+    { id: 'raptorskin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'raptorclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
   ],
   pirate: [
-    { id: 'piratebandana', chance: 0.7, qty: [1, 1], rate: 'Common' },
-    { id: 'brassbutton', chance: 0.8, qty: [1, 3], rate: 'Common' },
-    { id: 'cutlassscrap', chance: 0.4, qty: [1, 1], rate: 'Uncommon' },
+    { id: 'scimitar', chance: 0.6, qty: [1, 1], rate: 'Common' },
+    { id: 'pirategold', chance: 0.9, qty: [1, 3], rate: 'Common' },
+    { id: 'piratebone', chance: 0.4, qty: [1, 2], rate: 'Uncommon' },
   ],
   cursedpirate: [
-    { id: 'cursedbone', chance: 1, qty: [1, 3], rate: 'Common' },
-    { id: 'tatteredsail', chance: 0.5, qty: [1, 2], rate: 'Common' },
-    { id: 'cursedcoin', chance: 0.3, qty: [1, 1], rate: 'Rare' },
+    { id: 'piratebone', chance: 1, qty: [2, 4], rate: 'Common' },
+    { id: 'pirategold', chance: 0.8, qty: [1, 3], rate: 'Common' },
+    { id: 'scimitar', chance: 0.45, qty: [1, 1], rate: 'Uncommon' },
   ],
 };
 
