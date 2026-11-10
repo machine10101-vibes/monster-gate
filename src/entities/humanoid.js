@@ -436,7 +436,7 @@ export function buildHumanoid(o = {}) {
 
   /* Sheathed weapon. The grip clears the right shoulder and the blade angles down the back. */
   const backSlot = new THREE.Group();
-  backSlot.position.set(0.02, 0.34, -0.3);
+  backSlot.position.set(0.02, 0.5, -0.3);
   upper.add(backSlot);
 
   const legL = new THREE.Group();

@@ -56,6 +56,27 @@ function ball(c, cx, cy, cz, r, fn, glow = false) {
       }
 }
 
+/**
+ * The holy hammer's blunt ends sit on ±x and the broad cross faces down the haft.
+ * Turn the head so a blunt face points forward.
+ */
+function turnStrike(c, zMin, bulge = 0) {
+  const head = [];
+  let mnz = 1e9;
+  let mxz = -1e9;
+  c.each((x, y, z, col, glow) => {
+    const proud = bulge > 0 && z >= zMin - 6 && (Math.abs(x) > bulge || Math.abs(y) > bulge);
+    if (z < zMin && !proud) return;
+    head.push([x, y, z, col, glow]);
+    mnz = Math.min(mnz, z);
+    mxz = Math.max(mxz, z);
+  });
+  if (!head.length) return;
+  const cz = Math.round((mnz + mxz) / 2);
+  for (const [x, y, z] of head) c.clear(x, y, z);
+  for (const [x, y, z, col, glow] of head) c.set(-(z - cz), y, x + cz, col, glow);
+}
+
 /** Stamps a rectilinear glyph (list of [a,b] corners) as a 2-voxel stroke via put(a,b). */
 function strokePath(pts, put, w = 2) {
   for (let i = 1; i < pts.length; i++) {
@@ -181,6 +202,7 @@ export function holyHammerVoxels() {
     for (const sy of [-1, 1])
       for (const z of [60, 88]) ball(c, sx * 26.5, sy * 11.5, z, 2.4, (x, y, zz, d) => (d > 0.7 ? goldLo(x, y, zz, 11) : gold(x, y, zz, 12)));
   rod(c, 57, 61, 4.6, (x, y, z) => (z === 61 || z === 57 ? goldLo(x, y, z, 13) : gold(x, y, z, 14)));
+  turnStrike(c, 60, 5);
   return c.done();
 }
 
