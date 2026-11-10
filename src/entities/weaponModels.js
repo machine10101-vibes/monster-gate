@@ -32,7 +32,11 @@ const EDGE_HOLD = new Set([
   ...JUNGLE_EDGE,
 ]);
 
-/** Resting roll of a weapon in the hand, around the grip. The sign keeps the edge up. */
+/**
+ * Resting roll of a weapon in the hand, around the grip.
+ * Swords stand on their edge. Hammers are turned in the sculpt so the blunt
+ * face already leads; rolling them would swing that flat cheek toward the viewer.
+ */
 export function gripRoll(kind) {
   return EDGE_HOLD.has(kind) ? -Math.PI / 2 : 0;
 }
@@ -50,12 +54,12 @@ const sheathBasis = new THREE.Matrix4();
  */
 export function placeSheath(group, kind) {
   if (TALL_KINDS.has(kind)) {
-    group.position.set(-0.08, 0.36, -0.02);
+    group.position.set(-0.08, 0.56, -0.02);
     group.rotation.set(0.08, -0.15, 0.48);
     return;
   }
   const lean = 0.42;
-  group.position.set(-0.08, 0.32, -0.05);
+  group.position.set(-0.08, 0.52, -0.05);
   sheathTip.set(Math.sin(lean), -Math.cos(lean), -0.04).normalize();
   sheathX.crossVectors(sheathBack, sheathTip).normalize();
   sheathY.crossVectors(sheathTip, sheathX).normalize();
@@ -370,6 +374,28 @@ const SWORDS = {
 
 /* ------------------------------ hafted weapons ------------------------------ */
 
+/**
+ * Maul heads carry their spikes out to the sides, with a broad cheek facing
+ * down the haft. Turn the head a quarter around its middle so a spike points
+ * forward, the way a sword's edge leads a cut. The iron mallet's caps already
+ * face down the haft, so it is left alone.
+ */
+function turnStrike(c, zMin) {
+  const head = [];
+  let mnz = 1e9;
+  let mxz = -1e9;
+  c.each((x, y, z, col, glow) => {
+    if (z < zMin) return;
+    head.push([x, y, z, col, glow]);
+    mnz = Math.min(mnz, z);
+    mxz = Math.max(mxz, z);
+  });
+  if (!head.length) return;
+  const cz = Math.round((mnz + mxz) / 2);
+  for (const [x, y, z] of head) c.clear(x, y, z);
+  for (const [x, y, z, col, glow] of head) c.set(-(z - cz), y, x + cz, col, glow);
+}
+
 /** Banded block head with rounded corners. */
 function blockHead(c, T, o) {
   const { z0, z1, hx, hy, bands, scale = true, glow = false } = o;
@@ -409,6 +435,7 @@ function maul(T, o) {
   spike(c, 'z', 1, 85, 20, 0, 3.2, 0.7, 0, (k) => (k > 16 ? T.edge : k % 6 === 5 ? T.hornDark : T.horn));
   if (dark) for (const y of [-1, 0]) for (let z = 88; z <= 96; z += 2) c.set(-1, y, z, T.glow, true);
   else for (let z = 90; z <= 100; z += 3) c.set(-1, -1, z, T.glow, true);
+  turnStrike(c, 54);
   return c.done();
 }
 
