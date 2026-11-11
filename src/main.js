@@ -992,7 +992,7 @@ class Game {
     const it = this.items[i];
     if (!it) return;
     if (it.kind === 'use') {
-      if (this.player?.tryAttack(it)) this.selectSlot(i, true);
+      this.player?.tryAttack(it);
       return;
     }
     this.selectSlot(i);
@@ -2240,8 +2240,12 @@ class Game {
     this.uiBlocking = hud.panelOpen || !this.started;
 
     if (inp.slotSelect >= 0) {
-      this.selectSlot(inp.slotSelect);
+      const slot = inp.slotSelect;
       inp.slotSelect = -1;
+      const picked = this.items[slot];
+      if (picked?.kind === 'use') {
+        if (!hud.panelOpen && this.started) this.player?.tryAttack(picked);
+      } else this.selectSlot(slot);
     }
     if (!this.started) this.cam.targetYaw += this.rawDt * 0.12;
     this.cam.targetYaw += inp.rotateDelta;

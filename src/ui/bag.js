@@ -184,9 +184,8 @@ function collect(game) {
       canvas: () => renderThumb({ kind: 'held', id: it.held }, 96),
       action: it.kind === 'use' ? 'Use' : 'Hold',
       run: (paint) => {
-        if (it.kind === 'use') {
-          if (game.player?.tryAttack(it)) game.selectSlot(i, true);
-        } else game.selectSlot(i);
+        if (it.kind === 'use') game.player?.tryAttack(it);
+        else game.selectSlot(i);
         paint();
       },
     });
