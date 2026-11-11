@@ -64,18 +64,28 @@ export class CharacterSelect {
     this.root.classList.remove('hidden');
     document.body.classList.add('selecting');
     this.active = true;
+    g.hud?.clearPlates?.();
     if (this.hourWas == null) this.hourWas = g.sky.hour;
     g.sky.setHour(18.4);
-    this.stage.show();
-    $('cs-account').textContent = g.wallet?.email || shortAddress(g.wallet?.address || '');
-    g.paintCloudStatus?.();
-    this.filter = '';
-    $('cs-search').value = '';
-    this.refresh();
+    try {
+      this.stage.show();
+      $('cs-account').textContent = g.wallet?.email || shortAddress(g.wallet?.address || '');
+      g.paintCloudStatus?.();
+      this.filter = '';
+      $('cs-search').value = '';
+      this.refresh();
+    } catch (err) {
+      this.note(err?.message || 'The camp could not be opened.', true, true);
+      throw err;
+    } finally {
+      if (this.active) g.parkWorld?.();
+    }
   }
 
   close() {
     const g = this.game;
+    g.unparkWorld?.();
+    g.hud?.clearPlates?.();
     this.active = false;
     this.root?.classList.add('hidden');
     document.body.classList.remove('selecting');
@@ -227,6 +237,7 @@ export class CharacterSelect {
   }
 
   place(node, pos, dx = 0) {
+    if (!node) return;
     if (!pos || !pos[2]) {
       node.style.display = 'none';
       return;
@@ -252,7 +263,7 @@ export class CharacterSelect {
 
   /* ----------------------------------- actions ----------------------------------- */
 
-  note(text, bad = false) {
+  note(text, bad = false, hold = false) {
     let n = $('cs-note');
     if (!n) {
       n = el('div', 'cs-note');
@@ -263,7 +274,7 @@ export class CharacterSelect {
     n.classList.toggle('bad', bad);
     n.classList.add('show');
     clearTimeout(this.noteTimer);
-    this.noteTimer = setTimeout(() => n.classList.remove('show'), 2800);
+    if (!hold) this.noteTimer = setTimeout(() => n.classList.remove('show'), 2800);
   }
 
   enter() {

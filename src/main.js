@@ -150,6 +150,73 @@ class Game {
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
     this.renderer = r;
+    this.canvas.addEventListener('webglcontextlost', (ev) => {
+      ev.preventDefault();
+      this.reportFault(new Error('This device ran out of graphics memory. Refresh the page.'));
+    });
+  }
+
+  /** Say what broke, once, on the loading screen or the character camp. */
+  reportFault(err) {
+    const message = (err && err.message) || String(err || 'The game hit an error.');
+    if (this.faultText === message) return;
+    this.faultText = message;
+    console.error(err);
+    const loading = document.getElementById('loading');
+    const text = document.getElementById('load-text');
+    if (loading && text && !loading.classList.contains('hidden')) text.textContent = 'Failed to load: ' + message;
+    if (this.charSelect?.active) this.charSelect.note(message, true, true);
+    else this.hud?.toast?.(message, 6000);
+  }
+
+  /** Hide the live world while the character camp is on screen so a phone draws one scene. */
+  parkWorld() {
+    if (this.campParked || !this.world?.group) return;
+    const hide = (obj) => {
+      if (!obj) return null;
+      const visible = obj.visible;
+      obj.visible = false;
+      return { obj, visible };
+    };
+    const hideEach = (list) => (list || []).map((item) => hide(item?.obj)).filter(Boolean);
+    const quiet = !!(this.input?.touch || this.quality?.id === 'low');
+    const shadows = !!this.renderer?.shadowMap.enabled;
+    if (quiet && this.renderer) {
+      this.renderer.shadowMap.enabled = false;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+    this.campParked = {
+      quiet,
+      shadows,
+      singles: [
+        hide(this.world.group),
+        hide(this.world.cave?.group),
+        hide(this.player?.obj),
+        hide(this.snowfall?.points),
+        hide(this.ashfall?.points),
+        hide(this.fx?.motes),
+        hide(this.fx?.gateMotes),
+      ].filter(Boolean),
+      crowds: [
+        ...hideEach(this.monsters),
+        ...hideEach(this.ambient?.npcs),
+        ...hideEach(this.ambient?.fowl),
+        ...hideEach(this.ambient?.cows),
+        ...hideEach(this.ambient?.butterflies),
+      ],
+    };
+  }
+
+  unparkWorld() {
+    const held = this.campParked;
+    if (!held) return;
+    this.campParked = null;
+    for (const row of held.singles) if (row.obj) row.obj.visible = row.visible;
+    for (const row of held.crowds) if (row.obj) row.obj.visible = row.visible;
+    if (held.quiet && this.renderer) {
+      this.renderer.shadowMap.enabled = held.shadows;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
   }
 
   async load() {
@@ -188,6 +255,8 @@ class Game {
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
     this.bindUI();
     this.applyQuality();
+    progress(0.98, 'Ready');
+    this.renderer.compile(this.scene, this.camera);
     const account = readAccount();
     const klever = readSession();
     const session = account && klever
@@ -198,8 +267,8 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
+    if (this.charSelect?.active) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
-    this.renderer.compile(this.scene, this.camera);
 
     document.getElementById('loading').classList.add('hidden');
     if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
@@ -2407,20 +2476,24 @@ class Game {
       this.last = now;
       return;
     }
-    const raw = now - this.last;
-    this.last = now;
-    if (!(raw >= 0) || raw > 250) return;
-    this.adaptResolution(raw);
-    let dt = Math.min(raw / 1000, 0.05);
-    if (this.hitstopT > 0) {
-      this.hitstopT -= dt;
-      dt *= 0.08;
-    } else if (this.slowT > 0) {
-      this.slowT -= dt;
-      dt *= this.slowK + (1 - this.slowK) * Math.max(0, 1 - this.slowT / 0.25) * (this.slowT < 0.25 ? 1 : 0);
+    try {
+      const raw = now - this.last;
+      this.last = now;
+      if (!(raw >= 0) || raw > 250) return;
+      this.adaptResolution(raw);
+      let dt = Math.min(raw / 1000, 0.05);
+      if (this.hitstopT > 0) {
+        this.hitstopT -= dt;
+        dt *= 0.08;
+      } else if (this.slowT > 0) {
+        this.slowT -= dt;
+        dt *= this.slowK + (1 - this.slowK) * Math.max(0, 1 - this.slowT / 0.25) * (this.slowT < 0.25 ? 1 : 0);
+      }
+      this.step(dt, raw / 1000);
+      this.renderer.render(this.scene, this.camera);
+    } catch (err) {
+      this.reportFault(err);
     }
-    this.step(dt, raw / 1000);
-    this.renderer.render(this.scene, this.camera);
   }
 
   step(dt, rawDt) {
@@ -2432,18 +2505,20 @@ class Game {
 
     if (this.started) this.sky.setHour(this.sky.hour + rawDt / 50);
 
-    this.player.update(dt);
+    if (!this.campParked) this.player.update(dt);
     updateCaveTravel(this, dt);
     tendCaveDragon(this, dt);
     if (this.player) updateSkillWorld(this, dt);
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
-    for (const m of this.monsters) m.update(dt);
-    if (this.started) this.checkDiscoveries(dt);
-    if (this.monsters.some((m) => m.remove)) {
-      for (const m of this.monsters) if (m.remove) m.dispose();
-      this.monsters = this.monsters.filter((m) => !m.remove);
+    if (!this.campParked) {
+      for (const m of this.monsters) m.update(dt);
+      if (this.monsters.some((m) => m.remove)) {
+        for (const m of this.monsters) if (m.remove) m.dispose();
+        this.monsters = this.monsters.filter((m) => !m.remove);
+      }
     }
+    if (this.started) this.checkDiscoveries(dt);
     if (this.started) this.spawner.update(dt);
     if (this.started && this.wallet) {
       this.saveAcc += dt;
@@ -2452,10 +2527,12 @@ class Game {
         this.captureHunter();
       }
     }
-    for (const n of this.ambient.npcs) n.update(dt, t);
-    for (const f of this.ambient.fowl) f.update(dt, t);
-    for (const c of this.ambient.cows || []) c.update(dt, t);
-    for (const b of this.ambient.butterflies) b.update(dt);
+    if (!this.campParked) {
+      for (const n of this.ambient.npcs) n.update(dt, t);
+      for (const f of this.ambient.fowl) f.update(dt, t);
+      for (const c of this.ambient.cows || []) c.update(dt, t);
+      for (const b of this.ambient.butterflies) b.update(dt);
+    }
     this.updateProjectiles(dt);
     this.updatePickups(dt);
 
@@ -2467,8 +2544,10 @@ class Game {
     this.sky.chill = this.chill;
     this.sky.ember = this.ember;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
-    this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.chill);
-    this.ashfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.ember);
+    if (!this.campParked) {
+      this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.chill);
+      this.ashfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.ember);
+    }
     const camp = this.charSelect?.active ? this.charSelect.stage : null;
     const lights = camp ? camp.lightSpots : this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
     if (camp) this.sky.assignTorchLights(lights, camp.origin.x, camp.origin.z);
@@ -2479,7 +2558,7 @@ class Game {
     this.vfx.update(dt, this.camera);
     this.world.haloMat.uniforms.uScale.value = scale;
     this.world.haloMat.uniforms.uNight.value = night;
-    this.world.update(dt, t);
+    if (!this.campParked) this.world.update(dt, t);
 
     this.hud.setClock(this.sky.hour);
     this.refreshHud();

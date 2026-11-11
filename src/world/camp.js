@@ -162,7 +162,7 @@ export class CampStage {
     const g = new THREE.Group();
     for (const p of parts) {
       const mesh = new THREE.Mesh(p.geo, p.kind === 'solid' ? mats.solid : p.kind === 'glow' ? mats.glow : mats.window);
-      if (p.kind === 'solid') {
+      if (p.kind === 'solid' && this.shadows) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }
@@ -180,28 +180,33 @@ export class CampStage {
     this.built = true;
     const M = this.game.world.models;
     const rand = rng(7041);
+    const phone = !!(this.game.input?.touch || this.game.quality?.id === 'low');
+    this.shadows = !phone;
+    const grassCount = phone ? 120 : 520;
+    const treeCount = phone ? 16 : 46;
+    const plantCount = phone ? 20 : 70;
 
     const grass = toonMaterial({ color: 0x4f8f3a });
-    const ground = new THREE.Mesh(new THREE.CylinderGeometry(30, 31.5, 2, 56), grass);
+    const ground = new THREE.Mesh(new THREE.CylinderGeometry(30, 31.5, 2, phone ? 32 : 56), grass);
     ground.position.y = -1;
-    ground.receiveShadow = true;
+    ground.receiveShadow = this.shadows;
     this.group.add(ground);
 
     const dirt = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 8, 0.08, 40), toonMaterial({ color: 0x8a6a46 }));
     dirt.position.y = 0.02;
-    dirt.receiveShadow = true;
+    dirt.receiveShadow = this.shadows;
     this.group.add(dirt);
     const path = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.1, 32), toonMaterial({ color: 0x735740 }));
     path.position.y = 0.04;
-    path.receiveShadow = true;
+    path.receiveShadow = this.shadows;
     this.group.add(path);
 
     const patch = new THREE.BoxGeometry(1, 0.12, 1);
     const tones = [0x5aa043, 0x468733, 0x6cb04c, 0x3f7a30, 0x78b858];
-    const patches = new THREE.InstancedMesh(patch, toonMaterial({}), 520);
+    const patches = new THREE.InstancedMesh(patch, toonMaterial({}), grassCount);
     const mtx = new THREE.Matrix4();
     const col = new THREE.Color();
-    for (let i = 0; i < 520; i++) {
+    for (let i = 0; i < grassCount; i++) {
       const a = rand() * Math.PI * 2;
       const r = 8 + Math.sqrt(rand()) * 21;
       const s = 0.8 + rand() * 1.8;
@@ -209,7 +214,7 @@ export class CampStage {
       patches.setMatrixAt(i, mtx);
       patches.setColorAt(i, col.setHex(tones[Math.floor(rand() * tones.length)]));
     }
-    patches.receiveShadow = true;
+    patches.receiveShadow = this.shadows;
     this.group.add(patches);
 
     const stones = new THREE.InstancedMesh(new THREE.BoxGeometry(0.62, 0.42, 0.55), toonMaterial({}), 12);
@@ -219,7 +224,7 @@ export class CampStage {
       stones.setMatrixAt(i, mtx);
       stones.setColorAt(i, col.setHex(i % 3 === 0 ? 0x9a9da4 : 0x7c7f86));
     }
-    stones.castShadow = true;
+    stones.castShadow = this.shadows;
     this.group.add(stones);
 
     const fire = buildCampfire('oak');
@@ -243,7 +248,7 @@ export class CampStage {
     for (const [x, z] of [[-9, 3.4], [9.4, 2.2], [-11, -2], [11.5, -1.5]]) this.mesh(M.crate[Math.floor(rand() * 2)], x, z, rand() * 3, 1.2);
     this.mesh(M.barrel[0], 10.4, 3.6, 0.4, 1.2);
 
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < treeCount; i++) {
       const a = Math.PI * (0.02 + rand() * 1.96) + Math.PI * 0;
       const r = 13 + rand() * 15;
       const x = Math.cos(a) * r;
@@ -253,7 +258,7 @@ export class CampStage {
       const pool = kind < 0.6 ? M.pines : kind < 0.85 ? M.oaks : M.teal;
       this.mesh(pool[Math.floor(rand() * pool.length)], x, z, rand() * 6.28, 1.15 + rand() * 0.7);
     }
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < plantCount; i++) {
       const a = rand() * Math.PI * 2;
       const r = 5.5 + rand() * 20;
       const x = Math.cos(a) * r;
@@ -488,8 +493,8 @@ export class CampStage {
     if (!this.active) return;
     this.fireT += dt;
     const flick = 0.88 + Math.sin(this.fireT * 17) * 0.08 + Math.sin(this.fireT * 9.3) * 0.06;
-    this.flame.scale.set(1.25, 1.25 * flick, 1.25);
-    this.fireLight.intensity = 4.6 + Math.sin(this.fireT * 13) * 0.9 + Math.sin(this.fireT * 23) * 0.4;
+    this.flame?.scale.set(1.25, 1.25 * flick, 1.25);
+    if (this.fireLight) this.fireLight.intensity = 4.6 + Math.sin(this.fireT * 13) * 0.9 + Math.sin(this.fireT * 23) * 0.4;
     this.spark -= dt;
     if (this.spark <= 0) {
       this.spark = 0.07 + Math.random() * 0.08;

@@ -277,6 +277,9 @@ export class HUD {
       this.plates.delete(id);
     }
   }
+  clearPlates() {
+    for (const id of [...this.plates.keys()]) this.removePlate(id);
+  }
   placePlate(id, x, y, visible) {
     const p = this.plates.get(id);
     if (!p) return;
