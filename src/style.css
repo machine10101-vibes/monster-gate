@@ -764,6 +764,13 @@ body.touch #menu-buttons .row.bottom {
 body.touch #center-bottom {
   transform: translateX(-50%) scale(calc(var(--ui) * 0.86));
 }
+/* Phones: the stick and fight bubbles sit just above the orbs and hotbar. */
+@media (max-width: 1100px) {
+  body.touch #stick,
+  body.touch #touch-btns {
+    bottom: calc(90px + var(--safe-b));
+  }
+}
 body.touch #top-right {
   top: calc(6px + var(--safe-t));
 }
