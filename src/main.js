@@ -177,6 +177,7 @@ class Game {
     this.portalNear = false;
     this.portalHinted = false;
     this.guestBound = false;
+    this.parkedHunt = null;
     this.wallet = null;
     this.roster = null;
     this.character = null;
@@ -363,6 +364,7 @@ class Game {
   start() {
     if (this.started) return;
     if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
+    if (this.wallet.kind === 'guest') this.cloudState = 'off';
     document.body.classList.add('hunting');
     if (this.input.touch && (this.isLandscape() || isTablet())) {
       this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
@@ -425,6 +427,7 @@ class Game {
 
   cloudStatusText() {
     if (!this.wallet) return '';
+    if (this.wallet.kind === 'guest') return 'Guest hunt. Saved on this device only.';
     if (this.cloudSyncing) return 'Opening the hunt saved to your account…';
     if (this.cloudState === 'on' && this.cloudReachable) return 'Saved to your account';
     return 'Saved on this device only';
@@ -460,6 +463,11 @@ class Game {
   }
 
   bindCloudPush() {
+    if (this.wallet?.kind === 'guest') {
+      this.progress.onCloud = null;
+      this.stopAutosave();
+      return;
+    }
     this.progress.onCloud = (data) => {
       if (!this.roster || !this.wallet) return;
       this.roster.touch(data.savedAt);
@@ -482,7 +490,7 @@ class Game {
 
   /** Write the roster, hunts included, to the guild record. */
   autosaveCloud() {
-    if (!this.wallet || !this.roster || this.cloudSyncing || this.cloudConflict) return;
+    if (!this.wallet || this.wallet.kind === 'guest' || !this.roster || this.cloudSyncing || this.cloudConflict) return;
     if (this.cloudState === 'error') {
       this.applyWallet(this.wallet);
       return;
@@ -498,7 +506,7 @@ class Game {
     if (!this.roster || !this.wallet) return;
     this.roster.touch(Date.now());
     this.roster.save();
-    if (this.cloudState !== 'on' || this.cloudConflict) return;
+    if (this.wallet.kind === 'guest' || this.cloudState !== 'on' || this.cloudConflict) return;
     schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
   }
 
@@ -557,6 +565,23 @@ class Game {
     this.charSelect.open();
   }
 
+  /** Local hunt only. No guild record, and the waygate stays closed. */
+  playAsGuest() {
+    if (this.started || this.walletBusy) return;
+    this.closeAccount();
+    this.wallet = { kind: 'guest', address: 'guest:local' };
+    this.cloudState = 'off';
+    this.cloudSyncing = false;
+    this.cloudConflict = false;
+    this.cloudReachable = false;
+    this.progress.onCloud = null;
+    this.stopAutosave();
+    this.roster = new Roster(this.wallet.address, 'Guest');
+    this.walletNote = this.roster.chars.length ? 'loaded' : 'new';
+    this.refreshWalletUi();
+    this.openCharacterSelect();
+  }
+
   leaveCharacterSelect() {
     this.signOut(false);
   }
@@ -567,6 +592,12 @@ class Game {
     this.character = char;
     this.roster.played(char.id);
     this.progress.useCharacter(this.roster.charKey(char.id));
+    const warn = this.progress.saveWarning || this.roster.saveWarning;
+    if (warn) {
+      this.progress.saveWarning = null;
+      this.roster.saveWarning = null;
+      queueMicrotask(() => this.hud?.toast('A hunt save was damaged. A backup was kept. Starting a fresh hunt.', 5200));
+    }
     if (this.cloudState === 'on' && !this.cloudConflict) this.bindCloudPush();
     this.player.lookOpts = lookOptions(char.look);
     this.player.armorKey = null;
@@ -594,6 +625,7 @@ class Game {
     const forming = !!panel && !panel.classList.contains('hidden');
     const signed = !!this.wallet?.address;
     const email = this.wallet?.kind === 'email';
+    const guest = this.wallet?.kind === 'guest';
     choices?.classList.toggle('hidden', signed || forming);
     sign.classList.toggle('hidden', signed || forming);
     start.classList.add('hidden');
@@ -602,12 +634,16 @@ class Game {
     if (!signed) {
       help?.classList.add('hidden');
       if (!forming) {
-        const where = window.kleverWeb ? (isMobile() ? 'Klever Wallet' : 'the Klever extension') : 'your Klever wallet';
-        sign.textContent = window.kleverWeb ? `Sign in with ${where}` : 'Sign in with Klever';
-        status.textContent = window.kleverWeb
-          ? 'Tap Sign in. On the Klever screen, tap Confirm and leave that window open until it accepts.'
-          : 'Create an account with your email and password. The same account signs in on any device.';
+        sign.textContent = 'Sign in with Klever';
+        status.textContent = 'Play as a guest on this device, or sign in to keep the hunt on your account.';
       }
+      return;
+    }
+    if (guest) {
+      panel?.classList.add('hidden');
+      help?.classList.add('hidden');
+      swap.textContent = 'Leave guest hunt';
+      status.textContent = 'Playing as guest. The hunt stays on this device.';
       return;
     }
     panel?.classList.add('hidden');
@@ -652,10 +688,11 @@ class Game {
     confirmLabel?.classList.toggle('hidden', mode !== 'create');
     if (submit) submit.textContent = mode === 'create' ? 'Create account' : 'Sign in';
     if (password) password.setAttribute('autocomplete', mode === 'create' ? 'new-password' : 'current-password');
+    document.getElementById('account-pass-hint')?.classList.toggle('hidden', mode !== 'create');
     if (error) error.textContent = '';
     if (status) {
       status.textContent = mode === 'create'
-        ? 'Choose an email and a password. This account signs in on any device.'
+        ? 'Choose an email and a password of 8 to 72 characters. This account signs in on any device.'
         : 'Sign in with the email and password for your account.';
     }
     this.refreshWalletUi();
@@ -868,6 +905,7 @@ class Game {
       this.start();
     });
     sign.addEventListener('click', () => this.onWallet());
+    document.getElementById('btn-guest')?.addEventListener('click', () => this.playAsGuest());
     document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
     document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
     document.getElementById('account-cancel')?.addEventListener('click', () => {
@@ -1293,6 +1331,10 @@ class Game {
     if (!g || !this.progress.crafted(id)) return false;
     if (this.progress.storedGear(id)) {
       this.hud.toast('That is in the storage crate', 1400);
+      return false;
+    }
+    if (!this.progress.worn(id) && !this.progress.meetsReq(g)) {
+      this.hud.toast(`Need Strength ${g.reqLevel} to wield ${g.name}`, 2200);
       return false;
     }
     const was = this.progress.worn(id);
@@ -1839,16 +1881,38 @@ class Game {
     this.remotes.clear();
   }
 
-  suspendLocalHunt() {
+  parkLocalHunt() {
+    if (this.parkedHunt) return;
     this.guestBound = false;
-    for (const m of this.monsters) m.dispose();
+    this.parkedHunt = this.monsters.slice();
     this.monsters = [];
+  }
+
+  restoreParkedHunt() {
+    const parked = this.parkedHunt;
+    this.parkedHunt = null;
+    if (!parked) return false;
+    for (const m of this.monsters) m.dispose();
+    this.monsters = parked;
+    this.guestBound = false;
+    return true;
+  }
+
+  dropParkedHunt() {
+    if (!this.parkedHunt) return;
+    for (const m of this.parkedHunt) m.dispose();
+    this.parkedHunt = null;
+  }
+
+  suspendLocalHunt() {
+    this.parkLocalHunt();
   }
 
   onSessionEnd(wasGuest) {
     this.clearRemotes();
     this.guestBound = false;
     if (!wasGuest) return;
+    if (this.restoreParkedHunt()) return;
     for (const m of this.monsters) m.dispose();
     this.monsters = [];
     this.spawner?.populate();
@@ -1858,6 +1922,8 @@ class Game {
     if (!data?.m || this.net.role !== 'guest') return;
     if (!this.guestBound) {
       this.guestBound = true;
+      this.dropParkedHunt();
+      this.net.clearJoinTimer();
       for (const m of this.monsters) m.dispose();
       this.monsters = [];
     }

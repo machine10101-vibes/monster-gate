@@ -163,10 +163,12 @@ export class Journal {
     if (!q || !st || st.done) return { ok: false };
     const step = q.steps[st.step];
     if (!step || step.kind !== 'talk') return { ok: false };
-    if (step.deliver) {
-      const have = this.progress.good(step.deliver.id) >= step.deliver.n;
-      if (!have) return { ok: false, blocked: true, line: step.lack };
-      this.progress.takeGood(step.deliver.id, step.deliver.n);
+    if (step.deliver || step.alsoDeliver) {
+      const primary = step.deliver && this.progress.good(step.deliver.id) >= step.deliver.n ? step.deliver : null;
+      const alt = step.alsoDeliver && this.progress.good(step.alsoDeliver.id) >= step.alsoDeliver.n ? step.alsoDeliver : null;
+      const take = primary || alt;
+      if (!take) return { ok: false, blocked: true, line: step.lack };
+      this.progress.takeGood(take.id, take.n);
     }
     let page = step.journal;
     if (step.choices) {

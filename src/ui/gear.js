@@ -43,7 +43,10 @@ function bonusText(gear) {
 
 function statLine(gear) {
   if (gear.type === 'ammo') return gear.line;
-  if (gear.type === 'weapon') return `Damage ${gear.item.dmg} · ${STYLE_LABEL[gear.item.style] || 'Weapon'}`;
+  if (gear.type === 'weapon') {
+    const need = gear.reqLevel ? ` · Str ${gear.reqLevel}` : '';
+    return `Damage ${gear.item.dmg} · ${STYLE_LABEL[gear.item.style] || 'Weapon'}${need}`;
+  }
   if (gear.slot === 'book') return bonusText(gear) || 'Spell book';
   const tier = TIER_LABEL[setById(gear.set)?.tier] || '';
   return `Defense ${gear.def}${tier ? ' · ' + tier : ''}`;
@@ -264,6 +267,12 @@ export function mountGear(body, game) {
       const tag = document.createElement('u');
       tag.textContent = isWorn ? 'Unequip' : 'Equip';
       item.append(info, tag);
+      const locked = !isWorn && gear.reqLevel && !pr.meetsReq(gear);
+      if (locked) {
+        tag.textContent = `Str ${gear.reqLevel}`;
+        item.disabled = true;
+        item.title = `Need Strength ${gear.reqLevel} to wield ${gear.name}`;
+      }
       item.onclick = () => {
         game.wearPiece(gear.id);
         openSlot = null;

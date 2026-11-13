@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, burnChance, burntGoodId, chopChance, chopSwingTime, cookTime, fishChance, fishTickTime, isFishGood, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
+import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, burnChance, burnXp, burntGoodId, chopChance, chopSwingTime, cookTime, fishChance, fishTickTime, isFishGood, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
 import { buildCampfire, goodsVoxels } from '../world/gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
@@ -732,13 +732,13 @@ export class Gathering {
     const made = burnt ? burntGoodId(fish.id) : fish.cooked;
     g.progress.addGood(made, 1);
     const P = g.player.pos;
+    this.train('cooking', burnt ? burnXp(fish) : fish.cookXp, true);
     if (burnt) {
       g.hud.toast(`You burn the ${fish.name.toLowerCase()}.`, 1600);
       g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, '');
       g.audio.noise(0.16, 0.12, 500, 0.7);
       g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0x2a2a2a, 0x6a6a6a, 0xffe0b0], 10, 1.8, 0.07, 0.6, 2, 1.4);
     } else {
-      this.train('cooking', fish.cookXp, true);
       g.hud.toast(`You cook the ${fish.name.toLowerCase()}.`, 1600);
       g.audio.tone(520, 0.08, 'triangle', 0.08, 240);
       g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0xfff2a0, 0xff8a22, 0xffe0b0], 10, 1.8, 0.06, 0.6, 2, 1.4);

@@ -345,6 +345,107 @@ export const QUESTS = [
       },
     ],
   },
+  {
+    id: 'deepdig',
+    name: 'The Deep Dig',
+    series: 'Oakhollow',
+    kind: 'miniquest',
+    points: 1,
+    giver: 'Bram',
+    requires: ['pit'],
+    reward: { gold: 35 },
+    blurb: 'Greyrock is copper and tin. Bram wants iron from the hole they call Deepwell.',
+    opening:
+      'Bram has one more errand once the first bar is in your hands. The pit behind him is the starter hole. South of Southford, the desert has a bigger one, and the rocks there are not orange.',
+    steps: [
+      {
+        id: 'deep-ask',
+        kind: 'talk',
+        npc: 'smith',
+        objective: 'Ask Bram about the Deepwell dig',
+        lines: [
+          'Greyrock is copper and tin. That is how a hunter starts. It is not how a hunter finishes.',
+          'South of Southford the dunes open into a pit they call Deepwell. Iron, then coal, then the blue and green seams if you live long enough to swing at them.',
+          'Bring me one iron ore from that hole. I will not take it. I want to know you found the place.',
+        ],
+        journal:
+          'Bram sent me south of Southford, into the desert pit called Deepwell. He wants one iron ore from those rocks. Copper and tin will not count.',
+      },
+      {
+        id: 'iron-ore',
+        kind: 'hold',
+        goods: [{ id: 'iron_ore', n: 1 }],
+        objective: 'Mine 1 iron ore at Deepwell',
+        journal:
+          'The Deepwell rocks gave up a rust-brown lump. Bram is still on the rim of Greyrock, pretending he does not care whether I found the way.',
+      },
+      {
+        id: 'show-iron',
+        kind: 'talk',
+        npc: 'smith',
+        objective: 'Show Bram the iron ore',
+        lines: [
+          'That is iron. Heavy, ugly, and honest. Smelt it here if you want another bar, or take coal from the same pit and make steel.',
+          'The blue rocks are mithril. The green ones are adamant. They will not open for a pick until your arms remember the work. That is the whole of mining, written in dirt.',
+        ],
+        journal:
+          'Bram turned the iron ore and gave it back. Deepwell also holds coal, mithril and adamant, each behind a higher Mining level. The smithy will take whatever I bring.',
+      },
+    ],
+  },
+  {
+    id: 'burntpan',
+    name: "Lira's Burnt Pan",
+    series: 'Oakhollow',
+    kind: 'miniquest',
+    points: 1,
+    giver: 'Lira',
+    requires: ['lira'],
+    reward: { gold: 20 },
+    blurb: 'The alchemist wants a shrimp off the fire, cooked or ruined. She is collecting data.',
+    opening:
+      'Lira has decided that hunters who can follow a strange instruction can also follow a fire. She wants a shrimp from Mirrormere, put on a campfire, and she will take it whether it comes out gold or black.',
+    steps: [
+      {
+        id: 'pan-ask',
+        kind: 'talk',
+        npc: 'alchemist',
+        objective: 'Speak with Lira about the fire',
+        lines: [
+          'The feather settled. The next quiet on that shelf is a draught that hates guesswork.',
+          'Net a shrimp at Mirrormere. Light a fire. Cook it. If you burn it I will still take it. I am measuring the difference, not your pride.',
+        ],
+        journal:
+          'Lira wants a shrimp cooked on a campfire. A burnt shrimp still counts. She is measuring the difference, she says, not my pride.',
+      },
+      {
+        id: 'cooked',
+        kind: 'hold',
+        goods: [{ id: 'cooked_shrimp', n: 1 }],
+        also: [{ id: 'burnt_shrimp', n: 1 }],
+        alsoJournal:
+          'I burnt the shrimp. Lira said that still counted. The stall on the south road is waiting for the black one as cheerfully as it would have waited for the gold one.',
+        objective: 'Cook a shrimp on a campfire',
+        journal:
+          'The fire took the shrimp and gave it back cooked. Lira\'s stall is on the south road, and she asked for this on purpose.',
+      },
+      {
+        id: 'pan-give',
+        kind: 'talk',
+        npc: 'alchemist',
+        objective: 'Bring Lira a cooked or burnt shrimp',
+        deliver: { id: 'cooked_shrimp', n: 1 },
+        alsoDeliver: { id: 'burnt_shrimp', n: 1 },
+        lack: 'That is not a shrimp from the fire. Net one at the lake, cook it, and try not to look so wounded if it burns.',
+        lines: [
+          'Good. Gold or charcoal, the shelf has its sample. Hunters who never burn anything are lying, or they are not cooking.',
+          'Eat the rest yourself. A cooked catch heals more than a raw one. A burnt catch heals nothing, and it still taught the fire your name.',
+        ],
+        journal:
+          'Lira took the shrimp as a sample and told me to eat the rest. Cooked fish heal more than raw. Burnt fish teach the fire your name and still count as cooking practice.',
+      },
+    ],
+  },
 ];
 
 export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));

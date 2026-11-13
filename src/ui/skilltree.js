@@ -1,4 +1,5 @@
 import { CLASS_LIST, CLASSES, RESOURCE_NAME, SKILLS } from '../data/skills.js';
+import { SKILL_POINT_PER_KILLS } from '../systems/progress.js';
 import { resourceCost } from '../systems/skillcast.js';
 
 const SHAPES = {
@@ -111,9 +112,9 @@ export function mountSkillTree(body, game) {
   const paintPicker = () => {
     const intro = document.createElement('p');
     intro.className = 'sk-intro';
-    const slain = game.progress.totalKills();
-    const banked = Math.floor(slain / 2);
-    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every 2 monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on the round action buttons 1, 2, and 3 (keys Z, X, and V).`;
+    const slain = Math.max(0, game.progress.totalKills() - game.progress.kills('chicken'));
+    const banked = Math.floor(slain / SKILL_POINT_PER_KILLS);
+    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every ${SKILL_POINT_PER_KILLS} monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on the round action buttons 1, 2, and 3 (keys Z, X, and V).`;
     root.appendChild(intro);
     const row = document.createElement('div');
     row.className = 'sk-pick';

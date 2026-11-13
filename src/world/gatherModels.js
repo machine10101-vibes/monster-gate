@@ -21,6 +21,10 @@ function blob(m, cx, cy, cz, rx, ry, rz, color, seed, noise = 0.3) {
 const ORES = {
   copper: { vein: 0xe0823a, hi: 0xffb86a, lo: 0xa8501e, patina: 0x4aa58a, spark: 0xffd9a0 },
   tin: { vein: 0xc4d2e8, hi: 0xf4f8ff, lo: 0x7f8ca6, patina: 0x8fb4d8, spark: 0xffffff },
+  iron: { vein: 0x8a6a5a, hi: 0xc8a090, lo: 0x5a4038, patina: 0x6a5048, spark: 0xe8d0c0 },
+  coal: { vein: 0x2a2a32, hi: 0x5a5a66, lo: 0x141418, patina: 0x3a3a44, spark: 0x9a9aaa },
+  mithril: { vein: 0x4a7ab0, hi: 0x8ec4ff, lo: 0x2a5080, patina: 0x6a9ad0, spark: 0xd0e8ff },
+  adamant: { vein: 0x3a8a4a, hi: 0x7ad090, lo: 0x246034, patina: 0x4aaa5a, spark: 0xc8f0d0 },
 };
 
 const NEIGHBORS = [
@@ -29,7 +33,7 @@ const NEIGHBORS = [
 
 /** Chunky boulder with ore seams. `depleted` leaves a dull, cracked stump. */
 export function buildOreRock(kind, seed = 1, depleted = false) {
-  const ore = ORES[kind];
+  const ore = ORES[kind] || ORES.iron;
   const M = new VoxelModel(24, 20, 24);
   const stone = (x, y, z, d) => {
     const t = hash3(x >> 1, y >> 1, z >> 1, seed);
@@ -265,9 +269,9 @@ export function buildDock({ length = 11.1, width = 2.4, baseY = -1.5, deckY = 1,
 /* ------------------------------------------------------------------ */
 
 function oreChunk(kind) {
-  const ore = ORES[kind];
+  const ore = ORES[kind] || ORES.iron;
   const M = new VoxelModel(16, 14, 16);
-  const seed = kind === 'copper' ? 4 : 9;
+  const seed = { copper: 4, tin: 9, iron: 14, coal: 19, mithril: 24, adamant: 29 }[kind] || 9;
   blob(M, 8, 5, 8, 6, 4.4, 5.6, (x, y, z) => J(mix(0x6f747d, 0x8e939c, hash3(x >> 1, y >> 1, z >> 1, seed)), x, y, z, seed, 0.07), seed, 0.4);
   blob(M, 5, 3, 9, 3.6, 3, 3.4, (x, y, z) => J(mix(0x626770, 0x80858e, hash3(x >> 1, y >> 1, z >> 1, seed + 1)), x, y, z, seed + 1, 0.07), seed + 1, 0.4);
   const spots = [[8, 9, 7], [11, 6, 9], [5, 7, 5], [9, 5, 12], [4, 4, 9]];
@@ -777,6 +781,10 @@ function tintFish(id, mode) {
 const GOODS_MODELS = {
   copper_ore: () => oreChunk('copper'),
   tin_ore: () => oreChunk('tin'),
+  iron_ore: () => oreChunk('iron'),
+  coal: () => oreChunk('coal'),
+  mithril_ore: () => oreChunk('mithril'),
+  adamant_ore: () => oreChunk('adamant'),
   shrimp: shrimpModel,
   trout: troutModel,
   pikeminnow: pikeMinnowModel,
@@ -809,6 +817,9 @@ const GOODS_MODELS = {
   oak_logs: () => logStack('oak'),
   maple_logs: () => logStack('maple'),
   iron_bar: ironBar,
+  steel_bar: () => tintBar(0xb8c0c8, 0x6e7680),
+  mithril_bar: () => tintBar(0x8ec4ff, 0x2a5080),
+  adamant_bar: () => tintBar(0x7ad090, 0x246034),
   arrowhead: arrowHead,
   feather,
   birch_shaft: () => arrowShaft('birch'),
@@ -820,9 +831,13 @@ const GOODS_MODELS = {
 };
 
 function ironBar() {
+  return tintBar(0xd7dee6, 0x6e7680);
+}
+
+function tintBar(hi, lo) {
   const M = new VoxelModel(22, 8, 8);
-  M.box(1, 2, 2, 20, 6, 6, (x, y, z) => J(y === 5 ? 0xd7dee6 : y === 2 ? 0x6e7680 : 0xb7c0c8, x, y, z, 4, 0.05));
-  M.box(1, 3, 3, 20, 5, 5, 0x9aa3ab);
+  M.box(1, 2, 2, 20, 6, 6, (x, y, z) => J(y === 5 ? hi : y === 2 ? lo : mix(hi, lo, 0.45), x, y, z, 4, 0.05));
+  M.box(1, 3, 3, 20, 5, 5, mix(hi, lo, 0.35));
   return [M, 0.05, 11, 0, 4];
 }
 

@@ -207,7 +207,21 @@ export function castSkill(game, id) {
   return true;
 }
 
+/** Active skill damage grows with spent tree points and hunt rank. */
+export function abilityMul(game) {
+  const spent = game.progress?.skillPoints?.().spent || 0;
+  const rank = game.rank || 0;
+  return 1 + spent * 0.05 + rank * 0.06;
+}
+
+function scaledSkill(game, s) {
+  const mul = abilityMul(game);
+  const n = (v) => (v ? Math.max(1, Math.round(v * mul)) : v);
+  return { ...s, power: n(s.power), dps: n(s.dps) };
+}
+
 function effect(game, s) {
+  s = scaledSkill(game, s);
   switch (s.id) {
     case 'shieldbash':
       return shieldBash(game, s);

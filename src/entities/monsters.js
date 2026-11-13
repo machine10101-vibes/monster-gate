@@ -59,10 +59,10 @@ const DEFS = {
   boar: { name: 'Thorn Boar', hp: 38, radius: 0.7, speed: 2.5, dmg: 3, gold: [5, 10], aggro: 10, build: buildBoar },
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
   budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
-  darksycledragon: { name: 'Darksycle Dragon', hp: 220, radius: 1.9, speed: 2.7, dmg: 8, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
+  darksycledragon: { name: 'Darksycle Dragon', hp: 155, radius: 1.9, speed: 2.7, dmg: 5, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
   snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
-  demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 7, gold: [90, 140], aggro: 17, build: buildDemonKnight },
-  holyknight: { name: 'Holy Knight', hp: 300, radius: 1.05, speed: 3.0, dmg: 7, gold: [90, 140], aggro: 17, build: buildHolyKnight },
+  demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 5, gold: [90, 140], aggro: 14, build: buildDemonKnight },
+  holyknight: { name: 'Holy Knight', hp: 300, radius: 1.05, speed: 3.0, dmg: 5, gold: [90, 140], aggro: 14, build: buildHolyKnight },
   orcscout: { name: 'Orc Scout', hp: 36, radius: 0.6, speed: 2.7, dmg: 4, gold: [2, 8], aggro: 12, build: buildOrcScout },
 };
 

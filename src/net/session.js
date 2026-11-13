@@ -1,6 +1,8 @@
 import { joinRoom, selfId } from 'trystero';
 
 export const MAX_PLAYERS = 6;
+/** Guest join waits this long for the host before restoring the local hunt. */
+export const JOIN_MS = 15000;
 const APP = { appId: 'monster-gate-waygate' };
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -50,6 +52,22 @@ export class Session {
     this.onChange = () => {};
     this.poseT = 0;
     this.worldT = 0;
+    this.joinTimer = null;
+  }
+
+  clearJoinTimer() {
+    if (this.joinTimer) {
+      clearTimeout(this.joinTimer);
+      this.joinTimer = null;
+    }
+  }
+
+  failJoin() {
+    this.joinTimer = null;
+    if (this.role !== 'guest' || this.game.guestBound) return;
+    this.status = 'The host did not answer. Your hunt is still here.';
+    this.game.hud?.toast(this.status, 3200);
+    this.leave();
   }
 
   get count() {
@@ -57,10 +75,22 @@ export class Session {
   }
 
   host(name) {
+    if (this.game.wallet?.kind === 'guest') {
+      this.status = 'Sign in with an account to hunt with friends.';
+      this.game.hud?.toast(this.status, 2800);
+      this.onChange();
+      return;
+    }
     this.connect('host', makeCode(), name);
   }
 
   join(name, code) {
+    if (this.game.wallet?.kind === 'guest') {
+      this.status = 'Sign in with an account to hunt with friends.';
+      this.game.hud?.toast(this.status, 2800);
+      this.onChange();
+      return;
+    }
     const clean = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (clean.length < 4) {
       this.status = 'Enter the 4-character code from the host.';
@@ -71,6 +101,7 @@ export class Session {
   }
 
   connect(role, code, name) {
+    this.clearJoinTimer();
     this.leave(false);
     this.role = role;
     this.code = code;
@@ -154,7 +185,10 @@ export class Session {
     this.status = role === 'host'
       ? 'You are hosting. Share the code with up to 5 friends.'
       : 'Joining world ' + code + '…';
-    if (role === 'guest') this.game.suspendLocalHunt();
+    if (role === 'guest') {
+      this.game.parkLocalHunt();
+      this.joinTimer = setTimeout(() => this.failJoin(), JOIN_MS);
+    }
     this.onChange();
   }
 
@@ -204,6 +238,7 @@ export class Session {
   }
 
   leave(notify = true) {
+    this.clearJoinTimer();
     const wasGuest = this.role === 'guest';
     const room = this.room;
     this.room = null;
