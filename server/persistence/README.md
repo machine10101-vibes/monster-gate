@@ -96,14 +96,30 @@ Validation, unique-name, and version-conflict errors are not retried.
 Adapters: `createMemoryAdapter()`, `createNoopAdapter()`, and (lazy)
 `openPersistence()` → Supabase when env is set.
 
-Thrown errors are `PersistenceError` with `code`:
+Thrown errors are `PersistenceError`. Import `PersistErrorCodes` from this
+module and switch on `err.code` — do not string-match messages except
+`name_taken`, whose text is always `That hunter name is already taken.`
 
-- `invalid` — bad UUID, name, or payload
-- `not_found` — save before create
-- `conflict` — stale `version`
-- `name_taken` — unique hunter name
-- `already_imported` — local save already folded in
-- `unavailable` — database / network after retries
+```js
+import { PersistErrorCodes, PersistenceError } from './persistence/index.js';
+
+try {
+  await persist.createCharacter(userId, name);
+} catch (err) {
+  if (err instanceof PersistenceError && err.code === PersistErrorCodes.NAME_TAKEN) {
+    // ask the player for another name
+  }
+}
+```
+
+| `PersistErrorCodes` | `code` | When |
+| --- | --- | --- |
+| `INVALID` | `invalid` | bad UUID, name, or payload |
+| `NOT_FOUND` | `not_found` | save before create |
+| `CONFLICT` | `conflict` | stale `version` |
+| `NAME_TAKEN` | `name_taken` | unique hunter name (`createCharacter` or rename). Postgres `23505` on `characters_name_lower_idx` maps here, not to `unavailable`. |
+| `ALREADY_IMPORTED` | `already_imported` | local save already folded in |
+| `UNAVAILABLE` | `unavailable` | database / network after retries |
 
 ## State shape
 

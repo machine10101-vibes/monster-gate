@@ -5,7 +5,7 @@ import { xpForLevel } from '../../../src/data/gathering.js';
 import { createMemoryAdapter } from '../adapters/memory.js';
 import { createNoopAdapter } from '../adapters/noop.js';
 import { createPersistence } from '../api.js';
-import { PersistenceError } from '../errors.js';
+import { NAME_TAKEN_MESSAGE, PersistErrorCodes, PersistenceError } from '../errors.js';
 import { MAX_GOLD, MAX_HP, MAX_KILLS, MAX_STACK, WORLD_BOUNDS } from '../schema.js';
 
 const USER = '11111111-1111-4111-8111-111111111111';
@@ -156,12 +156,32 @@ test('importLocalSave unwraps a roster-shaped account save', async () => {
   await db.close();
 });
 
+function isNameTaken(err) {
+  return err instanceof PersistenceError
+    && err.code === PersistErrorCodes.NAME_TAKEN
+    && err.message === NAME_TAKEN_MESSAGE;
+}
+
 test('unique names and missing rows', async () => {
-  const { db } = persist();
+  const { db, adapter } = persist();
   await db.createCharacter(USER, 'Dara');
-  await assert.rejects(() => db.createCharacter(USER_B, 'Dara'), (err) => err.code === 'name_taken');
-  await assert.rejects(() => db.createCharacter('not-a-uuid', 'Eden'), (err) => err.code === 'invalid');
-  assert.equal(await db.loadCharacter(USER_B), null);
+  await assert.rejects(() => db.createCharacter(USER_B, 'Dara'), isNameTaken);
+  await assert.rejects(() => db.createCharacter(USER_B, 'dara'), isNameTaken);
+  await assert.rejects(() => adapter.create(USER_B, 'Dara'), isNameTaken);
+
+  await db.createCharacter(USER_B, 'Eden');
+  await assert.rejects(
+    () => adapter.save(USER_B, { name: 'Dara' }, { expectedVersion: 1 }),
+    isNameTaken,
+  );
+  await assert.rejects(
+    () => db.saveCharacter(USER_B, { name: 'Dara' }, { immediate: true }),
+    isNameTaken,
+  );
+
+  await assert.rejects(() => db.createCharacter('not-a-uuid', 'Eden'), (err) => err.code === PersistErrorCodes.INVALID);
+  const still = await db.loadCharacter(USER_B);
+  assert.equal(still.name, 'Eden');
   await db.close();
 });
 
