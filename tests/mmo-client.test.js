@@ -295,3 +295,25 @@ test('a view that throws on waking does not crash the client', async () => {
   assert.ok(client.ws || view.statuses.some((s) => s.status === 'connecting'));
   client.dispose();
 });
+
+test('name_taken is a fatal distinct error on the view', async () => {
+  const toasts = [];
+  const view = stubView();
+  const game = { hud: { toast: (t) => toasts.push(t) }, wallet: { kind: 'account' } };
+  const client = new MmoClient(game, view, {
+    url: 'ws://world.test',
+    WebSocket: FakeSocket,
+    token: 'bea',
+    guest: false,
+    fetch: okFetch(),
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 20));
+  client.ws.push({ v: 1, type: 'error', code: 'name_taken', message: 'That hunter name is already taken.' });
+  assert.equal(client.fatal, true);
+  assert.equal(client.closed, true);
+  const err = view.statuses.find((s) => s.status === 'error' && s.code === 'name_taken');
+  assert.ok(err);
+  assert.match(err.message, /already taken/i);
+  assert.ok(toasts.some((t) => /already taken/i.test(t)));
+});
