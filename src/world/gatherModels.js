@@ -749,10 +749,25 @@ function tintFish(id, mode) {
       g = Math.min(255, Math.round(l * 0.55 + 28));
       b = Math.min(255, Math.round(l * 0.16 + 8));
     } else {
-      const ash = l * 0.16;
-      r = Math.round(ash + 24);
-      g = Math.round(ash + 18);
-      b = Math.round(ash + 14);
+      const z = Math.floor(i / (M.sx * M.sy));
+      const rem = i - z * M.sx * M.sy;
+      const y = Math.floor(rem / M.sx);
+      const x = rem - y * M.sx;
+      const crack = hash3(x, y, z, 91);
+      if (crack > 0.9) {
+        r = 22;
+        g = 16;
+        b = 12;
+      } else if (crack > 0.84 && l > 120) {
+        r = 168;
+        g = 64;
+        b = 22;
+      } else {
+        const ash = 58 + l * 0.22;
+        r = Math.round(ash + 16);
+        g = Math.round(ash * 0.72 + 10);
+        b = Math.round(ash * 0.48 + 6);
+      }
     }
     data[i] = (v & ~0xffffff) | (r << 16) | (g << 8) | b;
   }
@@ -780,6 +795,15 @@ const GOODS_MODELS = {
   cooked_tuna: () => tintFish('tuna', 'cooked'),
   cooked_stingray: () => tintFish('stingray', 'cooked'),
   cooked_tigershark: () => tintFish('tigershark', 'cooked'),
+  burnt_shrimp: () => tintFish('shrimp', 'burnt'),
+  burnt_trout: () => tintFish('trout', 'burnt'),
+  burnt_pikeminnow: () => tintFish('pikeminnow', 'burnt'),
+  burnt_salmon: () => tintFish('salmon', 'burnt'),
+  burnt_pike: () => tintFish('pike', 'burnt'),
+  burnt_sturgeon: () => tintFish('sturgeon', 'burnt'),
+  burnt_tuna: () => tintFish('tuna', 'burnt'),
+  burnt_stingray: () => tintFish('stingray', 'burnt'),
+  burnt_tigershark: () => tintFish('tigershark', 'burnt'),
   burnt_fish: () => tintFish('trout', 'burnt'),
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),

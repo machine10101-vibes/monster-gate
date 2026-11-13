@@ -6,7 +6,7 @@ import { TALL_KINDS, buildBookModel, buildShieldModel, gripRoll } from '../entit
 import { toonMaterial } from '../engine/materials.js';
 import { buildMaterialModel } from '../entities/gearModels.js';
 import { goodsVoxels } from '../world/gatherModels.js';
-import { GOODS, HEADS_PER_BAR, SHAFT_IDS } from '../data/gathering.js';
+import { GOODS, HEADS_PER_BAR, SHAFT_IDS, isFishGood } from '../data/gathering.js';
 
 /* ------------------------------------------------------------------ */
 /* Offscreen 3D stage: renders the same in-game models to 2D canvases   */
@@ -36,7 +36,7 @@ function buildSubject(spec, silhouette) {
   } else if (spec.kind === 'good') {
     const [gm, size, ox, oy, oz] = goodsVoxels(spec.id);
     tilt.add(meshFrom(gm, ox, oy, oz, toonMaterial({ vertexColors: true }), size));
-    const fishy = spec.id === 'burnt_fish' || spec.id.startsWith('cooked_') || spec.id === 'shrimp' || spec.id === 'trout' || spec.id === 'pikeminnow' || spec.id === 'salmon' || spec.id === 'pike' || spec.id === 'sturgeon' || spec.id === 'tuna' || spec.id === 'stingray' || spec.id === 'tigershark';
+    const fishy = isFishGood(spec.id);
     yaw = fishy ? 0.75 : 0.6;
     pitch = fishy ? 0.3 : 0.24;
   } else if (spec.kind === 'weapon') {
