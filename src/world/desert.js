@@ -46,7 +46,7 @@ export const DESERT_SPECS = {
     banner: ['The South Road', 'Glassroad'], desert: true, shade: 0.1, forest: 0.04, amp: 1.6, base: 3.3, seed: 75,
     rim: {},
     knolls: [[100, 46, 13, 2.2], [40, 70, 9, 1.4], [110, 100, 11, 1.8], [80, 30, 7, -0.6]],
-    roads: [[[72, 0], [70, 40], [52, 86], [28, 118]]],
+    roads: [[[60, 0], [62, 36], [52, 86], [28, 118]]],
     dress: { cactus: 14, scrub: 26, rocks: 16, buttes: 4, palms: 0, reeds: 0, flowers: 12 },
   },
   deepwell: {
@@ -114,16 +114,16 @@ function stampPass(data, visit) {
   if (x1 >= x0) reslopeBand(H, slope, Math.max(0, x0 - 1), Math.min(W - 1, x1 + 1), Math.max(0, z0 - 1), Math.min(W - 1, z1 + 1));
 }
 
-/** A road through Southford's south rim, centered on the vale road, down into the desert. */
+/** A road through Southford's south rim, on the vale road (x = 60), down into Glassroad. */
 export function openSouthfordDesert(data) {
   stampPass(data, (x, z, h) => {
-    if (z < W - 40) return null;
-    const bank = Math.abs(x - 72);
-    if (bank > 28) return null;
-    const fade = smoothstep(W - 40, W - 16, z);
-    const floor = 4.2;
-    const want = bank <= 5 ? floor : floor + (bank - 5) * 0.55;
-    return { h: lerp(h, want, fade), path: bank <= 5 };
+    if (z < W - 48) return null;
+    const bank = Math.abs(x - 60);
+    if (bank > 26) return null;
+    const fade = smoothstep(W - 48, W - 20, z);
+    const floor = 3.6;
+    const want = bank <= 8 ? floor : floor + (bank - 8) * 0.42;
+    return { h: lerp(h, Math.min(h, want), fade), path: bank <= 6 };
   });
 }
 

@@ -125,7 +125,7 @@ export class World {
     if (z >= 0 && z <= 30 && x >= 58 && x <= 86 && h > 0.4 && h < 8.6) return true;
     if (x >= 0 && x <= 46 && z >= 48 && z <= 80 && h > 0.4 && h < 8.6) return true;
     if (x >= 108 && x < W && z >= 82 && z <= 108 && h > 0.4 && h < 8.6) return true;
-    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W - 8 && x >= 14 && x <= 130) return h < 8.6;
+    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W && x >= 14 && x <= 130) return h < 8.6;
     const lz = z - SOUTH_Z;
     if (this.south && x >= 0 && x <= 22 && lz >= 64 && lz <= 108 && h > 0.4 && h < 8.6) return true;
     if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
