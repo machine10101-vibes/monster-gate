@@ -18,7 +18,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { attachDebug, setDebugAutoAttack, tickDebugAutoAttack } from './debug/flags.js';
+import { attachDebug, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
@@ -2843,7 +2843,9 @@ class Game {
   /* ------------------------------ camera ------------------------------ */
   snapCamera() {
     const P = this.player.pos;
-    this.cam.look.set(P.x, P.y + 1.3, P.z);
+    const ahead = Number(this.cam.lookAhead) || 0;
+    const yaw = Number(this.player.yaw) || 0;
+    this.cam.look.set(P.x + Math.sin(yaw) * ahead, P.y + 1.3, P.z + Math.cos(yaw) * ahead);
     this.cam.yaw = this.cam.targetYaw;
     this.positionCamera(0);
   }
@@ -2858,9 +2860,11 @@ class Game {
     const k = dt === 0 ? 1 : Math.min(1, dt * 7);
     c.yaw += (c.targetYaw - c.yaw) * Math.min(1, dt === 0 ? 1 : dt * 9);
     c.dist += (c.targetDist - c.dist) * Math.min(1, dt === 0 ? 1 : dt * 6);
-    const tx = P.x;
+    const ahead = Number(c.lookAhead) || 0;
+    const face = Number(this.player.yaw) || 0;
+    const tx = P.x + Math.sin(face) * ahead;
     const ty = P.y + 1.3;
-    const tz = P.z;
+    const tz = P.z + Math.cos(face) * ahead;
     c.look.x += (tx - c.look.x) * k;
     c.look.y += (ty - c.look.y) * Math.min(1, dt === 0 ? 1 : dt * 5);
     c.look.z += (tz - c.look.z) * k;
@@ -3059,6 +3063,7 @@ class Game {
       }
     }
     if (this.started) this.spawner.update(dt);
+    if (this.started && this.debug) tickDebugTank(this, dt);
     if (this.started && this.wallet) {
       this.saveAcc += dt;
       if (this.saveAcc > 5) {

@@ -353,7 +353,50 @@ h1 em,
 }
 #title .title-inner {
   max-width: min(540px, 92vw);
+  max-height: calc(100dvh - 16px);
+  box-sizing: border-box;
   padding: 28px 28px 22px;
+}
+#title .touch-only {
+  margin-top: 14px;
+  padding: 0 8px 8px;
+  line-height: 1.35;
+}
+@media (max-height: 500px) {
+  #title {
+    align-items: center;
+    padding: 8px;
+  }
+  #title .title-inner {
+    max-height: calc(100dvh - 16px);
+    padding: 8px 16px 14px;
+    overflow: auto;
+  }
+  #title h1 {
+    margin: 2px 0 6px;
+    font-size: clamp(18px, 6.4vh, 28px);
+  }
+  #title .title-inner small {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  #title .wallet-status {
+    min-height: 0;
+    margin: 0 auto 6px;
+    font-size: 12px;
+  }
+  #title .account-choices {
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  #title .account-choices .start {
+    min-height: 34px;
+  }
+  #title .touch-only {
+    margin-top: 8px;
+    padding: 0 6px 8px;
+    font-size: 12px;
+  }
 }
 #title .account-choices .start {
   animation: none;
@@ -379,6 +422,7 @@ h1 em,
 
 /* Brand boot: video already carries the wordmark. Bar + tips sit under it. */
 #loading {
+  --load-chrome: 118px;
   overflow: hidden;
   background:
     radial-gradient(ellipse 72% 58% at 50% 36%, rgba(176, 22, 28, 0.42), transparent 64%),
@@ -399,15 +443,16 @@ h1 em,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-  width: min(760px, 96vw);
-  padding: 8px 8px 18px;
+  gap: 14px;
+  width: min(92vw, calc((100dvh - var(--load-chrome)) * 1.5));
+  padding: 4px 8px 12px;
   background: none;
   border: 0;
 }
 .load-stage {
   position: relative;
-  width: min(720px, 96vw, calc((100dvh - 108px) * 1.5));
+  width: min(92vw, calc((100dvh - var(--load-chrome)) * 1.5));
+  max-height: calc(100dvh - var(--load-chrome));
   aspect-ratio: 3 / 2;
   background: none;
   border: 0;
@@ -496,13 +541,16 @@ h1 em,
   inset: 0;
   z-index: 3;
   margin: 0;
+  padding: 0 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--mg-gold-bright);
-  font-size: 10px;
-  letter-spacing: 0.6px;
+  font-size: 11px;
+  letter-spacing: 0.4px;
   line-height: 1;
+  white-space: nowrap;
+  overflow: visible;
   text-shadow: 0 1px 0 #1a0808, 0 0 8px #000;
   pointer-events: none;
 }
@@ -556,13 +604,18 @@ h1 em,
 .load-runes span:nth-child(4) { bottom: 6%; right: 5%; }
 
 @media (max-height: 500px) {
-  .load-shell { gap: 12px; padding: 4px 8px 10px; }
-  .load-stage { width: min(720px, 88vw, calc((100dvh - 78px) * 1.5)); }
+  #loading { --load-chrome: 84px; }
+  .load-shell { gap: 8px; padding: 2px 8px 8px; }
+  .load-stage,
+  .load-shell {
+    width: min(92vw, calc((100dvh - var(--load-chrome)) * 1.5));
+  }
   #loading .load-bar { height: 20px; }
-  #load-tip { min-height: 1.4em; margin-top: 10px; font-size: 12px; }
+  #loading #load-text { font-size: 10px; padding: 0 18px; }
+  #load-tip { min-height: 1.4em; margin-top: 8px; font-size: 12px; }
 }
 @media (max-width: 420px) {
-  .load-stage { width: min(672px, 94vw, calc((100dvh - 110px) * 1.5)); }
+  #loading { --load-chrome: 124px; }
   .load-runes { font-size: 13px; }
 }
 
@@ -1239,6 +1292,13 @@ body.mmo-view #top-left {
 }
 body.debug-session #mock-wallet-badge {
   top: calc(40px + var(--safe-t));
+}
+#debug-badge {
+  top: calc(8px + var(--safe-t));
+  left: auto;
+  right: calc(10px + var(--safe-r));
+  transform: none;
+  z-index: 90;
 }
 
 /* Weapon cursor: canvas only. Menus and buttons keep a normal pointer. */

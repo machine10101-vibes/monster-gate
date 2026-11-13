@@ -141,6 +141,15 @@ test('setLoadProgress clamps and writes the fill', () => {
   assert.equal(setLoadProgress(fill, text, -2, 'x'), 0);
 });
 
+test('MG-UI-20 loading stage fills the largest 3:2 box above the bar', () => {
+  const theme = src('src/ui/theme.css');
+  const stage = theme.slice(theme.indexOf('.load-stage {'), theme.indexOf('.load-glow'));
+  assert.match(stage, /min\(92vw,\s*calc\(\(100dvh - var\(--load-chrome\)\) \* 1\.5\)\)/);
+  assert.doesNotMatch(stage, /720px/);
+  assert.match(theme, /#loading \{[\s\S]*--load-chrome:\s*118px/);
+  assert.match(theme, /#loading #load-text \{[\s\S]*white-space:\s*nowrap/);
+});
+
 test('index.html loading markup has the clip, no extra title, bar below', () => {
   const html = src('index.html');
   const loading = html.slice(html.indexOf('id="loading"'), html.indexOf('id="title"'));
@@ -192,6 +201,12 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(theme, /\.load-cap \{[\s\S]*rotate\(45deg\)/);
   assert.doesNotMatch(theme, /\.load-vignette/);
   assert.doesNotMatch(html, /load-vignette/);
+  const stage = theme.slice(theme.indexOf('.load-stage {'), theme.indexOf('.load-glow'));
+  assert.match(stage, /min\(92vw,\s*calc\(\(100dvh - var\(--load-chrome\)\) \* 1\.5\)\)/);
+  assert.doesNotMatch(stage, /720px/);
+  assert.match(theme, /#loading #load-text \{[\s\S]*white-space:\s*nowrap/);
+  assert.match(theme, /#loading #load-text \{[\s\S]*overflow:\s*visible/);
+  assert.match(src('src/world/world.js'), /Raising the mountains/);
   const loading = html.slice(html.indexOf('id="loading"'), html.indexOf('id="title"'));
   assert.ok(loading.indexOf('id="load-text"') > loading.indexOf('class="load-bar"'));
   assert.ok(loading.indexOf('id="load-text"') < loading.indexOf('id="load-tip"'));
