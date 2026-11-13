@@ -2,15 +2,18 @@
 
 A 3D pixel (voxel) monster hunting game for desktop and mobile browsers, built with Three.js and Vite.
 
+Play at [https://monstergate.online/](https://monstergate.online/). The previous GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects there after the custom domain is attached. Hunters saved in that browser on github.io do not move with the domain; the first visit offers to bring them over, and Settings has **Import old saves**.
+
 Start in the village of Oakhollow, step out into the fairy-tale Whispering Wood, and hunt the creatures spilling out of the Monster Gate. Mountains ring the map and open fields and farmland surround the town.
 
 ## Run
 
 ```bash
 npm install
-npm run dev      # development server
-npm run build    # production build in dist/
-npm run preview  # serve the production build
+npm run dev           # development server
+npm run build         # production build in dist/ (Vite base `/` for the custom domain)
+npm run build:gh-path # same build with base `/monster-gate/` if you need the old project path
+npm run preview       # serve the production build
 ```
 
 ## Controls
@@ -55,7 +58,7 @@ The world is 100 tiles, ten by ten. Oakhollow is tile 55. Southford, tile 65, is
 
 Southford's eastern bluff holds a cave mouth. Walking into it leaves the overworld for the Darksycle Den, a separate cavern where the Darksycle Dragon lairs. Walk back down the tunnel to return to the vale, just outside the mouth.
 
-Gathering: east of town, the Greyrock Pit is sunk into the ground with a cobbled ramp leading down to it. It holds three copper rocks and two tin rocks. South-west of town, Mirrormere has a walk-out dock with two net spots (shrimp, Fishing 1) and two pole spots (trout, Fishing 3). West of town, the Whispering Wood holds three groves: pale birch and green oak in the meadow (Woodcutting 1), and red maple further into the trees (Woodcutting 10). Stand next to a rock, on the dock, or by a tree and press F: the hunter walks into place, swaps to the pickaxe, net, pole or woodcutter axe, and works until you move, attack or get hurt. A felled tree leaves a stump and grows back. Ore, fish and logs go into the bag (Gathered). Fish can be eaten from there. Logs can be lit from the bag, or by clicking the tinderbox: the hunter kneels, and a campfire burns for a while, then goes out. Birch and oak logs light at Firemaking 1; maple logs need Firemaking 10. Dalla's market stall (the pumpkin stall in town) buys everything. Strength, Agility, Stamina, Mining, Fishing, Woodcutting and Firemaking each level from 1 to 99 on a RuneScape-style XP curve; press H for the stats page. Strength adds 1% melee damage a level, Agility 0.3% move speed, Stamina 1 maximum stamina.
+Gathering: east of town, the Greyrock Pit is sunk into the ground with a cobbled ramp leading down to it. It holds copper rocks and one iron rock. Deepwell, south of Southford, holds iron, coal, mithril and adamite. Titanium is on Cinderfall, platinum on Glimmerfrost. Smelt ore into bars at the smithy; steel is iron ore plus coal. Bram's forge then makes the helm, platebody, gauntlets, platelegs, boots, shield and weapons of that metal. South-west of town, Mirrormere has a walk-out dock with two net spots (shrimp, Fishing 1) and two pole spots (trout, Fishing 3). West of town, the Whispering Wood holds three groves: pale birch and green oak in the meadow (Woodcutting 1), and red maple further into the trees (Woodcutting 10). Stand next to a rock, on the dock, or by a tree and press F: the hunter walks into place, swaps to the pickaxe, net, pole or woodcutter axe, and works until you move, attack or get hurt. A felled tree leaves a stump and grows back. Ore, fish and logs go into the bag (Gathered). Fish can be eaten from there. Logs can be lit from the bag, or by clicking the tinderbox: the hunter kneels, and a campfire burns for a while, then goes out. Birch and oak logs light at Firemaking 1; maple logs need Firemaking 10. Dalla's market stall (the pumpkin stall in town) buys everything. Strength, Agility, Stamina, Mining, Smithing, Fishing, Cooking, Woodcutting and Firemaking each level from 1 to 99 on a RuneScape-style XP curve; press H for the stats page. Strength adds 1% melee damage a level, Agility 0.3% move speed, Stamina 1 maximum stamina. Metal XP, costs and equip levels are in [docs/BALANCE.md](docs/BALANCE.md).
 
 Press K (or Menu → Skill Tree) to choose Warrior, Ranger, or Mage. Each class has three paths, and each path runs five skills deep: a passive, an active, a special, another passive, and a capstone.
 

@@ -1,4 +1,5 @@
 import { verifyKleverSignature } from './verify.js';
+import { signedMessage } from '../../supabase/functions/_shared/linkAuth.js';
 
 export const SESSION_KEY = 'monster-gate-klever-session';
 const PROMPT_LOCK = 'monster-gate-klever-prompt-lock';
@@ -170,11 +171,7 @@ async function connectProvider(kw, mobile) {
   return address;
 }
 
-/**
- * Asks the Klever extension (desktop) or the Klever Wallet app (mobile, inside its browser)
- * to sign a login message. The signature is checked against the address before it is trusted.
- */
-export async function signIn() {
+export async function connectWallet() {
   const mobile = isMobile();
   const kw = await waitForProvider(mobile ? (inKleverHandoff() ? 4000 : 900) : 2500);
   if (!kw) {
@@ -186,16 +183,21 @@ export async function signIn() {
     );
   }
   const address = await connectProvider(kw, mobile);
+  return { kw, address, mobile };
+}
+
+/**
+ * Asks the Klever extension or app to sign a server nonce. The signature is
+ * checked against the address before it is sent. This never creates an account.
+ */
+export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
   holdPageStill();
-  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
-  const nonce = [...nonceBytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-  const message = [
-    'Monster Gate wants you to sign in with your Klever wallet.',
-    'This does not send any coins.',
-    `Address: ${address}`,
-    `Nonce: ${nonce}`,
-    `Issued: ${new Date().toISOString()}`,
-  ].join('\n');
+  const message = signedMessage({
+    purpose,
+    address,
+    nonce,
+    issued: new Date().toISOString(),
+  });
   let signed;
   try {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
@@ -208,7 +210,6 @@ export async function signIn() {
   }
   const signature = signatureText(signed);
   let ok = verifyKleverSignature(message, signature, address);
-  // The extension can also check the signature itself. Trust that only when it names this same address.
   if (!ok && typeof kw.validateSignature === 'function') {
     try {
       const res = await kw.validateSignature(message, signature, address);
@@ -220,9 +221,18 @@ export async function signIn() {
     }
   }
   if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
-  const session = { address, message, signature, at: Date.now() };
-  saveSession(session);
-  return session;
+  return { address, message, signature, nonce };
+}
+
+/**
+ * Connects and signs a locally made nonce. Prefer loginWithKlever, which
+ * uses a server nonce and refuses to create an account from the wallet.
+ */
+export async function signIn() {
+  const { kw, address, mobile } = await connectWallet();
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = [...nonceBytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return signProof('login', nonce, address, kw, mobile);
 }
 
 function saveSession(session) {

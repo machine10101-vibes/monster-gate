@@ -2,6 +2,17 @@
 
 export const BACKUP_SUFFIX = '.bak';
 
+let frozen = false;
+
+/** Session-only debug: block hunt/roster writes without touching existing keys. */
+export function freezeSaves(on) {
+  frozen = !!on;
+}
+
+export function savesFrozen() {
+  return frozen;
+}
+
 function store() {
   try {
     if (typeof localStorage === 'undefined') return null;
@@ -49,6 +60,7 @@ export function readJson(key) {
 }
 
 export function writeJson(key, value) {
+  if (frozen) return;
   const ls = store();
   if (!ls) return;
   try {
@@ -59,6 +71,7 @@ export function writeJson(key, value) {
 }
 
 export function dropKey(key) {
+  if (frozen) return;
   const ls = store();
   if (!ls) return;
   try {
@@ -66,4 +79,35 @@ export function dropKey(key) {
   } catch {
     /* already gone */
   }
+}
+
+/** Write already-serialized save text (the import-save path). */
+export function importRaw(key, text) {
+  if (frozen) return false;
+  const ls = store();
+  if (!ls) return false;
+  try {
+    ls.setItem(key, String(text ?? ''));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Snapshot every localStorage key. Missing storage is an empty object. */
+export function dumpRaw() {
+  const ls = store();
+  const out = {};
+  if (!ls) return out;
+  try {
+    for (let i = 0; i < ls.length; i++) {
+      const key = ls.key(i);
+      if (!key) continue;
+      const value = ls.getItem(key);
+      if (value != null) out[key] = value;
+    }
+  } catch {
+    /* private mode */
+  }
+  return out;
 }

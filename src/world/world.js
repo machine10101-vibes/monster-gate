@@ -11,6 +11,7 @@ import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
+import { buildRift } from './rift.js';
 import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
@@ -83,6 +84,7 @@ export class World {
     return null;
   }
   heightAt(x, z) {
+    if (this.rift?.contains(x, z)) return this.rift.heightAt(x, z);
     if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
     const d = this.dock;
     if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
@@ -105,7 +107,7 @@ export class World {
     return this.heightAt(x, z) < WATER_Y;
   }
   zoneAt(x, z) {
-    if (this.cave?.contains(x, z)) return ZONE.FIELD;
+    if (this.rift?.contains(x, z) || this.cave?.contains(x, z)) return ZONE.FIELD;
     const land = this.landAt(x, z);
     if (!land) return ZONE.MOUNTAIN;
     const lx = Math.floor(x) - land.x0;
@@ -118,6 +120,7 @@ export class World {
     return false;
   }
   playable(x, z) {
+    if (this.rift?.contains(x, z)) return this.rift.walkable(x, z);
     if (this.cave?.contains(x, z)) return this.cave.walkable(x, z);
     const h = this.heightAt(x, z);
     if (Math.hypot(x - CENTER.x, z - CENTER.z) < PLAY_RADIUS) return true;
@@ -382,6 +385,7 @@ export class World {
     dressSouthford(this);
     dressRing(this);
     this.cave = buildCave(this);
+    this.rift = buildRift(this);
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
@@ -500,11 +504,17 @@ export class World {
           return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y);
         }
         void main() {
-          vec2 q = floor(vWorld.xz * 6.0) / 6.0;
-          float n = vn(q * 1.3 + vec2(uTime * 0.35, uTime * 0.2)) * 0.6 + vn(q * 3.1 - vec2(uTime * 0.25, -uTime * 0.3)) * 0.4;
-          vec3 col = mix(uDeep, uShallow, smoothstep(0.25, 0.8, n));
-          float sparkle = step(0.86, vn(q * 5.0 + uTime * 0.8)) * 0.55;
-          float ripple = step(0.74, n) * 0.25;
+          vec2 p = vWorld.xz;
+          float macro = vn(p * 0.055);
+          float mid = vn(p * 0.22 + vec2(uTime * 0.045, -uTime * 0.03));
+          float fine = vn(p * 0.85 + vec2(-uTime * 0.07, uTime * 0.05));
+          float cell = 1.15 + macro * 2.4 + mid * 0.8;
+          vec2 q = floor(p * cell + vec2(mid - 0.5, fine - 0.5) * 1.4) / cell;
+          float n = vn(q * 0.7 + vec2(uTime * 0.1, uTime * 0.07)) * 0.42 + mid * 0.33 + fine * 0.25;
+          vec3 col = mix(uDeep, uShallow, smoothstep(0.18, 0.88, n));
+          col = mix(col, uDeep * 0.72, smoothstep(0.55, 1.0, macro) * 0.4);
+          float sparkle = step(0.9, vn(p * 2.6 + uTime * 0.55)) * 0.4;
+          float ripple = step(0.78, n) * 0.16;
           col += uSky * (sparkle + ripple);
           col *= uLight;
           gl_FragColor = vec4(col, 0.78);
@@ -1044,7 +1054,7 @@ export class World {
     this.streamRadius = radius;
     const pull = (obj) => {
       if (!obj) return;
-      if (obj === this.group || obj === this.cave?.group) {
+      if (obj === this.group || obj === this.cave?.group || obj === this.rift?.group) {
         for (const child of [...obj.children]) pull(child);
         return;
       }

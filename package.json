@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "build:gh-path": "VITE_BASE=/monster-gate/ vite build",
     "preview": "vite preview --host",
+    "start:server": "node server/index.js",
+    "test": "node --test tests/*.js",
     "test:persistence": "node --test server/persistence/tests/*.test.js"
   },
   "repository": {
@@ -23,6 +26,7 @@
     "bech32": "^2.0.0",
     "three": "^0.187.0",
     "trystero": "^0.26.0",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "ws": "^8.23.0"
   }
 }

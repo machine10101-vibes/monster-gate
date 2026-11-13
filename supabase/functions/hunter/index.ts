@@ -1,11 +1,12 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { mergeAccountProgress } from "./huntMerge.js";
-import { loginMessageOk, verifyKleverSignature } from "./verify.ts";
+import {
+  RETIRED_HUNTER_ERROR,
+  RETIRED_HUNTER_STATUS,
+  isRetiredHunterOp,
+} from "../_shared/retiredHunter.js";
 
-const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
-const TOKEN_RE = /^[0-9a-f]{64}$/;
-const TOKEN_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BODY = 300_000;
 const MAX_PROGRESS = 262144;
 
@@ -13,35 +14,10 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
 }
 
-function hex(bytes: Uint8Array): string {
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return hex(new Uint8Array(digest));
-}
-
 type Admin = {
   from: (table: string) => any;
   rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };
-
-async function sessionAddress(admin: Admin, token: unknown): Promise<string | Response> {
-  if (typeof token !== "string" || !TOKEN_RE.test(token)) return json({ error: "Sign in with Klever again." }, 401);
-  const tokenHash = await sha256Hex(token);
-  const { data, error } = await admin
-    .from("hunter_sessions")
-    .select("address, expires_at")
-    .eq("token_hash", tokenHash)
-    .maybeSingle();
-  if (error) return json({ error: "The guild record could not be opened." }, 503);
-  const row = data as { address?: string; expires_at?: string } | null;
-  if (!row?.address || !row.expires_at || Date.parse(row.expires_at) <= Date.now()) {
-    return json({ error: "Sign in with Klever again." }, 401);
-  }
-  return row.address;
-}
 
 function sanitizeProgress(value: unknown, now: number): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -53,45 +29,6 @@ function sanitizeProgress(value: unknown, now: number): Record<string, unknown> 
   progress.savedAt = Math.floor(savedAt);
   if (JSON.stringify(progress).length > MAX_PROGRESS) return null;
   return progress;
-}
-
-async function auth(admin: Admin, body: Record<string, unknown>): Promise<Response> {
-  const address = typeof body.address === "string" ? body.address : "";
-  const message = typeof body.message === "string" ? body.message : "";
-  const signature = typeof body.signature === "string" ? body.signature : "";
-  if (!ADDRESS_RE.test(address) || !loginMessageOk(message, address) || !verifyKleverSignature(message, signature, address)) {
-    return json({ error: "The Klever signature was not accepted." }, 401);
-  }
-
-  await admin.from("hunter_sessions").delete().lt("expires_at", new Date().toISOString());
-
-  const token = hex(crypto.getRandomValues(new Uint8Array(32)));
-  const expiresAt = new Date(Date.now() + TOKEN_MS).toISOString();
-  const { error } = await admin.from("hunter_sessions").insert({
-    token_hash: await sha256Hex(token),
-    address,
-    expires_at: expiresAt,
-  });
-  if (error) return json({ error: "The guild record could not be opened." }, 503);
-  return json({ token, expiresAt });
-}
-
-async function load(admin: Admin, body: Record<string, unknown>): Promise<Response> {
-  const address = await sessionAddress(admin, body.token);
-  if (address instanceof Response) return address;
-  const { data, error } = await admin
-    .from("hunters")
-    .select("progress, revision")
-    .eq("address", address)
-    .maybeSingle();
-  if (error) return json({ error: "The guild record could not be opened." }, 503);
-  const row = data as { progress?: Record<string, unknown>; revision?: number | string } | null;
-  if (!row?.progress) return json({ progress: null, revision: 0, savedAt: 0 });
-  return json({
-    progress: row.progress,
-    revision: Number(row.revision) || 0,
-    savedAt: Number(row.progress.savedAt) || 0,
-  });
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -166,25 +103,8 @@ async function accountSave(admin: Admin, body: Record<string, unknown>): Promise
   return json({ revision, savedAt, progress: merged });
 }
 
-async function save(admin: Admin, body: Record<string, unknown>): Promise<Response> {
-  const address = await sessionAddress(admin, body.token);
-  if (address instanceof Response) return address;
-  const progress = sanitizeProgress(body.progress, Date.now());
-  if (!progress) return json({ error: "That hunt cannot be stored." }, 400);
-  const { data, error } = await admin.rpc("save_hunt", { p_address: address, p_progress: progress });
-  if (error || !data || typeof data !== "object") return json({ error: "The guild record could not be saved." }, 503);
-  const result = data as { ok?: boolean; revision?: number | string; savedAt?: number | string; progress?: unknown };
-  const savedAt = Number(result.savedAt) || 0;
-  const revision = Number(result.revision) || 0;
-  if (!result.ok) {
-    return json({
-      error: "A newer hunt is already saved to this wallet.",
-      progress: result.progress ?? null,
-      revision,
-      savedAt,
-    }, 409);
-  }
-  return json({ revision, savedAt });
+function retiredHunter(): Response {
+  return json({ error: RETIRED_HUNTER_ERROR, gone: true }, RETIRED_HUNTER_STATUS);
 }
 
 export default {
@@ -209,10 +129,8 @@ export default {
     } catch {
       return json({ error: "The request was not understood." }, 400);
     }
+    if (isRetiredHunterOp(body.op)) return retiredHunter();
     const admin = ctx.supabaseAdmin as unknown as Admin;
-    if (body.op === "auth") return auth(admin, body);
-    if (body.op === "load") return load(admin, body);
-    if (body.op === "save") return save(admin, body);
     if (body.op === "account-load") return accountLoad(admin, body);
     if (body.op === "account-save") return accountSave(admin, body);
     return json({ error: "The request was not understood." }, 400);

@@ -4,6 +4,7 @@ import { buildCampfire, goodsVoxels } from '../world/gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
+import { INVENTORY_FULL } from './stacks.js';
 
 const TOOL_HELD = { mine: 'pick', net: 'fishnet', rod: 'fishrod', chop: 'axe', light: 'tinder' };
 const STRIKE_AT = 0.56;
@@ -352,12 +353,27 @@ export class Gathering {
     this.mined(s, rock, n);
   }
 
+  bagGood(id, n, x, y, z) {
+    const g = this.game;
+    const added = g.progress.addGood(id, n);
+    if (added < n) {
+      g.dropStack('good', id, n - added, x, y, z);
+      g.hud.toast(INVENTORY_FULL, 1800);
+    }
+    return added;
+  }
+
   mined(s, rock, n) {
     const g = this.game;
     const P = g.player.pos;
-    g.progress.addGood(rock.ore, 1);
+    const added = this.bagGood(rock.ore, 1, n.x, n.y + 0.9, n.z);
+    if (added) {
+      if (g.bounties?.onGather(rock.ore, 1) && g.hud.panelId === 'quest' && g.hud.journalRefresh) g.hud.journalRefresh();
+      g.hud.toast(`You manage to mine some ${n.type}.`, 1800);
+      g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[rock.ore].name}`, 'gold');
+      this.flyGood(rock.ore, n.x, n.y + 0.9, n.z, P.x, P.y + 1.3, P.z, 0.75);
+    }
     this.train('mining', rock.xp, true);
-    g.hud.toast(`You manage to mine some ${n.type}.`, 1800);
     g.audio.coin();
     g.fx.burst(n.x, n.y + 0.8, n.z, [0x8d939c, 0x6f747d, 0xb3b8c0], 14, 3.6, 0.12, 0.8, 11, 2.4);
     g.fx.shockwave(n.x, n.y, n.z, 0xb9ae98, 1.2);
@@ -366,8 +382,6 @@ export class Gathering {
     n.respawnT = rock.respawn;
     n.full.visible = false;
     n.dead.visible = true;
-    this.flyGood(rock.ore, n.x, n.y + 0.9, n.z, P.x, P.y + 1.3, P.z, 0.75);
-    g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[rock.ore].name}`, 'gold');
     g.bagDirty = true;
     this.cancel();
   }
@@ -417,9 +431,14 @@ export class Gathering {
   felled(s, tree, n) {
     const g = this.game;
     const P = g.player.pos;
-    g.progress.addGood(tree.log, 1);
+    const added = this.bagGood(tree.log, 1, n.x, n.y + 1.2, n.z);
+    if (added) {
+      if (g.bounties?.onGather(tree.log, 1) && g.hud.panelId === 'quest' && g.hud.journalRefresh) g.hud.journalRefresh();
+      g.hud.toast(`You get some ${GOODS[tree.log].name.toLowerCase()}.`, 1800);
+      g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[tree.log].name}`, 'gold');
+      this.flyGood(tree.log, n.x, n.y + 1.2, n.z, P.x, P.y + 1.3, P.z, 0.75);
+    }
     this.train('woodcutting', tree.xp, true);
-    g.hud.toast(`You get some ${GOODS[tree.log].name.toLowerCase()}.`, 1800);
     g.audio.tone(140, 0.14, 'triangle', 0.18, -40);
     g.audio.coin();
     g.fx.burst(n.x, n.y + 1.6, n.z, tree.chip, 18, 3.8, 0.12, 0.9, 6, 2.2);
@@ -430,8 +449,6 @@ export class Gathering {
     n.full.visible = false;
     n.full.rotation.z = 0;
     n.dead.visible = true;
-    this.flyGood(tree.log, n.x, n.y + 1.2, n.z, P.x, P.y + 1.3, P.z, 0.75);
-    g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[tree.log].name}`, 'gold');
     g.bagDirty = true;
     this.cancel();
   }
@@ -730,21 +747,24 @@ export class Gathering {
     }
     const burnt = Math.random() < burnChance(fish, lvl);
     const made = burnt ? burntGoodId(fish.id) : fish.cooked;
-    g.progress.addGood(made, 1);
+    const added = this.bagGood(made, 1, s.fire.x, s.fire.y + 0.6, s.fire.z);
     const P = g.player.pos;
     this.train('cooking', burnt ? burnXp(fish) : fish.cookXp, true);
-    if (burnt) {
-      g.hud.toast(`You burn the ${fish.name.toLowerCase()}.`, 1600);
-      g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, '');
-      g.audio.noise(0.16, 0.12, 500, 0.7);
-      g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0x2a2a2a, 0x6a6a6a, 0xffe0b0], 10, 1.8, 0.07, 0.6, 2, 1.4);
-    } else {
-      g.hud.toast(`You cook the ${fish.name.toLowerCase()}.`, 1600);
-      g.audio.tone(520, 0.08, 'triangle', 0.08, 240);
-      g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0xfff2a0, 0xff8a22, 0xffe0b0], 10, 1.8, 0.06, 0.6, 2, 1.4);
-      g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, 'gold');
-    }
-    this.flyGood(made, s.fire.x, s.fire.y + 0.7, s.fire.z, P.x, P.y + 1.3, P.z, 0.7);
+    if (added) {
+      if (burnt) {
+        g.hud.toast(`You burn the ${fish.name.toLowerCase()}.`, 1600);
+        g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, '');
+        g.audio.noise(0.16, 0.12, 500, 0.7);
+        g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0x2a2a2a, 0x6a6a6a, 0xffe0b0], 10, 1.8, 0.07, 0.6, 2, 1.4);
+      } else {
+        g.hud.toast(`You cook the ${fish.name.toLowerCase()}.`, 1600);
+        g.audio.tone(520, 0.08, 'triangle', 0.08, 240);
+        g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0xfff2a0, 0xff8a22, 0xffe0b0], 10, 1.8, 0.06, 0.6, 2, 1.4);
+        g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, 'gold');
+      }
+      this.flyGood(made, s.fire.x, s.fire.y + 0.7, s.fire.z, P.x, P.y + 1.3, P.z, 0.7);
+    } else if (burnt) g.audio.noise(0.16, 0.12, 500, 0.7);
+    else g.audio.tone(520, 0.08, 'triangle', 0.08, 240);
     g.bagDirty = true;
     if (g.progress.good(s.raw) < 1) this.cancel(true);
   }
@@ -887,14 +907,17 @@ export class Gathering {
     const g = this.game;
     const P = g.player.pos;
     const fish = s.fish;
-    g.progress.addGood(fish.id, 1);
+    const added = this.bagGood(fish.id, 1, tx, sp.y + 0.3, tz);
+    if (added) {
+      if (g.bounties?.onGather(fish.id, 1) && g.hud.panelId === 'quest' && g.hud.journalRefresh) g.hud.journalRefresh();
+      g.hud.toast(fish.catchText, 1800);
+      g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[fish.id].name}`, 'gold');
+      this.flyGood(fish.id, tx, sp.y + 0.3, tz, P.x, P.y + 1.4, P.z, 0.8);
+    }
     this.train('fishing', fish.xp, true);
-    g.hud.toast(fish.catchText, 1800);
     g.audio.coin();
     g.fx.burst(tx, sp.y + 0.2, tz, [0xbfeaff, 0xffffff], 14, 3.4, 0.08, 0.7, 8, 2.8);
     g.fx.ring(tx, sp.y + 0.07, tz, 0xbfeaff, 14, 2.4, 0.08, 0.6);
-    this.flyGood(fish.id, tx, sp.y + 0.3, tz, P.x, P.y + 1.4, P.z, 0.8);
-    g.hud.floatText(...g.screenOf(P.x, P.y + 3.7, P.z), `+1 ${GOODS[fish.id].name}`, 'gold');
     g.bagDirty = true;
   }
 

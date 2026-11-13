@@ -1,4 +1,5 @@
 /** Skill levels, rocks, trees, fishing spots and the goods they yield. */
+import { COAL_ROCK, METALS, metalBarGood, metalOreGood, metalRock, metalSmelt, miningUnlocks, smithingUnlocks } from './metals.js';
 
 export const MAX_LEVEL = 99;
 
@@ -22,7 +23,7 @@ export function levelForXp(xp) {
   return lvl;
 }
 
-export const SKILL_ORDER = ['strength', 'agility', 'stamina', 'mining', 'fishing', 'cooking', 'woodcutting', 'firemaking'];
+export const SKILL_ORDER = ['strength', 'agility', 'stamina', 'mining', 'smithing', 'fishing', 'cooking', 'woodcutting', 'firemaking'];
 
 export const LEVEL_SKILLS = {
   strength: {
@@ -71,16 +72,17 @@ export const LEVEL_SKILLS = {
     id: 'mining',
     name: 'Mining',
     color: '#d98a3d',
-    blurb: 'Swing a pickaxe in the Greyrock Pit, then the Deepwell dig south of Southford. Higher levels open iron, coal, mithril and adamant, and find ore faster.',
+    blurb: 'Swing a pickaxe in the Greyrock Pit, then Deepwell, Cinderfall and Glimmerfrost. Higher levels open iron, coal, mithril, adamite, titanium and platinum, and find ore faster.',
     effect: (lvl) => `${Math.round(mineChance(ROCKS.copper.base, lvl) * 100)}% ore strike chance`,
-    unlocks: [
-      [1, 'Copper ore'],
-      [1, 'Tin ore'],
-      [15, 'Iron ore'],
-      [30, 'Coal'],
-      [50, 'Mithril ore'],
-      [70, 'Adamant ore'],
-    ],
+    unlocks: miningUnlocks(),
+  },
+  smithing: {
+    id: 'smithing',
+    name: 'Smithing',
+    color: '#c8b070',
+    blurb: 'Smelt ore into bars at the smithy, then forge armor and weapons at Bram\'s forge. Steel is iron plus coal. Each metal wants a higher Smithing level and more bars.',
+    effect: (lvl) => `Smelt and forge up to ${METALS.filter((m) => m.smith <= lvl).slice(-1)[0]?.name || 'Copper'}`,
+    unlocks: smithingUnlocks(),
   },
   fishing: {
     id: 'fishing',
@@ -149,72 +151,8 @@ export const CHOP_SWING = 2.15;
 export const LIGHT_TIME = 2.35;
 
 export const ROCKS = {
-  copper: {
-    id: 'copper',
-    name: 'Copper rock',
-    ore: 'copper_ore',
-    level: 1,
-    xp: 17.5,
-    base: 0.5,
-    respawn: 11,
-    color: 0xe0823a,
-    spark: [0xffb066, 0xff8a3a, 0xffe0b0],
-  },
-  tin: {
-    id: 'tin',
-    name: 'Tin rock',
-    ore: 'tin_ore',
-    level: 1,
-    xp: 17.5,
-    base: 0.5,
-    respawn: 11,
-    color: 0xc8d4e8,
-    spark: [0xe8f2ff, 0xb8c8e0, 0xffffff],
-  },
-  iron: {
-    id: 'iron',
-    name: 'Iron rock',
-    ore: 'iron_ore',
-    level: 15,
-    xp: 35,
-    base: 0.42,
-    respawn: 16,
-    color: 0x8a6a5a,
-    spark: [0xc8a090, 0x6a5048, 0xe8d0c0],
-  },
-  coal: {
-    id: 'coal',
-    name: 'Coal rock',
-    ore: 'coal',
-    level: 30,
-    xp: 50,
-    base: 0.4,
-    respawn: 22,
-    color: 0x2a2a32,
-    spark: [0x5a5a66, 0x1a1a20, 0x9a9aaa],
-  },
-  mithril: {
-    id: 'mithril',
-    name: 'Mithril rock',
-    ore: 'mithril_ore',
-    level: 50,
-    xp: 80,
-    base: 0.34,
-    respawn: 36,
-    color: 0x4a7ab0,
-    spark: [0x8ec4ff, 0x2a5080, 0xd0e8ff],
-  },
-  adamant: {
-    id: 'adamant',
-    name: 'Adamant rock',
-    ore: 'adamant_ore',
-    level: 70,
-    xp: 95,
-    base: 0.3,
-    respawn: 48,
-    color: 0x3a8a4a,
-    spark: [0x7ad090, 0x246034, 0xc8f0d0],
-  },
+  ...Object.fromEntries(METALS.map(metalRock).filter(Boolean).map((r) => [r.id, r])),
+  coal: COAL_ROCK,
 };
 
 export const FISH = {
@@ -399,7 +337,6 @@ export const TREES = {
 
 export const GOODS = {
   copper_ore: { id: 'copper_ore', name: 'Copper ore', desc: 'Orange-veined ore from the Greyrock Pit.', price: 4, kind: 'ore' },
-  tin_ore: { id: 'tin_ore', name: 'Tin ore', desc: 'Silvery ore from the Greyrock Pit.', price: 4, kind: 'ore' },
   shrimp: { id: 'shrimp', name: 'Shrimp', desc: 'Netted in Mirrormere. Eat for 2 health, or cook it on a fire.', price: 3, heal: 2, kind: 'fish' },
   trout: { id: 'trout', name: 'Trout', desc: 'Pole-caught in Mirrormere. Eat for 6 health, or cook it on a fire.', price: 9, heal: 6, kind: 'fish' },
   pikeminnow: { id: 'pikeminnow', name: 'Pike minnow', desc: 'Netted in the Silverrun river. Eat for 4 health, or cook it on a fire.', price: 7, heal: 4, kind: 'fish' },
@@ -438,14 +375,9 @@ Object.assign(GOODS, {
   birch_logs: { id: 'birch_logs', name: 'Birch logs', desc: 'Pale wood from the meadow west of Oakhollow. Light it with a tinderbox, or shave it into birch arrow shafts.', price: 4, kind: 'log', tree: 'birch' },
   oak_logs: { id: 'oak_logs', name: 'Oak logs', desc: 'Heavy timber from the oak grove. Light it with a tinderbox, or shave it into oak arrow shafts.', price: 8, kind: 'log', tree: 'oak' },
   maple_logs: { id: 'maple_logs', name: 'Maple logs', desc: 'Red maple wood. Light it with a tinderbox once Firemaking is 10, or shave it into maple arrow shafts.', price: 16, kind: 'log', tree: 'maple' },
-  iron_ore: { id: 'iron_ore', name: 'Iron ore', desc: 'A heavy rust-brown lump from Greyrock and Deepwell. Smelt it alone into an iron bar, or with coal into steel.', price: 8, kind: 'ore' },
-  coal: { id: 'coal', name: 'Coal', desc: 'Black fuel from the Deepwell dig. The smithy burns it to make steel, mithril and adamant.', price: 10, kind: 'ore' },
-  mithril_ore: { id: 'mithril_ore', name: 'Mithril ore', desc: 'Blue-veined ore from Deepwell. Two coal and one ore make a mithril bar.', price: 28, kind: 'ore' },
-  adamant_ore: { id: 'adamant_ore', name: 'Adamant ore', desc: 'Green-veined ore from the deepest Deepwell seams. Three coal and one ore make an adamant bar.', price: 52, kind: 'ore' },
-  iron_bar: { id: 'iron_bar', name: 'Iron bar', desc: 'Smelted from one copper ore and one tin ore, or from a single iron ore. The stock of every iron piece.', price: 12, kind: 'bar' },
-  steel_bar: { id: 'steel_bar', name: 'Steel bar', desc: 'Smelted from one iron ore and one coal. Heavier than iron, and it sells for more.', price: 28, kind: 'bar' },
-  mithril_bar: { id: 'mithril_bar', name: 'Mithril bar', desc: 'Smelted from one mithril ore and two coal. Light blue steel from Deepwell.', price: 72, kind: 'bar' },
-  adamant_bar: { id: 'adamant_bar', name: 'Adamant bar', desc: 'Smelted from one adamant ore and three coal. Green metal from the deepest seams.', price: 140, kind: 'bar' },
+  coal: { id: 'coal', name: 'Coal', desc: 'Black fuel from the Deepwell dig. The smithy burns it to make steel and every metal above iron.', price: 10, kind: 'ore' },
+  ...Object.fromEntries(METALS.map(metalOreGood).filter(Boolean).map((g) => [g.id, g])),
+  ...Object.fromEntries(METALS.map(metalBarGood).map((g) => [g.id, g])),
   arrowhead: { id: 'arrowhead', name: 'Iron arrowhead', desc: 'Forged at the blacksmith. One bar makes fifteen. Fits any arrow shaft, then a feather finishes the arrow.', price: 2, kind: 'part' },
   feather: { id: 'feather', name: 'Feather', desc: 'Plucked from a chicken. One feather fletches one arrow shaft.', price: 2, kind: 'part' },
   birch_shaft: { id: 'birch_shaft', name: 'Birch arrow shaft', desc: 'Shaved from a birch log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 1, kind: 'part', wood: 'birch' },
@@ -454,21 +386,17 @@ Object.assign(GOODS, {
   iron_arrow: { id: 'iron_arrow', name: 'Iron arrow', desc: 'An iron head on a wooden shaft. A quiver holds 99.', price: 3, kind: 'arrow' },
 });
 const FISH_GOODS = Object.keys(FISH).flatMap((id) => [id, `cooked_${id}`, `burnt_${id}`]);
+const ORE_IDS = METALS.filter((m) => m.ore).map((m) => m.oreId);
+const BAR_IDS = METALS.map((m) => m.barId);
 export const GOODS_ORDER = [
-  'copper_ore', 'tin_ore', 'iron_ore', 'coal', 'mithril_ore', 'adamant_ore',
-  'iron_bar', 'steel_bar', 'mithril_bar', 'adamant_bar',
+  ...ORE_IDS, 'coal',
+  ...BAR_IDS,
   'arrowhead', 'feather', 'birch_shaft', 'oak_shaft', 'maple_shaft', 'iron_arrow',
   ...FISH_GOODS, 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs',
 ];
 
-/** Named smithy recipes. `ins` is [good, count] pairs. `n` is bars produced. */
-export const SMELTS = {
-  iron: { id: 'iron', name: 'Iron bar', ins: [['copper_ore', 1], ['tin_ore', 1]], out: 'iron_bar', n: 1, hint: 'Copper and tin from Greyrock Pit.' },
-  iron_ore: { id: 'iron_ore', name: 'Iron bar', ins: [['iron_ore', 1]], out: 'iron_bar', n: 1, hint: 'One iron ore, no coal.' },
-  steel: { id: 'steel', name: 'Steel bar', ins: [['iron_ore', 1], ['coal', 1]], out: 'steel_bar', n: 1, hint: 'Iron ore and coal from Deepwell.' },
-  mithril: { id: 'mithril', name: 'Mithril bar', ins: [['mithril_ore', 1], ['coal', 2]], out: 'mithril_bar', n: 1, hint: 'Mithril ore and two coal.' },
-  adamant: { id: 'adamant', name: 'Adamant bar', ins: [['adamant_ore', 1], ['coal', 3]], out: 'adamant_bar', n: 1, hint: 'Adamant ore and three coal.' },
-};
+/** Named smithy recipes. `ins` is [good, count] pairs. `n` is bars produced. `level` is Smithing. */
+export const SMELTS = Object.fromEntries(METALS.map(metalSmelt).map((r) => [r.id, r]));
 
 /** True for a raw catch, its grilled form, or its burnt form. */
 export function isFishGood(id) {
@@ -499,7 +427,7 @@ export const SHAFT_LOGS = Object.keys(SHAFT_FROM_LOG);
 export const SHAFT_IDS = Object.values(SHAFT_FROM_LOG);
 
 export const TOOLS = [
-  { id: 'pickaxe', held: 'pick', name: 'Iron Pickaxe', desc: 'Used on rocks in the Greyrock Pit and the Deepwell dig.' },
+  { id: 'pickaxe', held: 'pick', name: 'Iron Pickaxe', desc: 'Used on rocks in the Greyrock Pit, the Deepwell dig, Cinderfall and Glimmerfrost.' },
   { id: 'fishrod', held: 'fishrod', name: 'Fishing Pole', desc: 'Used at pole spots and ice fishing holes to land trout, salmon, pike, sturgeon, tuna, stingray and tiger shark.' },
   { id: 'fishnet', held: 'fishnet', name: 'Small Net', desc: 'Used at net spots on the dock and the river to scoop shrimp and pike minnow.' },
   { id: 'tinderbox', held: 'tinder', name: 'Tinderbox', desc: 'Lights a campfire from logs in the bag.' },

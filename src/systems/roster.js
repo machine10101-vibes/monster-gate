@@ -4,7 +4,7 @@ import { SKILL_ORDER } from '../data/gathering.js';
 import { dropKey, readJson as readStored, writeJson } from './saveio.js';
 
 export const MAX_CHARACTERS = 8;
-const META_KEY = 'monster-gate-roster-v1';
+export const META_KEY = 'monster-gate-roster-v1';
 const RESTORE_DAYS = 30;
 const KEEP_DELETED = 4;
 

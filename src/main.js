@@ -2,6 +2,7 @@ import '@fontsource/press-start-2p/400.css';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './style.css';
+import './ui/theme.css';
 import * as THREE from 'three';
 import { World } from './world/world.js';
 import { Sky } from './world/sky.js';
@@ -17,10 +18,14 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
+import { attachDebug } from './debug/flags.js';
+import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
+import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
 import { Journal } from './systems/journal.js';
+import { Bounties } from './systems/bounties.js';
 import { Roster, lookOptions } from './systems/roster.js';
 import { CharacterSelect } from './ui/charselect.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
@@ -33,13 +38,19 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
+import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
-import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
+import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
+import { loginWithKlever } from './wallet/link.js';
+import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
+import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
+import { INVENTORY_FULL } from './systems/stacks.js';
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
@@ -153,6 +164,7 @@ class Game {
     this.items = ITEMS.map((i) => ({ ...i }));
     this.progress = new Progress();
     this.journal = new Journal(this.progress);
+    this.bounties = new Bounties(this.progress);
     this.journalT = 0;
     this.talkScript = null;
     this.talkQuest = false;
@@ -304,6 +316,7 @@ class Game {
     await this.world.build(progress);
     this.scene.add(this.world.group);
     if (this.world.cave) this.scene.add(this.world.cave.group);
+    if (this.world.rift) this.scene.add(this.world.rift.group);
     this.sky = new Sky(this.scene, this.quality);
     this.snowfall = new Snowfall(this.scene);
     this.ashfall = new Ashfall(this.scene);
@@ -337,17 +350,15 @@ class Game {
     this.refreshHud(true);
 
     this.snapCamera();
-    this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
+    this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.player.yaw, [], [], 0);
     this.bindUI();
     progress(0.98, 'Ready');
     const account = readAccount();
-    const klever = readSession();
-    const session = account && klever
-      ? ((account.at || 0) >= (klever.at || 0) ? account : klever)
-      : (account || klever);
-    if (session) {
-      await this.applyWallet(session);
+    if (account?.kind === 'email') {
+      await this.applyWallet(account);
       this.watchAccount();
+    } else {
+      clearSession();
     }
     this.refreshWalletUi();
     this.applyQuality();
@@ -392,6 +403,7 @@ class Game {
 
   rebindFromProgress() {
     this.journal?.rebind();
+    this.bounties?.rebind();
     this.gold = this.progress.gold;
     this.items = ITEMS.map((i) => ({ ...i }));
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
@@ -565,6 +577,12 @@ class Game {
     this.charSelect.open();
   }
 
+  /** Open the github.io bridge so this device can re-read the old-origin saves. */
+  async importOldSaves() {
+    const ok = await openLegacyBridge();
+    if (!ok) this.hud?.toast('The old-site restore page is not up yet.', 3200);
+  }
+
   /** Local hunt only. No guild record, and the waygate stays closed. */
   playAsGuest() {
     if (this.started || this.walletBusy) return;
@@ -623,19 +641,22 @@ class Game {
     const choices = document.getElementById('account-choices');
     const panel = document.getElementById('account-panel');
     const forming = !!panel && !panel.classList.contains('hidden');
+    const unlinkedOpen = !!document.getElementById('wallet-unlinked') && !document.getElementById('wallet-unlinked').classList.contains('hidden');
     const signed = !!this.wallet?.address;
     const email = this.wallet?.kind === 'email';
     const guest = this.wallet?.kind === 'guest';
-    choices?.classList.toggle('hidden', signed || forming);
-    sign.classList.toggle('hidden', signed || forming);
+    choices?.classList.toggle('hidden', signed || forming || unlinkedOpen);
+    sign.classList.toggle('hidden', signed || forming || unlinkedOpen);
     start.classList.add('hidden');
     start.textContent = 'Begin the hunt';
     swap.classList.toggle('hidden', !signed);
     if (!signed) {
       help?.classList.add('hidden');
       if (!forming) {
-        sign.textContent = 'Sign in with Klever';
-        status.textContent = 'Play as a guest on this device, or sign in to keep the hunt on your account.';
+        sign.textContent = 'Log in with Klever';
+        if (!unlinkedOpen) {
+          status.textContent = 'Play as a guest on this device, or sign in to keep the hunt on your account.';
+        }
       }
       return;
     }
@@ -648,7 +669,7 @@ class Game {
     }
     panel?.classList.add('hidden');
     help?.classList.add('hidden');
-    swap.textContent = email ? 'Sign out' : 'Use a different wallet';
+    swap.textContent = 'Sign out';
     if (this.cloudState === 'error' && !this.cloudSyncing && !this.started) {
       status.replaceChildren();
       const noun = email ? 'account' : 'wallet';
@@ -682,6 +703,7 @@ class Game {
     const password = document.getElementById('account-password');
     const error = document.getElementById('account-error');
     if (!panel) return;
+    this.hideWalletUnlinked();
     panel.dataset.mode = mode;
     panel.classList.remove('hidden');
     confirm?.classList.toggle('hidden', mode !== 'create');
@@ -705,6 +727,7 @@ class Game {
     panel?.classList.add('hidden');
     const error = document.getElementById('account-error');
     if (error) error.textContent = '';
+    this.hideWalletUnlinked();
   }
 
   async onAccountSubmit(event) {
@@ -764,7 +787,6 @@ class Game {
     document.getElementById('title').classList.remove('hidden');
     this.closeAccount();
     this.refreshWalletUi();
-    if (repromptKlever) this.onWallet();
   }
 
   handOffToWallet() {
@@ -818,17 +840,24 @@ class Game {
       ? 'Confirm the signature in the Klever Wallet app…'
       : 'Confirm the signature in the Klever extension…';
     try {
-      const session = await signIn();
+      const session = await loginWithKlever();
+      this.hideWalletUnlinked();
       await this.applyWallet(session);
       this.watchAccount();
     } catch (err) {
       const help = document.getElementById('wallet-help');
       if (help && (err.code === 'mobile-app' || err.code === 'extension')) showWalletHelp(help, err.code);
-      if (status) status.textContent = err.message || 'Klever sign-in failed.';
+      if (err.code === UNLINKED_CODE) {
+        this.showWalletUnlinked();
+      } else if (status) {
+        status.textContent = err.message || 'Klever sign-in failed.';
+      }
     } finally {
       this.walletBusy = false;
       if (sign) sign.disabled = false;
-      if (!this.wallet?.address) document.getElementById('account-choices')?.classList.remove('hidden');
+      if (!this.wallet?.address && document.getElementById('wallet-unlinked')?.classList.contains('hidden')) {
+        document.getElementById('account-choices')?.classList.remove('hidden');
+      }
     }
   }
 
@@ -837,6 +866,7 @@ class Game {
     if (this.accountWatch || !hub || typeof hub.onAccountChanged !== 'function') return;
     this.accountWatch = true;
     hub.onAccountChanged((event) => {
+      if (this.wallet?.kind === 'email') return;
       const next = event?.address;
       if (!next || next === this.wallet?.address) return;
       this.captureHunter();
@@ -852,19 +882,36 @@ class Game {
     });
   }
 
+  hideWalletUnlinked() {
+    document.getElementById('wallet-unlinked')?.classList.add('hidden');
+  }
+
+  showWalletUnlinked() {
+    const panel = document.getElementById('wallet-unlinked');
+    const status = document.getElementById('wallet-status');
+    const text = document.getElementById('wallet-unlinked-text');
+    if (text) text.textContent = UNLINKED_MESSAGE;
+    panel?.classList.remove('hidden');
+    document.getElementById('account-choices')?.classList.add('hidden');
+    document.getElementById('wallet-help')?.classList.add('hidden');
+    if (status) status.textContent = '';
+  }
+
   captureHunter() {
     if (!this.started || !this.wallet || !this.player) return;
     const p = this.player;
+    const rifted = this.world?.realm === 'rift';
+    const park = rifted ? this.world.rift?.outside : null;
     this.progress.rememberHunter({
-      x: p.pos.x,
-      z: p.pos.z,
+      x: park ? park.x : p.pos.x,
+      z: park ? park.z : p.pos.z,
       yaw: p.yaw,
       hp: p.hp,
       mana: p.mana,
       stamina: p.stamina,
       rank: this.rank,
       quest: this.quest,
-      realm: this.world?.realm,
+      realm: rifted ? 'over' : this.world?.realm,
     });
   }
 
@@ -874,6 +921,12 @@ class Game {
     this.rank = h.rank;
     if (h.quest?.text) this.quest = { text: h.quest.text, n: h.quest.n, total: h.quest.total };
     if (h.realm === 'cave' && this.world.cave) enterCave(this);
+    else if (h.realm === 'rift' && this.world.waygate) {
+      const o = this.world.rift?.outside || this.world.waygate;
+      const y = this.world.heightAt(o.x, o.z);
+      this.player.pos.set(o.x, y, o.z);
+      this.player.syncObj();
+    }
     else if (this.world.playable(h.x, h.z)) {
       const y = this.world.heightAt(h.x, h.z);
       this.player.pos.set(h.x, y, h.z);
@@ -913,7 +966,11 @@ class Game {
       this.refreshWalletUi();
     });
     document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
-    swap.addEventListener('click', () => this.signOut(this.wallet?.kind !== 'email'));
+    swap.addEventListener('click', () => this.signOut(false));
+    document.getElementById('wallet-unlinked-email')?.addEventListener('click', () => {
+      this.hideWalletUnlinked();
+      this.openAccount('signin');
+    });
     window.addEventListener('keydown', (e) => {
       if (this.started || this.charSelect.active || (e.code !== 'Enter' && e.code !== 'Space')) return;
       if (e.target?.closest?.('input, textarea, #account-panel')) return;
@@ -1138,7 +1195,11 @@ class Game {
     this.camera.fov = w / h < 1.2 ? 46 : 38;
     this.camera.updateProjectionMatrix();
     this.pxScale = this.renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
-    hideUniforms.uHideRadius.value = Math.max(60, this.renderer.domElement.height * 0.09);
+    const cw = this.renderer.domElement.width;
+    const ch = this.renderer.domElement.height;
+    hideUniforms.uHideRadius.value = Math.max(180, Math.min(cw, ch) * 0.42);
+    const ui = Math.max(1, Math.min(1.5, h / 820));
+    document.documentElement.style.setProperty('--ui', ui.toFixed(3));
   }
 
   adaptResolution(rawMs) {
@@ -1217,6 +1278,7 @@ class Game {
     this.player.setHeld(it.held || null);
     this.syncVitals();
     this.itemsChanged();
+    applyWeaponCursor(this);
     if (!silent) {
       this.audio.select();
       this.hud.toast(it.name, 900);
@@ -1239,6 +1301,7 @@ class Game {
       this.selectSlot(this.sel, true);
       this.refreshHud();
     }
+    applyWeaponCursor(this);
   }
 
   syncVitals() {
@@ -1410,12 +1473,54 @@ class Game {
     this.hud.setQuest(t.text, t.n, t.total);
   }
 
+  claimBounty(index) {
+    const r = this.bounties?.claim(index);
+    if (!r) return false;
+    if (!r.ok) {
+      const msg = r.reason === 'cap' ? 'The board pays six times an hour.' : r.reason === 'short' ? 'That posting is not finished.' : 'That posting is gone.';
+      this.hud.toast(msg, 2200);
+      return false;
+    }
+    this.addGold(r.gold);
+    this.audio.quest();
+    this.hud.toast(`${r.label}: +${r.gold} gold, +${r.xp} ${r.skill} XP.`, 2800);
+    if (r.levelled) this.hud.banner('Level up', `${r.skill} ${r.levelled}`, 2600);
+    this.syncTracker();
+    return true;
+  }
+
+  enterRiftFromGate() {
+    const r = tryEnterRift(this);
+    if (r.ok) {
+      this.hud.closePanel();
+      this.net?.broadcastWorld?.();
+      return true;
+    }
+    if (r.reason === 'cool') {
+      const s = Math.max(1, Math.ceil((r.wait || 0) / 1000));
+      this.hud.toast(`The tear is sealed for ${s}s.`, 2400);
+    } else if (r.reason === 'guest-session') this.hud.toast('The host opens the rift.', 2400);
+    else if (r.reason === 'inside') this.hud.toast('You are already in the tear.', 1800);
+    return false;
+  }
+
   applyJournal(events) {
     const list = Array.isArray(events) ? events : events ? [events] : [];
     let hud = false;
     for (const e of list) {
       if (!e) continue;
       if (e.gold) this.addGold(e.gold);
+      if (e.gear) {
+        const gg = gearById(e.gear);
+        if (this.progress.crafted(e.gear)) {
+          /* already owned */
+        } else if (!this.progress.grantFound(e.gear)) {
+          this.hud.toast(INVENTORY_FULL, 1800);
+        } else if (gg) {
+          this.applyGear();
+          this.hud.toast(`Earned: ${gg.name}`, 2800);
+        }
+      }
       if (e.fanfare) this.audio.quest();
       if (e.banner) this.hud.banner(e.banner[0], e.banner[1], 3800);
       if (e.toast && !e.quiet) this.hud.toast(e.toast, 2800);
@@ -1589,14 +1694,19 @@ class Game {
     if (this.progress.classId && this.progress.skillPoints().earned > hadPoints) {
       this.hud.toast('Skill point earned. Press K.', 2200);
     }
-    if (parts.length) {
-      const line = parts.map((d) => `+${d.n} ${MATERIALS[d.id]?.name || GOODS[d.id]?.name || d.id}`).join('   ');
+    if (parts.got.length) {
+      const line = parts.got.map((d) => `+${d.n} ${MATERIALS[d.id]?.name || GOODS[d.id]?.name || d.id}`).join('   ');
       this.hud.toast(line, 2600);
-      this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.map((d) => `+${d.n}`).join(' '), 'gold');
+      this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.got.map((d) => `+${d.n}`).join(' '), 'gold');
       this.fx.burst(m.x, m.y + 1, m.z, [0x6fd45a, 0xf1e6c6, 0xffd23f], 12, 3.5, 0.1, 0.8);
+    }
+    if (parts.leftover.length) {
+      for (const d of parts.leftover) this.dropStack(d.k, d.id, d.n, m.x, m.y + 0.9, m.z);
+      this.hud.toast(INVENTORY_FULL, 1800);
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
     this.applyJournal(this.journal.onKill(m.type));
+    if (this.bounties?.onKill(m.type) && this.hud.panelId === 'quest' && this.hud.journalRefresh) this.hud.journalRefresh();
     if (m.type === 'chicken') return;
     this.quest.n++;
     if (this.quest.n >= this.quest.total) this.completeQuest();
@@ -1646,6 +1756,24 @@ class Game {
     const a = Math.random() * Math.PI * 2;
     const s = 1.2 + Math.random();
     this.pickups.push({ holder, mesh: model, kind: 'orcblade', value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.2, age: 0, grounded: false });
+  }
+
+  dropStack(k, id, n, x, y, z) {
+    n = n | 0;
+    if (n < 1) return;
+    const geo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+    const mat = new THREE.MeshBasicMaterial({ color: k === 'part' ? 0x6fd45a : 0xc6a15a });
+    const mesh = new THREE.Mesh(geo, mat);
+    const holder = new THREE.Group();
+    holder.add(mesh);
+    holder.position.set(x, y, z);
+    this.scene.add(holder);
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.2 + Math.random();
+    this.pickups.push({
+      holder, mesh, kind: 'stack', k, id, n,
+      value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4 + Math.random() * 2, age: 0, grounded: false,
+    });
   }
 
   dropGear(id, x, y, z) {
@@ -1710,36 +1838,69 @@ class Game {
         h.y += (P.y + 0.9 - h.y) * Math.min(1, dt * 6);
       }
       if (k.age > 0.5 && d < 0.8) {
-        k.done = true;
-        if (k.kind === 'heart') {
+        if (k.kind === 'stack') {
+          const added = k.k === 'good' ? this.progress.addGood(k.id, k.n) : this.progress.addPart(k.id, k.n);
+          if (added < 1) {
+            this.hud.toast(INVENTORY_FULL, 1400);
+          } else {
+            k.n -= added;
+            const label = MATERIALS[k.id]?.name || GOODS[k.id]?.name || k.id;
+            this.audio.coin();
+            this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), `+${added} ${label}`, 'gold');
+            this.fx.burst(h.x, h.y, h.z, [0xc6a15a, 0xffffff], 5, 2, 0.07, 0.3);
+            if (k.n < 1) k.done = true;
+            else this.hud.toast(INVENTORY_FULL, 1400);
+          }
+        } else if (k.kind === 'heart') {
+          k.done = true;
           this.player.heal(4);
           this.audio.potion();
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), '+2', 'heal');
+          this.fx.burst(h.x, h.y, h.z, [0xff4a5c, 0xffffff], 5, 2, 0.07, 0.3);
         } else if (k.kind === 'gear') {
           const gg = gearById(k.gearId);
-          const got = this.progress.grantFound(k.gearId);
-          this.audio.quest();
-          this.hud.toast(got ? `Found: ${gg.name}` : `You already carry ${gg.name}`, 2800);
-          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), gg.name, 'gold');
-          if (got) {
+          if (this.progress.crafted(k.gearId)) {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast(`You already carry ${gg.name}`, 2800);
+            this.fx.burst(h.x, h.y, h.z, [0xffd27a, 0xff6a3a, 0xffffff], 5, 2, 0.07, 0.3);
+          } else if (!this.progress.grantFound(k.gearId)) {
+            this.hud.toast(INVENTORY_FULL, 1800);
+          } else {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast(`Found: ${gg.name}`, 2800);
+            this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), gg.name, 'gold');
             this.applyGear();
             if (gg.type === 'weapon' && this.progress.data.weapon === gg.id) this.selectSlot(0, true);
+            this.fx.burst(h.x, h.y, h.z, [0xffd27a, 0xff6a3a, 0xffffff], 5, 2, 0.07, 0.3);
           }
         } else if (k.kind === 'orcblade') {
-          const got = this.progress.grantFound('orcblade');
-          this.audio.quest();
-          this.hud.toast(got ? 'Orc Scout Blade' : 'You already carry that blade', 1800);
-          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), 'Orc Blade', 'gold');
-          if (got && this.progress.data.weapon === 'orcblade') {
-            this.applyGear();
-            this.selectSlot(0, true);
+          if (this.progress.crafted('orcblade')) {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast('You already carry that blade', 1800);
+            this.fx.burst(h.x, h.y, h.z, [0xb0b4bc, 0xe6dcc4, 0xffffff], 5, 2, 0.07, 0.3);
+          } else if (!this.progress.grantFound('orcblade')) {
+            this.hud.toast(INVENTORY_FULL, 1800);
+          } else {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast('Orc Scout Blade', 1800);
+            this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), 'Orc Blade', 'gold');
+            if (this.progress.data.weapon === 'orcblade') {
+              this.applyGear();
+              this.selectSlot(0, true);
+            }
+            this.fx.burst(h.x, h.y, h.z, [0xb0b4bc, 0xe6dcc4, 0xffffff], 5, 2, 0.07, 0.3);
           }
         } else {
+          k.done = true;
           this.addGold(k.value);
           this.audio.coin();
+          this.fx.burst(h.x, h.y, h.z, [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
         }
-        this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : k.kind === 'gear' ? [0xffd27a, 0xff6a3a, 0xffffff] : k.kind === 'orcblade' ? [0xb0b4bc, 0xe6dcc4, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
-      } else if (k.age > (k.kind === 'gear' ? 180 : 40)) k.done = true;
+      } else if (k.age > (k.kind === 'gear' || k.kind === 'stack' ? 180 : 40)) k.done = true;
       if (k.done) {
         this.scene.remove(k.holder);
         if (k.kind === 'orcblade' || k.kind === 'gear') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
@@ -1762,7 +1923,16 @@ class Game {
 
   respawnPlayer() {
     document.getElementById('faint').classList.add('hidden');
-    if (this.world.realm === 'cave') restoreOverworld(this);
+    if (this.world.realm === 'rift' && this.net?.role === 'guest') {
+      const r = this.world.rift;
+      this.player.respawn(r.spawn.x, r.spawn.z);
+      this.zone = 'rift';
+      this.hud.setArea('Waygate Rift');
+      this.snapCamera();
+      this.hud.banner('Rift', 'Back on your feet', 2000);
+      return;
+    }
+    if (this.world.realm === 'cave' || this.world.realm === 'rift') restoreOverworld(this);
     this.player.respawn(72, 73);
     this.zone = this.world.zoneAt(72, 73);
     this.hud.setArea('Oakhollow');
@@ -1919,7 +2089,7 @@ class Game {
   }
 
   applyWorld(data) {
-    if (!data?.m || this.net.role !== 'guest') return;
+    if (!data || this.net.role !== 'guest') return;
     if (!this.guestBound) {
       this.guestBound = true;
       this.dropParkedHunt();
@@ -1927,8 +2097,9 @@ class Game {
       for (const m of this.monsters) m.dispose();
       this.monsters = [];
     }
+    if (data.rift) syncRiftFollow(this, data.rift);
     const seen = new Set();
-    for (const row of data.m) {
+    for (const row of data.m || []) {
       const [id, type, x, y, z, yaw, hp, state] = row;
       seen.add(id);
       let mon = this.monsters.find((m) => m.id === id);
@@ -1936,6 +2107,7 @@ class Game {
         mon = this.spawner.spawn(type, x, z, false);
         mon.id = id;
         mon.puppet = true;
+        if (this.world.realm === 'rift') mon.realm = 'rift';
       }
       if (!mon.dead) mon.snap({ x, y, z, yaw, hp, state });
     }
@@ -1953,6 +2125,21 @@ class Game {
     const net = this.net;
     const lobby = document.getElementById('wg-lobby');
     const session = document.getElementById('wg-session');
+    const riftBtn = document.getElementById('wg-rift-enter');
+    const riftNote = document.getElementById('wg-rift-note');
+    const cool = riftReady(this);
+    if (riftBtn) {
+      const inside = this.world.realm === 'rift';
+      const guestNet = net.role === 'guest';
+      riftBtn.disabled = inside || guestNet || !cool.ok;
+      riftBtn.textContent = inside ? 'Already in the rift' : guestNet ? 'Host opens the rift' : cool.ok ? 'Enter a rift' : 'Rift sealed';
+    }
+    if (riftNote) {
+      const party = this.wallet?.kind === 'guest' ? 1 : Math.min(4, 1 + (net.peers?.size || 0));
+      riftNote.textContent = cool.ok
+        ? `A short instanced hunt. Waves scale with the party (${party}). Guests can enter solo. Host and join stay account-only.`
+        : `The last chest sealed the tear for ${Math.max(1, Math.ceil(cool.wait / 1000))}s.`;
+    }
     status.textContent = net.status;
     if (!net.role) {
       lobby?.classList.remove('hidden');
@@ -2009,7 +2196,7 @@ class Game {
 
   travelTo(dest) {
     if (!this.started || !this.player || this.player.dead || !dest) return;
-    if (this.world.realm === 'cave') restoreOverworld(this);
+    if (this.world.realm === 'cave' || this.world.realm === 'rift') restoreOverworld(this);
     this.gather?.cancel?.();
     const y = this.world.heightAt(dest.x, dest.z);
     this.player.dead = false;
@@ -2065,6 +2252,18 @@ class Game {
     const wd = w ? Math.hypot(p.x - w.x, p.z - w.z) : 99;
     const npcNear = this.ambient.npcs.find((n) => n.near);
     const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
+    if (this.world.realm === 'rift') {
+      const chest = this.world.rift?.chest;
+      if (chest?.ready && !chest.looted && Math.hypot(p.x - chest.x, p.z - chest.z) < 2.4) {
+        lootRiftChest(this);
+        return;
+      }
+      const r = this.world.rift;
+      if (r && !this.riftRun?.follow && r.cool <= 0 && Math.hypot(p.x - r.spawn.x, p.z - r.spawn.z) < 2.8 && p.z >= r.spawn.z - 0.4) {
+        leaveRift(this);
+        return;
+      }
+    }
     if (!this.talkNpc && this.gather.interact()) return;
     const crate = this.world.storage;
     const sd = crate ? Math.hypot(p.x - crate.x, p.z - crate.z) : 99;
@@ -2377,16 +2576,14 @@ class Game {
       this.hud.toast('That is already in the crate', 1400);
       return false;
     }
-    if (!pr.canFitStorage(k, id)) {
+    if (!pr.canFitStorage(k, id, n)) {
       this.hud.toast('The crate is full', 1400);
       return false;
     }
     const refund = () => {
       if (k === 'good') pr.addGood(id, n);
-      else if (k === 'part') {
-        pr.data.materials[id] = pr.count(id) + n;
-        pr.save();
-      } else if (k === 'potion') {
+      else if (k === 'part') pr.addPart(id, n);
+      else if (k === 'potion') {
         const it = this.items.find((i) => i.id === id);
         if (it) {
           it.count += n;
@@ -2398,9 +2595,7 @@ class Game {
     if (k === 'good') {
       if (!pr.takeGood(id, n)) return false;
     } else if (k === 'part') {
-      if (pr.count(id) < n) return false;
-      pr.data.materials[id] = pr.count(id) - n;
-      pr.save();
+      if (!pr.takePart(id, n)) return false;
     } else if (k === 'gear') {
       if (!pr.crafted(id)) return false;
       const g = gearById(id);
@@ -2439,14 +2634,27 @@ class Game {
         return false;
       }
       want = Math.min(want, room);
+    } else if (s.k === 'good') {
+      want = Math.min(want, pr.roomFor('good', s.id));
+      if (want < 1) {
+        this.hud.toast(INVENTORY_FULL, 1400);
+        return false;
+      }
+    } else if (s.k === 'part') {
+      want = Math.min(want, pr.roomFor('part', s.id));
+      if (want < 1) {
+        this.hud.toast(INVENTORY_FULL, 1400);
+        return false;
+      }
+    } else if (s.k === 'gear' && !pr.fitsBag(pr.bagSlotsUsed() + 1)) {
+      this.hud.toast(INVENTORY_FULL, 1400);
+      return false;
     }
     const out = pr.pullStorage(index, want);
     if (!out) return false;
     if (out.k === 'good') pr.addGood(out.id, out.n);
-    else if (out.k === 'part') {
-      pr.data.materials[out.id] = pr.count(out.id) + out.n;
-      pr.save();
-    } else if (out.k === 'potion') {
+    else if (out.k === 'part') pr.addPart(out.id, out.n);
+    else if (out.k === 'potion') {
       const it = this.items.find((i) => i.id === out.id);
       if (it) {
         it.count += out.n;
@@ -2480,11 +2688,11 @@ class Game {
     }
     if (this.smithyNear && !this.smithyHinted) {
       this.smithyHinted = true;
-      this.hud.toast('The Smithy - press F to smelt copper and tin into iron bars', 2800);
+      this.hud.toast('The Smithy - press F to smelt ore into bars', 2800);
     }
     if (this.smithyNear) {
       const [sx, sy, vis] = this.screenOf(s.x, s.y + 3.2, s.z, true);
-      this.hud.plate('smithy', 'The Smithy<small>F · smelt iron</small>');
+      this.hud.plate('smithy', 'The Smithy<small>F · smelt bars</small>');
       this.hud.placePlate('smithy', sx, sy, vis);
     } else this.hud.removePlate('smithy');
     if (this.hud.panelId === 'smithy' && d > 5.2) this.hud.closePanel();
@@ -2643,6 +2851,7 @@ class Game {
     const gh = this.world.heightAt(cx, cz);
     if (cy < gh + 1.2) cy = gh + 1.2;
     if (this.world.realm === 'cave' && cy < 8.2) cy = 8.2;
+    if (this.world.realm === 'rift' && cy < 6.4) cy = 6.4;
     this.camera.position.set(cx, cy, cz);
 
     if (this.punchAmt > 0.002) {
@@ -2688,6 +2897,16 @@ class Game {
       if (this.zone !== 'cave') {
         this.zone = 'cave';
         this.hud.setArea('Darksycle Den');
+      }
+      this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
+      this.chill += (0 - this.chill) * Math.min(1, dt * 2);
+      this.ember += (0 - this.ember) * Math.min(1, dt * 2);
+      return;
+    }
+    if (this.world.realm === 'rift') {
+      if (this.zone !== 'rift') {
+        this.zone = 'rift';
+        this.hud.setArea('Waygate Rift');
       }
       this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
       this.chill += (0 - this.chill) * Math.min(1, dt * 2);
@@ -2773,6 +2992,7 @@ class Game {
     if (!this.campParked) this.player.update(dt);
     updateCaveTravel(this, dt);
     tendCaveDragon(this, dt);
+    updateRift(this, dt);
     if (this.player) updateSkillWorld(this, dt);
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
@@ -2794,6 +3014,9 @@ class Game {
           guild: GUILD,
           smithy: this.world.smithy,
           forge: this.world.forge,
+          hellspire: this.world.demonKeep,
+          dawnspire: this.world.holyKeep,
+          warfield: this.world.warfield,
         }));
       }
     }
@@ -2823,11 +3046,11 @@ class Game {
     this.sky.ember = this.ember;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
     if (!this.campParked) {
-      this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.chill);
-      this.ashfall.update(dt, t, this.camera.position, this.world.realm === 'cave' ? 0 : this.ember);
+      this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' || this.world.realm === 'rift' ? 0 : this.chill);
+      this.ashfall.update(dt, t, this.camera.position, this.world.realm === 'cave' || this.world.realm === 'rift' ? 0 : this.ember);
     }
     const camp = this.charSelect?.active ? this.charSelect.stage : null;
-    const lights = camp ? camp.lightSpots : this.world.realm === 'cave' ? this.world.cave.lights : this.world.lightSpots;
+    const lights = camp ? camp.lightSpots : this.world.realm === 'cave' ? this.world.cave.lights : this.world.realm === 'rift' ? this.world.rift.lights : this.world.lightSpots;
     if (camp) this.sky.assignTorchLights(lights, camp.origin.x, camp.origin.z);
     else this.sky.assignTorchLights(lights, P.pos.x, P.pos.z);
     const night = this.sky.night;
@@ -2844,14 +3067,20 @@ class Game {
     this.waygateNear = !!(wgate && Math.hypot(P.pos.x - wgate.x, P.pos.z - wgate.z) < 3.6);
     if (this.waygateNear && !this.waygateHinted && this.started) {
       this.waygateHinted = true;
-      this.hud.toast('Waygate — press F to host or join', 2400);
+      this.hud.toast('Waygate — press F for a rift, or host with an account', 2400);
     }
     if (this.waygateNear && wgate) {
       const [sx, sy, vis] = this.screenOf(wgate.x, wgate.y + 3.5, wgate.z, true);
-      const label = this.net.role ? `Waygate<small>${this.net.code} · ${this.net.count}/6</small>` : 'Waygate<small>F · host or join</small>';
+      const label = this.net.role ? `Waygate<small>${this.net.code} · ${this.net.count}/6</small>` : 'Waygate<small>F · rift or friends</small>';
       this.hud.plate('waygate', label);
       this.hud.placePlate('waygate', sx, sy, vis);
     } else this.hud.removePlate('waygate');
+    const chest = this.world.rift?.chest;
+    if (this.world.realm === 'rift' && chest?.ready && !chest.looted) {
+      const [sx, sy, vis] = this.screenOf(chest.x, chest.y + 1.2, chest.z, true);
+      this.hud.plate('riftchest', 'Rift chest<small>F · take the spoils</small>');
+      this.hud.placePlate('riftchest', sx, sy, vis);
+    } else this.hud.removePlate('riftchest');
     this.updateForge(dt);
     this.updateSmithy(dt);
     this.updateAlchemy(dt);
@@ -2862,15 +3091,48 @@ class Game {
     this.gather.update(dt);
     const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
-    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
+    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, P.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values(), this.social);
   }
 }
 
-const game = new Game();
-window.__game = game;
-game.load().catch((e) => {
-  console.error(e);
-  document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
+function startGame() {
+  const game = new Game();
+  window.__game = game;
+  try {
+    installMockWallet();
+    attachDebug(game);
+    attachSocial(game);
+    const q = new URLSearchParams(location.search);
+    if (q.get('mmo') === '1') {
+      import('./net/worldView.js').then(async (m) => {
+        const flags = m.parseMmoFlags(location.search);
+        const view = await m.init(game.scene, {
+          game,
+          mock: flags.mockFeed || flags.mockwake,
+          search: location.search,
+          wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
+        });
+        if (!flags.mock && !flags.mockwake) {
+          const { attachMmo } = await import('./net/mmo.js');
+          attachMmo(game, view);
+        }
+      }).catch((err) => console.warn('world view', err));
+    }
+  } catch {
+    /* query parsing failed; stay offline */
+  }
+  game.load().catch((e) => {
+    console.error(e);
+    document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
+  });
+}
+
+runLegacySaveBridge().then((result) => {
+  if (result === 'away') return;
+  startGame();
+}).catch((e) => {
+  console.warn('save bridge', e);
+  startGame();
 });
 
 export { lerp, GUILD };

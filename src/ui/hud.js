@@ -17,6 +17,10 @@ import { mountTeleport } from './teleport.js';
 import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
+import { mountWalletSettings } from '../wallet/settings.js';
+import { decorateAllFrames, decorateFrame } from './theme.js';
+import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
+import { mountFriends } from '../social/ui.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -41,6 +45,14 @@ export const POTION_SHOP = {
 };
 
 const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire']);
+
+function isPartyRemote(r, partyOf) {
+  if (!r || !partyOf) return false;
+  if (typeof partyOf.isPartyMember === 'function') return !!partyOf.isPartyMember(r.id, r.name);
+  if (typeof partyOf === 'function') return !!partyOf(r);
+  if (partyOf.has) return partyOf.has(r.id) || partyOf.has(r.name);
+  return false;
+}
 
 /** Area and city names for the map the player opens. */
 function landMapLabels(world) {
@@ -73,6 +85,42 @@ function caveMapLabels(cave) {
     { name: "Dragon's Nest", x: cave.nest.x, z: cave.nest.z - 3 },
     { name: 'Darksycle Den', x: cave.origin.x + cave.w / 2, z: cave.origin.z + cave.d * 0.62, city: true },
   ];
+}
+
+/**
+ * Canvas rotate for a north-up minimap.
+ * World +Z is down on the map, -Z is up (Oakhollow's gate sits at lower Z).
+ * Character yaw 0 faces +Z. The arrow sprite's tip is local -Y (canvas up at 0).
+ * A rotating minimap would subtract camera yaw; this game is north-up only.
+ */
+export function minimapArrowAngle(yaw, opts = {}) {
+  let a = -Number(yaw || 0) + Math.PI;
+  if (opts.rotateMap) a -= Number(opts.cameraYaw || 0);
+  return a;
+}
+
+function paintMinimapArrow(ctx, x, y, yaw, { fill = '#e9fff1', stroke = '#000', scale = 1 } = {}) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(minimapArrowAngle(yaw));
+  ctx.scale(scale, scale);
+  ctx.fillStyle = stroke;
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(6, 6);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(-6, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(4, 4);
+  ctx.lineTo(0, 2);
+  ctx.lineTo(-4, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 export class HUD {
@@ -109,6 +157,7 @@ export class HUD {
     });
     $('btn-fs').style.backgroundImage = `url(${iconURL('fs')})`;
     $('btn-snd').style.backgroundImage = `url(${iconURL('snd')})`;
+    decorateAllFrames();
   }
 
   buildHotbar(items, onSelect) {
@@ -290,14 +339,18 @@ export class HUD {
     let p = this.plates.get(id);
     if (!p) {
       p = document.createElement('div');
-      p.className = 'nameplate ' + cls;
       this.el.nameplates.appendChild(p);
       p.dataset.h = '';
       this.plates.set(id, p);
     }
+    const nextCls = ('nameplate ' + cls).trim();
+    if (p.className !== nextCls) p.className = nextCls;
+    p.dataset.pid = String(id);
     if (p.dataset.h !== html) {
       p.innerHTML = html;
       p.dataset.h = html;
+      const name = p.childNodes[0]?.textContent || '';
+      if (name) p.dataset.pname = name.trim();
     }
     return p;
   }
@@ -311,7 +364,7 @@ export class HUD {
   clearPlates() {
     for (const id of [...this.plates.keys()]) this.removePlate(id);
   }
-  placePlate(id, x, y, visible) {
+  placePlate(id, x, y, visible, opts = {}) {
     const p = this.plates.get(id);
     if (!p) return;
     if (!visible) {
@@ -321,16 +374,20 @@ export class HUD {
     p.style.display = '';
     p.style.left = x.toFixed(0) + 'px';
     p.style.top = y.toFixed(0) + 'px';
+    if (opts.opacity != null) p.style.opacity = String(opts.opacity);
+    else p.style.opacity = '';
+    if (opts.zIndex != null) p.style.zIndex = String(opts.zIndex);
+    else p.style.zIndex = '';
   }
 
-  drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null) {
+  drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null, partyOf = null) {
     const ctx = this.mctx;
     const cv = this.el.minimap;
     const N = 44;
     const sc = cv.width / N;
     ctx.fillStyle = '#0d1116';
     ctx.fillRect(0, 0, cv.width, cv.height);
-    const cave = world.realm === 'cave' ? world.cave : null;
+    const cave = world.realm === 'cave' ? world.cave : world.realm === 'rift' ? world.rift : null;
     const origin = cave ? cave.origin : (world.minimapOrigin || { x: 0, z: 0 });
     const sx = Math.round(px - origin.x - N / 2);
     const sz = Math.round(pz - origin.z - N / 2);
@@ -378,10 +435,14 @@ export class HUD {
     ctx.fillStyle = '#5ad0ff';
     for (const n of npcs) if (inView(n.x, n.z)) ctx.fillRect(toX(n.x) - 2, toZ(n.z) - 2, 4, 4);
     if (remotes) {
-      ctx.fillStyle = '#9ad7ff';
       for (const r of remotes) {
         if (!r.ready || !inView(r.x, r.z)) continue;
-        ctx.fillRect(toX(r.x) - 2, toZ(r.z) - 2, 4, 4);
+        const mate = isPartyRemote(r, partyOf);
+        paintMinimapArrow(ctx, toX(r.x), toZ(r.z), r.yaw, {
+          fill: mate ? '#ffe27a' : '#9ad7ff',
+          stroke: mate ? '#6a4a10' : '#14343a',
+          scale: mate ? 0.78 : 0.62,
+        });
       }
     }
     ctx.fillStyle = '#ff4d4d';
@@ -392,26 +453,7 @@ export class HUD {
       ctx.fillRect(toX(m.x) - 1, toZ(m.z) - 1, 2, 2);
       ctx.fillStyle = '#ff4d4d';
     }
-    ctx.save();
-    ctx.translate(toX(px), toZ(pz));
-    ctx.rotate(-yaw + Math.PI);
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.lineTo(6, 6);
-    ctx.lineTo(0, 3);
-    ctx.lineTo(-6, 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#e9fff1';
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(4, 4);
-    ctx.lineTo(0, 2);
-    ctx.lineTo(-4, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    paintMinimapArrow(ctx, toX(px), toZ(pz), yaw);
     const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, cv.width * 0.35, cv.width / 2, cv.height / 2, cv.width * 0.72);
     g.addColorStop(0, 'rgba(0,0,0,0)');
     g.addColorStop(1, 'rgba(0,0,0,0.45)');
@@ -430,6 +472,8 @@ export class HUD {
     const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
     card?.classList.toggle('wide', wide);
     card?.classList.toggle('adventures', name === 'quest');
+    card?.querySelectorAll(':scope > .mg-corner').forEach((n) => n.remove());
+    if (name !== 'quest') decorateFrame(card);
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -441,21 +485,23 @@ export class HUD {
     };
     if (name === 'map') {
       const inCave = game.world.realm === 'cave';
-      title.textContent = inCave ? 'Darksycle Den' : 'Map';
+      const inRift = game.world.realm === 'rift';
+      const instanced = inCave || inRift;
+      title.textContent = inCave ? 'Darksycle Den' : inRift ? 'Waygate Rift' : 'Map';
       const c = document.createElement('canvas');
       c.className = 'bigmap';
-      const src = inCave ? game.world.cave.minimap : game.world.minimapCanvas;
-      c.width = inCave ? 240 : src.width;
-      c.height = inCave ? 192 : src.height;
+      const src = inCave ? game.world.cave.minimap : inRift ? game.world.rift.minimap : game.world.minimapCanvas;
+      c.width = instanced ? 240 : src.width;
+      c.height = instanced ? 192 : src.height;
       const ctx = c.getContext('2d');
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(src, 0, 0, c.width, c.height);
       const p = game.player;
-      const ox = inCave ? game.world.cave.origin.x : (game.world.minimapOrigin?.x || 0);
-      const oz = inCave ? game.world.cave.origin.z : (game.world.minimapOrigin?.z || 0);
+      const ox = inCave ? game.world.cave.origin.x : inRift ? game.world.rift.origin.x : (game.world.minimapOrigin?.x || 0);
+      const oz = inCave ? game.world.cave.origin.z : inRift ? game.world.rift.origin.z : (game.world.minimapOrigin?.z || 0);
       const mx = (p.pos.x - ox) * (c.width / src.width);
       const mz = (p.pos.z - oz) * (c.height / src.height);
-      if (!inCave) {
+      if (!instanced) {
         ctx.fillStyle = '#c27bff';
         ctx.fillRect(GATE.x - ox - 3, GATE.z - oz - 3, 6, 6);
         ctx.fillStyle = '#ffd23f';
@@ -470,7 +516,7 @@ export class HUD {
       const frame = document.createElement('div');
       frame.className = 'playmap';
       frame.appendChild(c);
-      const labels = inCave ? caveMapLabels(game.world.cave) : landMapLabels(game.world);
+      const labels = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
       for (const label of labels) {
         const b = document.createElement('b');
         b.className = 'playmap-label' + (label.city ? ' city' : '');
@@ -480,7 +526,7 @@ export class HUD {
         frame.appendChild(b);
       }
       body.appendChild(frame);
-      if (!inCave) {
+      if (!instanced) {
         if (game.world.waygate) {
           ctx.fillStyle = '#7ef6ff';
           ctx.fillRect(game.world.waygate.x - ox - 2, game.world.waygate.z - oz - 2, 5, 5);
@@ -498,7 +544,9 @@ export class HUD {
       }
       add(inCave
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
-        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
+        : inRift
+          ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
+          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);
@@ -520,6 +568,9 @@ export class HUD {
     } else if (name === 'world') {
       title.textContent = 'World Map';
       this.cleanup = mountWorldMap(body, game);
+    } else if (name === 'friends') {
+      title.textContent = 'Friends';
+      this.cleanup = mountFriends(body, game);
     } else if (name === 'stats') {
       title.textContent = 'Hunter Stats';
       this.cleanup = mountStats(body, game, game.statsFocus);
@@ -587,6 +638,10 @@ export class HUD {
       title.textContent = 'Waygate';
       const saved = (localStorage.getItem('mg-name') || 'Hunter').replace(/[<>"&]/g, '').slice(0, 16);
       add(`<p id="wg-status" style="color:#cfe"></p>
+        <div id="wg-rift">
+          <button id="wg-rift-enter" class="wg-btn" type="button">Enter a rift</button>
+          <p id="wg-rift-note" style="color:#99a;font-size:13px">A short instanced hunt. Waves scale with the party. Guests can enter solo. Host and join stay account-only.</p>
+        </div>
         <div id="wg-lobby">
           <label class="wg-label">Your name</label>
           <input id="wg-name" class="wg-input" maxlength="16" value="${saved.replace(/"/g, '')}" />
@@ -596,7 +651,7 @@ export class HUD {
             <input id="wg-join-code" class="wg-input" maxlength="4" placeholder="CODE" />
             <button id="wg-join" class="wg-btn" type="button">Join</button>
           </div>
-          <p style="color:#99a;font-size:13px">The host's browser runs the world. Up to 6 hunters. Share the code with friends at their own waygate.</p>
+          <p style="color:#99a;font-size:13px">The host's browser runs the world. Up to 6 hunters. Share the code with friends at their own waygate. Sign in with an account to host or join.</p>
         </div>
         <div id="wg-session" class="hidden">
           <div class="wg-label">World code</div>
@@ -610,6 +665,7 @@ export class HUD {
         </div>`);
       const nameInput = document.getElementById('wg-name');
       nameInput?.addEventListener('change', () => localStorage.setItem('mg-name', nameInput.value.slice(0, 16)));
+      document.getElementById('wg-rift-enter').onclick = () => game.enterRiftFromGate();
       document.getElementById('wg-host').onclick = () => game.net.host(document.getElementById('wg-name').value);
       document.getElementById('wg-join').onclick = () => game.net.join(document.getElementById('wg-name').value, document.getElementById('wg-join-code').value);
       document.getElementById('wg-copy').onclick = () => {
@@ -628,6 +684,7 @@ export class HUD {
       jumps.className = 'set-jumps';
       for (const [id, label, sub] of [
         ['tome', 'Teleportation Tome', 'Travel to a remembered place'],
+        ['friends', 'Friends', 'Friends list and party'],
         ['gear', 'Character', 'Equipped and unequipped'],
         ['bag', 'Inventory', 'Bag, tools and goods'],
         ['world', 'World Creator', '100-tile map'],
@@ -654,9 +711,12 @@ export class HUD {
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
+        ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
+        ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
+      if (game.wallet?.kind === 'email') mountWalletSettings(body, game);
       if (game.wallet?.address) {
         const row = document.createElement('div');
         row.className = 'panel-row account';
@@ -672,7 +732,7 @@ export class HUD {
         row.append(label, out);
         body.appendChild(row);
       }
-      add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
+      add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · P friends · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
@@ -695,6 +755,12 @@ export class HUD {
       };
       document.getElementById('set-time').onclick = () => game.sky.setHour(game.sky.hour + 3);
       document.getElementById('set-fs').onclick = () => game.toggleFullscreen();
+      document.getElementById('set-wcur').onclick = () => {
+        setWeaponCursorEnabled(!weaponCursorEnabled());
+        applyWeaponCursor(game);
+        document.getElementById('set-wcur').textContent = weaponCursorEnabled() ? 'On' : 'Off';
+      };
+      document.getElementById('set-import-old').onclick = () => game.importOldSaves();
     }
     this.el.panel.classList.remove('hidden');
   }

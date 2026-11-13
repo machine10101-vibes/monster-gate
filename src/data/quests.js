@@ -99,23 +99,23 @@ export const QUESTS = [
         lines: [
           'Five. I will mark the board, and I will pay you what the guild promised.',
           'There is a smith on the rim of Greyrock Pit, just outside town. Bram. He moved the forge out of the square so the ore would not have to walk so far.',
-          'Take him the copper and the tin from the pit. One of each, smelted into a bar. A hunter with no iron is a story I am tired of telling.',
+          'Take him the copper from the pit. One lump, smelted into a bar. A hunter with no plate is a story I am tired of telling.',
         ],
         journal:
-          'Mira marked the board and paid the guild\'s price. She sent me to Bram. He has moved the forge to the rim of Greyrock Pit, and she wants a bar of iron in my hands before she will call me equipped.',
+          'Mira marked the board and paid the guild\'s price. She sent me to Bram. He has moved the forge to the rim of Greyrock Pit, and she wants a copper bar in my hands before she will call me equipped.',
       },
     ],
   },
   {
     id: 'pit',
-    name: 'Iron from the Pit',
+    name: 'Copper from the Pit',
     series: 'Oakhollow',
     kind: 'quest',
     points: 2,
     giver: 'Bram',
     requires: ['board'],
     reward: { gold: 25 },
-    blurb: 'Bram works the forge on the south rim of Greyrock Pit. He wants a bar, not a promise.',
+    blurb: 'Bram works the forge on the south rim of Greyrock Pit. He wants a copper bar, not a promise.',
     opening:
       'Mira\'s directions were plain. East out of the houses, the ground rises into a ring of stone, and the ring has a hole in it. The smith is on the south lip, with the town at his back and the ore at his feet.',
     steps: [
@@ -126,39 +126,41 @@ export const QUESTS = [
         objective: 'Speak with Bram at Greyrock Pit',
         lines: [
           'Mira sends me the ones who have already bled a little. You qualify.',
-          'The pit is the round hole behind me. Copper on one side, tin on the other. I do not mind which rock you hit first.',
-          'Bring one of each to the smithy door and smelt them. Then come back and show me the bar. I will not take it. A smith who keeps the first bar is a thief.',
+          'The pit is the round hole behind me. The orange rocks are copper. Hit one until it gives.',
+          'Bring the ore to the smithy door and smelt a copper bar. Then come back and show me the bar. I will not take it. A smith who keeps the first bar is a thief.',
         ],
         journal:
-          'Bram stands by a forge on the rim, close enough to the pit that the ore is still warm in the story he tells. He wants one copper and one tin, smelted at the smithy into a bar, and he says he will not take the bar from me.',
+          'Bram stands by a forge on the rim, close enough to the pit that the ore is still warm in the story he tells. He wants one copper ore, smelted at the smithy into a bar, and he says he will not take the bar from me.',
       },
       {
         id: 'ore',
         kind: 'hold',
         goods: [
           { id: 'copper_ore', n: 1 },
-          { id: 'tin_ore', n: 1 },
         ],
-        also: [{ id: 'iron_bar', n: 1 }],
+        also: [{ id: 'copper_bar', n: 1 }],
         alsoJournal:
-          'I already had an iron bar in the bag. Bram\'s rocks can wait. The smithy has done this work once, and the bar is the part he asked to see.',
-        objective: 'Mine 1 copper ore and 1 tin ore',
+          'I already had a copper bar in the bag. Bram\'s rocks can wait. The smithy has done this work once, and the bar is the part he asked to see.',
+        objective: 'Mine 1 copper ore',
         journal:
-          'The pit floor is gravel and old stone, and the rocks give up their color if you hit them long enough. I have copper and tin both. The smithy door is on the rim above me.',
+          'The pit floor is gravel and old stone, and the orange rocks give up their color if you hit them long enough. I have copper. The smithy door is on the rim above me.',
       },
       {
         id: 'bar',
         kind: 'hold',
-        goods: [{ id: 'iron_bar', n: 1 }],
-        objective: 'Smelt an iron bar at the smithy',
+        goods: [{ id: 'copper_bar', n: 1 }],
+        also: [{ id: 'iron_bar', n: 1 }],
+        alsoJournal:
+          'I already had an iron bar from the old copper-and-tin recipe. Bram asked to see a bar, and this one still counts.',
+        objective: 'Smelt a copper bar at the smithy',
         journal:
-          'The hearth took the two ores and gave back one bar, pale and heavy. It looks too simple for the trouble, which is what Bram said iron always looks like.',
+          'The hearth took the ore and gave back one bar, orange and heavy. It looks too simple for the trouble, which is what Bram said copper always looks like.',
       },
       {
         id: 'show-bar',
         kind: 'talk',
         npc: 'smith',
-        objective: 'Show the iron bar to Bram',
+        objective: 'Show the copper bar to Bram',
         lines: [
           'That is a true bar. Keep it. Armor and blades both start there, and so do arrowheads if you ever decide to be clever.',
           'The forge beside me will shape it when you are ready. Monster parts, too, if the gate gives you any. I hammer what you bring. I do not hunt.',
@@ -354,7 +356,7 @@ export const QUESTS = [
     giver: 'Bram',
     requires: ['pit'],
     reward: { gold: 35 },
-    blurb: 'Greyrock is copper and tin. Bram wants iron from the hole they call Deepwell.',
+    blurb: 'Greyrock is copper. Bram wants iron from the hole they call Deepwell.',
     opening:
       'Bram has one more errand once the first bar is in your hands. The pit behind him is the starter hole. South of Southford, the desert has a bigger one, and the rocks there are not orange.',
     steps: [
@@ -364,12 +366,12 @@ export const QUESTS = [
         npc: 'smith',
         objective: 'Ask Bram about the Deepwell dig',
         lines: [
-          'Greyrock is copper and tin. That is how a hunter starts. It is not how a hunter finishes.',
-          'South of Southford the dunes open into a pit they call Deepwell. Iron, then coal, then the blue and green seams if you live long enough to swing at them.',
+          'Greyrock is copper. That is how a hunter starts. It is not how a hunter finishes.',
+          'South of Southford the dunes open into a pit they call Deepwell. Iron, then coal, then mithril and adamite if you live long enough to swing at them.',
           'Bring me one iron ore from that hole. I will not take it. I want to know you found the place.',
         ],
         journal:
-          'Bram sent me south of Southford, into the desert pit called Deepwell. He wants one iron ore from those rocks. Copper and tin will not count.',
+          'Bram sent me south of Southford, into the desert pit called Deepwell. He wants one iron ore from those rocks. Copper will not count.',
       },
       {
         id: 'iron-ore',
@@ -386,10 +388,10 @@ export const QUESTS = [
         objective: 'Show Bram the iron ore',
         lines: [
           'That is iron. Heavy, ugly, and honest. Smelt it here if you want another bar, or take coal from the same pit and make steel.',
-          'The blue rocks are mithril. The green ones are adamant. They will not open for a pick until your arms remember the work. That is the whole of mining, written in dirt.',
+          'The blue rocks are mithril. The green ones are adamite. Titanium lives in Cinderfall, platinum on Glimmerfrost. They will not open for a pick until your arms remember the work.',
         ],
         journal:
-          'Bram turned the iron ore and gave it back. Deepwell also holds coal, mithril and adamant, each behind a higher Mining level. The smithy will take whatever I bring.',
+          'Bram turned the iron ore and gave it back. Deepwell also holds coal, mithril and adamite, each behind a higher Mining level. Titanium is in Cinderfall, platinum on Glimmerfrost. The smithy will take whatever I bring.',
       },
     ],
   },
@@ -443,6 +445,101 @@ export const QUESTS = [
         ],
         journal:
           'Lira took the shrimp as a sample and told me to eat the rest. Cooked fish heal more than raw. Burnt fish teach the fire your name and still count as cooking practice.',
+      },
+    ],
+  },
+  {
+    id: 'keepassault',
+    name: 'The Eternal War',
+    series: 'Embergate',
+    kind: 'quest',
+    points: 3,
+    giver: 'Mira',
+    requires: ['mark'],
+    reward: { gold: 70, gear: 'ashenbrand' },
+    blurb: 'Hellspire and Dawnspire have spilled their war onto the Endless Field. Mira wants a hunter who can walk both courtyards and put the Warden down.',
+    opening:
+      'The board in the guild hall has a new name on it that is not a slime. Mira has been reading reports from the north pass: black iron at one keep, white gold at the other, and something between them that answers to both.',
+    steps: [
+      {
+        id: 'war-ask',
+        kind: 'talk',
+        npc: 'guild',
+        objective: 'Speak with Mira about the keeps',
+        lines: [
+          'The north pass is not a pasture. Ashen Road climbs into a wasteland the guild maps as Embergate.',
+          'Hellspire is the Demon Knight\'s fortress. Dawnspire is the Holy Knight\'s castle. They have been at this longer than Oakhollow has had a name.',
+          'Walk both courtyards. Put down the knights that will let you. Then stand in the field between them. The Warden waits there. If you come back with the brand it carries, the board will believe you.',
+        ],
+        journal:
+          'Mira sent me north through Ashen Road. Hellspire first, then Dawnspire, then the Endless Field between them. The Keep Warden carries a brand she wants on the board.',
+      },
+      {
+        id: 'see-hell',
+        kind: 'visit',
+        spot: 'hellspire',
+        radius: 28,
+        objective: 'Enter the courtyard of Hellspire',
+        journal:
+          'Hellspire is a mouth of black iron. The courtyard smells like old heat. The knights on the posts did not look surprised to see a hunter from the south.',
+      },
+      {
+        id: 'kill-demon',
+        kind: 'kill',
+        types: ['demonknight'],
+        count: 2,
+        objective: 'Slay 2 Demon Knights at Hellspire',
+        journal:
+          'Two of the black knights went down. The keep did not. I still had the white castle west of the field to walk, and Mira does not take half a report.',
+      },
+      {
+        id: 'see-dawn',
+        kind: 'visit',
+        spot: 'dawnspire',
+        radius: 28,
+        objective: 'Enter the courtyard of Dawnspire',
+        journal:
+          'Dawnspire is white stone and blue fire. The courtyard is quieter than Hellspire and somehow worse for it. The Holy Knights watch the same war from the other side.',
+      },
+      {
+        id: 'kill-holy',
+        kind: 'kill',
+        types: ['holyknight'],
+        count: 2,
+        objective: 'Slay 2 Holy Knights at Dawnspire',
+        journal:
+          'Two of the white knights fell. The field between the keeps is a grave of banners. That is where Mira said the Warden would be.',
+      },
+      {
+        id: 'see-field',
+        kind: 'visit',
+        spot: 'warfield',
+        radius: 22,
+        objective: 'Stand on the Endless Field',
+        journal:
+          'The Endless Field is swords in the ash, two colours of banner, and a knight in mixed plate that does not belong to either keep. It was waiting.',
+      },
+      {
+        id: 'kill-warden',
+        kind: 'kill',
+        types: ['keepwarden'],
+        count: 1,
+        objective: 'Defeat the Keep Warden',
+        journal:
+          'The Warden used both keeps\' tricks: a hammer of light and a line of hellfire. It went down harder than a posted knight and cleaner than a dragon. The brand it carried is ugly, honest steel.',
+      },
+      {
+        id: 'war-back',
+        kind: 'talk',
+        npc: 'guild',
+        objective: 'Return to Mira with the report',
+        lines: [
+          'You walked both keeps and the dirt between them. That is more than most names on this board will ever do.',
+          'Keep the brand. It is not dusk steel and it is not a starter hammer. It is what a hunter carries after the war has looked at them.',
+          'The knights will still be there tomorrow. The Warden too. The board does not need you to end eternity. It needed you to stand in it.',
+        ],
+        journal:
+          'Mira took the report and left me the brand. Hellspire and Dawnspire are still at war. The guild board has a name that has been to both courtyards.',
       },
     ],
   },

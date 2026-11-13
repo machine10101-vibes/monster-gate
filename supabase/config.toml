@@ -157,11 +157,13 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://machine10101-vibes.github.io/monster-gate/"
+site_url = "https://monstergate.online/"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
+  "https://monstergate.online/",
+  "https://monstergate.online/index.html",
   "https://machine10101-vibes.github.io/monster-gate/",
   "https://machine10101-vibes.github.io/monster-gate/index.html",
   "http://127.0.0.1:5173",
@@ -443,3 +445,9 @@ entrypoint = "./functions/hunter/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/hunter/*.html" ]
+
+[functions.wallet]
+enabled = true
+verify_jwt = false
+import_map = "./functions/wallet/deno.json"
+entrypoint = "./functions/wallet/index.ts"

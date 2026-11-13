@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { gripRoll } from './weaponModels.js';
+import { DUAL_KINDS, gripRoll, placeSheath } from './weaponModels.js';
+import { lookOptions } from '../systems/roster.js';
 
 const LOOKS = [
   { tunic: 0x2c3d4a, hair: 0x1c140e, hairStyle: 'messy' },
@@ -15,6 +16,32 @@ function angDiff(a, b) {
   if (d > Math.PI) d -= Math.PI * 2;
   if (d < -Math.PI) d += Math.PI * 2;
   return d;
+}
+
+function lookFrom(id, look) {
+  if (look?.resolved) {
+    return {
+      skin: look.skin,
+      hair: look.hair,
+      hairStyle: look.hairStyle || 'messy',
+      tunic: look.tunic,
+      tunicLight: look.tunicLight,
+      beard: !!look.beard,
+      hero: true,
+      seed: look.seed ?? 4,
+    };
+  }
+  if (look && look.skin != null) return lookOptions(look);
+  let n = 0;
+  const key = String(id || '');
+  for (let i = 0; i < key.length; i++) n = (n + key.charCodeAt(i) * (i + 3)) % LOOKS.length;
+  return { ...LOOKS[n], hero: true, seed: n + 4 };
+}
+
+function disposeModel(model) {
+  model?.root?.traverse((o) => {
+    if (o.isMesh && o.geometry) o.geometry.dispose();
+  });
 }
 
 export class RemoteHunter {
@@ -35,14 +62,13 @@ export class RemoteHunter {
     this.hp = 20;
     this.dead = false;
     this.ready = false;
+    this.driven = false;
     this.cycle = Math.random() * 6;
-    let n = 0;
-    for (let i = 0; i < id.length; i++) n = (n + id.charCodeAt(i) * (i + 3)) % LOOKS.length;
-    const look = LOOKS[n];
-    this.model = buildHumanoid({ ...look, hero: true, seed: n + 4 });
-    const held = buildHeld('blade');
-    this.model.heldSlot.rotation.z = gripRoll('blade');
-    this.model.heldSlot.add(held);
+    this.appearKey = '';
+    this.heldKind = null;
+    this.sheathKind = null;
+    this.look = lookFrom(id, null);
+    this.model = buildHumanoid({ ...this.look, hero: true });
     this.obj = new THREE.Group();
     this.pivot = new THREE.Group();
     this.pivot.position.y = 0.55;
@@ -50,7 +76,78 @@ export class RemoteHunter {
     this.pivot.add(this.model.root);
     this.obj.add(this.pivot);
     this.obj.visible = false;
+    this.setHeld('blade');
     game.scene.add(this.obj);
+  }
+
+  setAppearance({ name, look, armor, held, sheath } = {}) {
+    if (name) this.name = name;
+    const nextLook = lookFrom(this.id, look);
+    const armorKey = JSON.stringify(armor || {});
+    const lookKey = JSON.stringify({
+      skin: nextLook.skin, hair: nextLook.hair, hairStyle: nextLook.hairStyle,
+      tunic: nextLook.tunic, beard: !!nextLook.beard, armor: armorKey,
+    });
+    if (lookKey !== this.appearKey) {
+      this.appearKey = lookKey;
+      this.look = nextLook;
+      const old = this.model;
+      const next = buildHumanoid({ ...nextLook, armor: armor || {} });
+      next.root.position.copy(old.root.position);
+      this.pivot.remove(old.root);
+      disposeModel(old);
+      this.model = next;
+      this.pivot.add(next.root);
+      this.heldKind = null;
+      this.sheathKind = null;
+    }
+    this.setHeld(held || this.heldKind || 'blade');
+    this.setSheath(sheath || null);
+  }
+
+  setHeld(kind) {
+    if (this.heldKind === kind) {
+      this.syncSheath();
+      return;
+    }
+    this.heldKind = kind;
+    const slot = this.model.heldSlot;
+    while (slot.children.length) slot.remove(slot.children[0]);
+    slot.rotation.z = 0;
+    if (kind) {
+      const g = buildHeld(kind);
+      g.traverse((o) => (o.castShadow = true));
+      slot.rotation.z = gripRoll(kind);
+      slot.add(g);
+    }
+    const off = this.model.offhand;
+    if (off) {
+      while (off.children.length) off.remove(off.children[0]);
+      if (DUAL_KINDS.has(kind)) {
+        const twin = buildHeld(kind === 'dual' ? 'blade' : kind);
+        twin.scale.setScalar(kind === 'dual' ? 0.82 : 0.95);
+        twin.rotation.y = Math.PI;
+        off.add(twin);
+      }
+    }
+    this.syncSheath();
+  }
+
+  setSheath(kind) {
+    this.sheathKind = kind || null;
+    this.syncSheath();
+  }
+
+  syncSheath() {
+    const slot = this.model.backSlot;
+    if (!slot) return;
+    while (slot.children.length) slot.remove(slot.children[0]);
+    const kind = this.sheathKind;
+    if (!kind || kind === this.heldKind) return;
+    const g = buildHeld(kind);
+    g.traverse((o) => (o.castShadow = true));
+    placeSheath(g, kind);
+    slot.add(g);
   }
 
   pushPose(data) {
@@ -73,15 +170,38 @@ export class RemoteHunter {
     }
   }
 
-  update(dt) {
-    if (!this.ready) return;
-    const k = Math.min(1, dt * 12);
-    this.x += (this.tx - this.x) * k;
-    this.y += (this.ty - this.y) * k;
-    this.z += (this.tz - this.z) * k;
-    this.yaw += angDiff(this.yaw, this.tyaw) * Math.min(1, dt * 14);
+  /** Authoritative interpolated pose from the world-view buffer. Skips local lerp. */
+  present(pose) {
+    if (!pose) return;
+    this.x = pose.x;
+    this.y = pose.y;
+    this.z = pose.z;
+    this.yaw = pose.yaw;
+    this.tx = pose.x;
+    this.ty = pose.y;
+    this.tz = pose.z;
+    this.tyaw = pose.yaw;
+    this.move = pose.move || 0;
+    this.state = pose.anim ?? pose.state ?? 0;
+    if (pose.hp != null) this.hp = pose.hp;
+    this.dead = this.hp <= 0 || this.state === 3;
+    this.ready = true;
+    this.obj.visible = true;
     this.obj.position.set(this.x, this.y, this.z);
     this.obj.rotation.y = this.yaw;
+  }
+
+  update(dt) {
+    if (!this.ready) return;
+    if (!this.driven) {
+      const k = Math.min(1, dt * 12);
+      this.x += (this.tx - this.x) * k;
+      this.y += (this.ty - this.y) * k;
+      this.z += (this.tz - this.z) * k;
+      this.yaw += angDiff(this.yaw, this.tyaw) * Math.min(1, dt * 14);
+      this.obj.position.set(this.x, this.y, this.z);
+      this.obj.rotation.y = this.yaw;
+    }
     this.cycle += dt * (2 + this.move * 6);
     const m = this.model;
     const walk = Math.sin(this.cycle);
@@ -99,14 +219,18 @@ export class RemoteHunter {
     m.legL.rotation.x += (leg - m.legL.rotation.x) * s;
     m.legR.rotation.x += (-leg - m.legR.rotation.x) * s;
     m.hip.position.y = 24 * S + Math.abs(Math.sin(this.cycle)) * 0.03 * mv;
+    if (this.driven) return;
     const [sx, sy, vis] = this.game.screenOf(this.x, this.y + 2.15, this.z, true);
     const d = Math.hypot(this.x - this.game.player.pos.x, this.z - this.game.player.pos.z);
-    this.game.hud.plate(this.id, `${this.name}<small>hunter</small>`);
+    const mate = this.game.social?.isPartyMember?.(this.id, this.name);
+    const plate = this.game.hud.plate(this.id, `${this.name}<small>hunter</small>`, mate ? 'hunter party' : 'hunter');
+    if (plate) plate.dataset.pname = this.name;
     this.game.hud.placePlate(this.id, sx, sy, vis && d < 24);
   }
 
   dispose() {
     this.game.scene.remove(this.obj);
     this.game.hud.removePlate(this.id);
+    disposeModel(this.model);
   }
 }
