@@ -188,6 +188,13 @@ export function enterCave(game) {
   w.realm = 'cave';
   w.group.visible = false;
   c.group.visible = true;
+  if (w.rift) {
+    w.rift.group.visible = false;
+    if (w.rift.chest) {
+      game.scene.remove(w.rift.chest.obj);
+      w.rift.chest = null;
+    }
+  }
   if (game.spawner && !game.monsters.some((m) => m.type === 'darksycledragon' && m.realm === 'cave' && !m.remove)) {
     const den = game.spawner.spawn('darksycledragon', c.nest.x, c.nest.z, false);
     den.realm = 'cave';
@@ -215,6 +222,19 @@ export function restoreOverworld(game) {
   if (c) {
     c.group.visible = false;
     c.cool = 1.6;
+  }
+  const r = w.rift;
+  if (r) {
+    r.group.visible = false;
+    if (r.chest) {
+      game.scene.remove(r.chest.obj);
+      r.chest = null;
+    }
+  }
+  if (game.riftRun) {
+    for (const m of game.monsters) if (m.realm === 'rift') m.dispose?.();
+    game.monsters = game.monsters.filter((m) => m.realm !== 'rift');
+    game.riftRun = null;
   }
   if (game.sky) game.sky.indoors = false;
 }

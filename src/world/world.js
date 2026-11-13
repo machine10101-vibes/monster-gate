@@ -11,6 +11,7 @@ import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
+import { buildRift } from './rift.js';
 import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
@@ -83,6 +84,7 @@ export class World {
     return null;
   }
   heightAt(x, z) {
+    if (this.rift?.contains(x, z)) return this.rift.heightAt(x, z);
     if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
     const d = this.dock;
     if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
@@ -105,7 +107,7 @@ export class World {
     return this.heightAt(x, z) < WATER_Y;
   }
   zoneAt(x, z) {
-    if (this.cave?.contains(x, z)) return ZONE.FIELD;
+    if (this.rift?.contains(x, z) || this.cave?.contains(x, z)) return ZONE.FIELD;
     const land = this.landAt(x, z);
     if (!land) return ZONE.MOUNTAIN;
     const lx = Math.floor(x) - land.x0;
@@ -118,6 +120,7 @@ export class World {
     return false;
   }
   playable(x, z) {
+    if (this.rift?.contains(x, z)) return this.rift.walkable(x, z);
     if (this.cave?.contains(x, z)) return this.cave.walkable(x, z);
     const h = this.heightAt(x, z);
     if (Math.hypot(x - CENTER.x, z - CENTER.z) < PLAY_RADIUS) return true;
@@ -382,6 +385,7 @@ export class World {
     dressSouthford(this);
     dressRing(this);
     this.cave = buildCave(this);
+    this.rift = buildRift(this);
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
@@ -1044,7 +1048,7 @@ export class World {
     this.streamRadius = radius;
     const pull = (obj) => {
       if (!obj) return;
-      if (obj === this.group || obj === this.cave?.group) {
+      if (obj === this.group || obj === this.cave?.group || obj === this.rift?.group) {
         for (const child of [...obj.children]) pull(child);
         return;
       }

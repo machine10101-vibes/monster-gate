@@ -257,6 +257,7 @@ export class Journal {
         questId: id,
         quest: q.name,
         gold: q.reward?.gold || 0,
+        gear: q.reward?.gear || null,
         points: q.points,
         started,
         fanfare: true,

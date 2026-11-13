@@ -78,13 +78,20 @@ function begin(m, atk, P) {
 function pick(m, dist) {
   const r = Math.random();
   const holy = m.type === 'holyknight';
+  const warden = m.type === 'keepwarden';
   let a = null;
-  if (holy) {
+  if (warden) {
+    if (dist < 4.4) a = r < 0.34 ? 'smash' : r < 0.62 ? 'cleave' : r < 0.82 ? 'rush' : 'hellfire';
+    else if (dist < 12) a = r < 0.45 ? 'smite' : r < 0.8 ? 'hellfire' : 'rush';
+  } else if (holy) {
     if (dist < 4.4) a = r < 0.62 ? 'smash' : 'smite';
     else if (dist < 12) a = r < 0.7 ? 'smite' : null;
   } else if (dist < 4.1) a = r < 0.55 ? 'cleave' : r < 0.78 ? 'rush' : 'hellfire';
   else if (dist < 11) a = r < 0.45 ? 'rush' : r < 0.9 ? 'hellfire' : null;
-  if (a && a === m.lastAtk && Math.random() < 0.6) a = holy ? (a === 'smash' ? 'smite' : 'smash') : a === 'cleave' ? 'hellfire' : 'cleave';
+  if (a && a === m.lastAtk && Math.random() < 0.6) {
+    if (warden) a = a === 'smite' ? 'hellfire' : a === 'hellfire' ? 'smash' : 'smite';
+    else a = holy ? (a === 'smash' ? 'smite' : 'smash') : a === 'cleave' ? 'hellfire' : 'cleave';
+  }
   return a;
 }
 

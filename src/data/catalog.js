@@ -141,6 +141,11 @@ export const MONSTERS = [
     lore: KNIGHT_LORE.holyknight,
   },
   {
+    id: 'keepwarden', name: 'Keep Warden', level: 12, temper: 'Unending', style: 'Brawler', habitat: 'The Endless Field between Hellspire and Dawnspire',
+    desc: 'A knight in mixed black and white plate that fights the eternal war from the dirt between the two keeps. It borrows the Demon Knight\'s hellfire and the Holy Knight\'s smite, and it hits harder than the posted guards. Fair at its level. Not kind.',
+    lore: KNIGHT_LORE.keepwarden,
+  },
+  {
     id: 'tiger', name: 'Bengal Tiger', level: 6, temper: 'Stalking', style: 'Pouncer', habitat: 'The jungle oasis, west of Brookside',
     desc: 'An orange and black striped cat with white paws and yellow eyes. It creeps low through the undergrowth, then pounces from a distance and rakes with both paws. If you roll away it lunges again. Hit it during its crouch to knock it off the pounce.',
   },
@@ -497,6 +502,13 @@ GEAR.push(
     recipe: {},
     item: { id: 'holyhammer', icon: 'holyhammer', name: 'Smiterfall War Hammer', kind: 'melee', style: 'twohand', dmg: 36, reach: 2.8, arc: 2.5, dur: 0.78, hit: 0.36, stam: 18, knock: 12, held: 'holyhammer', desc: 'Two-handed. A holy stone hammer.' },
     stats: [['Damage', 36], ['Reach', '2.8'], ['Style', 'Two-Handed']],
+  },
+  {
+    id: 'ashenbrand', type: 'weapon', wtype: 'onesword', name: 'Ashen Brand', monster: 'keepwarden', held: 'ironsword', found: true, reqLevel: 12,
+    desc: 'A straight iron blade darkened by the Endless Field, with a fuller of cinder-red and a crossguard split black and gold. Stronger than budge steel, short of a knight\'s own arm.',
+    recipe: {},
+    item: { id: 'ashenbrand', icon: 'ironsword', name: 'Ashen Brand', kind: 'melee', style: 'swordshield', dmg: 20, reach: 2.5, arc: 2.1, dur: 0.4, hit: 0.16, stam: 9, knock: 5, held: 'ironsword', desc: 'Sword and shield. Cinder-dark iron from the field between the keeps.' },
+    stats: [['Damage', 20], ['Reach', '2.5'], ['Style', 'Sword & Shield'], ['Requires', 'Strength 12']],
   },
   { id: 'demonshield', type: 'armor', slot: 'shield', name: 'Hellforged Bulwark', monster: DEMON_K, set: 'demonset', def: 4, desc: 'A tall kite shield of black plate with a spiked rim and a glowing red demon face.', recipe: {}, found: true },
 );

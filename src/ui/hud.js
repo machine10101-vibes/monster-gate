@@ -330,7 +330,7 @@ export class HUD {
     const sc = cv.width / N;
     ctx.fillStyle = '#0d1116';
     ctx.fillRect(0, 0, cv.width, cv.height);
-    const cave = world.realm === 'cave' ? world.cave : null;
+    const cave = world.realm === 'cave' ? world.cave : world.realm === 'rift' ? world.rift : null;
     const origin = cave ? cave.origin : (world.minimapOrigin || { x: 0, z: 0 });
     const sx = Math.round(px - origin.x - N / 2);
     const sz = Math.round(pz - origin.z - N / 2);
@@ -441,21 +441,23 @@ export class HUD {
     };
     if (name === 'map') {
       const inCave = game.world.realm === 'cave';
-      title.textContent = inCave ? 'Darksycle Den' : 'Map';
+      const inRift = game.world.realm === 'rift';
+      const instanced = inCave || inRift;
+      title.textContent = inCave ? 'Darksycle Den' : inRift ? 'Waygate Rift' : 'Map';
       const c = document.createElement('canvas');
       c.className = 'bigmap';
-      const src = inCave ? game.world.cave.minimap : game.world.minimapCanvas;
-      c.width = inCave ? 240 : src.width;
-      c.height = inCave ? 192 : src.height;
+      const src = inCave ? game.world.cave.minimap : inRift ? game.world.rift.minimap : game.world.minimapCanvas;
+      c.width = instanced ? 240 : src.width;
+      c.height = instanced ? 192 : src.height;
       const ctx = c.getContext('2d');
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(src, 0, 0, c.width, c.height);
       const p = game.player;
-      const ox = inCave ? game.world.cave.origin.x : (game.world.minimapOrigin?.x || 0);
-      const oz = inCave ? game.world.cave.origin.z : (game.world.minimapOrigin?.z || 0);
+      const ox = inCave ? game.world.cave.origin.x : inRift ? game.world.rift.origin.x : (game.world.minimapOrigin?.x || 0);
+      const oz = inCave ? game.world.cave.origin.z : inRift ? game.world.rift.origin.z : (game.world.minimapOrigin?.z || 0);
       const mx = (p.pos.x - ox) * (c.width / src.width);
       const mz = (p.pos.z - oz) * (c.height / src.height);
-      if (!inCave) {
+      if (!instanced) {
         ctx.fillStyle = '#c27bff';
         ctx.fillRect(GATE.x - ox - 3, GATE.z - oz - 3, 6, 6);
         ctx.fillStyle = '#ffd23f';
@@ -470,7 +472,7 @@ export class HUD {
       const frame = document.createElement('div');
       frame.className = 'playmap';
       frame.appendChild(c);
-      const labels = inCave ? caveMapLabels(game.world.cave) : landMapLabels(game.world);
+      const labels = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
       for (const label of labels) {
         const b = document.createElement('b');
         b.className = 'playmap-label' + (label.city ? ' city' : '');
@@ -480,7 +482,7 @@ export class HUD {
         frame.appendChild(b);
       }
       body.appendChild(frame);
-      if (!inCave) {
+      if (!instanced) {
         if (game.world.waygate) {
           ctx.fillStyle = '#7ef6ff';
           ctx.fillRect(game.world.waygate.x - ox - 2, game.world.waygate.z - oz - 2, 5, 5);
@@ -498,7 +500,9 @@ export class HUD {
       }
       add(inCave
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
-        : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
+        : inRift
+          ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
+          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);
@@ -587,6 +591,10 @@ export class HUD {
       title.textContent = 'Waygate';
       const saved = (localStorage.getItem('mg-name') || 'Hunter').replace(/[<>"&]/g, '').slice(0, 16);
       add(`<p id="wg-status" style="color:#cfe"></p>
+        <div id="wg-rift">
+          <button id="wg-rift-enter" class="wg-btn" type="button">Enter a rift</button>
+          <p id="wg-rift-note" style="color:#99a;font-size:13px">A short instanced hunt. Waves scale with the party. Guests can enter solo. Host and join stay account-only.</p>
+        </div>
         <div id="wg-lobby">
           <label class="wg-label">Your name</label>
           <input id="wg-name" class="wg-input" maxlength="16" value="${saved.replace(/"/g, '')}" />
@@ -596,7 +604,7 @@ export class HUD {
             <input id="wg-join-code" class="wg-input" maxlength="4" placeholder="CODE" />
             <button id="wg-join" class="wg-btn" type="button">Join</button>
           </div>
-          <p style="color:#99a;font-size:13px">The host's browser runs the world. Up to 6 hunters. Share the code with friends at their own waygate.</p>
+          <p style="color:#99a;font-size:13px">The host's browser runs the world. Up to 6 hunters. Share the code with friends at their own waygate. Sign in with an account to host or join.</p>
         </div>
         <div id="wg-session" class="hidden">
           <div class="wg-label">World code</div>
@@ -610,6 +618,7 @@ export class HUD {
         </div>`);
       const nameInput = document.getElementById('wg-name');
       nameInput?.addEventListener('change', () => localStorage.setItem('mg-name', nameInput.value.slice(0, 16)));
+      document.getElementById('wg-rift-enter').onclick = () => game.enterRiftFromGate();
       document.getElementById('wg-host').onclick = () => game.net.host(document.getElementById('wg-name').value);
       document.getElementById('wg-join').onclick = () => game.net.join(document.getElementById('wg-name').value, document.getElementById('wg-join-code').value);
       document.getElementById('wg-copy').onclick = () => {

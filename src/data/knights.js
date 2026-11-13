@@ -49,6 +49,8 @@ export const KNIGHT_LORE = {
   holyknight:
     'Sworn in light and sealed in gold, the Holy Knight has held the line against the dark since before the first torch was lit. Its whole purpose is the war: every blow it lands answers a blow that was struck against it ten thousand years ago.',
   war: 'The Demon Knight and the Holy Knight are locked in one continuous battle that has raged through all of eternity: good against evil, neither able to fall for good. The Embergate wasteland is the ground they fight on.',
+  keepwarden:
+    'The Keep Warden is what the eternal war leaves in the dirt between Hellspire and Dawnspire: a knight that has worn both colours long enough to fight as both. It is not the war. It is the war\'s doorman.',
 };
 
 /** Whole pieces only. Each is its own 1 to 2 percent roll when the knight falls. */
@@ -70,6 +72,9 @@ export const GEAR_DROPS = {
     { id: 'holyboots', chance: 0.02 },
     { id: 'holyhammer', chance: 0.01 },
   ],
+  keepwarden: [
+    { id: 'ashenbrand', chance: 0.12 },
+  ],
 };
 
-export const KNIGHT_TYPES = new Set(['demonknight', 'holyknight']);
+export const KNIGHT_TYPES = new Set(['demonknight', 'holyknight', 'keepwarden']);

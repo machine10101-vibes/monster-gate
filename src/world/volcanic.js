@@ -382,6 +382,7 @@ function dressAvenue(world, land, spec, place) {
 }
 
 function dressBattle(world, land, spec, place, cellOk, scatter) {
+  world.warfield = { x: land.x0 + 72.5, z: land.z0 + 72.5 };
   const V = world.models.volcanic;
   const seed = spec.seed;
   const holySide = (lx, lz) => Math.hypot(lx - 0, lz - 72) < Math.hypot(lx - 72, lz - 0) + (hash2(lx, lz, seed) - 0.5) * 22;

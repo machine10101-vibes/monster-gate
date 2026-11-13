@@ -27,6 +27,8 @@ const NPC_DEFS = [
       'Monster parts can be forged into gear. Bram the blacksmith keeps the forge by Greyrock Pit, just outside town.',
       'Lira the alchemist sells healing draughts and spirit philters from her stall on the south road.',
       'When the hunt starts to stick, press K. Warrior, Ranger, and Mage each keep three paths, and the same points raise your attributes.',
+      'The board in the hall pins three bounties that pay gold and training. They rotate. Do not try to turn the same stack in twice.',
+      'Hellspire and Dawnspire are still at war on the Endless Field. If you have the guild mark, ask me about the keeps.',
     ],
   },
   {
