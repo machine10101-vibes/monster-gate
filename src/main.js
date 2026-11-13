@@ -20,6 +20,7 @@ import { Session } from './net/session.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
+import { Journal } from './systems/journal.js';
 import { Roster, lookOptions } from './systems/roster.js';
 import { CharacterSelect } from './ui/charselect.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
@@ -30,7 +31,7 @@ import { Gathering } from './systems/gather.js';
 import { GOODS } from './data/gathering.js';
 import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
-import { ZONE, GATE, GUILD } from './world/terrain.js';
+import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
@@ -93,6 +94,10 @@ class Game {
     this.quest = { text: 'Slay 5 Gate monsters', n: 0, total: 5 };
     this.items = ITEMS.map((i) => ({ ...i }));
     this.progress = new Progress();
+    this.journal = new Journal(this.progress);
+    this.journalT = 0;
+    this.talkScript = null;
+    this.talkQuest = false;
     this.gold = this.progress.gold;
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.catalog = new Catalog(this);
@@ -301,6 +306,7 @@ class Game {
   }
 
   rebindFromProgress() {
+    this.journal?.rebind();
     this.gold = this.progress.gold;
     this.items = ITEMS.map((i) => ({ ...i }));
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
@@ -1263,11 +1269,31 @@ class Game {
     this.hud.setOrb('mana', p.mana, p.maxMana);
     this.hud.setOrb('fury', p.fury, 100);
     if (force) {
-      this.hud.setQuest(this.quest.text, this.quest.n, this.quest.total);
+      this.syncTracker();
       this.hud.setGold(this.gold);
       this.hud.setRank(RANKS[this.rank]);
     }
     this.hud.updateSkillbar(this);
+  }
+
+  syncTracker() {
+    const t = this.journal.tracker(this.quest);
+    this.hud.setQuest(t.text, t.n, t.total);
+  }
+
+  applyJournal(events) {
+    const list = Array.isArray(events) ? events : events ? [events] : [];
+    let hud = false;
+    for (const e of list) {
+      if (!e) continue;
+      if (e.gold) this.addGold(e.gold);
+      if (e.fanfare) this.audio.quest();
+      if (e.banner) this.hud.banner(e.banner[0], e.banner[1], 3800);
+      if (e.toast && !e.quiet) this.hud.toast(e.toast, 2800);
+      if (e.hud || e.toast || e.complete || e.advance) hud = true;
+    }
+    if (hud) this.syncTracker();
+    if (hud && this.hud.panelId === 'quest' && this.hud.journalRefresh) this.hud.journalRefresh();
   }
 
   /* ------------------------------ gameplay ------------------------------ */
@@ -1441,10 +1467,11 @@ class Game {
       this.fx.burst(m.x, m.y + 1, m.z, [0x6fd45a, 0xf1e6c6, 0xffd23f], 12, 3.5, 0.1, 0.8);
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
+    this.applyJournal(this.journal.onKill(m.type));
     if (m.type === 'chicken') return;
     this.quest.n++;
     if (this.quest.n >= this.quest.total) this.completeQuest();
-    else this.hud.setQuest(this.quest.text, this.quest.n, this.quest.total);
+    else this.syncTracker();
   }
 
   completeQuest() {
@@ -1456,7 +1483,8 @@ class Game {
     p.hp = p.maxHp;
     p.mana = p.maxMana;
     this.quest = { text: `Slay ${5 + this.rank * 3} Gate monsters`, n: 0, total: 5 + this.rank * 3 };
-    this.hud.setQuest(this.quest.text, 0, this.quest.total);
+    this.journal.noteChallenge(RANKS[this.rank], this.quest.total);
+    this.syncTracker();
     this.hud.setRank(RANKS[this.rank]);
     this.hud.banner('Hunt complete', `Rank ${RANKS[this.rank]}  +${reward}g`, 3800);
     this.audio.quest();
@@ -1926,26 +1954,102 @@ class Game {
     }
     if (this.talkNpc) {
       const npc = this.talkNpc;
+      if (this.talkScript) {
+        this.advanceQuestTalk(npc);
+        return;
+      }
       if (npc.dialogLeft > 0) {
         npc.dialogLeft--;
         this.hud.showDialog(npc.name, npc.nextLine());
       } else {
         this.hud.hideDialog();
         this.talkNpc = null;
-        if (npc.def.service === 'forge') this.openForge();
+        if (!this.talkQuest && npc.def.service === 'forge') this.openForge();
+        this.talkQuest = false;
       }
       this.audio.select();
       return;
     }
     const near = this.ambient.npcs.find((n) => n.near);
     if (!near) return;
-    if (near.def.service === 'alchemy') {
+    const script = this.journal.scriptFor(near.def.id);
+    if (near.def.service === 'alchemy' && !script) {
       this.openAlchemy();
       return;
     }
     this.talkNpc = near;
-    near.dialogLeft = near.def.lines.length - 1;
-    this.hud.showDialog(near.name, near.nextLine());
+    this.talkQuest = !!script;
+    if (script) {
+      this.talkScript = { questId: script.questId, lines: script.lines, choices: script.choices, index: 0, phase: 'line', choiceId: null };
+      this.hud.showDialog(near.name, script.lines[0] || '...');
+    } else {
+      this.talkScript = null;
+      near.dialogLeft = near.def.lines.length - 1;
+      this.hud.showDialog(near.name, near.nextLine());
+    }
+    this.audio.select();
+  }
+
+  advanceQuestTalk(npc) {
+    const s = this.talkScript;
+    if (!s) return;
+    if (s.phase === 'choice') {
+      this.audio.select();
+      return;
+    }
+    if (s.phase === 'lack') {
+      this.hud.hideDialog();
+      this.talkNpc = null;
+      this.talkScript = null;
+      this.talkQuest = false;
+      this.audio.select();
+      return;
+    }
+    if (s.phase === 'reply') {
+      this.finishQuestTalk(s.choiceId);
+      return;
+    }
+    s.index += 1;
+    if (s.index < s.lines.length) {
+      this.hud.showDialog(npc.name, s.lines[s.index]);
+      this.audio.select();
+      return;
+    }
+    if (s.choices?.length) {
+      s.phase = 'choice';
+      this.hud.showDialog(npc.name, s.lines[s.lines.length - 1] || '');
+      this.hud.showChoices(s.choices, (id) => this.pickTalk(id));
+      this.audio.select();
+      return;
+    }
+    this.finishQuestTalk(null);
+  }
+
+  pickTalk(id) {
+    const s = this.talkScript;
+    if (!s || s.phase !== 'choice' || !this.talkNpc) return;
+    const choice = s.choices.find((c) => c.id === id);
+    if (!choice) return;
+    s.choiceId = id;
+    s.phase = 'reply';
+    this.hud.showDialog(this.talkNpc.name, choice.reply);
+    this.audio.select();
+  }
+
+  finishQuestTalk(choiceId) {
+    const s = this.talkScript;
+    const result = s ? this.journal.finishTalk(s.questId, choiceId) : { ok: false };
+    if (result.blocked) {
+      s.phase = 'lack';
+      this.hud.showDialog(this.talkNpc.name, result.line || 'You do not have it yet.');
+      this.audio.select();
+      return;
+    }
+    this.hud.hideDialog();
+    this.talkNpc = null;
+    this.talkScript = null;
+    this.talkQuest = false;
+    if (result.ok) this.applyJournal(result);
     this.audio.select();
   }
 
@@ -2518,7 +2622,20 @@ class Game {
         this.monsters = this.monsters.filter((m) => !m.remove);
       }
     }
-    if (this.started) this.checkDiscoveries(dt);
+    if (this.started) {
+      this.checkDiscoveries(dt);
+      this.journalT -= dt;
+      if (this.journalT <= 0) {
+        this.journalT = 0.45;
+        this.applyJournal(this.journal.pulse(this.player.pos, {
+          gate: GATE,
+          pit: MINE,
+          guild: GUILD,
+          smithy: this.world.smithy,
+          forge: this.world.forge,
+        }));
+      }
+    }
     if (this.started) this.spawner.update(dt);
     if (this.started && this.wallet) {
       this.saveAcc += dt;
