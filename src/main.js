@@ -99,16 +99,10 @@ function pickQuality() {
   return cores >= 8 ? QUALITIES[2] : QUALITIES[1];
 }
 
-/** iPad-sized, including Brave's desktop site where the screen is still a tablet. */
-function largeScreen() {
-  const w = Math.max(window.screen?.width || 0, window.innerWidth || 0);
-  const h = Math.max(window.screen?.height || 0, window.innerHeight || 0);
-  return Math.min(w, h) >= 744 || w * h > 700000;
-}
-
 /**
- * iPad Safari and iPad Brave die at the end of loading if the first real frame
- * is a full-size multisampled buffer plus a shadow map plus every shader at once.
+ * A boot that already died reloads once on the small setting.
+ * The first boot keeps the chosen foliage. Shrinking every iPad boot, then
+ * drawing that scene three times, is what turned one restart into a loop.
  */
 function survivalBudget(q, heavy) {
   const w = Math.max(window.screen?.width || 0, window.innerWidth || 1);
@@ -133,8 +127,8 @@ class Game {
     const killed = bootWasKilled();
     markBoot();
     const ios = isIOS();
-    this.heavyBoot = killed || ((ios || isTablet()) && largeScreen());
-    this.lightBoot = ios || this.heavyBoot;
+    this.heavyBoot = killed;
+    this.lightBoot = ios || isTablet() || killed;
     const base = this.heavyBoot ? QUALITIES[0] : pickQuality();
     this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : base;
     this.bootFrames = 0;
@@ -224,9 +218,8 @@ class Game {
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.NoToneMapping;
     r.setClearColor(0x0b0d10, 1);
-    r.shadowMap.enabled = !lite;
+    r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
-    r.debug.checkShaderErrors = !lite;
     this.renderer = r;
     this.canvas.addEventListener('webglcontextlost', (ev) => {
       ev.preventDefault();
@@ -343,11 +336,8 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
-    if (this.lightBoot) await this.settleGpu();
-    else {
-      this.applyQuality();
-      this.renderer.compile(this.scene, this.camera);
-    }
+    this.applyQuality();
+    if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
     document.getElementById('loading').classList.add('hidden');
@@ -1032,53 +1022,6 @@ class Game {
     this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : next;
     this.applyQuality();
     this.hud.toast(`Graphics: ${this.quality.label} (foliage density applies on reload)`, 2600);
-  }
-
-  /**
-   * Compile the visible shaders into a tiny buffer before the real one exists.
-   * On iPad the crash is the moment those two costs land together.
-   */
-  async settleGpu() {
-    const r = this.renderer;
-    r.shadowMap.enabled = false;
-    if (this.sky?.sun) this.sky.sun.castShadow = false;
-    const hold = [];
-    const hide = (obj) => {
-      if (!obj) return;
-      hold.push([obj, obj.visible]);
-      obj.visible = false;
-    };
-    hide(this.world?.group);
-    hide(this.world?.cave?.group);
-    hide(this.player?.obj);
-    hide(this.snowfall?.points);
-    hide(this.ashfall?.points);
-    hide(this.fx?.motes);
-    hide(this.fx?.gateMotes);
-    for (const m of this.monsters || []) hide(m.obj);
-    for (const n of this.ambient?.npcs || []) hide(n.obj);
-    const w = Math.max(2, Math.round(window.innerWidth));
-    const h = Math.max(2, Math.round(window.innerHeight));
-    r.setPixelRatio(0.35);
-    r.setSize(w, h, false);
-    this.snapCamera();
-    const draw = () => {
-      try {
-        r.render(this.scene, this.camera);
-      } catch (err) {
-        this.reportFault(err);
-      }
-    };
-    const wait = () => new Promise((resolve) => setTimeout(resolve, 40));
-    draw();
-    await wait();
-    if (this.world?.group) this.world.group.visible = true;
-    draw();
-    await wait();
-    for (const [obj, vis] of hold) obj.visible = vis;
-    draw();
-    await wait();
-    this.applyQuality();
   }
 
   applyQuality() {

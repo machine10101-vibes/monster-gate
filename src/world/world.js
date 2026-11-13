@@ -37,7 +37,9 @@ export class World {
     this.occupied = new Map();
     this.batches = new Map();
     this.instances = new Map();
-    this.instanceProps = false;
+    // Baking every tree and palm into the chunk mesh is what runs an iPad out of
+    // memory as the loading screen finishes. One shared copy, stamped by matrix.
+    this.instanceProps = true;
     this.rng = new RNG(20260711);
     this.realm = 'over';
   }
