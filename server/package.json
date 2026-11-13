@@ -1,0 +1,15 @@
+{
+  "name": "@monster-gate/world-1",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Authoritative World 1 server for Monster Gate.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test tests/*.test.js",
+    "smoke": "node scripts/smoke.mjs"
+  }
+}
