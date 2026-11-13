@@ -1143,7 +1143,7 @@ body.mmo-view #top-left {
     max-height: min(168px, calc(100dvh - 72px));
     overflow: hidden;
   }
-  body.touch #world-chat .wc-log {
+  body.touch #world-chat .wc-stack {
     height: 64px;
   }
   body.touch #world-chat:not(.collapsed) .wc-toggle {

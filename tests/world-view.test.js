@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   ANIM, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S, REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
-  SnapshotBuffer, WorldView, angLerp, animName, animOf,
+  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows,
   normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
@@ -313,6 +313,27 @@ test('MG-UI-37 own pin clears after 15s of wall clock with no frames', (t) => {
   t.mock.timers.tick(15_000);
   assert.equal(view.localPin, null);
   view.dispose();
+});
+
+test('MG-UI-38 log cull hides rows that do not fully fit', () => {
+  const rows = [
+    { id: 'clip-top', top: -8, bottom: 10 },
+    { id: 'full-a', top: 10, bottom: 28 },
+    { id: 'full-b', top: 28, bottom: 46 },
+    { id: 'clip-bot', top: 46, bottom: 70 },
+  ];
+  assert.deepEqual(fullyVisibleRows(0, 64, rows).map((r) => r.id), ['full-a', 'full-b']);
+  assert.deepEqual(fullyVisibleRows(0, 46, rows.slice(1, 3)).map((r) => r.id), ['full-a', 'full-b']);
+  const wv = src('../src/net/worldView.js');
+  const style = src('../src/style.css');
+  const theme = src('../src/ui/theme.css');
+  assert.match(wv, /wc-stack/);
+  assert.match(wv, /cullChatLogRows/);
+  assert.match(style, /#world-chat \.wc-stack \{[\s\S]*?height:\s*112px/);
+  assert.match(style, /#world-chat \.wc-log \{[\s\S]*?overflow:\s*hidden/);
+  assert.match(style, /body\.touch #world-chat \.wc-stack \{[\s\S]*?height:\s*84px/);
+  assert.match(theme, /body\.touch #world-chat \.wc-stack \{[\s\S]*?height:\s*64px/);
+  assert.doesNotMatch(theme, /body\.touch #world-chat \.wc-log \{[\s\S]*?height:\s*64px/);
 });
 
 test('waking overlay is inert without ?mmo=1', () => {

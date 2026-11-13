@@ -623,3 +623,14 @@ test('MG-UI-37 pin slot is labeled and distinct from the in-log own row', () => 
   assert.doesNotMatch(theme, /#world-chat \.wc-log p\.wc-you,\s*#world-chat \.wc-pin p\.wc-you/);
   assert.match(theme, /#world-chat \.wc-pin \{[\s\S]*?border-left-color:\s*var\(--mg-gold\)/);
 });
+
+test('MG-UI-38 pin shares the log stack so the panel height stays put', () => {
+  const style = src('src/style.css');
+  const theme = src('src/ui/theme.css');
+  const wv = src('src/net/worldView.js');
+  assert.match(wv, /class="wc-stack"/);
+  assert.match(style, /#world-chat \.wc-stack \{[\s\S]*?display:\s*flex[\s\S]*?flex-direction:\s*column/);
+  assert.match(style, /#world-chat \.wc-log \{[\s\S]*?overflow:\s*hidden/);
+  assert.match(style, /#world-chat \.wc-log \{[\s\S]*?justify-content:\s*flex-end/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*body\.touch #world-chat \.wc-stack \{[\s\S]*height:\s*64px/);
+});

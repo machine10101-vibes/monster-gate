@@ -30,6 +30,7 @@ export const CHAT_MAX = 120;
 export const MOVE_HZ = 10;
 export const LOCAL_BUBBLE_S = 4.2;
 export const LOCAL_PIN_S = 15;
+export const ROW_FIT_EPS = 0.5;
 
 export const ANIM = { idle: 0, attack: 1, roll: 2, dead: 3, stagger: 4, use: 5 };
 
@@ -201,6 +202,43 @@ export function normalizeChat(raw) {
     zone: raw.zone != null ? String(raw.zone).slice(0, 32) : '',
     to: raw.to && typeof raw.to === 'object' ? { id: String(raw.to.id || ''), name: cleanName(raw.to.name) } : null,
   };
+}
+
+/** Rows whose box sits fully inside the log's visible inner band. */
+export function fullyVisibleRows(viewTop, viewBottom, rows, eps = ROW_FIT_EPS) {
+  return (rows || []).filter((r) => r.top >= viewTop - eps && r.bottom <= viewBottom + eps);
+}
+
+/** Hide any log row that would render only partially. Scrolls to the bottom first. */
+export function cullChatLogRows(log) {
+  if (!log || typeof log.getBoundingClientRect !== 'function') return 0;
+  const rows = [...(log.querySelectorAll?.(':scope > p') || log.children || [])];
+  for (const row of rows) row.hidden = false;
+  log.scrollTop = Math.max(0, (log.scrollHeight || 0) - (log.clientHeight || 0));
+  const box = log.getBoundingClientRect();
+  if (!box.height) return 0;
+  let padTop = 0;
+  let padBot = 0;
+  if (typeof getComputedStyle === 'function') {
+    const cs = getComputedStyle(log);
+    padTop = parseFloat(cs.paddingTop) || 0;
+    padBot = parseFloat(cs.paddingBottom) || 0;
+  }
+  const viewTop = box.top + padTop;
+  const viewBottom = box.bottom - padBot;
+  const rects = rows.map((row) => {
+    const r = row.getBoundingClientRect?.() || { top: 0, bottom: 0 };
+    return { row, top: r.top, bottom: r.bottom };
+  });
+  const keep = new Set(fullyVisibleRows(viewTop, viewBottom, rects).map((r) => r.row));
+  let hidden = 0;
+  for (const row of rows) {
+    if (keep.has(row)) continue;
+    row.hidden = true;
+    hidden += 1;
+  }
+  log.scrollTop = Math.max(0, (log.scrollHeight || 0) - (log.clientHeight || 0));
+  return hidden;
 }
 
 export function angLerp(a, b, t) {
@@ -964,8 +1002,10 @@ export class WorldView {
           <button type="button" data-ch="world">World</button>
           <button type="button" data-ch="zone">Zone</button>
         </div>
-        <div class="wc-log" role="log" aria-live="polite"></div>
-        <div class="wc-pin" hidden></div>
+        <div class="wc-stack">
+          <div class="wc-log" role="log" aria-live="polite"></div>
+          <div class="wc-pin" hidden></div>
+        </div>
         <form class="wc-form">
           <input class="wc-in" type="text" maxlength="${CHAT_MAX}" autocomplete="off" autocapitalize="sentences" spellcheck="true" placeholder="Say something" />
           <button type="submit" class="wc-send">Send</button>
@@ -1096,11 +1136,15 @@ export class WorldView {
   paintPin() {
     this.expireOwnPin();
     const el = this.ui?.pin;
-    if (!el) return;
+    if (!el) {
+      this.cullLog();
+      return;
+    }
     const pin = this.localPin;
     if (!pin) {
       el.hidden = true;
       el.innerHTML = '';
+      this.cullLog();
       return;
     }
     const who = escapeHtml(pin.name);
@@ -1108,6 +1152,11 @@ export class WorldView {
     const pid = escapeHtml(pin.id);
     el.hidden = false;
     el.innerHTML = `<p class="wc-you"><span class="wc-pin-mark" aria-label="Pinned">📌</span><b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
+    this.cullLog();
+  }
+
+  cullLog() {
+    cullChatLogRows(this.ui?.log);
   }
 
   wrapGame() {
