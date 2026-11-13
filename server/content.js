@@ -75,9 +75,23 @@ export function realmOf(zone) {
   return zone === 'cave' ? 'cave' : 'over';
 }
 
+/** Armor, weapon, and look come from the saved character, never the client. */
+export function appearanceFromState(state = {}) {
+  const armor = state.armor && typeof state.armor === 'object' ? { ...state.armor } : {};
+  const weapon = typeof state.weapon === 'string' && state.weapon ? state.weapon : null;
+  const look = state.look || null;
+  return {
+    look,
+    armor,
+    weapon,
+    held: weapon || 'blade',
+  };
+}
+
 export function spawnPoseFromRow(row, hello = {}) {
   const state = row?.state && typeof row.state === 'object' ? row.state : {};
   const hunter = state.hunter && typeof state.hunter === 'object' ? state.hunter : {};
+  const appear = appearanceFromState(state);
   const x = Number.isFinite(hunter.x) ? hunter.x : Number.isFinite(row?.x) ? row.x : 72;
   const y = Number.isFinite(hunter.y) ? hunter.y : Number.isFinite(row?.y) ? row.y : 3.2;
   const z = Number.isFinite(hunter.z) ? hunter.z : Number.isFinite(row?.z) ? row.z : 72.5;
@@ -91,10 +105,11 @@ export function spawnPoseFromRow(row, hello = {}) {
     yaw,
     move: 0,
     anim: 0,
-    held: hello.held || state.held || 'blade',
-    sheath: hello.sheath ?? state.sheath ?? null,
-    look: hello.look || state.look || null,
-    armor: hello.armor || state.armor || {},
+    held: appear.held,
+    weapon: appear.weapon,
+    sheath: null,
+    look: appear.look,
+    armor: appear.armor,
     zone: hello.zone && hello.zone !== 'Oakhollow' ? cleanZone(hello.zone) : zoneAt(x, z, realm),
     hp: Number.isFinite(hunter.hp) ? hunter.hp : 20,
     movedAt: 0,
@@ -107,6 +122,7 @@ export function persistStateFromSession(session) {
     name: session.name,
     look: session.look,
     armor: session.armor && typeof session.armor === 'object' ? session.armor : {},
+    weapon: session.weapon ?? null,
     hunter: {
       x: session.x,
       y: session.y,

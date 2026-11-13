@@ -46,7 +46,7 @@ export function applyMove(prev, next, nowMs) {
   const dz = next.z - prev.z;
   const dist = Math.hypot(dx, dz);
   if (dist > TELEPORT_MAX) {
-    return { pose: { ...prev, look: next.look || prev.look, armor: next.armor || prev.armor }, clamped: false, teleport: true };
+    return { pose: { ...prev }, clamped: false, teleport: true };
   }
   const maxDist = SPEED_MAX * dt + 1.5;
   let x = next.x;
@@ -67,10 +67,8 @@ export function applyMove(prev, next, nowMs) {
       yaw: next.yaw,
       move: next.move,
       anim: next.anim,
-      held: next.held,
       sheath: next.sheath,
-      look: next.look || prev.look,
-      armor: next.armor || prev.armor,
+      // held, look, and armor stay on prev — the server owns appearance.
       zone: next.zone || prev.zone,
       movedAt: nowMs,
     },
