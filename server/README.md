@@ -42,6 +42,7 @@ Or run `npm run smoke` from this folder (uses mocked auth, two scripted clients)
 | `SUPABASE_SERVICE_ROLE_KEY` | for live saves | Persistence only. **Never commit.** |
 | `ALLOWED_ORIGINS` | no | Comma-separated browser origins. Empty allows all (local dev). |
 | `ALLOW_DEV_TOKENS` | no | `1` accepts `dev:<uuid>` tokens. Do not set in production. |
+| `ZONE_CAP` | no (150) | Max hunters in one place name (Oakhollow, Hellspire, …). Further joins get `error` `zone_full`. `0` disables the cap. |
 
 Apply the characters migration once Brandon merges PR #60:
 

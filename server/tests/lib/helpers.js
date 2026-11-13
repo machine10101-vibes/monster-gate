@@ -26,6 +26,9 @@ export async function startWorld(extra = {}) {
     memory: true,
     verifyToken: extra.verifyToken || verifyToken,
     aoi: extra.aoi,
+    aoiNear: extra.aoiNear,
+    farHz: extra.farHz,
+    zoneCap: extra.zoneCap,
     monsters: extra.monsters,
     nodes: extra.nodes,
   });
