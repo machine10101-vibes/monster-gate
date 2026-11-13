@@ -244,9 +244,10 @@ test('?mockwallet is session-only and never a signup path', () => {
   assert.match(main, /loginWithKlever/);
   assert.match(main, /kind === 'email'/);
   assert.doesNotMatch(main, /account \|\| klever/);
-  assert.match(hunter, /UNLINKED_MESSAGE/);
-  assert.match(hunter, /created: false/);
-  assert.doesNotMatch(hunter, /hunter_sessions"\)\.insert/);
+  assert.doesNotMatch(hunter, /hunter_sessions/);
+  assert.doesNotMatch(hunter, /from\("hunters"\)/);
+  assert.match(hunter, /account-load/);
+  assert.match(hunter, /account-save/);
   assert.match(walletFn, /op === "login"/);
   assert.match(walletFn, /UNLINKED_MESSAGE/);
   assert.doesNotMatch(src('../src/wallet/link.js'), /createAccount/);
