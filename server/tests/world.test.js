@@ -18,18 +18,29 @@ test('healthz reports the world is up', async () => {
   await srv.close();
 });
 
-test('healthz sends CORS headers for the GitHub Pages origin', async () => {
-  const origin = 'https://machine10101-vibes.github.io';
-  const srv = await startWorld({ allowedOrigins: [origin] });
+const LIVE_ORIGINS = [
+  'https://monstergate.online',
+  'http://monstergate.online',
+  'https://www.monstergate.online',
+  'https://machine10101-vibes.github.io',
+];
+
+test('healthz CORS and websocket origins allow the live game sites', async () => {
+  const srv = await startWorld({ allowedOrigins: LIVE_ORIGINS });
   const url = `http://127.0.0.1:${srv.port}/healthz`;
-  const ok = await fetch(url, { headers: { origin } });
-  assert.equal(ok.status, 200);
-  assert.equal(ok.headers.get('access-control-allow-origin'), origin);
-  const pre = await fetch(url, { method: 'OPTIONS', headers: { origin } });
+  for (const origin of LIVE_ORIGINS) {
+    const ok = await fetch(url, { headers: { origin } });
+    assert.equal(ok.status, 200, origin);
+    assert.equal(ok.headers.get('access-control-allow-origin'), origin);
+  }
+  const pre = await fetch(url, { method: 'OPTIONS', headers: { origin: 'https://monstergate.online' } });
   assert.equal(pre.status, 204);
-  assert.equal(pre.headers.get('access-control-allow-origin'), origin);
+  assert.equal(pre.headers.get('access-control-allow-origin'), 'https://monstergate.online');
   const blocked = await fetch(url, { headers: { origin: 'https://evil.example' } });
   assert.equal(blocked.status, 403);
+  const allowedWs = await open(srv.url, { origin: 'https://monstergate.online' });
+  allowedWs.close();
+  await assert.rejects(() => open(srv.url, { origin: 'https://evil.example' }));
   await srv.close();
 });
 

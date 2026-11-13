@@ -57,9 +57,9 @@ export function collect(ws, into) {
   ws.on('message', (raw) => into.push(JSON.parse(String(raw))));
 }
 
-export function open(url) {
+export function open(url, extra = {}) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
+    const ws = extra.origin ? new WebSocket(url, { origin: extra.origin }) : new WebSocket(url);
     ws.once('open', () => resolve(ws));
     ws.once('error', reject);
   });
