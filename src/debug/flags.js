@@ -28,6 +28,8 @@ export const DEBUG_SPOTS = {
   forge: { live: 'forge', x: 86.3, z: 72.8 },
   oasis: { x: OASIS.x + 12, z: OASIS.z },
   deepwell: { x: SAND_MINE.x + 22, z: SAND_MINE.z },
+  cinderfall: { kind: 'cinderfall' },
+  glimmerfrost: { kind: 'glimmerfrost' },
   hellspire: { live: 'demonKeep', kind: 'hellspire' },
   dawnspire: { live: 'holyKeep', kind: 'dawnspire' },
   endlessfield: { live: 'warfield', kind: 'warfield' },

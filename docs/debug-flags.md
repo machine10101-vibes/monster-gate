@@ -37,6 +37,8 @@ Without `debug=1`, `tp` and `unlock` do nothing.
 | `forge` | `bram`, `bramsforge` | Bram's forge by Greyrock |
 | `oasis` | `greenbowl` | Desert oasis pool |
 | `deepwell` | | Deepwell sand pit |
+| `cinderfall` | | Cinderfall volcano (titanium) |
+| `glimmerfrost` | | Glimmerfrost glacier (platinum) |
 | `hellspire` | `hellspire keep` | Demon Knight keep courtyard |
 | `dawnspire` | `dawnspire keep` | Holy Knight keep courtyard |
 | `endlessfield` | `endless`, `warfield` | Endless Field between the keeps |

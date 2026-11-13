@@ -915,6 +915,19 @@ ART.stamina = draw((p, line) => {
   line(9, 1, 11, 1, 'h');
 });
 
+ART.smithing = draw((p, line) => {
+  for (let y = 10; y <= 14; y++) for (let x = 2; x <= 13; x++) p(x, y, y === 10 ? 's' : 'S');
+  line(6, 4, 6, 10, 's');
+  line(9, 4, 9, 10, 'S');
+  line(4, 3, 11, 3, 'l');
+  line(3, 4, 12, 4, 's');
+  p(5, 2, 'h');
+  p(10, 2, 'y');
+  p(7, 1, 'w');
+  p(8, 5, 'L');
+  p(7, 6, 'T');
+});
+
 ART.mining = draw((p, line) => {
   line(3, 13, 11, 5, 'B');
   line(4, 13, 12, 5, 'b');

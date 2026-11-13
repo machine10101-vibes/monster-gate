@@ -1,16 +1,17 @@
 import { GOODS, SHAFT_FROM_LOG, SHAFT_IDS, SHAFT_LOGS, SHAFTS_PER_LOG, SMELTS } from '../data/gathering.js';
+import { METALS } from '../data/metals.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
-const STOCK = ['copper_ore', 'tin_ore', 'iron_ore', 'coal', 'mithril_ore', 'adamant_ore', 'iron_bar', 'steel_bar', 'mithril_bar', 'adamant_bar'];
+const STOCK = [...METALS.filter((m) => m.ore).map((m) => m.oreId), 'coal', ...METALS.map((m) => m.barId)];
 
-/** Copper, tin, iron, coal, mithril and adamant become bars here. */
+/** Ore and coal become bars here. Each recipe wants a Smithing level. */
 export function mountSmithy(body, game) {
   const paint = () => {
     body.innerHTML = '';
     const pr = game.progress;
     const intro = document.createElement('p');
     intro.className = 'alc-intro';
-    intro.innerHTML = '<b>The Smithy</b>Copper and tin still make iron. Iron ore, coal, mithril and adamant from Deepwell make the rest. Bring iron bars to Bram for armor, weapons or arrowheads.';
+    intro.innerHTML = `<b>The Smithy</b>Copper, iron, mithril, adamite, titanium and platinum smelt into bars. Steel is iron ore plus coal. Smithing ${pr.level('smithing')} opens the next metal.`;
     body.appendChild(intro);
     const row = document.createElement('div');
     row.className = 'smith-stock';
@@ -24,6 +25,7 @@ export function mountSmithy(body, game) {
     }
     body.appendChild(row);
     for (const rec of Object.values(SMELTS)) {
+      const lock = pr.smeltLocked(rec.id);
       const can = pr.smeltCan(rec.id);
       const acts = document.createElement('div');
       acts.className = 'smith-acts';
@@ -33,11 +35,10 @@ export function mountSmithy(body, game) {
       one.textContent = `Smelt 1 ${rec.name.toLowerCase()}`;
       one.disabled = can < 1;
       one.onclick = () => {
+        const before = pr.level('smithing');
         const n = pr.smelt(rec.id, false);
         if (!n) return;
-        game.audio.quest();
-        game.hud.toast(`Smelted ${n === 1 ? 'a' : n} ${rec.name.toLowerCase()}${n === 1 ? '' : 's'}`, 1400);
-        spark(game);
+        pingSmith(game, rec, n, before);
         paint();
       };
       const all = document.createElement('button');
@@ -46,16 +47,20 @@ export function mountSmithy(body, game) {
       all.textContent = can > 1 ? `Smelt all (${can})` : 'Smelt all';
       all.disabled = can < 1;
       all.onclick = () => {
+        const before = pr.level('smithing');
         const n = pr.smelt(rec.id, true);
         if (!n) return;
-        game.audio.quest();
-        game.hud.toast(`Smelted ${n} ${rec.name.toLowerCase()}${n === 1 ? '' : 's'}`, 1600);
-        spark(game);
+        pingSmith(game, rec, n, before);
         paint();
       };
       acts.append(one, all);
       body.appendChild(acts);
-      if (!can) {
+      if (lock === `smith:${rec.level}`) {
+        const note = document.createElement('p');
+        note.className = 'cat-muted';
+        note.textContent = `Need Smithing ${rec.level}. ${rec.hint}`;
+        body.appendChild(note);
+      } else if (!can) {
         const note = document.createElement('p');
         note.className = 'cat-muted';
         note.textContent = rec.hint;
@@ -66,6 +71,14 @@ export function mountSmithy(body, game) {
   };
   paint();
   return () => {};
+}
+
+function pingSmith(game, rec, n, before) {
+  game.audio.quest();
+  game.hud.toast(`Smelted ${n === 1 ? 'a' : n} ${rec.name.toLowerCase()}${n === 1 ? '' : 's'}`, 1400);
+  const after = game.progress.level('smithing');
+  if (after > before) game.gather?.levelUp('smithing', after);
+  spark(game);
 }
 
 function spark(game) {

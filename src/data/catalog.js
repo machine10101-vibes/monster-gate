@@ -1,5 +1,6 @@
 /** Everything the Hunter Catalog knows about: monsters, their parts, and what the parts make. */
 import { KNIGHT_LORE, GEAR_DROPS } from './knights.js';
+import { METALS, metalArmorPieces, metalSetDef, metalWeapons } from './metals.js';
 export { GEAR_DROPS };
 
 export const MATERIALS = {
@@ -296,6 +297,7 @@ function weapon(id, wtype, name, monster, desc, recipe, it, extra = {}) {
   const { shotLabel: _shot, ...rest } = it;
   const stats = [['Damage', it.dmg], third, ['Style', STYLE_LABEL[it.style]]];
   if (extra.reqLevel) stats.push(['Requires', `Strength ${extra.reqLevel}`]);
+  if (extra.reqSmith) stats.push(['Smithing', extra.reqSmith]);
   return {
     id, type: 'weapon', wtype, name, monster, held: id, desc, recipe,
     item: { id, icon: id, name, held: id, ...rest, desc: rest.blurb },
@@ -527,23 +529,23 @@ foundSet(HOLY_K, 'holyset', [
   ['boots', 'holyboots', 'Radiant Sabatons', 3, 'Large white sabatons with gold bands.'],
 ]);
 
+for (const metal of METALS) {
+  for (const w of metalWeapons(metal)) {
+    GEAR.push(weapon(
+      w.id, w.wtype, w.name, 'smith', w.desc, w.recipe,
+      M(w.melee.style, w.melee.dmg, w.melee.reach, w.melee.arc, w.melee.dur, w.melee.hit, w.melee.stam, w.melee.knock, w.melee.blurb),
+      { reqLevel: w.reqLevel, reqSmith: w.reqSmith, forgeXp: w.forgeXp, metal: metal.id },
+    ));
+  }
+  GEAR.push(...metalArmorPieces(metal));
+}
 GEAR.push(
-  weapon('ironsword', 'onesword', 'Iron Sword', 'smith', 'A plain steel blade with a straight crossguard. Heavier than the starter sword, and it holds an edge.', { iron_bar: 2 }, M('swordshield', 14, 2.4, 2.0, 0.4, 0.16, 8, 4, 'Sword and shield. Forged iron.')),
-  weapon('irongreatsword', 'twosword', 'Iron Greatsword', 'smith', 'A long steel blade on a two-hand grip. Slow, and it cleaves.', { iron_bar: 4 }, M('twohand', 16, 2.7, 2.4, 0.58, 0.26, 13, 7, 'Two-handed. Heavy iron.')),
-  weapon('ironspear', 'spear', 'Iron Spear', 'smith', 'A leaf-shaped iron head on an ash shaft. It reaches past a sword.', { iron_bar: 3 }, M('twohand', 13, 3.1, 1.0, 0.46, 0.2, 10, 4, 'Two-handed. A long iron thrust.')),
-  weapon('ironhammer', 'hammer', 'Iron Hammer', 'smith', 'A block of iron on a short haft. It is slow and it knocks things down.', { iron_bar: 4 }, M('twohand', 18, 2.5, 2.3, 0.7, 0.32, 15, 9, 'Two-handed. A smith\'s hammer, scaled up.')),
-  { id: 'ironhelm', type: 'armor', slot: 'helm', name: 'Iron Helm', monster: 'smith', set: 'iron', def: 1, desc: 'A plain steel cap with a nasal guard and a brass rivet.', recipe: { iron_bar: 2 } },
-  { id: 'ironchest', type: 'armor', slot: 'chest', name: 'Iron Platebody', monster: 'smith', set: 'iron', def: 2, desc: 'A hammered cuirass. The first real plate a hunter can wear.', recipe: { iron_bar: 5 } },
-  { id: 'ironarms', type: 'armor', slot: 'arms', name: 'Iron Gauntlets', monster: 'smith', set: 'iron', def: 1, desc: 'Steel plates over the hands and a short vambrace.', recipe: { iron_bar: 2 } },
-  { id: 'ironlegs', type: 'armor', slot: 'legs', name: 'Iron Platelegs', monster: 'smith', set: 'iron', def: 1, desc: 'Banded steel over the thighs.', recipe: { iron_bar: 3 } },
-  { id: 'ironboots', type: 'armor', slot: 'boots', name: 'Iron Boots', monster: 'smith', set: 'iron', def: 1, desc: 'Steel sabatons with a brass toe cap.', recipe: { iron_bar: 2 } },
-  { id: 'ironshield', type: 'armor', slot: 'shield', name: 'Iron Shield', monster: 'smith', set: 'iron', def: 2, desc: 'A square steel shield with a raised boss.', recipe: { iron_bar: 3 } },
-  { id: 'quiver', type: 'armor', slot: 'quiver', name: 'Leather Quiver', monster: 'smith', set: 'iron', def: 0, desc: 'A birch-and-iron quiver. Once worn, it fills itself from the arrows in your bag, 99 at a time.', recipe: { iron_bar: 1, birch_logs: 2 } },
+  { id: 'quiver', type: 'armor', slot: 'quiver', name: 'Leather Quiver', monster: 'smith', set: 'iron', def: 0, reqLevel: 1, reqSmith: 15, forgeXp: 20, desc: 'A birch-and-iron quiver. Once worn, it fills itself from the arrows in your bag, 99 at a time.', recipe: { iron_bar: 1, birch_logs: 2 } },
 );
 
 const set = (id, name, monster, tier, role, stats, bonus) => ({ id, name, monster, tier, role, hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0, ...stats, bonus });
 export const SETS = [
-  set('iron', 'Iron Plate', 'smith', 'metal', 'Warrior', { hp: 2 }, 'Full set: +2 max health (1 heart).'),
+  ...METALS.map(metalSetDef),
   set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 4 }, 'Full set: +4 max health (2 hearts).'),
   set('budgeleather', 'Budgehide Leathers', BUDGE_ARMOR, 'leather', 'Ranger', { stamina: 20, ranged: 0.06 }, 'Full set: +20 max stamina and +6% ranged damage.'),
   set('budgecloth', 'Emberweave Robes', BUDGE_ARMOR, 'cloth', 'Mage', { mana: 20, spell: 0.06 }, 'Full set: +20 max mana and +6% spell damage.'),
