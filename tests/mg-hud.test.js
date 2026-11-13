@@ -592,6 +592,7 @@ test('MG-UI-36 own bubble nudges off the open chat panel', () => {
   assert.match(hud, /nudgeAnchorOffRects/);
   assert.match(hud, /classList.contains\('you'\)/);
   assert.match(wv, /LOCAL_PIN_S = 15/);
+  assert.match(wv, /setTimeout/);
   assert.match(wv, /wc-pin/);
   assert.match(style, /\.wc-pin/);
   const chat = { id: 'world-chat', x: 127, y: 126, w: 280, h: 168 };
