@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { VoxelModel, RNG, hash3, shade, mix } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
 import { meshFrom, splitLimb, relief, buildHeld } from './humanoid.js';
-import { buildShieldModel } from './weaponModels.js';
+import { buildShieldModel, gripRoll } from './weaponModels.js';
 import { HOLY, DEMON } from '../data/knights.js';
 import { J, pick, frontZ, backZ, topY, ell, spike, tube, skin, edgeOf, inlay, crossAt } from './knightKit.js';
 
@@ -588,9 +588,10 @@ export function buildDemonKnight() {
   rig.parts.body.add(sh);
   rig.parts.shield = sh;
 
+  const edge = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), gripRoll('demonsword'));
   rig.holdGear = (p = DM_HOLD) => {
     sw.position.set(...p.pos);
-    sw.quaternion.copy(aimHammer(p.dir, [0, 0, 1]));
+    sw.quaternion.copy(aimHammer(p.dir, p.face || [0, 0, 1])).multiply(edge);
     const grip = _v(0, 0, 8 * 0.015 * 0.78).applyQuaternion(sw.quaternion).add(sw.position);
     reachArm(rig, 'L', grip, _v(-0.8, -0.5, -0.3));
     const back = _v(0.78, 0.18, 0.28);
