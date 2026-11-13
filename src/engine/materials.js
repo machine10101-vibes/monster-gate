@@ -4,10 +4,20 @@ import { RNG, hash2, shade, hex, mix, clamp } from './voxel.js';
 export const hideUniforms = {
   uPlayerScreen: { value: new THREE.Vector2(-9999, -9999) },
   uPlayerDepth: { value: 10 },
-  uHideRadius: { value: 90 },
+  uHideRadius: { value: 40 },
 };
 
-/** Screen-door fade of anything that sits between the camera and the hero. */
+/**
+ * Occlusion hole in framebuffer pixels. Caps well below a viewport-sized
+ * Bayer blob so roofs and cobbles beside the hero stay solid.
+ */
+export function hideRadiusPx(bufferW, bufferH, playerPxH = 0) {
+  const short = Math.max(1, Math.min(bufferW, bufferH));
+  const fromHero = playerPxH > 0 ? playerPxH * 1.2 : short * 0.075;
+  return Math.max(28, Math.min(fromHero, short * 0.12));
+}
+
+/** Tight screen-door of geometry that sits between the camera and the hero. */
 export function patchHide(material, key = 'hide') {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPlayerScreen = hideUniforms.uPlayerScreen;
@@ -30,12 +40,10 @@ uniform float uHideRadius;`
         `#include <clipping_planes_fragment>
 {
   vec2 dlt = gl_FragCoord.xy - uPlayerScreen;
-  dlt.y *= 0.62;
   float hd = length(dlt);
   if (vHideDepth < uPlayerDepth - 0.8 && hd < uHideRadius) {
     float t = clamp(hd / uHideRadius, 0.0, 1.0);
-    vec2 pp = floor(gl_FragCoord.xy / 2.0);
-    float bayer = fract(52.9829189 * fract(dot(pp, vec2(0.06711056, 0.00583715))));
+    float bayer = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     if (bayer > t * t * 0.92) discard;
   }
 }`

@@ -12,7 +12,7 @@ import { FX } from './engine/fx.js';
 import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
-import { hideUniforms } from './engine/materials.js';
+import { hideRadiusPx, hideUniforms } from './engine/materials.js';
 import { Player } from './entities/player.js';
 import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
@@ -1216,7 +1216,7 @@ class Game {
     this.pxScale = this.renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
     const cw = this.renderer.domElement.width;
     const ch = this.renderer.domElement.height;
-    hideUniforms.uHideRadius.value = Math.max(180, Math.min(cw, ch) * 0.42);
+    hideUniforms.uHideRadius.value = hideRadiusPx(cw, ch);
     const ui = Math.max(1, Math.min(1.5, h / 820));
     document.documentElement.style.setProperty('--ui', ui.toFixed(3));
     this.hud?.layoutHud?.();
@@ -2971,12 +2971,17 @@ class Game {
       return;
     }
     const P = this.player.pos;
-    this.tmpV.set(P.x, P.y + 1, P.z);
     const cam = this.camera;
-    const depth = this.tmpV.clone().applyMatrix4(cam.matrixWorldInverse).z * -1;
-    const proj = this.tmpV.project(cam);
     const rh = this.renderer.domElement.height;
     const rw = this.renderer.domElement.width;
+    this.tmpV.set(P.x, P.y, P.z);
+    const feetY = this.tmpV.project(cam).y;
+    this.tmpV.set(P.x, P.y + 2.2, P.z);
+    const headY = this.tmpV.project(cam).y;
+    hideUniforms.uHideRadius.value = hideRadiusPx(rw, rh, Math.abs(headY - feetY) * 0.5 * rh);
+    this.tmpV.set(P.x, P.y + 1, P.z);
+    const depth = this.tmpV.clone().applyMatrix4(cam.matrixWorldInverse).z * -1;
+    const proj = this.tmpV.project(cam);
     hideUniforms.uPlayerScreen.value.set((proj.x * 0.5 + 0.5) * rw, (proj.y * 0.5 + 0.5) * rh);
     hideUniforms.uPlayerDepth.value = depth;
   }
