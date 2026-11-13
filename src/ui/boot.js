@@ -10,6 +10,11 @@ export const LOAD_FADE_MS = 420;
 export const LOAD_TIP_MS = 3200;
 export const LOAD_EMBER_MAX = 22;
 export const LOAD_EMBER_MOBILE = 10;
+/** Near-neutral blacks below this luma become alpha 0. Colored grout stays. */
+export const LOAD_KEY_LO = 22;
+/** Luma ramp end; brighter (or chromatic) pixels stay fully opaque. */
+export const LOAD_KEY_HI = 40;
+export const LOAD_KEY_CHROMA = 18;
 
 export const LOAD_TIPS = [
   'A Monster Gate opened in the northern forest.',
@@ -64,6 +69,50 @@ export function emberCount({ mobile = false, reduced = false } = {}) {
   return mobile ? LOAD_EMBER_MOBILE : LOAD_EMBER_MAX;
 }
 
+/** Rec. 601 luma in 0..255. */
+export function lumaOf(r, g, b) {
+  return (r * 77 + g * 150 + b * 29) >> 8;
+}
+
+/**
+ * Punch out only the clip's near-black, near-neutral background.
+ * White letter faces, gold .online, and dark red grout keep alpha 255.
+ */
+export function lumaKeyRgba(data, { lo = LOAD_KEY_LO, hi = LOAD_KEY_HI, chroma = LOAD_KEY_CHROMA } = {}) {
+  const span = Math.max(1, hi - lo);
+  const buf = data;
+  for (let i = 0; i < buf.length; i += 4) {
+    const r = buf[i];
+    const g = buf[i + 1];
+    const b = buf[i + 2];
+    if (Math.max(r, g, b) - Math.min(r, g, b) > chroma) continue;
+    const y = lumaOf(r, g, b);
+    if (y <= lo) buf[i + 3] = 0;
+    else if (y >= hi) buf[i + 3] = 255;
+    else buf[i + 3] = Math.round(((y - lo) / span) * 255);
+  }
+  return buf;
+}
+
+export function keySourceToCanvas(src, canvas, opts) {
+  if (!src || !canvas) return false;
+  const ctx = canvas.getContext?.('2d', { willReadFrequently: true });
+  if (!ctx) return false;
+  const w = src.videoWidth || src.naturalWidth || canvas.width || 672;
+  const h = src.videoHeight || src.naturalHeight || canvas.height || 448;
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  try {
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    lumaKeyRgba(img.data, opts);
+    ctx.putImageData(img, 0, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function spawnEmbers(layer, n, createEl) {
   if (!layer) return;
   layer.replaceChildren();
@@ -88,37 +137,77 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   const el = doc?.getElementById?.('loading');
   if (!el) return null;
   const video = doc.getElementById('load-video');
+  const poster = el.querySelector?.('.load-poster') || doc.querySelector?.('.load-poster');
+  const canvas = doc.getElementById('load-key');
+  const stage = el.querySelector?.('.load-stage');
   const tipEl = doc.getElementById('load-tip');
   const embers = doc.getElementById('load-embers');
   const reduced = opts.reduced ?? prefersReducedMotion(opts.win || globalThis);
   const mobile = opts.mobile ?? (typeof matchMedia === 'function' && matchMedia('(max-width: 900px), (max-height: 520px)').matches);
   const startedAt = opts.now ?? Date.now();
   const fadeMs = opts.fadeMs ?? LOAD_FADE_MS;
+  const raf = opts.requestAnimationFrame || globalThis.requestAnimationFrame;
+  const caf = opts.cancelAnimationFrame || globalThis.cancelAnimationFrame;
   let tipIndex = 0;
   let tipTimer = 0;
   let held = false;
+  let rafId = 0;
+  let keyed = false;
 
   el.classList.toggle('reduced', reduced);
   spawnEmbers(embers, emberCount({ mobile, reduced }), (tag) => doc.createElement(tag));
+
+  const paint = (src) => {
+    if (!keySourceToCanvas(src, canvas)) return false;
+    keyed = true;
+    canvas.classList?.add?.('on');
+    stage?.classList?.add?.('is-keyed');
+    el.classList.add('keyed');
+    return true;
+  };
+
+  const paintVideo = () => {
+    if (!video || reduced) return paint(poster);
+    if ((video.readyState || 0) >= 2) return paint(video);
+    return paint(poster);
+  };
 
   const hold = () => {
     if (reduced || held) return;
     if (holdVideoAtLogo(video)) {
       held = true;
       el.classList.add('held');
+      paint(video);
     }
   };
 
+  const tick = () => {
+    rafId = 0;
+    if (held || reduced) {
+      paintVideo();
+      return;
+    }
+    paintVideo();
+    if (typeof raf === 'function') rafId = raf(tick);
+  };
+
+  if (poster && !poster.complete) poster.addEventListener?.('load', () => { if (!keyed || reduced || held) paint(poster); });
+  else if (poster) paint(poster);
+
   if (reduced) {
     try { video?.pause?.(); } catch { /* ignore */ }
+    paint(poster);
   } else if (video) {
     video.loop = false;
     video.muted = true;
     video.playsInline = true;
     video.addEventListener('timeupdate', hold);
     video.addEventListener('ended', hold);
+    video.addEventListener('seeked', () => paint(video));
+    video.addEventListener('play', () => { if (!rafId && typeof raf === 'function') rafId = raf(tick); });
     const play = video.play?.();
-    if (play && typeof play.catch === 'function') play.catch(() => { el.classList.add('held'); });
+    if (play && typeof play.catch === 'function') play.catch(() => { el.classList.add('held'); paintVideo(); });
+    if (typeof raf === 'function') rafId = raf(tick);
   }
 
   if (tipEl) {
@@ -146,6 +235,7 @@ export function mountLoading(root = globalThis.document, opts = {}) {
       el.classList.add('hidden');
       el.setAttribute('aria-hidden', 'true');
       try { video?.pause?.(); } catch { /* ignore */ }
+      if (rafId && typeof caf === 'function') caf(rafId);
       if (tipTimer) (opts.clearInterval || clearInterval)(tipTimer);
       return true;
     },

@@ -504,7 +504,7 @@ h1 em,
 }
 .load-poster,
 #load-video,
-.load-stage canvas {
+.load-key {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -515,9 +515,8 @@ h1 em,
   pointer-events: none;
   background: transparent;
   border: 0;
-  /* Clip pixels are opaque black. Screen-blend them away over the red surround,
-     and fade alpha to 0 before the 3:2 box edge. */
-  mix-blend-mode: screen;
+  /* Soften the 3:2 box into the red surround. The canvas luma-keys the clip's
+     near-black; video/poster keep this mask as a no-JS fallback. */
   -webkit-mask-image:
     radial-gradient(ellipse 70% 66% at 50% 48%, #000 22%, transparent 72%),
     linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
@@ -535,6 +534,13 @@ h1 em,
 }
 .load-poster { z-index: 0; }
 #load-video { z-index: 1; }
+.load-key { z-index: 2; }
+#loading.keyed #load-video,
+#loading.keyed .load-poster,
+.load-stage.is-keyed #load-video,
+.load-stage.is-keyed .load-poster {
+  opacity: 0;
+}
 .load-meter {
   width: min(460px, 86vw);
   padding: 0 16px;
@@ -660,6 +666,7 @@ h1 em,
 
 @media (prefers-reduced-motion: reduce) {
   #load-video { display: none; }
+  .load-key { display: block; }
   .load-ember,
   .load-glow,
   #loading.held .load-glow { animation: none !important; }

@@ -6,9 +6,14 @@ import { test } from 'node:test';
 import {
   LOAD_CROP_AT,
   LOAD_HOLD_AT,
+  LOAD_KEY_CHROMA,
+  LOAD_KEY_HI,
+  LOAD_KEY_LO,
   LOAD_MIN_MS,
   emberCount,
   holdVideoAtLogo,
+  lumaKeyRgba,
+  lumaOf,
   mountLoading,
   nextTip,
   remainMinDisplay,
@@ -150,22 +155,51 @@ test('MG-UI-20 loading stage fills the largest 3:2 box above the bar', () => {
   assert.match(theme, /#loading #load-text \{[\s\S]*white-space:\s*nowrap/);
   assert.match(theme, /#loading #load-text \{[\s\S]*font-size:\s*14px/);
   assert.match(theme, /#load-tip \{[\s\S]*font-size:\s*15px/);
-  assert.match(theme, /#load-video[\s\S]{0,900}mix-blend-mode:\s*screen/);
+  assert.doesNotMatch(theme, /mix-blend-mode:\s*screen/);
   assert.match(theme, /mask-image:\s*radial-gradient\(ellipse 70% 66%/);
   assert.match(theme, /linear-gradient\(to right, transparent 0%, #000 14%/);
   assert.match(theme, /linear-gradient\(to bottom, transparent 0%, #000 12%/);
   assert.match(theme, /-webkit-mask-image:/);
   assert.match(theme, /mask-composite:\s*intersect/);
-  assert.match(theme, /\.load-poster,\s*\n#load-video,\s*\n\.load-stage canvas \{[\s\S]*background:\s*transparent/);
+  assert.match(theme, /\.load-poster,\s*\n#load-video,\s*\n\.load-key \{[\s\S]*background:\s*transparent/);
   assert.match(theme, /\.load-stage \{[\s\S]*background:\s*transparent/);
   assert.match(theme, /\.load-shell \{[\s\S]*background:\s*transparent/);
   assert.doesNotMatch(theme, /\.load-stage::after \{/);
+});
+
+test('luma key punches near-black and keeps logo faces and grout', () => {
+  assert.equal(LOAD_KEY_LO, 22);
+  assert.equal(LOAD_KEY_HI, 40);
+  assert.equal(LOAD_KEY_CHROMA, 18);
+  const px = (r, g, b, a = 255) => [r, g, b, a];
+  const buf = Uint8ClampedArray.from([
+    ...px(0, 0, 0),
+    ...px(12, 12, 12),
+    ...px(221, 189, 185),
+    ...px(255, 255, 255),
+    ...px(26, 7, 3),
+    ...px(214, 88, 38),
+    ...px(11, 9, 10),
+  ]);
+  lumaKeyRgba(buf);
+  assert.equal(buf[3], 0, 'pure black surround');
+  assert.equal(buf[7], 0, 'near-black surround');
+  assert.equal(buf[8], 221);
+  assert.equal(buf[11], 255, 'stone letter face stays opaque');
+  assert.ok(lumaOf(buf[8], buf[9], buf[10]) >= 190);
+  assert.equal(buf[12], 255);
+  assert.equal(buf[15], 255, 'white stays opaque');
+  assert.equal(buf[19], 255, 'dark red grout stays');
+  assert.equal(buf[20], 214);
+  assert.equal(buf[23], 255, 'gold .online stays');
+  assert.equal(buf[27], 0, 'neutral dark outline-adjacent black keys out');
 });
 
 test('index.html loading markup has the clip, no extra title, bar below', () => {
   const html = src('index.html');
   const loading = html.slice(html.indexOf('id="loading"'), html.indexOf('id="title"'));
   assert.match(loading, /id="load-video"/);
+  assert.match(loading, /id="load-key"/);
   assert.match(loading, /brand\/loading\.mp4/);
   assert.match(loading, /muted/);
   assert.match(loading, /autoplay/);
