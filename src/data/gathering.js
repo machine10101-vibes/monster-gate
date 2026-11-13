@@ -373,6 +373,22 @@ export const GOODS = {
   cooked_stingray: { id: 'cooked_stingray', name: 'Cooked stingray', desc: 'Grilled over a campfire. Eat to restore 32 health.', price: 72, heal: 32, kind: 'fish' },
   cooked_tigershark: { id: 'cooked_tigershark', name: 'Cooked tiger shark', desc: 'Grilled over a campfire. Eat to restore 46 health.', price: 118, heal: 46, kind: 'fish' },
   burnt_fish: { id: 'burnt_fish', name: 'Burnt fish', desc: 'Left on the fire too long. It sells for a coin, and nobody will eat it.', price: 1, kind: 'fish' },
+};
+
+/** One burnt good per catch, so a burnt shrimp stays a shrimp and a burnt tuna stays a tuna. */
+for (const fish of Object.values(FISH)) {
+  const id = `burnt_${fish.id}`;
+  GOODS[id] = {
+    id,
+    name: `Burnt ${fish.name.toLowerCase()}`,
+    desc: `A ${fish.name.toLowerCase()} left on the fire too long. It sells for a coin, and nobody will eat it.`,
+    price: 1,
+    kind: 'fish',
+    burnt: true,
+  };
+}
+
+Object.assign(GOODS, {
   birch_logs: { id: 'birch_logs', name: 'Birch logs', desc: 'Pale wood from the meadow west of Oakhollow. Light it with a tinderbox, or shave it into birch arrow shafts.', price: 4, kind: 'log', tree: 'birch' },
   oak_logs: { id: 'oak_logs', name: 'Oak logs', desc: 'Heavy timber from the oak grove. Light it with a tinderbox, or shave it into oak arrow shafts.', price: 8, kind: 'log', tree: 'oak' },
   maple_logs: { id: 'maple_logs', name: 'Maple logs', desc: 'Red maple wood. Light it with a tinderbox once Firemaking is 10, or shave it into maple arrow shafts.', price: 16, kind: 'log', tree: 'maple' },
@@ -383,8 +399,23 @@ export const GOODS = {
   oak_shaft: { id: 'oak_shaft', name: 'Oak arrow shaft', desc: 'Shaved from an oak log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 2, kind: 'part', wood: 'oak' },
   maple_shaft: { id: 'maple_shaft', name: 'Maple arrow shaft', desc: 'Shaved from a maple log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 3, kind: 'part', wood: 'maple' },
   iron_arrow: { id: 'iron_arrow', name: 'Iron arrow', desc: 'An iron head on a wooden shaft. A quiver holds 99.', price: 3, kind: 'arrow' },
-};
-export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'iron_bar', 'arrowhead', 'feather', 'birch_shaft', 'oak_shaft', 'maple_shaft', 'iron_arrow', 'shrimp', 'cooked_shrimp', 'trout', 'cooked_trout', 'pikeminnow', 'cooked_pikeminnow', 'salmon', 'cooked_salmon', 'pike', 'cooked_pike', 'sturgeon', 'cooked_sturgeon', 'tuna', 'cooked_tuna', 'stingray', 'cooked_stingray', 'tigershark', 'cooked_tigershark', 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs'];
+});
+const FISH_GOODS = Object.keys(FISH).flatMap((id) => [id, `cooked_${id}`, `burnt_${id}`]);
+export const GOODS_ORDER = ['copper_ore', 'tin_ore', 'iron_bar', 'arrowhead', 'feather', 'birch_shaft', 'oak_shaft', 'maple_shaft', 'iron_arrow', ...FISH_GOODS, 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs'];
+
+/** True for a raw catch, its grilled form, or its burnt form. */
+export function isFishGood(id) {
+  if (!id) return false;
+  if (FISH[id]) return true;
+  if (id === 'burnt_fish') return true;
+  const raw = id.startsWith('cooked_') ? id.slice(7) : id.startsWith('burnt_') ? id.slice(6) : '';
+  return !!FISH[raw];
+}
+
+/** The good id produced when this catch burns. */
+export function burntGoodId(fishId) {
+  return `burnt_${fishId}`;
+}
 
 /** Arrow goods a quiver can be told to carry. */
 export const ARROW_TYPES = ['iron_arrow'];

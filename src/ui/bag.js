@@ -246,6 +246,8 @@ function collect(game) {
       sub = `Eat to restore ${g.heal} health. You have ${n}.`;
       action = 'Eat';
       run = (paint) => { if (game.eatGood(id)) paint(); };
+    } else if (g.burnt) {
+      sub = `${g.desc} You have ${n}.`;
     } else if (g.kind === 'bar' || g.kind === 'part' || g.kind === 'arrow') {
       sub = `${g.desc} You have ${n}.`;
     } else if (g.kind === 'log') {

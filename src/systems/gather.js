@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, burnChance, chopChance, chopSwingTime, cookTime, fishChance, fishTickTime, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
+import { FISH, GOODS, LEVEL_SKILLS, ROCKS, TREES, burnChance, burntGoodId, chopChance, chopSwingTime, cookTime, fishChance, fishTickTime, isFishGood, lightChance, lightTime, mineChance, mineSwingTime, pickFish, treeByLog } from '../data/gathering.js';
 import { buildCampfire, goodsVoxels } from '../world/gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
@@ -729,11 +729,12 @@ export class Gathering {
       return;
     }
     const burnt = Math.random() < burnChance(fish, lvl);
-    const made = burnt ? 'burnt_fish' : fish.cooked;
+    const made = burnt ? burntGoodId(fish.id) : fish.cooked;
     g.progress.addGood(made, 1);
     const P = g.player.pos;
     if (burnt) {
       g.hud.toast(`You burn the ${fish.name.toLowerCase()}.`, 1600);
+      g.hud.floatText(...g.screenOf(P.x, P.y + 3.4, P.z), `+1 ${GOODS[made].name}`, '');
       g.audio.noise(0.16, 0.12, 500, 0.7);
       g.fx.burst(s.fire.x, s.fire.y + 0.6, s.fire.z, [0x2a2a2a, 0x6a6a6a, 0xffe0b0], 10, 1.8, 0.07, 0.6, 2, 1.4);
     } else {
@@ -905,7 +906,7 @@ export class Gathering {
       this.models[id] = meshFrom(m, ox, oy, oz, this.mat, size);
     }
     const mesh = this.models[id].clone();
-    const fishish = FISH[id] || id.startsWith('cooked_') || id === 'burnt_fish';
+    const fishish = isFishGood(id);
     mesh.scale.setScalar(fishish ? (id.endsWith('sturgeon') || id.endsWith('tigershark') ? 0.7 : 0.9) : id.endsWith('_logs') ? 0.62 : 0.75);
     g.scene.add(mesh);
     this.flyers.push({ mesh, x0, y0, z0, x1, y1, z1, t: 0, dur, spin: rand(4, 9), id });
@@ -923,7 +924,7 @@ export class Gathering {
       const ey = P.y + 1.3;
       const e = u * u * (3 - 2 * u);
       f.mesh.position.set(f.x0 + (ex - f.x0) * e, f.y0 + (ey - f.y0) * e + Math.sin(u * Math.PI) * 1.5, f.z0 + (ez - f.z0) * e);
-      const fishish = FISH[f.id] || String(f.id).startsWith('cooked_') || f.id === 'burnt_fish';
+      const fishish = isFishGood(f.id);
       f.mesh.rotation.set(u * f.spin * 0.5, u * f.spin, fishish ? Math.sin(u * 14) * 0.6 : 0);
       if (u >= 1) {
         g.fx.burst(ex, ey, ez, f.id.endsWith('ore') ? [0xffd9a0, 0xffffff] : [0xbfeaff, 0xffffff], 7, 2, 0.06, 0.5, -1, 0.8);
