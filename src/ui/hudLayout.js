@@ -132,6 +132,18 @@ export function nameplateHitsHud(plate, safe, pad = 0.5) {
   return safe.some((s) => overlap(plate, s, pad));
 }
 
+/** Hide labels that cross the viewport chrome, with a small inset. */
+export const VIEWPORT_PLATE_INSET = 4;
+
+export function nameplateOutsideViewport(plate, vp, inset = VIEWPORT_PLATE_INSET) {
+  if (!plate || !vp) return false;
+  const pad = Number.isFinite(Number(inset)) ? Number(inset) : VIEWPORT_PLATE_INSET;
+  const w = Number(vp.w);
+  const h = Number(vp.h);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 2 || h < 2) return false;
+  return plate.x < pad || plate.y < pad || plate.x + plate.w > w - pad || plate.y + plate.h > h - pad;
+}
+
 /**
  * Offset overlapping world labels using real CSS-px boxes. Near labels stay;
  * farther ones lift until they clear, then hide if they still collide.

@@ -1,3 +1,21 @@
+/** 180° of yaw per full-width one-finger swipe on touch / coarse pointers. */
+export const LOOK_SWIPE_RAD = Math.PI;
+export const MOUSE_LOOK_GAIN = 0.006;
+
+export function lookRadiansPerPixel(width, { touch = false } = {}) {
+  const w = Math.max(1, Number(width) || 1);
+  if (touch) return LOOK_SWIPE_RAD / w;
+  return MOUSE_LOOK_GAIN;
+}
+
+/** Bottom-left well where a press spawns the move stick. Empty screen elsewhere looks. */
+export function inStickZone(x, y, vp) {
+  const w = Math.max(1, Number(vp?.w) || 1);
+  const h = Math.max(1, Number(vp?.h) || 1);
+  const wellW = Math.min(220, w * 0.28);
+  return x >= 0 && x < wellW && y > h * 0.45 && y <= h;
+}
+
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
@@ -135,13 +153,14 @@ export class Input {
         this.aim.x = e.clientX;
         this.aim.y = e.clientY;
         this.aim.has = true;
-        if (this.drag) {
-          this.rotateDelta += e.movementX * 0.006;
+        if (this.drag && !this.touch) {
+          this.rotateDelta += e.movementX * lookRadiansPerPixel(window.innerWidth, { touch: false });
         }
       }
     });
     c.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'mouse') return;
+      if (this.touch) return;
       this.aim.x = e.clientX;
       this.aim.y = e.clientY;
       this.aim.has = true;
@@ -170,28 +189,31 @@ export class Input {
     );
 
     window.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' || !this.enabled) return;
+      if (!this.enabled) return;
+      if (e.pointerType === 'mouse' && !this.touch) return;
       this.touch = true;
       document.body.classList.add('touch');
       const t = e.target;
-      if (t.closest && (t.closest('.tbtn') || t.closest('.slot') || t.closest('.mbtn') || t.closest('#panel') || t.closest('#dialog') || t.closest('.mini') || t.closest('#title') || t.closest('#loading') || t.closest('#rotate-overlay') || t.closest('#party-frame') || t.closest('#social-invite') || t.closest('#social-menu') || t.closest('#world-chat'))) return;
-      const w = window.innerWidth;
-      if (e.clientX < w * 0.42 && this.stick.id === null) {
+      if (t.closest && t.closest('.tbtn, .slot, .mbtn, .mini, #panel, #dialog, #title, #loading, #rotate-overlay, #party-frame, #social-invite, #social-menu, #world-chat, #clock, #quest, #menu-col, #minimap-wrap, #center-bottom, #hotbar')) return;
+      e.preventDefault();
+      try { t.setPointerCapture?.(e.pointerId); } catch { /* capture is best-effort */ }
+      const vp = { w: window.innerWidth, h: window.innerHeight };
+      if (this.stick.id === null && inStickZone(e.clientX, e.clientY, vp)) {
         this.stick.id = e.pointerId;
         this.stick.ox = e.clientX;
         this.stick.oy = e.clientY;
         this.stick.x = 0;
         this.stick.y = 0;
         this.showStick(e.clientX, e.clientY, 0, 0);
-      } else if (this.look.id === null && e.clientX >= w * 0.42) {
+      } else if (this.look.id === null) {
         this.look.id = e.pointerId;
         this.look.x = e.clientX;
         this.look.moved = 0;
         this.look.startT = performance.now();
       }
-    });
+    }, { passive: false });
     window.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'mouse') return;
+      if (e.pointerType === 'mouse' && !this.touch) return;
       if (e.pointerId === this.stick.id) {
         let dx = e.clientX - this.stick.ox;
         let dy = e.clientY - this.stick.oy;
@@ -208,7 +230,7 @@ export class Input {
         const dx = e.clientX - this.look.x;
         this.look.x = e.clientX;
         this.look.moved += Math.abs(dx);
-        this.rotateDelta += dx * 0.008;
+        this.rotateDelta += dx * lookRadiansPerPixel(window.innerWidth, { touch: true });
       }
     });
     const end = (e) => {
@@ -230,7 +252,7 @@ export class Input {
       const down = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        b.setPointerCapture?.(e.pointerId);
+        try { b.setPointerCapture?.(e.pointerId); } catch { /* synthetic / DevTools pointers */ }
         b.classList.add('active');
         if (act === 'shield') this.shieldBtn = true;
         else if (act === 'attack') {
