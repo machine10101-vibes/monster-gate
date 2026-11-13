@@ -44,6 +44,7 @@ import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cl
 const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
@@ -570,6 +571,12 @@ class Game {
   openCharacterSelect() {
     if (this.started || !this.wallet?.address || !this.roster || this.cloudSyncing) return;
     this.charSelect.open();
+  }
+
+  /** Open the github.io bridge so this device can re-read the old-origin saves. */
+  async importOldSaves() {
+    const ok = await openLegacyBridge();
+    if (!ok) this.hud?.toast('The old-site restore page is not up yet.', 3200);
   }
 
   /** Local hunt only. No guild record, and the waygate stays closed. */
@@ -2984,28 +2991,38 @@ class Game {
   }
 }
 
-const game = new Game();
-window.__game = game;
-try {
-  attachDebug(game);
-  const q = new URLSearchParams(location.search);
-  if (q.get('mmo') === '1') {
-    import('./net/worldView.js').then(async (m) => {
-      const mock = q.get('mock') === '1';
-      const mockwake = q.get('mockwake') === '1';
-      const view = await m.init(game.scene, { game, mock: mock || mockwake, search: location.search });
-      if (!mock && !mockwake) {
-        const { attachMmo } = await import('./net/mmo.js');
-        attachMmo(game, view);
-      }
-    }).catch((err) => console.warn('world view', err));
+function startGame() {
+  const game = new Game();
+  window.__game = game;
+  try {
+    attachDebug(game);
+    const q = new URLSearchParams(location.search);
+    if (q.get('mmo') === '1') {
+      import('./net/worldView.js').then(async (m) => {
+        const mock = q.get('mock') === '1';
+        const mockwake = q.get('mockwake') === '1';
+        const view = await m.init(game.scene, { game, mock: mock || mockwake, search: location.search });
+        if (!mock && !mockwake) {
+          const { attachMmo } = await import('./net/mmo.js');
+          attachMmo(game, view);
+        }
+      }).catch((err) => console.warn('world view', err));
+    }
+  } catch {
+    /* query parsing failed; stay offline */
   }
-} catch {
-  /* query parsing failed; stay offline */
+  game.load().catch((e) => {
+    console.error(e);
+    document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
+  });
 }
-game.load().catch((e) => {
-  console.error(e);
-  document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
+
+runLegacySaveBridge().then((result) => {
+  if (result === 'away') return;
+  startGame();
+}).catch((e) => {
+  console.warn('save bridge', e);
+  startGame();
 });
 
 export { lerp, GUILD };

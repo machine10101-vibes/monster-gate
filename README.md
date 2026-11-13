@@ -2,7 +2,7 @@
 
 A 3D pixel (voxel) monster hunting game for desktop and mobile browsers, built with Three.js and Vite.
 
-Play at [https://monstergate.online/](https://monstergate.online/). The previous GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects there after the custom domain is attached.
+Play at [https://monstergate.online/](https://monstergate.online/). The previous GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects there after the custom domain is attached. Hunters saved in that browser on github.io do not move with the domain; the first visit offers to bring them over, and Settings has **Import old saves**.
 
 Start in the village of Oakhollow, step out into the fairy-tale Whispering Wood, and hunt the creatures spilling out of the Monster Gate. Mountains ring the map and open fields and farmland surround the town.
 

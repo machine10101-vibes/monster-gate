@@ -80,3 +80,34 @@ export function dropKey(key) {
     /* already gone */
   }
 }
+
+/** Write already-serialized save text (the import-save path). */
+export function importRaw(key, text) {
+  if (frozen) return false;
+  const ls = store();
+  if (!ls) return false;
+  try {
+    ls.setItem(key, String(text ?? ''));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Snapshot every localStorage key. Missing storage is an empty object. */
+export function dumpRaw() {
+  const ls = store();
+  const out = {};
+  if (!ls) return out;
+  try {
+    for (let i = 0; i < ls.length; i++) {
+      const key = ls.key(i);
+      if (!key) continue;
+      const value = ls.getItem(key);
+      if (value != null) out[key] = value;
+    }
+  } catch {
+    /* private mode */
+  }
+  return out;
+}

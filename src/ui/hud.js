@@ -672,6 +672,7 @@ export class HUD {
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
+        ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
       if (game.wallet?.address) {
@@ -712,6 +713,7 @@ export class HUD {
       };
       document.getElementById('set-time').onclick = () => game.sky.setHour(game.sky.hour + 3);
       document.getElementById('set-fs').onclick = () => game.toggleFullscreen();
+      document.getElementById('set-import-old').onclick = () => game.importOldSaves();
     }
     this.el.panel.classList.remove('hidden');
   }

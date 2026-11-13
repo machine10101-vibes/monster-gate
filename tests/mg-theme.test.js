@@ -28,6 +28,8 @@ test('MG-UI panels share the journal theme tokens and classes', () => {
   assert.match(html, /id="hud-corner-right"/);
   assert.match(view, /name_taken/);
   assert.match(view, /wn-in/);
+  assert.match(theme, /#mg-import/);
+  assert.match(hud, /set-import-old/);
 
   assert.match(style, /#title \.account-choices \.start \{[\s\S]*animation: none/);
   assert.match(style, /min\(320px, 86vw\)/);
