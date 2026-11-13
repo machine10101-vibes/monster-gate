@@ -4319,10 +4319,8 @@ body.touch #dialog { z-index: 74; }
   -webkit-overflow-scrolling: touch;
 }
 #world-chat .wc-log p { margin: 0 0 4px; }
-#world-chat .wc-log p.wc-you {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
+#world-chat .wc-log p.wc-you,
+#world-chat .wc-pin p.wc-you {
   margin: 4px -4px 0;
   padding: 4px 6px;
   background: rgba(18, 48, 58, 0.96);
@@ -4330,7 +4328,16 @@ body.touch #dialog { z-index: 74; }
   border-radius: 4px;
   color: #e8fbff;
 }
-#world-chat .wc-log p.wc-you b { color: #7ef6ff; }
+#world-chat .wc-log p.wc-you b,
+#world-chat .wc-pin p.wc-you b { color: #7ef6ff; }
+#world-chat .wc-pin {
+  display: none;
+  flex: none;
+  padding: 4px 8px 6px;
+  border-top: 1px solid rgba(198, 161, 90, 0.35);
+}
+#world-chat .wc-pin:not([hidden]) { display: block; }
+#world-chat .wc-pin p.wc-you { margin: 0; }
 #world-chat .wc-log b {
   color: #ffd23f;
   font-weight: 600;

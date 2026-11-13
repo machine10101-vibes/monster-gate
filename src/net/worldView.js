@@ -28,6 +28,8 @@ export const WORLD_VIEW = 1;
 export const REMOTE_PREFIX = 'wv:';
 export const CHAT_MAX = 120;
 export const MOVE_HZ = 10;
+export const LOCAL_BUBBLE_S = 4.2;
+export const LOCAL_PIN_S = 15;
 
 export const ANIM = { idle: 0, attack: 1, roll: 2, dead: 3, stagger: 4, use: 5 };
 
@@ -313,6 +315,8 @@ export class WorldView {
     this.localHeld = null;
     this.localSay = '';
     this.localSayT = 0;
+    this.localPin = null;
+    this.localPinT = 0;
   }
 
   localPlayerId() {
@@ -499,7 +503,9 @@ export class WorldView {
     }
     if (msg.from.id === 'you' || this.isLocalId(msg.from.id)) {
       this.localSay = msg.text;
-      this.localSayT = 4.2;
+      this.localSayT = LOCAL_BUBBLE_S;
+      this.localPin = { id: msg.from.id, name: msg.from.name || 'You', text: msg.text };
+      this.localPinT = LOCAL_PIN_S;
     }
     this.paintChat();
   }
@@ -807,6 +813,13 @@ export class WorldView {
       this.localSayT -= dt;
       if (this.localSayT <= 0) this.localSay = '';
     }
+    if (this.localPinT > 0) {
+      this.localPinT -= dt;
+      if (this.localPinT <= 0) {
+        this.localPin = null;
+        this.paintChat();
+      }
+    }
     const tags = [];
     for (const row of this.actors.values()) {
       if (row.sayT > 0) {
@@ -923,6 +936,7 @@ export class WorldView {
           <button type="button" data-ch="zone">Zone</button>
         </div>
         <div class="wc-log" role="log" aria-live="polite"></div>
+        <div class="wc-pin" hidden></div>
         <form class="wc-form">
           <input class="wc-in" type="text" maxlength="${CHAT_MAX}" autocomplete="off" autocapitalize="sentences" spellcheck="true" placeholder="Say something" />
           <button type="submit" class="wc-send">Send</button>
@@ -931,7 +945,13 @@ export class WorldView {
     hud.appendChild(chat);
     decorateFrame(chat.querySelector('.wc-body'));
 
-    this.ui = { status, chat, log: chat.querySelector('.wc-log'), input: chat.querySelector('.wc-in') };
+    this.ui = {
+      status,
+      chat,
+      log: chat.querySelector('.wc-log'),
+      pin: chat.querySelector('.wc-pin'),
+      input: chat.querySelector('.wc-in'),
+    };
 
     chat.querySelector('.wc-toggle').addEventListener('click', (e) => {
       e.preventDefault();
@@ -1036,9 +1056,20 @@ export class WorldView {
       const cls = mine ? ' class="wc-you"' : '';
       return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
     }).join('');
-    const youLine = this.ui.log.querySelector('p.wc-you:last-of-type');
-    if (youLine) youLine.scrollIntoView({ block: 'nearest' });
-    else this.ui.log.scrollTop = this.ui.log.scrollHeight;
+    this.ui.log.scrollTop = this.ui.log.scrollHeight;
+    if (this.ui.pin) {
+      const pin = this.localPin && this.localPinT > 0 ? this.localPin : null;
+      if (pin) {
+        const who = escapeHtml(pin.name);
+        const text = escapeHtml(pin.text);
+        const pid = escapeHtml(pin.id);
+        this.ui.pin.hidden = false;
+        this.ui.pin.innerHTML = `<p class="wc-you"><b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
+      } else {
+        this.ui.pin.hidden = true;
+        this.ui.pin.innerHTML = '';
+      }
+    }
     this.paintHud();
   }
 

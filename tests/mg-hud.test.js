@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
 import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
-import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, overlap, padHudSafeRects, plateAnchorRect, platesCollide } from '../src/ui/hudLayout.js';
+import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, overlap, padHudSafeRects, plateAnchorRect, platesCollide } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -581,4 +581,30 @@ test('MG-UI-35 hunter plates join NPC declutter and large touch panels stay cent
   assert.match(style, /@media \(min-width: 1024px\) and \(min-height: 640px\) \{[\s\S]*max-width:\s*min\(560px/);
   assert.match(style, /#panel \{[\s\S]*align-items:\s*center[\s\S]*justify-content:\s*center/);
   assert.match(style, /p\.wc-you/);
+});
+
+test('MG-UI-36 own bubble nudges off the open chat panel', () => {
+  const layout = src('src/ui/hudLayout.js');
+  const hud = src('src/ui/hud.js');
+  const wv = src('src/net/worldView.js');
+  const style = src('src/style.css');
+  assert.match(layout, /'world-chat'/);
+  assert.match(hud, /nudgeAnchorOffRects/);
+  assert.match(hud, /classList.contains\('you'\)/);
+  assert.match(wv, /LOCAL_PIN_S = 15/);
+  assert.match(wv, /wc-pin/);
+  assert.match(style, /\.wc-pin/);
+  const chat = { id: 'world-chat', x: 127, y: 126, w: 280, h: 168 };
+  const vp = { w: 844, h: 390 };
+  const w = 90;
+  const h = 28;
+  const ax = 200;
+  const ay = 180;
+  const padded = padHudSafeRects([chat], 16);
+  assert.equal(nameplateHitsHud(plateAnchorRect(ax, ay, w, h), padded), true, 'bubble over the open chat hits the padded panel');
+  const moved = nudgeAnchorOffRects(ax, ay, w, h, padded, vp);
+  assert.equal(moved.moved, true);
+  const after = plateAnchorRect(moved.x, moved.y, w, h);
+  assert.equal(nameplateHitsHud(after, padded), false, 'nudged bubble misses the chat panel');
+  assert.equal(nameplateOutsideViewport(after, vp), false, 'nudged bubble stays on screen');
 });

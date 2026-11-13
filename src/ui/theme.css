@@ -1587,12 +1587,17 @@ body.weapon-cursor-on #social-menu {
 #social-menu button:disabled { opacity: 0.45; }
 
 #world-chat .wc-log b.wc-name { cursor: pointer; }
-#world-chat .wc-log p.wc-you {
+#world-chat .wc-log p.wc-you,
+#world-chat .wc-pin p.wc-you {
   background: rgba(18, 36, 52, 0.96);
   border-color: var(--mg-gold);
   color: var(--mg-ink-text);
 }
-#world-chat .wc-log p.wc-you b { color: var(--mg-gold-hi); }
+#world-chat .wc-log p.wc-you b,
+#world-chat .wc-pin p.wc-you b { color: var(--mg-gold-hi); }
+#world-chat .wc-pin {
+  border-top-color: rgba(198, 161, 90, 0.4);
+}
 #world-chat .wc-log .wc-wh {
   font-style: normal;
   font-size: 10px;
