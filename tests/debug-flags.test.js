@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, ensureDebugStarterWeapon, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
@@ -230,7 +230,7 @@ test('debug-granted starter weapon is stripped from a save written in a debug se
   }
 });
 
-test('debug tank spawn is ~20x HP, hits back, and stays out of saves', () => {
+test('debug tank spawn is capped HP, hits back, and stays out of saves', () => {
   const spawned = [];
   const game = {
     debug: { enabled: true },
@@ -264,7 +264,76 @@ test('debug tank spawn is ~20x HP, hits back, and stays out of saves', () => {
   assert.match(hud, /set-spawn-tank/);
   assert.match(hud, /game\.debug && !game\.mmo && !game\.worldView/);
   const slim = applyDebugTank({ hp: 10, maxHp: 10, name: 'Boar', cd: 0 });
-  assert.equal(slim.maxHp, 10 * DEBUG_TANK_HP_MUL);
+  assert.equal(slim.maxHp, debugTankHp(10));
+  assert.ok(slim.maxHp <= DEBUG_TANK_HP_CAP);
+  const fat = applyDebugTank({ hp: 80, maxHp: 80, name: 'Boar', cd: 0 });
+  assert.equal(fat.maxHp, DEBUG_TANK_HP_CAP);
+});
+
+test('debug tank dies in ~20-30s of low-level hits, auto-attacks until dead, and drops loot', () => {
+  const mon = applyDebugTank({
+    type: 'slime',
+    x: 73,
+    z: 73,
+    y: 3,
+    name: 'Gate Slime',
+    hp: 18,
+    maxHp: 18,
+    def: { gold: [2, 4], dmg: 2 },
+  });
+  assert.ok(mon.maxHp <= DEBUG_TANK_HP_CAP);
+  const budget = debugTankKillBudget(mon.maxHp, { dmg: DEBUG_STARTER_DMG, swingSec: 1.5 });
+  assert.ok(budget.sec >= 15 && budget.sec <= 30, `kill time ${budget.sec}s`);
+  const coins = [];
+  const payload = huntSavePayload({ gold: 4, debugGranted: { items: [] } });
+  assert.equal(payload.debugGranted, undefined);
+
+  const live = {
+    type: 'slime',
+    x: 73.6,
+    z: 73,
+    dead: false,
+    debugTank: true,
+    hp: mon.maxHp,
+    maxHp: mon.maxHp,
+  };
+  const attacks = [];
+  const game = {
+    debug: { enabled: true, autoAttack: true },
+    started: true,
+    uiBlocking: false,
+    player: { pos: { x: 72, y: 3, z: 73 }, yaw: 0, dead: false, state: 'idle' },
+    items: [{ reach: 2.4, kind: 'melee', dmg: DEBUG_STARTER_DMG }],
+    sel: 0,
+    monsters: [live],
+    carried(it) { return it; },
+    nearestMonster() { return live.dead ? null : live; },
+    doAttack() {
+      attacks.push('hit');
+      live.hp -= DEBUG_STARTER_DMG;
+      if (live.hp <= 0) live.dead = true;
+    },
+    dropCoin(x, y, z, n) { coins.push({ x, y, z, n }); },
+    mmo: null,
+  };
+  setDebugAutoAttack(game, true);
+  let ticks = 0;
+  while (!live.dead && ticks < 80) {
+    game.player.state = 'idle';
+    const swung = tickDebugAutoAttack(game);
+    assert.equal(swung, true);
+    game.player.state = 'attack';
+    assert.equal(tickDebugAutoAttack(game), false, 'waits out the swing');
+    ticks++;
+  }
+  assert.equal(live.dead, true);
+  assert.ok(attacks.length >= 8);
+  assert.ok(grantDebugTankLoot(game, { ...mon, debugTank: true }));
+  assert.ok(coins.length >= 1);
+  assert.ok(!JSON.stringify(payload).includes('debugTank'));
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(main, /grantDebugTankLoot/);
+  assert.match(main, /m\.debugTank/);
 });
 
 test('MG-UI-22 oasis landing frames the pool above the hotbar clearance', () => {

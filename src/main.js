@@ -18,7 +18,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { attachDebug, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
+import { attachDebug, grantDebugTankLoot, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
@@ -1000,7 +1000,7 @@ class Game {
       }
       e.preventDefault();
     });
-    document.getElementById('panel-close').addEventListener('click', () => this.hud.closePanel());
+    this.hud.bindPanelClose();
     document.getElementById('btn-fs').addEventListener('click', () => this.toggleFullscreen());
     document.getElementById('btn-snd').addEventListener('click', () => {
       this.audio.unlock();
@@ -1690,6 +1690,7 @@ class Game {
 
   onMonsterKilled(m) {
     this.kills++;
+    if (m.debugTank) grantDebugTankLoot(this, m);
     if (m.type === 'orcscout') {
       if (Math.random() < 0.72) {
         const n = m.def.gold[0] + Math.floor(Math.random() * (m.def.gold[1] - m.def.gold[0] + 1));
