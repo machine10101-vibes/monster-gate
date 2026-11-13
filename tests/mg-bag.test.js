@@ -44,6 +44,7 @@ test('MG-UI-41: holding a bag cell opens Use or Drop', () => {
   assert.match(bag, /openBagMenu/);
   assert.match(bag, /Hold an item to Use or Drop it/);
   assert.match(bag, /bag-ask-drop/);
+  assert.match(bag, /k: 'held', id: it\.id, n: 1/);
   assert.match(src('src/main.js'), /dropBagItem\(/);
 });
 

@@ -341,7 +341,7 @@ function collect(game) {
       badge: it.count !== undefined ? String(it.count) : null,
       canvas: () => renderThumb({ kind: 'held', id: it.held }, 96),
       action: it.kind === 'use' ? 'Use' : 'Hold',
-      drop: it.count != null && it.count > 0 ? { k: 'held', id: it.id, n: it.count, name: it.name } : null,
+      drop: it.count != null && it.count > 0 ? { k: 'held', id: it.id, n: 1, name: it.name } : null,
       run: (paint) => {
         if (it.kind === 'use') game.player?.tryAttack(it);
         else game.selectSlot(i);
