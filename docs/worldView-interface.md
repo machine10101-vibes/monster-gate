@@ -12,6 +12,7 @@ Live GitHub Pages is unchanged unless the page is opened with `?mmo=1`.
 | `?mmo=1` | Mounts worldView and leaves it idle for `mmo.js` (`offline` until `setStatus`). |
 | `?mmo=1&mock=1` | Same, plus a local mock crowd and chat feed for layout / screenshots. |
 | `?mmo=1&mockwake=1` | Mock path with a 30s `waking` queue overlay, then `online`. Does not open a socket. |
+| `?mmo=1&mock=1&mockerr=name_taken` | Mock join that stays on a final `error` / name-taken prompt. No auto-reconnect. |
 
 ## Mount
 
@@ -65,7 +66,9 @@ worldView.setStatus(state, detail?)           // or { status, detail?, online? }
 
 ### Status
 
-`'offline' | 'connecting' | 'waking' | 'online' | 'reconnecting'`
+`'offline' | 'connecting' | 'waking' | 'online' | 'reconnecting' | 'error'`
+
+`setStatus('error', { code: 'name_taken', message })` (or `{ status: 'error', code: 'name_taken', message }`) is **final**. It does not auto-reconnect. The view shows a themed prompt that the hunter name is taken, asks for another, and focuses the name field. Submitting a valid new name emits `{ type: 'rename', name }`.
 
 `setStatus('waking', { secondsLeft, elapsedMs })` (or `{ status: 'waking', detail: { secondsLeft, elapsedMs } }`) shows the login-queue overlay:
 

@@ -16,9 +16,11 @@
  *
  * Flags: ?mmo=1 mounts this module. ?mmo=1&mock=1 also starts a local crowd.
  * ?mmo=1&mockwake=1 simulates a 30s waking queue, then online.
+ * ?mmo=1&mock=1&mockerr=name_taken shows the hunter-name prompt and stays final.
  */
 
-import { lookOptions } from '../systems/roster.js';
+import { lookOptions, cleanName as rosterCleanName, nameProblem } from '../systems/roster.js';
+import { decorateFrame } from '../ui/theme.js';
 
 export const WORLD_VIEW = 1;
 export const REMOTE_PREFIX = 'wv:';
@@ -33,6 +35,7 @@ export const STATUS = {
   waking: 'waking',
   online: 'online',
   reconnecting: 'reconnecting',
+  error: 'error',
 };
 
 export const WAKE_SECONDS = 30;
@@ -52,7 +55,8 @@ export function parseMmoFlags(search = '') {
   const mmo = q.get('mmo') === '1';
   const mock = q.get('mock') === '1';
   const mockwake = q.get('mockwake') === '1';
-  return { mmo, mock, mockwake, enabled: mmo, mockFeed: mmo && mock };
+  const mockerr = q.get('mockerr') || '';
+  return { mmo, mock, mockwake, mockerr, enabled: mmo, mockFeed: mmo && mock };
 }
 
 /**
@@ -275,6 +279,8 @@ export class WorldView {
     this.wakeDismissed = false;
     this.wakeUi = null;
     this.wakeTick = 0;
+    this.nameUi = null;
+    this.nameTakenOpen = false;
     this.online = 0;
     this.intents = [];
     this.onIntent = null;
@@ -458,6 +464,11 @@ export class WorldView {
           elapsedMs: extra.elapsedMs ?? status.elapsedMs,
         };
       }
+      if (status.code || status.message) {
+        extra = extra && typeof extra === 'object'
+          ? { ...extra, code: extra.code || status.code, message: extra.message || status.message }
+          : { code: status.code, message: status.message || extra };
+      }
     }
     this.status = STATUS[next] || next || STATUS.offline;
     if (this.status === STATUS.waking) {
@@ -465,14 +476,33 @@ export class WorldView {
       this.wakeMarkedAt = this.now();
       this.wakeDismissed = false;
       this.detail = this.wakeDetail;
+      this.nameTakenOpen = false;
     } else {
       this.wakeDetail = null;
       this.wakeMarkedAt = 0;
       this.detail = extra == null ? '' : extra;
       if (this.status === STATUS.online) this.wakeDismissed = false;
+      this.nameTakenOpen = this.status === STATUS.error && this.errorCode() === 'name_taken';
     }
     this.paintHud();
     this.syncWakeOverlay();
+    this.syncNamePrompt();
+  }
+
+  errorCode() {
+    const d = this.detail;
+    if (d && typeof d === 'object') return String(d.code || '');
+    return '';
+  }
+
+  errorMessage() {
+    const d = this.detail;
+    if (d && typeof d === 'object') return String(d.message || '');
+    return typeof d === 'string' ? d : '';
+  }
+
+  nameTakenActive() {
+    return this.mmoEnabled() && this.status === STATUS.error && this.errorCode() === 'name_taken' && this.nameTakenOpen;
   }
 
   now() {
@@ -509,7 +539,7 @@ export class WorldView {
     const root = document.createElement('div');
     root.id = 'world-wake';
     root.innerHTML = `
-      <div class="ww-card">
+      <div class="ww-card mg-frame">
         <small>World 1</small>
         <h1>MONSTER <em>GATE</em></h1>
         <div class="ww-spin" aria-hidden="true"></div>
@@ -537,6 +567,7 @@ export class WorldView {
       fill: root.querySelector('.ww-bar i'),
       actions: root.querySelector('.ww-actions'),
     };
+    decorateFrame(root.querySelector('.ww-card'));
     this.unsubs.push(() => this.hideWakeOverlay());
   }
 
@@ -584,6 +615,92 @@ export class WorldView {
     this.wakeDismissed = true;
     this.hideWakeOverlay();
     this.stopWakeTick();
+  }
+
+  syncNamePrompt() {
+    if (!this.nameTakenActive()) {
+      this.hideNamePrompt();
+      return;
+    }
+    this.ensureNamePrompt();
+    this.paintNamePrompt();
+  }
+
+  ensureNamePrompt() {
+    if (this.nameUi || typeof document === 'undefined') return;
+    const root = document.createElement('div');
+    root.id = 'world-name';
+    root.innerHTML = `
+      <form class="wn-card mg-frame">
+        <small>World 1</small>
+        <h2>Name taken</h2>
+        <p class="wn-msg">That hunter name is taken. Pick another.</p>
+        <label class="wg-label" for="world-name-input">Hunter name</label>
+        <input id="world-name-input" class="wn-in" type="text" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" />
+        <p class="wn-err" role="alert"></p>
+        <button type="submit" class="start wn-go">Use this name</button>
+      </form>`;
+    (document.getElementById('app') || document.body).appendChild(root);
+    decorateFrame(root.querySelector('.wn-card'));
+    const input = root.querySelector('.wn-in');
+    const err = root.querySelector('.wn-err');
+    const msg = root.querySelector('.wn-msg');
+    root.querySelector('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const problem = this.submitHunterName(input.value);
+      if (problem) err.textContent = problem;
+    });
+    this.nameUi = { root, input, err, msg };
+    this.unsubs.push(() => this.hideNamePrompt());
+  }
+
+  paintNamePrompt() {
+    if (!this.nameUi) return;
+    const current = this.game?.character?.name || this.game?.net?.name || '';
+    const custom = this.errorMessage();
+    this.nameUi.msg.textContent = custom || 'That hunter name is taken. Pick another.';
+    if (!this.nameUi.input.value) this.nameUi.input.value = current;
+    this.nameUi.err.textContent = '';
+    const focus = () => {
+      this.nameUi?.input?.focus?.();
+      this.nameUi?.input?.select?.();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focus);
+    else focus();
+  }
+
+  hideNamePrompt() {
+    this.nameUi?.root?.remove();
+    this.nameUi = null;
+  }
+
+  applyHunterName(raw) {
+    const name = rosterCleanName(raw);
+    const g = this.game;
+    if (g?.character) g.character.name = name;
+    if (g?.net) g.net.name = name;
+    const roster = g?.roster;
+    const id = g?.character?.id;
+    const char = roster?.get?.(id) || roster?.chars?.find?.((c) => c.id === id) || roster?.chars?.[0];
+    if (char) char.name = name;
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('mg-name', name);
+    } catch { /* ignore */ }
+    return name;
+  }
+
+  submitHunterName(raw) {
+    const name = rosterCleanName(raw);
+    const problem = nameProblem(name, this.game?.roster, this.game?.character?.id);
+    if (problem) return problem;
+    const taken = String(this.game?.character?.name || this.game?.net?.name || '').toLowerCase();
+    if (name.toLowerCase() === taken) return 'That hunter name is taken. Pick another.';
+    this.applyHunterName(name);
+    this.nameTakenOpen = false;
+    this.hideNamePrompt();
+    this.emit({ type: 'rename', name });
+    this.paintHud();
+    return '';
   }
 
   setOnlineCount(n) {
@@ -713,6 +830,7 @@ export class WorldView {
   }
 
   requestReconnect() {
+    if (this.nameTakenActive() || (this.status === STATUS.error && this.errorCode() === 'name_taken')) return;
     this.emit({ type: 'reconnect' });
     this.transport?.reconnect?.();
   }
@@ -733,7 +851,7 @@ export class WorldView {
     chat.className = 'pe';
     chat.innerHTML = `
       <button type="button" class="wc-toggle" aria-label="Chat">Chat</button>
-      <div class="wc-body">
+      <div class="wc-body mg-frame">
         <div class="wc-tabs">
           <button type="button" data-ch="world">World</button>
           <button type="button" data-ch="zone">Zone</button>
@@ -745,6 +863,7 @@ export class WorldView {
         </form>
       </div>`;
     hud.appendChild(chat);
+    decorateFrame(chat.querySelector('.wc-body'));
 
     this.ui = { status, chat, log: chat.querySelector('.wc-log'), input: chat.querySelector('.wc-in') };
 
@@ -808,8 +927,13 @@ export class WorldView {
           ? 'Starting…'
           : st === STATUS.reconnecting
             ? 'Reconnecting…'
-            : 'Offline';
-    const canRetry = st === STATUS.offline || st === STATUS.reconnecting;
+            : st === STATUS.error && this.errorCode() === 'name_taken'
+              ? 'Name taken'
+              : st === STATUS.error
+                ? 'Error'
+                : 'Offline';
+    const canRetry = (st === STATUS.offline || st === STATUS.reconnecting)
+      && this.errorCode() !== 'name_taken';
     this.ui.status.dataset.state = st;
     const note = typeof this.detail === 'string' ? this.detail : '';
     this.ui.status.innerHTML = `<b>${label}</b>${note ? `<small>${escapeHtml(note)}</small>` : ''}${
@@ -819,6 +943,11 @@ export class WorldView {
     if (retry) retry.onclick = () => this.requestReconnect();
     this.ui.chat.classList.toggle('collapsed', this.collapsed);
     this.ui.chat.dataset.channel = this.channel;
+    const tog = this.ui.chat.querySelector('.wc-toggle');
+    if (tog) {
+      tog.textContent = this.collapsed ? 'Chat' : 'Close';
+      tog.setAttribute('aria-label', this.collapsed ? 'Open chat' : 'Close chat');
+    }
     this.ui.chat.querySelectorAll('.wc-tabs button').forEach((b) => {
       b.classList.toggle('on', b.dataset.ch === this.channel);
     });
@@ -885,6 +1014,7 @@ export class WorldView {
     this.ui?.chat?.remove();
     this.ui = null;
     this.hideWakeOverlay();
+    this.hideNamePrompt();
     this.stopWakeTick();
     if (typeof document !== 'undefined') document.body?.classList.remove('mmo-view');
     const g = this.game;
@@ -923,6 +1053,7 @@ async function attachMock(view, game, extra = {}) {
   const feed = new MockWorld(view, {
     game,
     mockwake: extra.mockwake ?? flags.mockwake,
+    mockerr: extra.mockerr ?? flags.mockerr,
     wakeMs: extra.wakeMs,
   });
   view.bindTransport(feed);

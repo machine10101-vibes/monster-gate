@@ -17,6 +17,7 @@ import { mountTeleport } from './teleport.js';
 import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
+import { decorateAllFrames, decorateFrame } from './theme.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -109,6 +110,7 @@ export class HUD {
     });
     $('btn-fs').style.backgroundImage = `url(${iconURL('fs')})`;
     $('btn-snd').style.backgroundImage = `url(${iconURL('snd')})`;
+    decorateAllFrames();
   }
 
   buildHotbar(items, onSelect) {
@@ -434,6 +436,8 @@ export class HUD {
     const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
     card?.classList.toggle('wide', wide);
     card?.classList.toggle('adventures', name === 'quest');
+    card?.querySelectorAll(':scope > .mg-corner').forEach((n) => n.remove());
+    if (name !== 'quest') decorateFrame(card);
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';

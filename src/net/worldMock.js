@@ -85,6 +85,7 @@ export class MockWorld {
     this.seq = 1;
     this.online = 24;
     this.mockwake = !!opts.mockwake;
+    this.mockerr = String(opts.mockerr || '');
     this.wakeMs = Number.isFinite(Number(opts.wakeMs)) ? Number(opts.wakeMs) : 30000;
     this.wakeElapsed = 0;
   }
@@ -108,6 +109,13 @@ export class MockWorld {
     if (this.running) return;
     this.running = true;
     this.pinned = false;
+    if (this.mockerr === 'name_taken') {
+      this.setStatus(STATUS.error, {
+        code: 'name_taken',
+        message: 'That hunter name is taken. Pick another.',
+      });
+      return;
+    }
     if (this.mockwake) {
       this.wakeElapsed = 0;
       this.setStatus(STATUS.waking, { secondsLeft: 30, elapsedMs: 0 });
@@ -149,6 +157,7 @@ export class MockWorld {
   }
 
   reconnect() {
+    if (this.mockerr === 'name_taken' && this.status === STATUS.error) return;
     if (this.mockwake) {
       this.running = true;
       if (this._wake) clearInterval(this._wake);
@@ -178,11 +187,20 @@ export class MockWorld {
       const name = this.game?.character?.name || this.game?.net?.name || 'You';
       this.say(intent.channel === 'zone' ? 'zone' : 'world', { id: 'you', name }, intent.text);
     }
+    if (intent.type === 'rename') {
+      const name = String(intent.name || '').trim();
+      if (!name) return;
+      if (this.game?.character) this.game.character.name = name;
+      if (this.game?.net) this.game.net.name = name;
+      this.mockerr = '';
+      this.finishBoot();
+      return;
+    }
     if (intent.type === 'reconnect') this.reconnect();
   }
 
   update(dt) {
-    if (!this.running || this.status === STATUS.offline || this.status === STATUS.waking) return;
+    if (!this.running || this.status === STATUS.offline || this.status === STATUS.waking || this.status === STATUS.error) return;
     this.time += dt;
     this.snapT -= dt;
     if (this.snapT <= 0) {

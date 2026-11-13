@@ -12,11 +12,14 @@ import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
 test('MMO flags: presentation on mmo=1, mock feed only with both', () => {
-  assert.deepEqual(parseMmoFlags(''), { mmo: false, mock: false, mockwake: false, enabled: false, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('?mmo=1'), { mmo: true, mock: false, mockwake: false, enabled: true, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('mock=1'), { mmo: false, mock: true, mockwake: false, enabled: false, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { mmo: true, mock: true, mockwake: false, enabled: true, mockFeed: true });
-  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { mmo: true, mock: false, mockwake: true, enabled: true, mockFeed: false });
+  assert.deepEqual(parseMmoFlags(''), { mmo: false, mock: false, mockwake: false, mockerr: '', enabled: false, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('?mmo=1'), { mmo: true, mock: false, mockwake: false, mockerr: '', enabled: true, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('mock=1'), { mmo: false, mock: true, mockwake: false, mockerr: '', enabled: false, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { mmo: true, mock: true, mockwake: false, mockerr: '', enabled: true, mockFeed: true });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { mmo: true, mock: false, mockwake: true, mockerr: '', enabled: true, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1&mockerr=name_taken'), {
+    mmo: true, mock: true, mockwake: false, mockerr: 'name_taken', enabled: true, mockFeed: true,
+  });
   assert.equal(parseMmoFlags('?mmo=true&mock=true').enabled, false);
 });
 
@@ -340,4 +343,39 @@ test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () =>
   assert.equal(attachMmo(game, view, { search: '' }), null);
   assert.equal(attachMmo(game, view, { search: '?mock=1' }), null);
   assert.equal(attachMmo(game, view, { search: '?mmo=1&mock=1' }), null);
+});
+
+test('name_taken error is final, prompts for another hunter name, and does not reconnect', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  const feed = new MockWorld(view, { game, mockerr: 'name_taken' });
+  view.bindTransport(feed);
+  feed.start();
+  assert.equal(view.status, STATUS.error);
+  assert.equal(view.errorCode(), 'name_taken');
+  assert.equal(view.nameTakenActive(), true);
+  view.requestReconnect();
+  assert.equal(view.status, STATUS.error);
+  assert.equal(feed.status, STATUS.error);
+  assert.equal(view.submitHunterName('Test'), 'That hunter name is taken. Pick another.');
+  assert.equal(view.submitHunterName('x'), 'Names need at least 2 letters.');
+  assert.equal(view.submitHunterName('Rowan Two'), '');
+  assert.equal(game.character.name, 'Rowan Two');
+  assert.equal(game.net.name, 'Rowan Two');
+  assert.equal(view.nameTakenActive(), false);
+  assert.equal(view.status, STATUS.online);
+  assert.equal(feed.status, STATUS.online);
+});
+
+test('setStatus error name_taken accepts object detail without auto-reconnect', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  view.setStatus('error', { code: 'name_taken', message: 'That hunter name is taken.' });
+  assert.equal(view.status, STATUS.error);
+  assert.equal(view.nameTakenActive(), true);
+  assert.match(view.errorMessage(), /taken/);
+  view.requestReconnect();
+  assert.equal(view.status, STATUS.error);
+  view.setStatus({ status: 'error', code: 'name_taken', message: 'Pick another hunter name.' });
+  assert.equal(view.errorCode(), 'name_taken');
 });
