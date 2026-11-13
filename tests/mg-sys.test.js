@@ -31,7 +31,7 @@ test('BAL-3 weapon tiers: starter hammer no longer beats iron or budge swords', 
   const iron = gearById('ironsword');
   const budge = gearById('budgeblade');
   assert.equal(iron.item.dmg, 14);
-  assert.equal(budge.item.dmg, 18);
+  assert.equal(budge.item.dmg, 46);
   assert.ok(10 < iron.item.dmg);
   assert.ok(iron.item.dmg < budge.item.dmg);
 });

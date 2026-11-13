@@ -6,8 +6,9 @@
 
 export const BUDGE_CAP = 10;
 export const BUDGE_RESPAWN_MS = 30 * 60 * 1000;
-export const BUDGE_LEVEL = 8;
-export const BUDGE_STR = 8;
+export const BUDGE_LEVEL = 80;
+export const BUDGE_STR = 80;
+export const BUDGE_HEAVY = 85;
 export const BUDGE_SEP = 48;
 /** Interior pad inside a 144-unit land so dragons do not sit on tile rims. */
 export const BUDGE_PAD = 18;

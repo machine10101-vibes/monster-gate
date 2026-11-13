@@ -63,7 +63,7 @@ const DEFS = {
   voidslime: { name: 'Void Slime', hp: 26, radius: 0.55, speed: 3.0, dmg: 3, gold: [4, 8], aggro: 11, build: () => buildSlime('purple') },
   boar: { name: 'Thorn Boar', hp: 38, radius: 0.7, speed: 2.5, dmg: 3, gold: [5, 10], aggro: 10, build: buildBoar },
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
-  budgedragon: { name: 'Green Budge Dragon', hp: 148, radius: 0.85, speed: 3.1, dmg: 6, gold: [32, 52], aggro: 16, level: BUDGE_LEVEL, build: buildBudgeDragon },
+  budgedragon: { name: 'Green Budge Dragon', hp: 880, radius: 0.85, speed: 3.1, dmg: 18, gold: [80, 140], aggro: 20, level: BUDGE_LEVEL, build: buildBudgeDragon },
   darksycledragon: { name: 'Darksycle Dragon', hp: 155, radius: 1.9, speed: 2.7, dmg: 5, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
   snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
   demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 5, gold: [90, 140], aggro: 14, build: buildDemonKnight },

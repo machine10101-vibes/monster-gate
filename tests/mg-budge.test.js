@@ -93,28 +93,31 @@ test('Budge dragons pick random playable lands and skip towns, water, and clumps
   assert.ok(blocked.has(3) && blocked.has(4) && blocked.has(7) && blocked.has(8));
 });
 
-test('Green Budge Dragon is a level 8 hunt and its gear gates on Strength', () => {
+test('Green Budge Dragon is a level 80 hunt and its gear gates on Strength', () => {
   const m = MONSTERS.find((row) => row.id === 'budgedragon');
   assert.equal(m.level, BUDGE_LEVEL);
-  assert.equal(m.level, 8);
+  assert.equal(m.level, 80);
   assert.match(m.habitat, /whole world/i);
   assert.match(m.habitat, /ten/i);
   const blade = gearById('budgeblade');
-  assert.equal(blade.item.dmg, 18);
+  assert.equal(blade.item.dmg, 46);
   assert.equal(blade.reqLevel, BUDGE_STR);
+  assert.equal(blade.reqLevel, 80);
   const iron = gearById('ironsword');
+  const platinum = gearById('platinumsword');
   const ashen = gearById('ashenbrand');
   assert.ok(iron.item.dmg < blade.item.dmg);
-  assert.ok(blade.item.dmg < ashen.item.dmg);
+  assert.ok(platinum.item.dmg < blade.item.dmg);
+  assert.ok(ashen.item.dmg < blade.item.dmg);
   const budgeGear = GEAR.filter((g) => g.monster === 'budgedragon');
   assert.ok(budgeGear.length > 12);
   for (const g of budgeGear) {
     assert.ok((g.reqLevel | 0) >= BUDGE_STR, g.id);
   }
-  assert.equal(gearById('budgemaul').reqLevel, 10);
-  assert.equal(gearById('budgechest').def, 4);
+  assert.equal(gearById('budgemaul').reqLevel, 85);
+  assert.equal(gearById('budgechest').def, 8);
   const plate = SETS.find((s) => s.id === 'budgeset');
-  assert.equal(plate.hp, 6);
+  assert.equal(plate.hp, 12);
 });
 
 test('Spawner seeds world budges, caps them, and waits 30 minutes after a kill', () => {
@@ -122,7 +125,7 @@ test('Spawner seeds world budges, caps them, and waits 30 minutes after a kill',
   assert.match(monsters, /seedBudges\(\)/);
   assert.match(monsters, /fillBudges\(\)/);
   assert.match(monsters, /noteBudgeDeath/);
-  assert.match(monsters, /hp: 148,[\s\S]*dmg: 6/);
+  assert.match(monsters, /hp: 880,[\s\S]*dmg: 18/);
   assert.doesNotMatch(monsters, /\['budgedragon', 120, 74\]/);
   assert.doesNotMatch(monsters, /drakes < 2/);
   assert.match(monsters, /m\.type !== 'budgedragon'/);
