@@ -12,6 +12,7 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "start:server": "node server/index.js",
+    "ci:server": "npm ci && npm ci --prefix server/persistence",
     "test": "node --test tests/*.js server/tests/*.test.js",
     "test:server": "node --test server/tests/*.test.js",
     "test:persistence": "node --test server/persistence/tests/*.test.js"

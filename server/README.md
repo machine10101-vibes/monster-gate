@@ -97,7 +97,7 @@ New service from this repo. Start command: `npm run start:server`. Use Railway's
 
 ## Render
 
-`render.yaml` at the repo root is a **free** native Node web service: `npm ci`, start `npm run start:server`, health check `/healthz`. Set `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as dashboard secrets (`sync: false`). `ALLOWED_ORIGINS` is `https://machine10101-vibes.github.io` so the GitHub Pages client can read `/healthz` (CORS). Do not set `ALLOW_DEV_TOKENS`.
+`render.yaml` at the repo root is a **free** native Node web service. Build: `npm run ci:server` (`npm ci` at the repo root, then `npm ci --prefix server/persistence`, so `@supabase/supabase-js` is installed). Start: `npm run start:server`. Health check: `/healthz`. Set `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as dashboard secrets (`sync: false`). `ALLOWED_ORIGINS` is `https://machine10101-vibes.github.io` so the GitHub Pages client can read `/healthz` (CORS). Do not set `ALLOW_DEV_TOKENS`.
 
 The free plan sleeps when nobody is connected and takes about 30 seconds to wake. `src/net/mmo.js` probes `/healthz` first and calls `worldView.setStatus('waking', { secondsLeft, elapsedMs })` (countdown from 30) until the process answers, then `connecting` and `online`.
 
