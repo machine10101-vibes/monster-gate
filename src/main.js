@@ -891,7 +891,7 @@ class Game {
     panel?.classList.remove('hidden');
     document.getElementById('account-choices')?.classList.add('hidden');
     document.getElementById('wallet-help')?.classList.add('hidden');
-    if (status) status.textContent = UNLINKED_MESSAGE;
+    if (status) status.textContent = '';
   }
 
   captureHunter() {
