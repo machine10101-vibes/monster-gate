@@ -75,7 +75,7 @@ test('debug combined with mmo=1 changes nothing', () => {
 });
 
 test('every documented tp key resolves', () => {
-  const keys = ['oakhollow', 'goldenmeadow', 'greyrock', 'forge', 'oasis', 'deepwell', 'cinderfall', 'glimmerfrost', 'hellspire', 'dawnspire', 'endlessfield'];
+  const keys = ['oakhollow', 'goldenmeadow', 'greyrock', 'forge', 'oasis', 'deepwell', 'cinderfall', 'glimmerfrost', 'hellspire', 'dawnspire', 'endlessfield', 'crate', 'plaza', 'lira', 'dalla'];
   assert.deepEqual(debugSpotKeys().sort(), [...keys].sort());
   for (const key of keys) {
     const spot = resolveSpot(key);
@@ -611,4 +611,89 @@ test("Dalla skips session debug pouch in sellGood and the market listing", () =>
   assert.match(main, /sellAllGoods\(\) \{[\s\S]{0,220}if \(g\.session\) continue/);
   const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
   assert.match(hud, /function mountMarket[\s\S]*isUnsellableGood\(g\)\) continue/);
+});
+
+test('tp crate plaza lira dalla stand next to the props and do not write saves', () => {
+  const mira = { x: 70.6, z: 70.5 };
+  const crateProp = { x: 67.4, z: 74.2 };
+  const alchemy = { x: 71.2, z: 83.8 };
+  const market = { x: 77, z: 84.2 };
+
+  const crate = resolveSpot('crate');
+  assert.ok(Math.hypot(crate.x - crateProp.x, crate.z - crateProp.z) < 2.2, 'stand next to the crate');
+  assert.ok(Math.hypot(crate.x - mira.x, crate.z - mira.z) < 16, "Mira's nameplate stays in view");
+  const liveCrate = resolveSpot('crate', { storage: crateProp });
+  assert.equal(liveCrate.x, crateProp.x + 1.4);
+  assert.equal(liveCrate.z, crateProp.z - 1.0);
+
+  const plaza = resolveSpot('plaza');
+  assert.ok(Math.hypot(plaza.x - alchemy.x, plaza.z - alchemy.z) < 4.2);
+  assert.ok(Math.hypot(plaza.x - market.x, plaza.z - market.z) < 4.2);
+
+  const lira = resolveSpot('lira', { alchemy });
+  assert.ok(Math.hypot(lira.x - alchemy.x, lira.z - alchemy.z) < 2.2);
+  const dalla = resolveSpot('dalla', { market });
+  assert.ok(Math.hypot(dalla.x - market.x, dalla.z - market.z) < 2.2);
+  assert.equal(canonicalSpot('storage crate'), 'crate');
+  assert.equal(canonicalSpot("Dalla's Market"), 'dalla');
+
+  freezeSaves(false);
+  installStorage();
+  mem.clear();
+  const pos = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } };
+  const game = {
+    debug: { enabled: true },
+    player: { pos, yaw: 0, syncObj() {} },
+    world: { realm: 'over', heightAt: () => 3.2, revealAround() {}, storage: crateProp, alchemy, market },
+    hud: { toast() {} },
+    snapCamera() {},
+    progress: { sessionOnly: false, data: { gold: 4 } },
+  };
+  const before = [...mem.entries()];
+  assert.ok(teleportDebug(game, 'crate'));
+  assert.equal(savesFrozen(), false);
+  assert.deepEqual([...mem.entries()], before, 'teleportDebug must not write localStorage');
+
+  const blocked = { ...game, mmo: { send() {} }, player: { pos: { set() { this.moved = true; } } } };
+  assert.equal(teleportDebug(blocked, 'crate'), null);
+  assert.equal(blocked.player.pos.moved, undefined);
+  const view = { ...game, worldView: {}, player: { pos: { set() { this.moved = true; } } } };
+  assert.equal(teleportDebug(view, 'plaza'), null);
+  assert.equal(view.player.pos.moved, undefined);
+  assert.equal(parseDebugFlags('?tp=crate').tp, '');
+  assert.equal(parseDebugFlags('?debug=1&mmo=1&tp=crate').tp, '');
+  freezeSaves(false);
+  const warns = [];
+  const orig = console.warn;
+  console.warn = (...a) => warns.push(a.map(String).join(' '));
+  try {
+    assert.equal(attachDebug({ worldView: {}, progress: { sessionOnly: false } }, '?debug=1&tp=crate'), null);
+    assert.equal(savesFrozen(), false);
+    assert.ok(warns.some((w) => /world-view|mmo=1/i.test(w)));
+  } finally {
+    console.warn = orig;
+    freezeSaves(false);
+  }
+});
+
+test('loot-bag pickup toasts Loot bag, not the inventory name', () => {
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(main, /const itemName = k\.label \|\| 'Loot bag'/);
+  assert.match(main, /label \|\| 'Loot bag', 3600/);
+});
+
+test('NPC talk range matches stall range so Mira Lira Dalla show the talk button', () => {
+  const ambient = readFileSync(new URL('../src/entities/ambient.js', import.meta.url), 'utf8');
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const style = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+  const theme = readFileSync(new URL('../src/ui/theme.css', import.meta.url), 'utf8');
+  assert.match(ambient, /NPC_TALK_RANGE = 3\.4/);
+  assert.match(ambient, /this\.near = d < NPC_TALK_RANGE/);
+  assert.match(main, /alchemyNear = d < 3\.4/);
+  assert.match(main, /marketNear = d < 3\.4/);
+  assert.match(main, /storageNear = d < 3\.6/);
+  assert.match(main, /setTalkVisible\(near && this\.input\.touch\)/);
+  assert.match(style, /#tb-talk \{[\s\S]*z-index:\s*5/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#touch-btns \{[\s\S]*width:\s*220px/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#touch-btns \{[\s\S]*height:\s*200px/);
 });

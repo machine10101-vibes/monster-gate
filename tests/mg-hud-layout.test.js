@@ -94,6 +94,20 @@ test('MG-UI-17 844x390 action-button bounding rects leave at least 8px from #men
   assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#touch-btns \{[\s\S]*right:\s*var\(--hud-action-right\)/);
 });
 
+test('talk button stays inside the 844x390 landscape action cluster', () => {
+  const vp = { name: 'phone-landscape', w: 844, h: 390, touch: true };
+  const measured = touchActionRects(vp);
+  const talk = measured.talk;
+  const box = measured.cluster;
+  assert.ok(talk, 'talk rect');
+  assert.ok(talk.x >= box.x - 0.01, `talk left ${talk.x} vs cluster ${box.x}`);
+  assert.ok(talk.y >= box.y - 0.01, `talk top ${talk.y} vs cluster ${box.y}`);
+  assert.ok(talk.x + talk.w <= box.x + box.w + 0.01, 'talk right inside cluster');
+  assert.ok(talk.y + talk.h <= box.y + box.h + 0.01, 'talk bottom inside cluster');
+  assert.ok(talk.x + talk.w <= vp.w, 'talk on screen');
+  assert.ok(talk.y >= 0, 'talk below top of screen');
+});
+
 test('expanded quest tracker still misses the minimap', () => {
   for (const vp of HUD_VIEWPORTS) {
     const rects = hudRects(vp, { questOpen: true });

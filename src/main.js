@@ -1910,7 +1910,7 @@ class Game {
           const added = this.progress?.addGood?.(itemId, 1, false) || 0;
           if (added > 0 && this.progress?.data) markDebugGranted(this.progress.data, { items: [itemId] });
           this.audio.coin();
-          const itemName = GOODS[itemId]?.name || 'Trophy Pouch';
+          const itemName = k.label || 'Loot bag';
           this.hud.toast(itemName, 2200);
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), itemName, 'gold');
           this.fx.burst(h.x, h.y, h.z, [0xd4a84a, 0xffd23f, 0xffffff], 8, 2.2, 0.08, 0.45);
@@ -2596,7 +2596,7 @@ class Game {
     if (!m) return;
     const P = this.player.pos;
     const d = Math.hypot(P.x - m.x, P.z - m.z);
-    this.marketNear = d < 3.2 && this.started;
+    this.marketNear = d < 3.4 && this.started;
     if (this.marketNear && !this.marketHinted) {
       this.marketHinted = true;
       this.hud.toast("Dalla's Market - press F to sell ore and fish", 2600);

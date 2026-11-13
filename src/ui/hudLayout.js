@@ -181,9 +181,9 @@ export function touchActionRects(vp) {
   const menu = fitMenuButtons(h, { touch: true });
   const short = h <= 500;
   const ui = Math.max(1, Math.min(1.5, h / 820));
-  const scale = short ? ui * 0.92 : ui;
-  const boxW = short ? 180 : 220;
-  const boxH = short ? 160 : 190;
+  const scale = short ? ui * 0.82 : ui;
+  const boxW = 220;
+  const boxH = short ? 200 : 190;
   const bottom = w <= 1100 ? 90 : 18;
   const right = MENU_INSET + menu.colW + ACTION_GAP;
   const visualW = boxW * scale;
@@ -194,7 +194,16 @@ export function touchActionRects(vp) {
   const attack = rect('attack', cluster.x + cluster.w - attackW, cluster.y + cluster.h - attackH, attackW, attackH);
   const menuRect = rect('menu', w - MENU_INSET - menu.colW, h - 6 - menu.height, menu.colW, menu.height);
   const gap = menuRect.x - (attack.x + attack.w);
-  return { menu: menuRect, cluster, attack, gap, scale, right };
+  const talkW = 58 * scale;
+  const talkH = 58 * scale;
+  const talk = rect(
+    'talk',
+    cluster.x + (boxW - 150 - 58) * scale,
+    cluster.y + (boxH - 130 - 58) * scale,
+    talkW,
+    talkH,
+  );
+  return { menu: menuRect, cluster, attack, talk, gap, scale, right, boxW, boxH };
 }
 
 export function readQuestOpen(store) {

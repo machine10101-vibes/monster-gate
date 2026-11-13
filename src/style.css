@@ -719,6 +719,7 @@ body.touch #cast-buttons {
   right: 150px;
   bottom: 130px;
   border-color: #ffd23f;
+  z-index: 5;
 }
 .tbtn .ico {
   position: absolute;
