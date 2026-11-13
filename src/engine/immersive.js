@@ -8,6 +8,17 @@ export function isFullscreen() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
+/**
+ * iPhone, iPad, and iPadOS Safari in desktop mode (Macintosh + touch).
+ * That browser kills the tab and reloads it when the GPU budget is blown.
+ */
+export function isIOS() {
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/i.test(ua)) return true;
+  const touch = navigator.maxTouchPoints || 0;
+  return touch > 1 && (navigator.platform === 'MacIntel' || /Macintosh/i.test(ua));
+}
+
 /** iPad, including iPadOS Safari which presents itself as a desktop Mac. */
 export function isTablet() {
   const ua = navigator.userAgent || '';

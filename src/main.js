@@ -39,7 +39,34 @@ import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cl
 
 const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
-import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+
+/** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
+const BOOT_KEY = 'mg-boot';
+
+function bootWasKilled() {
+  try {
+    return sessionStorage.getItem(BOOT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markBoot() {
+  try {
+    sessionStorage.setItem(BOOT_KEY, '1');
+  } catch {
+    /* private mode */
+  }
+}
+
+function clearBoot() {
+  try {
+    sessionStorage.removeItem(BOOT_KEY);
+  } catch {
+    /* private mode */
+  }
+}
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
@@ -65,17 +92,29 @@ const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
 function pickQuality() {
   const saved = localStorage.getItem('mg-quality');
   const found = QUALITIES.find((q) => q.id === saved);
-  if (found) return found;
+  if (found && !isIOS()) return found;
+  // iPadOS reports a desktop Mac with many cores. A large screen at that
+  // setting blows the tab at the end of loading, and Safari restarts the page.
+  if (isIOS()) return found || QUALITIES[0];
   const touch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   const cores = navigator.hardwareConcurrency || 4;
   if (touch) return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
   return cores >= 8 ? QUALITIES[2] : QUALITIES[1];
 }
 
+/** Keep the iPad drawing buffer small enough that the first frame does not kill the tab. */
+function budgetFor(q) {
+  if (!isIOS()) return q;
+  return { ...q, dpr: 1, shadowSize: Math.min(q.shadowSize, 1024) };
+}
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('game');
-    this.quality = pickQuality();
+    const retry = isIOS() && bootWasKilled();
+    markBoot();
+    this.quality = budgetFor(retry ? QUALITIES[0] : pickQuality());
+    this.bootFrames = 0;
     this.hud = new HUD();
     this.audio = new Audio8();
     this.input = new Input(this.canvas);
@@ -149,7 +188,16 @@ class Game {
   }
 
   initRenderer() {
-    const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    // iPad Safari reloads the tab when the framebuffer peaks at the end of loading.
+    // No multisample buffer, and no preserved backbuffer, on that browser.
+    const ios = isIOS();
+    const r = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: !ios,
+      alpha: false,
+      powerPreference: ios ? 'default' : 'high-performance',
+      preserveDrawingBuffer: false,
+    });
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.NoToneMapping;
     r.shadowMap.enabled = true;
@@ -261,7 +309,8 @@ class Game {
     this.bindUI();
     this.applyQuality();
     progress(0.98, 'Ready');
-    this.renderer.compile(this.scene, this.camera);
+    // Compiling every shader at once is the spike that makes iPad Safari flash white and reload.
+    if (!isIOS()) this.renderer.compile(this.scene, this.camera);
     const account = readAccount();
     const klever = readSession();
     const session = account && klever
@@ -272,7 +321,7 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
-    if (this.charSelect?.active) this.renderer.compile(this.scene, this.camera);
+    if (!isIOS() && this.charSelect?.active) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
     document.getElementById('loading').classList.add('hidden');
@@ -2595,6 +2644,13 @@ class Game {
       }
       this.step(dt, raw / 1000);
       this.renderer.render(this.scene, this.camera);
+      if (this.bootFrames >= 0) {
+        this.bootFrames += 1;
+        if (this.bootFrames === 90) {
+          clearBoot();
+          this.bootFrames = -1;
+        }
+      }
     } catch (err) {
       this.reportFault(err);
     }
