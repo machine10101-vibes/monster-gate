@@ -311,7 +311,7 @@ export class HUD {
   clearPlates() {
     for (const id of [...this.plates.keys()]) this.removePlate(id);
   }
-  placePlate(id, x, y, visible) {
+  placePlate(id, x, y, visible, opts = {}) {
     const p = this.plates.get(id);
     if (!p) return;
     if (!visible) {
@@ -321,6 +321,10 @@ export class HUD {
     p.style.display = '';
     p.style.left = x.toFixed(0) + 'px';
     p.style.top = y.toFixed(0) + 'px';
+    if (opts.opacity != null) p.style.opacity = String(opts.opacity);
+    else p.style.opacity = '';
+    if (opts.zIndex != null) p.style.zIndex = String(opts.zIndex);
+    else p.style.zIndex = '';
   }
 
   drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null) {

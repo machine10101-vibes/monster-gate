@@ -2,6 +2,17 @@
 
 export const BACKUP_SUFFIX = '.bak';
 
+let frozen = false;
+
+/** Session-only debug: block hunt/roster writes without touching existing keys. */
+export function freezeSaves(on) {
+  frozen = !!on;
+}
+
+export function savesFrozen() {
+  return frozen;
+}
+
 function store() {
   try {
     if (typeof localStorage === 'undefined') return null;
@@ -49,6 +60,7 @@ export function readJson(key) {
 }
 
 export function writeJson(key, value) {
+  if (frozen) return;
   const ls = store();
   if (!ls) return;
   try {
@@ -59,6 +71,7 @@ export function writeJson(key, value) {
 }
 
 export function dropKey(key) {
+  if (frozen) return;
   const ls = store();
   if (!ls) return;
   try {

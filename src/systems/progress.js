@@ -2,7 +2,7 @@ import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, g
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_FROM_LOG, SHAFT_IDS, SKILL_ORDER, SMELTS, levelForXp, xpForLevel } from '../data/gathering.js';
 import { PORTAL_IDS } from '../data/portals.js';
-import { readJson } from './saveio.js';
+import { readJson, savesFrozen } from './saveio.js';
 
 const ANON_KEY = 'monster-gate-hunter-v1';
 
@@ -51,6 +51,7 @@ export class Progress {
     this.revision = 0;
     this.onCloud = null;
     this.saveWarning = null;
+    this.sessionOnly = false;
     this.loadRaw(readRaw(ANON_KEY, this));
   }
 
@@ -102,6 +103,7 @@ export class Progress {
   }
 
   save(echo = true) {
+    if (this.sessionOnly || savesFrozen()) return;
     if (echo) this.data.savedAt = Date.now();
     try {
       localStorage.setItem(saveKey(this.address), JSON.stringify(this.data));

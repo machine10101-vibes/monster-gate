@@ -233,6 +233,29 @@ test('reconnect intent asks the mock transport to come back online', () => {
   assert.equal(feed.status, STATUS.reconnecting);
 });
 
+test('hunter nameplates offset overlaps, cull extras, and fade with distance', () => {
+  const game = stubGame();
+  const placed = [];
+  game.hud.placePlate = (id, x, y, vis, opts) => placed.push({ id, x, y, vis, opts });
+  game.screenOf = () => [120, 80, true];
+  const view = new WorldView(game, { spawnRemote: stubRemote });
+  view.live = true;
+  view.applySnapshot([
+    { id: 'near', name: 'Ann', x: 73, y: 3, z: 73 },
+    { id: 'stack', name: 'Bea', x: 73.2, y: 3, z: 73.1 },
+    { id: 'far', name: 'Cam', x: 120, y: 3, z: 120 },
+  ]);
+  placed.length = 0;
+  view.update(0);
+  const shown = placed.filter((p) => p.vis);
+  const hidden = placed.filter((p) => !p.vis);
+  assert.ok(shown.length >= 1);
+  assert.ok(shown.length <= 2);
+  assert.equal(new Set(shown.map((p) => p.y)).size, shown.length);
+  assert.ok(shown.every((p) => p.opts?.opacity >= 0.35));
+  assert.ok(hidden.some((p) => p.id.includes('far') || p.id.endsWith('far')));
+});
+
 test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () => {
   const viewSrc = src('../src/net/worldView.js');
   assert.doesNotMatch(viewSrc, /WebSocket/);

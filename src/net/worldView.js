@@ -459,24 +459,57 @@ export class WorldView {
       this.emit({ type: 'zone', zone: z });
       this.paintChat();
     }
+    const tags = [];
     for (const row of this.actors.values()) {
       if (row.sayT > 0) {
         row.sayT -= dt;
         if (row.sayT <= 0) row.say = '';
       }
-      this.placeTag(row);
+      const tag = this.placeTag(row);
+      if (tag) tags.push(tag);
     }
+    this.layoutHunterTags(tags);
   }
 
   placeTag(row) {
     const g = this.game;
-    if (!g?.hud || !row.remote?.ready) return;
+    if (!g?.hud || !row.remote?.ready) return null;
     const r = row.remote;
     const [sx, sy, vis] = g.screenOf(r.x, r.y + 2.2, r.z, true);
     const d = Math.hypot(r.x - g.player.pos.x, r.z - g.player.pos.z);
     const bubble = row.say && row.sayT > 0 ? `<i class="say">${escapeHtml(row.say)}</i>` : '';
     g.hud.plate(r.id, `${escapeHtml(row.name)}${bubble}`, 'hunter');
-    g.hud.placePlate(r.id, sx, sy, vis && d < 28);
+    return { id: r.id, sx, sy, vis, d };
+  }
+
+  layoutHunterTags(tags) {
+    const g = this.game;
+    if (!g?.hud) return;
+    const rows = tags.slice().sort((a, b) => a.d - b.d);
+    const used = [];
+    const hit = (x, y) => used.some((u) => Math.abs(u.x - x) < 88 && Math.abs(u.y - y) < 22);
+    for (const t of rows) {
+      const fade = t.d >= 26 ? 0 : t.d <= 10 ? 1 : 1 - (t.d - 10) / 16;
+      if (!t.vis || fade < 0.18) {
+        g.hud.placePlate(t.id, t.sx, t.sy, false);
+        continue;
+      }
+      let y = t.sy;
+      let n = 0;
+      while (n < 6 && hit(t.sx, y)) {
+        y -= 22;
+        n += 1;
+      }
+      if (hit(t.sx, y)) {
+        g.hud.placePlate(t.id, t.sx, t.sy, false);
+        continue;
+      }
+      used.push({ x: t.sx, y });
+      g.hud.placePlate(t.id, t.sx, y, true, {
+        opacity: Math.max(0.35, fade),
+        zIndex: Math.max(1, 80 - Math.floor(t.d)),
+      });
+    }
   }
 
   emitMove() {

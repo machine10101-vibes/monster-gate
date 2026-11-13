@@ -29,12 +29,14 @@ uniform float uHideRadius;`
         '#include <clipping_planes_fragment>',
         `#include <clipping_planes_fragment>
 {
-  float hd = distance(gl_FragCoord.xy, uPlayerScreen);
-  if (vHideDepth < uPlayerDepth - 1.4 && hd < uHideRadius) {
-    float t = hd / uHideRadius;
+  vec2 dlt = gl_FragCoord.xy - uPlayerScreen;
+  dlt.y *= 0.62;
+  float hd = length(dlt);
+  if (vHideDepth < uPlayerDepth - 0.8 && hd < uHideRadius) {
+    float t = clamp(hd / uHideRadius, 0.0, 1.0);
     vec2 pp = floor(gl_FragCoord.xy / 2.0);
     float bayer = fract(52.9829189 * fract(dot(pp, vec2(0.06711056, 0.00583715))));
-    if (bayer > t * t * 1.15) discard;
+    if (bayer > t * t * 0.92) discard;
   }
 }`
       );

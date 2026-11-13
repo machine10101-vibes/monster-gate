@@ -17,6 +17,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
+import { attachDebug } from './debug/flags.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { Progress } from './systems/progress.js';
@@ -1151,7 +1152,11 @@ class Game {
     this.camera.fov = w / h < 1.2 ? 46 : 38;
     this.camera.updateProjectionMatrix();
     this.pxScale = this.renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
-    hideUniforms.uHideRadius.value = Math.max(60, this.renderer.domElement.height * 0.09);
+    const cw = this.renderer.domElement.width;
+    const ch = this.renderer.domElement.height;
+    hideUniforms.uHideRadius.value = Math.max(180, Math.min(cw, ch) * 0.42);
+    const ui = Math.max(1, Math.min(1.5, h / 820));
+    document.documentElement.style.setProperty('--ui', ui.toFixed(3));
   }
 
   adaptResolution(rawMs) {
@@ -2981,6 +2986,7 @@ class Game {
 const game = new Game();
 window.__game = game;
 try {
+  attachDebug(game);
   const q = new URLSearchParams(location.search);
   if (q.get('mmo') === '1') {
     import('./net/worldView.js').then(async (m) => {
