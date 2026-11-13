@@ -1129,11 +1129,11 @@ body.mmo-view #top-left {
   }
   body.touch #touch-btns,
   body.touch #hud #touch-btns {
-    width: 180px;
-    height: 160px;
+    width: 220px;
+    height: 200px;
     right: var(--hud-action-right);
     transform-origin: bottom right;
-    transform: scale(calc(var(--ui) * 0.92));
+    transform: scale(calc(var(--ui) * 0.82));
   }
   body.touch #world-chat {
     left: calc(8px + 142px * 0.78 + 8px + var(--safe-l));

@@ -22,6 +22,10 @@ https://monstergate.online/?debug=1
 https://monstergate.online/?debug=1&tp=oakhollow
 https://monstergate.online/?debug=1&unlock=1&tp=hellspire
 https://monstergate.online/?debug=1&tp=greyrock
+https://monstergate.online/?debug=1&tp=crate
+https://monstergate.online/?debug=1&tp=plaza
+https://monstergate.online/?debug=1&tp=lira
+https://monstergate.online/?debug=1&tp=dalla
 https://monstergate.online/?mockwallet=1
 https://monstergate.online/?mockwallet=klv1fpwjz234gy8aaae3gx0e8q9f52vymzzn3z5q0s5h60pvktzx0n0qwvtux5
 ```
@@ -49,5 +53,9 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `hellspire` | `hellspire keep` | Demon Knight keep courtyard |
 | `dawnspire` | `dawnspire keep` | Holy Knight keep courtyard |
 | `endlessfield` | `endless`, `warfield` | Endless Field between the keeps |
+| `crate` | `storage`, `storage crate` | Next to the Storage Crate; Mira's nameplate stays in view |
+| `plaza` | `square` | Between Lira's stall and Dalla's Market |
+| `lira` | `alchemy`, `alchemist` | In front of Lira the Alchemist |
+| `dalla` | `market`, `dalla's market` | In front of Dalla's Market |
 
-Keys are case-insensitive. Spaces, `_`, and `-` are ignored.
+Keys are case-insensitive. Spaces, `_`, and `-` are ignored. Teleports never write the hunter save. They are inert without `debug=1`, and with `mmo=1` or world-view.

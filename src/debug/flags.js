@@ -49,6 +49,12 @@ function paramsOf(search) {
   return new URLSearchParams(q);
 }
 
+/** Village stand-ins. Live world x/z plus dx/dz so we never spawn inside the prop. */
+const CRATE_STAND = { x: 68.8, z: 73.2, dx: 1.4, dz: -1.0 };
+const PLAZA_STAND = { x: 74.1, z: 84.0 };
+const LIRA_STAND = { x: 72.2, z: 85.0, dx: 1.0, dz: 1.2 };
+const DALLA_STAND = { x: 77.0, z: 85.6, dx: 0, dz: 1.4 };
+
 export const DEBUG_SPOTS = {
   oakhollow: { x: 72, z: 72.5 },
   goldenmeadow: { kind: 'goldmead' },
@@ -61,6 +67,10 @@ export const DEBUG_SPOTS = {
   hellspire: { live: 'demonKeep', kind: 'hellspire' },
   dawnspire: { live: 'holyKeep', kind: 'dawnspire' },
   endlessfield: { live: 'warfield', kind: 'warfield' },
+  crate: { live: 'storage', x: CRATE_STAND.x, z: CRATE_STAND.z, dx: CRATE_STAND.dx, dz: CRATE_STAND.dz },
+  plaza: { x: PLAZA_STAND.x, z: PLAZA_STAND.z },
+  lira: { live: 'alchemy', x: LIRA_STAND.x, z: LIRA_STAND.z, dx: LIRA_STAND.dx, dz: LIRA_STAND.dz },
+  dalla: { live: 'market', x: DALLA_STAND.x, z: DALLA_STAND.z, dx: DALLA_STAND.dx, dz: DALLA_STAND.dz },
 };
 
 export const DEBUG_ALIASES = {
@@ -84,6 +94,15 @@ export const DEBUG_ALIASES = {
   endless: 'endlessfield',
   warfield: 'endlessfield',
   'endless field': 'endlessfield',
+  storage: 'crate',
+  storagecrate: 'crate',
+  'storage crate': 'crate',
+  square: 'plaza',
+  alchemy: 'lira',
+  alchemist: 'lira',
+  market: 'dalla',
+  dallamarket: 'dalla',
+  "dalla's market": 'dalla',
 };
 
 export function parseDebugFlags(search = '') {
@@ -122,7 +141,11 @@ export function resolveSpot(raw, world) {
   if (spec.live && world) {
     const live = world[spec.live];
     if (live && Number.isFinite(Number(live.x)) && Number.isFinite(Number(live.z))) {
-      return { id, x: Number(live.x), z: Number(live.z) };
+      return {
+        id,
+        x: Number(live.x) + (Number(spec.dx) || 0),
+        z: Number(live.z) + (Number(spec.dz) || 0),
+      };
     }
   }
   if (spec.kind) {
@@ -537,6 +560,7 @@ function bindDebugSpawn(game) {
 }
 
 export function teleportDebug(game, raw) {
+  if (debugOnlineBlocked(game)) return null;
   const spot = resolveSpot(raw, game?.world);
   if (!spot || !game?.player?.pos) return null;
   if (game.world && game.world.realm && game.world.realm !== 'over') {
@@ -584,6 +608,12 @@ function applySession(game, flags) {
 export function attachDebug(game, search) {
   const src = search ?? (typeof location !== 'undefined' ? location.search : '');
   const flags = parseDebugFlags(src);
+  if (game?.mmo || game?.worldView) {
+    if (flags.enabled || flags.blocked) {
+      console.warn('[Monster Gate] Debug flags (?debug=1, &tp=, &unlock=1, spawn, F9) are ignored while ?mmo=1 or world-view is present, so the world-view session is not teleported, unlocked, spawned, or badged. World 1 rejects debug messages with error code debug.');
+    }
+    return null;
+  }
   if (flags.blocked) {
     console.warn('[Monster Gate] Debug flags (?debug=1, &tp=, &unlock=1, spawn, F9) are ignored while ?mmo=1 is present, so the world-view session is not teleported, unlocked, spawned, or badged. World 1 rejects debug messages with error code debug.');
     return null;
