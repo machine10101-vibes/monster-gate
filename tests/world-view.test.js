@@ -221,8 +221,13 @@ test('mock crowd wears distinct gear and chats on both channels', () => {
   assert.equal(snaps[0].meta.online, 24);
   assert.ok(players.some((p) => p.armor.helm === 'budgeset'));
   assert.ok(players.some((p) => p.held === 'wand'));
+  const names = HUNTERS.map((h) => h.name);
+  assert.ok(names.includes('Sera') && names.includes('Corvin') && names.includes('Tamsin'));
+  assert.equal(names.includes('Lira'), false);
+  assert.equal(names.includes('Dalla'), false);
+  assert.equal(names.includes('Mira'), false);
   feed.say('world', { id: 'bram', name: 'Bram' }, 'Forge is hot.');
-  feed.say('zone', { id: 'lira', name: 'Lira' }, 'At the well.');
+  feed.say('zone', { id: 'sera', name: 'Sera' }, 'At the well.');
   assert.equal(chats[0].channel, 'world');
   assert.equal(chats[1].channel, 'zone');
   feed.send({ type: 'chat', channel: 'world', text: 'I am here' });
@@ -243,7 +248,9 @@ test('reconnect intent asks the mock transport to come back online', () => {
 test('hunter nameplates offset overlaps, cull extras, and fade with distance', () => {
   const game = stubGame();
   const placed = [];
+  let laid = 0;
   game.hud.placePlate = (id, x, y, vis, opts) => placed.push({ id, x, y, vis, opts });
+  game.hud.layoutInteractPlates = () => { laid += 1; };
   game.screenOf = () => [120, 80, true];
   const view = new WorldView(game, { spawnRemote: stubRemote });
   view.live = true;
@@ -258,9 +265,22 @@ test('hunter nameplates offset overlaps, cull extras, and fade with distance', (
   const hidden = placed.filter((p) => !p.vis);
   assert.ok(shown.length >= 1);
   assert.ok(shown.length <= 2);
-  assert.equal(new Set(shown.map((p) => p.y)).size, shown.length);
   assert.ok(shown.every((p) => p.opts?.opacity >= 0.35));
   assert.ok(hidden.some((p) => p.id.includes('far') || p.id.endsWith('far')));
+  assert.ok(laid >= 1, 'hunter plates go through the shared nameplate declutter');
+});
+
+test('a mock chat send from you is marked local and opens a player bubble', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote });
+  view.live = true;
+  view.pushChat({ channel: 'world', from: { id: 'you', name: 'Test' }, text: 'test' });
+  assert.equal(view.localSay, 'test');
+  assert.ok(view.localSayT > 0);
+  const wv = src('../src/net/worldView.js');
+  assert.match(wv, /wc-you/);
+  assert.match(wv, /local-chat/);
+  assert.match(wv, /layoutInteractPlates/);
 });
 
 test('waking overlay is inert without ?mmo=1', () => {

@@ -854,7 +854,7 @@ body.touch #top-right {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 #nameplates {
   z-index: 4;
@@ -3811,6 +3811,46 @@ body.touch .panel-card.adventures #panel-body {
   display: flex;
 }
 
+/* Large touch screens: keep a centered, desktop-sized sheet, not a stretched phone overlay. */
+@media (min-width: 1024px) and (min-height: 640px) {
+  body.touch #panel {
+    align-items: center;
+    justify-content: center;
+    padding:
+      max(18px, var(--safe-t))
+      max(18px, var(--safe-r))
+      max(18px, var(--safe-b))
+      max(18px, var(--safe-l));
+  }
+  body.touch .panel-card,
+  body.touch .panel-card.wide,
+  body.touch .panel-card.adventures {
+    flex: 0 1 auto;
+    width: min(560px, 92vw);
+    max-width: min(560px, 92vw);
+    min-height: 0;
+    max-height: min(86vh, 900px);
+    margin: 0 auto;
+  }
+  body.touch .panel-card.wide {
+    width: min(900px, 94vw);
+    max-width: min(900px, 94vw);
+  }
+  body.touch .panel-card.adventures {
+    width: min(1080px, 94vw);
+    max-width: min(1080px, 94vw);
+    max-height: min(760px, 86vh);
+  }
+  body.touch .panel-card h2 {
+    padding: 16px 56px 10px 18px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  body.touch .panel-card p,
+  body.touch .panel-card li { font-size: 16px; line-height: 1.45; }
+  body.touch #panel-body { padding: 14px 16px 4px; }
+}
+
 .qj {
   position: relative;
   display: flex;
@@ -4279,6 +4319,18 @@ body.touch #dialog { z-index: 74; }
   -webkit-overflow-scrolling: touch;
 }
 #world-chat .wc-log p { margin: 0 0 4px; }
+#world-chat .wc-log p.wc-you {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 4px -4px 0;
+  padding: 4px 6px;
+  background: rgba(18, 48, 58, 0.96);
+  border: 1px solid #7ef6ff;
+  border-radius: 4px;
+  color: #e8fbff;
+}
+#world-chat .wc-log p.wc-you b { color: #7ef6ff; }
 #world-chat .wc-log b {
   color: #ffd23f;
   font-weight: 600;
@@ -4325,16 +4377,18 @@ body.touch #dialog { z-index: 74; }
 .nameplate.hunter.party { color: #ffe27a; }
 .nameplate .say {
   display: block;
-  margin: 4px auto 0;
-  padding: 3px 6px;
+  box-sizing: border-box;
+  margin: 5px auto 0;
+  padding: 6px 8px 5px;
   max-width: 180px;
+  overflow: visible;
   white-space: normal;
   background: rgba(8, 12, 16, 0.88);
-  border: 1px solid #7ef6ff;
+  border: 1px solid var(--mg-gold, #c6a15a);
   border-radius: 4px;
   color: #e8fbff;
   font-size: var(--plate-sub);
-  line-height: 1.3;
+  line-height: 1.45;
   text-align: center;
 }
 

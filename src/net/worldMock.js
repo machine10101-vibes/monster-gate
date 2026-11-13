@@ -14,13 +14,13 @@ const HUNTERS = [
     lines: { world: 'Forge is hot. Bring scales.', zone: 'Oakhollow well, five minutes.' },
   },
   {
-    id: 'lira', name: 'Lira', held: 'wand', sheath: 'wand',
+    id: 'sera', name: 'Sera', held: 'wand', sheath: 'wand',
     look: { skin: 0, hair: 5, style: 2, tunic: 4, beard: false },
     armor: { helm: 'darkcloth', chest: 'darkcloth', arms: 'darkcloth', legs: 'darkcloth', boots: 'darkcloth', book: 'darkcloth' },
     lines: { world: 'Spirit philters, two gold off.', zone: 'Do not drink the river.' },
   },
   {
-    id: 'dalla', name: 'Dalla', held: 'bow', sheath: 'bow',
+    id: 'corvin', name: 'Corvin', held: 'bow', sheath: 'bow',
     look: { skin: 1, hair: 3, style: 0, tunic: 5, beard: false },
     armor: { helm: 'budgeleather', chest: 'budgeleather', arms: 'budgeleather', legs: 'budgeleather', boots: 'budgeleather' },
     lines: { world: 'Anyone selling Budge hide?', zone: 'Pumpkin stall is open.' },
@@ -44,7 +44,7 @@ const HUNTERS = [
     lines: { world: 'Maple logs at the wood.', zone: 'I am by the birch grove.' },
   },
   {
-    id: 'mira', name: 'Mira', held: 'tome', sheath: 'tome',
+    id: 'tamsin', name: 'Tamsin', held: 'tome', sheath: 'tome',
     look: { skin: 0, hair: 2, style: 2, tunic: 6, beard: false },
     armor: { helm: 'yeticloth', chest: 'yeticloth', arms: 'yeticloth', legs: 'yeticloth', boots: 'yeticloth', book: 'yeticloth' },
     lines: { world: 'Who has a gloom core?', zone: 'Guild steps. Do not be late.' },
