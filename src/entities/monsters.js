@@ -12,6 +12,10 @@ import { clamp, lerp, RNG } from '../engine/voxel.js';
 import { statusFx } from '../systems/skillfx.js';
 import { debugTankHpLabel } from '../debug/flags.js';
 import { ZONE, GATE, TOWN, WATER_Y, CENTER, MINE, LAKE } from '../world/terrain.js';
+import {
+  BUDGE_CAP, BUDGE_LEVEL, consumeBudgeReady, budgeSpawnAllowance, isOverworldBudge,
+  liveOverworldBudgeCount, pickBudgeWorldSpot, scheduleBudgeRespawn,
+} from '../data/budgeSpawn.js';
 
 const TAU = Math.PI * 2;
 function angDiff(a, b) {
@@ -59,7 +63,7 @@ const DEFS = {
   voidslime: { name: 'Void Slime', hp: 26, radius: 0.55, speed: 3.0, dmg: 3, gold: [4, 8], aggro: 11, build: () => buildSlime('purple') },
   boar: { name: 'Thorn Boar', hp: 38, radius: 0.7, speed: 2.5, dmg: 3, gold: [5, 10], aggro: 10, build: buildBoar },
   wraith: { name: 'Gate Wraith', hp: 24, radius: 0.5, speed: 2.2, dmg: 2, gold: [6, 12], aggro: 13, build: buildWraith },
-  budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
+  budgedragon: { name: 'Green Budge Dragon', hp: 148, radius: 0.85, speed: 3.1, dmg: 6, gold: [32, 52], aggro: 16, level: BUDGE_LEVEL, build: buildBudgeDragon },
   darksycledragon: { name: 'Darksycle Dragon', hp: 155, radius: 1.9, speed: 2.7, dmg: 5, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
   snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
   demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 5, gold: [90, 140], aggro: 14, build: buildDemonKnight },
@@ -84,6 +88,7 @@ export class Monster {
     const d = DEFS[type];
     this.def = d;
     this.name = d.name;
+    this.level = d.level || 0;
     this.radius = d.radius;
     this.maxHp = d.hp;
     this.hp = d.hp;
@@ -311,6 +316,7 @@ export class Monster {
     const g = this.game;
     this.dead = true;
     this.deadT = 0;
+    if (this.type === 'budgedragon') g.spawner?.noteBudgeDeath(this);
     g.onMonsterKilled(this);
     g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, familyFx(this.type) ? familyFx(this.type).death : this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : this.type === 'darksycledragon' ? [0xb25cff, 0xd8d3ee, 0x2b2450] : this.type === 'snowyeti' ? [0xb4d0e6, 0xe6f9ff, 0x7fd0ff, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0xff3a1a, 0xff8a2a, 0xffffff] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0x6fb8ff, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
     g.audio.pop();
@@ -1511,10 +1517,12 @@ export class Monster {
     if (this.flash > 0) this.model.mat.emissive.setRGB(0.38, 0.32, 0.22);
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'scorpion' && this.state === 'stingwind') && !(this.type === 'darksycledragon' && this.airCharge) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
-    if ((this.debugTank && !this.dead) || (dist < 14 && this.hp < this.maxHp)) {
+    const showBudge = this.type === 'budgedragon' && !this.dead && dist < 18;
+    if ((this.debugTank && !this.dead) || (dist < 14 && this.hp < this.maxHp) || showBudge) {
       const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 6.0 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
       const hpNum = this.debugTank ? `<small>${debugTankHpLabel(this)}</small>` : '';
-      g.hud.plate(this.id, `${this.name}${hpNum}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
+      const lv = this.level ? `Lv ${this.level} ` : '';
+      g.hud.plate(this.id, `${lv}${this.name}${hpNum}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis);
     } else g.hud.removePlate(this.id);
   }
@@ -1774,6 +1782,7 @@ export class Spawner {
     this.timer = 1;
     this.rng = new RNG(4242);
     this.max = 9;
+    this.budgeReady = [];
     const penned = (game.world?.chickenNests || []).map((n) => ({ x: n.x, z: n.z, t: 0, pen: n.pen }));
     this.nests = CHICKEN_NESTS.map(([x, z]) => ({ x, z, t: 0 })).concat(penned);
   }
@@ -1783,7 +1792,6 @@ export class Spawner {
     const spots = [
       ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
       ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70], ['slime', 76, 102],
-      ['budgedragon', 120, 74],
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
     this.fillChickens(99);
@@ -1824,6 +1832,7 @@ export class Spawner {
       const den = this.spawn('darksycledragon', w.cave.nest.x, w.cave.nest.z, false);
       den.realm = 'cave';
     }
+    this.seedBudges();
   }
 
   spawn(type, x, z, fx = true) {
@@ -1835,6 +1844,34 @@ export class Spawner {
       g.fx.ring(x, m.y + 0.1, z, 0xc27bff, 16, 4, 0.1, 0.5);
     }
     return m;
+  }
+
+  budgeSpot(minFromPlayer = 22) {
+    const g = this.game;
+    return pickBudgeWorldSpot(g.world, this.rng, g.player?.pos, g.monsters.filter(isOverworldBudge), minFromPlayer);
+  }
+
+  seedBudges() {
+    for (let i = 0; i < BUDGE_CAP; i++) {
+      const at = this.budgeSpot(0);
+      if (!at) break;
+      this.spawn('budgedragon', at.x, at.z, false);
+    }
+  }
+
+  fillBudges() {
+    const g = this.game;
+    const now = Date.now();
+    const live = liveOverworldBudgeCount(g.monsters);
+    if (budgeSpawnAllowance(now, live, this.budgeReady) < 1) return;
+    const at = this.budgeSpot();
+    if (!at) return;
+    this.budgeReady = consumeBudgeReady(now, this.budgeReady);
+    this.spawn('budgedragon', at.x, at.z);
+  }
+
+  noteBudgeDeath(m) {
+    this.budgeReady = scheduleBudgeRespawn(Date.now(), this.budgeReady, m?.realm);
   }
 
   pickSpot() {
@@ -1882,7 +1919,8 @@ export class Spawner {
     this.fillWarden();
     this.fillJungle();
     this.fillDesert();
-    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
+    this.fillBudges();
+    const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && m.type !== 'budgedragon' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
     if (alive >= this.max) return;
     const spot = this.pickSpot();
     if (!spot) return;
@@ -1891,8 +1929,6 @@ export class Spawner {
     if (spot.nearGate) type = r < 0.35 ? 'voidslime' : r < 0.7 ? 'wraith' : 'slime';
     else type = r < 0.45 ? 'slime' : r < 0.85 ? 'boar' : 'voidslime';
     if (g.sky.night > 0.6 && r > 0.6) type = 'wraith';
-    const drakes = g.monsters.filter((m) => !m.dead && m.type === 'budgedragon').length;
-    if (!spot.nearGate && drakes < 2 && this.rng.next() < 0.3) type = 'budgedragon';
     this.spawn(type, spot.x, spot.z);
     if (spot.nearGate) g.audio.portal();
   }

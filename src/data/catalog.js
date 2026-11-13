@@ -1,6 +1,7 @@
 /** Everything the Hunter Catalog knows about: monsters, their parts, and what the parts make. */
 import { KNIGHT_LORE, GEAR_DROPS } from './knights.js';
 import { METALS, metalArmorPieces, metalSetDef, metalWeapons } from './metals.js';
+import { BUDGE_LEVEL, BUDGE_STR } from './budgeSpawn.js';
 export { GEAR_DROPS };
 
 export const MATERIALS = {
@@ -116,8 +117,8 @@ export const MONSTERS = [
     desc: 'A hooded shade that keeps its distance and hurls spirit orbs.',
   },
   {
-    id: 'budgedragon', name: 'Green Budge Dragon', level: 4, temper: 'Mean', style: 'Brawler', habitat: 'Open fields and forest edge',
-    desc: 'A stocky, short-fused young dragon with more attitude than altitude. It snaps at anything that moves, spits embers when you back off, and flies into a rage when hurt.',
+    id: 'budgedragon', name: 'Green Budge Dragon', level: BUDGE_LEVEL, temper: 'Mean', style: 'Brawler', habitat: 'Roams the whole world. Never more than ten at once; a slain one returns after thirty minutes.',
+    desc: 'A stocky, short-fused dragon that hunts every land, not just the gate. It snaps at anything that moves, spits embers when you back off, and flies into a rage when hurt. Its fang and scale make mid-tier gear that wants Strength 8.',
   },
   {
     id: 'orcscout', name: 'Orc Scout', level: 4, temper: 'Mean', style: 'Melee', habitat: 'The spiked camp in northwest Brookside, west of Oakhollow',
@@ -195,47 +196,55 @@ export const GEAR = [
     id: 'budgeblade', type: 'weapon', wtype: 'onesword', name: 'Budgefang Blade', monster: 'budgedragon', held: 'budgeblade',
     desc: 'A sword grown from a single dragon fang, veined with ember-green light. Quick, balanced, and it never dulls.',
     recipe: { budgefang: 3, budgescale: 2, budgeclaw: 1 },
-    item: { id: 'budgeblade', icon: 'budgeblade', name: 'Budgefang Blade', kind: 'melee', style: 'swordshield', dmg: 16, reach: 2.5, arc: 2.0, dur: 0.38, hit: 0.16, stam: 9, knock: 5, held: 'budgeblade', desc: 'Sword and shield. Dragon-fang steel.' },
-    stats: [['Damage', 16], ['Reach', '2.5'], ['Style', 'Sword & Shield']],
+    reqLevel: BUDGE_STR,
+    item: { id: 'budgeblade', icon: 'budgeblade', name: 'Budgefang Blade', kind: 'melee', style: 'swordshield', dmg: 18, reach: 2.5, arc: 2.0, dur: 0.38, hit: 0.16, stam: 9, knock: 5, held: 'budgeblade', desc: 'Sword and shield. Dragon-fang steel.' },
+    stats: [['Damage', 18], ['Reach', '2.5'], ['Style', 'Sword & Shield'], ['Requires', `Strength ${BUDGE_STR}`]],
   },
   {
     id: 'budgemaul', type: 'weapon', wtype: 'hammer', name: 'Horn Maul', monster: 'budgedragon', held: 'budgemaul',
     desc: 'Scale-banded head, a tusk of budge horn on each side and a spike up front. It hits like a tantrum.',
     recipe: { budgehorn: 2, budgescale: 4, budgehide: 1 },
-    item: { id: 'budgemaul', icon: 'budgemaul', name: 'Horn Maul', kind: 'melee', style: 'twohand', dmg: 22, reach: 2.5, arc: 2.4, dur: 0.72, hit: 0.34, stam: 16, knock: 9, held: 'budgemaul', desc: 'Two-handed. Slow, brutal, and tusked.' },
-    stats: [['Damage', 22], ['Reach', '2.5'], ['Style', 'Two-Handed']],
+    reqLevel: 10,
+    item: { id: 'budgemaul', icon: 'budgemaul', name: 'Horn Maul', kind: 'melee', style: 'twohand', dmg: 24, reach: 2.5, arc: 2.4, dur: 0.72, hit: 0.34, stam: 16, knock: 9, held: 'budgemaul', desc: 'Two-handed. Slow, brutal, and tusked.' },
+    stats: [['Damage', 24], ['Reach', '2.5'], ['Style', 'Two-Handed'], ['Requires', 'Strength 10']],
   },
   {
     id: 'budgebow', type: 'weapon', wtype: 'longbow', name: 'Wyrmhorn Bow', monster: 'budgedragon', held: 'budgebow',
     desc: 'Horn limbs, a scale-wrapped grip and claw-tipped ends. Arrows leave it faster and hit harder.',
     recipe: { budgehorn: 1, budgehide: 2, budgeclaw: 2 },
-    item: { id: 'budgebow', icon: 'budgebow', name: 'Wyrmhorn Bow', kind: 'ranged', style: 'longbow', dmg: 12, dur: 0.46, stam: 7, held: 'budgebow', desc: 'A longbow of horn and hide.' },
-    stats: [['Damage', 12], ['Range', 'Long'], ['Style', 'Longbow']],
+    reqLevel: BUDGE_STR,
+    item: { id: 'budgebow', icon: 'budgebow', name: 'Wyrmhorn Bow', kind: 'ranged', style: 'longbow', dmg: 15, dur: 0.46, stam: 7, held: 'budgebow', desc: 'A longbow of horn and hide.' },
+    stats: [['Damage', 15], ['Range', 'Long'], ['Style', 'Longbow'], ['Requires', `Strength ${BUDGE_STR}`]],
   },
   {
-    id: 'budgehelm', type: 'armor', slot: 'helm', name: 'Budgescale Helm', monster: 'budgedragon', set: 'budgeset', def: 1,
+    id: 'budgehelm', type: 'armor', slot: 'helm', name: 'Budgescale Helm', monster: 'budgedragon', set: 'budgeset', def: 2,
     desc: 'A snarling dragon-skull cap with swept horns and a gilded brow plate.',
     recipe: { budgescale: 3, budgehorn: 1, budgefang: 1 },
+    reqLevel: BUDGE_STR,
   },
   {
-    id: 'budgechest', type: 'armor', slot: 'chest', name: 'Budgescale Cuirass', monster: 'budgedragon', set: 'budgeset', def: 3,
+    id: 'budgechest', type: 'armor', slot: 'chest', name: 'Budgescale Cuirass', monster: 'budgedragon', set: 'budgeset', def: 4,
     desc: 'Layered green scales over a gold-banded belly plate.',
     recipe: { budgescale: 8, budgehide: 3 },
+    reqLevel: BUDGE_STR,
   },
   {
-    id: 'budgearms', type: 'armor', slot: 'arms', name: 'Budgescale Gauntlets', monster: 'budgedragon', set: 'budgeset', def: 1,
+    id: 'budgearms', type: 'armor', slot: 'arms', name: 'Budgescale Gauntlets', monster: 'budgedragon', set: 'budgeset', def: 2,
     desc: 'Scaled vambraces and a horn-spiked pauldron. The knuckles come with claws.',
     recipe: { budgescale: 4, budgeclaw: 2, budgehide: 1 },
+    reqLevel: BUDGE_STR,
   },
   {
-    id: 'budgelegs', type: 'armor', slot: 'legs', name: 'Budgescale Greaves', monster: 'budgedragon', set: 'budgeset', def: 2,
+    id: 'budgelegs', type: 'armor', slot: 'legs', name: 'Budgescale Greaves', monster: 'budgedragon', set: 'budgeset', def: 3,
     desc: 'Banded thigh plates with a spiked knee guard.',
     recipe: { budgescale: 5, budgehide: 2 },
+    reqLevel: BUDGE_STR,
   },
   {
-    id: 'budgeboots', type: 'armor', slot: 'boots', name: 'Budgescale Boots', monster: 'budgedragon', set: 'budgeset', def: 1,
+    id: 'budgeboots', type: 'armor', slot: 'boots', name: 'Budgescale Boots', monster: 'budgedragon', set: 'budgeset', def: 2,
     desc: 'Clawed toes grip the dirt. They look better than they smell.',
     recipe: { budgescale: 3, budgeclaw: 1, budgehide: 1 },
+    reqLevel: BUDGE_STR,
   },
   {
     id: 'darkscythe', type: 'weapon', wtype: 'scythe', name: 'Darksycle Scythe', monster: 'darksycledragon', held: 'darkscythe',
@@ -309,14 +318,15 @@ function weapon(id, wtype, name, monster, desc, recipe, it, extra = {}) {
 const M = (style, dmg, reach, arc, dur, hit, stam, knock, blurb) => ({ kind: 'melee', style, dmg, reach, arc, dur, hit, stam, knock, blurb });
 const R = (style, dmg, dur, stam, blurb, extra = {}) => ({ kind: 'ranged', style, dmg, dur, stam, blurb, ...extra });
 
+const BR = (n = BUDGE_STR) => ({ reqLevel: n });
 GEAR.push(
-  weapon('budgegreatsword', 'twosword', 'Fangreaver Greatsword', 'budgedragon', 'A broadsword of fused dragon fang with a serrated back edge, tusked crossguard and an ember vein down the fuller.', { budgefang: 4, budgehorn: 1, budgescale: 3, budgehide: 1 }, M('twohand', 20, 2.8, 2.5, 0.62, 0.28, 14, 8, 'Two-handed. Heavy fang steel.')),
-  weapon('budgedual', 'dual', 'Twin Fangs', 'budgedragon', 'A matched pair of curved fang blades with scale-wrapped grips. Fast, wicked, and never apart.', { budgefang: 4, budgeclaw: 2, budgescale: 2 }, M('dual', 9, 2.2, 1.8, 0.28, 0.12, 6, 3, 'Dual swords. Rapid fang strikes.')),
-  weapon('budgespear', 'spear', 'Horncollar Spear', 'budgedragon', 'A fang spearhead above a horn collar and a hide-wrapped shaft. Nothing out-reaches it.', { budgefang: 2, budgehorn: 1, budgescale: 2, budgehide: 2 }, M('twohand', 15, 3.3, 1.0, 0.46, 0.2, 10, 4, 'Two-handed. Long, narrow thrust.')),
-  weapon('budgestaff', 'staff', 'Emberhorn War Staff', 'budgedragon', 'Two swept horns cradle a glowing ember orb on a scale-banded staff. It spits fire in a straight line.', { budgehorn: 2, budgehide: 2, budgescale: 2, budgemembrane: 1 }, R('staff', 11, 0.6, 6, 'A war staff. Fires embers.', { spell: true, proj: 'ember', shotLabel: 'Ember' })),
-  weapon('budgewand', 'wand', 'Fangtip Wand', 'budgedragon', 'A slim wand carved from a budge fang with a living ember caught in the tip. Quick to cast.', { budgefang: 1, budgehorn: 1, budgemembrane: 1 }, R('wand', 8, 0.34, 4, 'A wand. Rapid embers.', { spell: true, proj: 'ember', shotLabel: 'Ember' })),
-  weapon('budgeshortbow', 'shortbow', 'Scalebound Shortbow', 'budgedragon', 'A compact hide-and-claw bow made for fast, close shooting.', { budgehide: 2, budgefang: 1, budgeclaw: 1 }, R('shortbow', 9, 0.34, 5, 'A short bow. Quick draws.')),
-  weapon('budgecrossbow', 'crossbow', 'Hornlock Crossbow', 'budgedragon', 'A scale-plated stock, a horn prod and a claw trigger. It lands a bolt like a thrown anvil.', { budgehorn: 1, budgescale: 3, budgehide: 2, budgeclaw: 1 }, R('crossbow', 14, 0.66, 8, 'A crossbow. Slow and heavy.')),
+  weapon('budgegreatsword', 'twosword', 'Fangreaver Greatsword', 'budgedragon', 'A broadsword of fused dragon fang with a serrated back edge, tusked crossguard and an ember vein down the fuller.', { budgefang: 4, budgehorn: 1, budgescale: 3, budgehide: 1 }, M('twohand', 22, 2.8, 2.5, 0.62, 0.28, 14, 8, 'Two-handed. Heavy fang steel.'), BR(10)),
+  weapon('budgedual', 'dual', 'Twin Fangs', 'budgedragon', 'A matched pair of curved fang blades with scale-wrapped grips. Fast, wicked, and never apart.', { budgefang: 4, budgeclaw: 2, budgescale: 2 }, M('dual', 11, 2.2, 1.8, 0.28, 0.12, 6, 3, 'Dual swords. Rapid fang strikes.'), BR()),
+  weapon('budgespear', 'spear', 'Horncollar Spear', 'budgedragon', 'A fang spearhead above a horn collar and a hide-wrapped shaft. Nothing out-reaches it.', { budgefang: 2, budgehorn: 1, budgescale: 2, budgehide: 2 }, M('twohand', 17, 3.3, 1.0, 0.46, 0.2, 10, 4, 'Two-handed. Long, narrow thrust.'), BR()),
+  weapon('budgestaff', 'staff', 'Emberhorn War Staff', 'budgedragon', 'Two swept horns cradle a glowing ember orb on a scale-banded staff. It spits fire in a straight line.', { budgehorn: 2, budgehide: 2, budgescale: 2, budgemembrane: 1 }, R('staff', 13, 0.6, 6, 'A war staff. Fires embers.', { spell: true, proj: 'ember', shotLabel: 'Ember' }), BR()),
+  weapon('budgewand', 'wand', 'Fangtip Wand', 'budgedragon', 'A slim wand carved from a budge fang with a living ember caught in the tip. Quick to cast.', { budgefang: 1, budgehorn: 1, budgemembrane: 1 }, R('wand', 10, 0.34, 4, 'A wand. Rapid embers.', { spell: true, proj: 'ember', shotLabel: 'Ember' }), BR()),
+  weapon('budgeshortbow', 'shortbow', 'Scalebound Shortbow', 'budgedragon', 'A compact hide-and-claw bow made for fast, close shooting.', { budgehide: 2, budgefang: 1, budgeclaw: 1 }, R('shortbow', 11, 0.34, 5, 'A short bow. Quick draws.'), BR()),
+  weapon('budgecrossbow', 'crossbow', 'Hornlock Crossbow', 'budgedragon', 'A scale-plated stock, a horn prod and a claw trigger. It lands a bolt like a thrown anvil.', { budgehorn: 1, budgescale: 3, budgehide: 2, budgeclaw: 1 }, R('crossbow', 16, 0.66, 8, 'A crossbow. Slow and heavy.'), BR()),
 
   weapon('darksword', 'onesword', 'Duskblade Saber', 'darksycledragon', 'A swept saber of scythe horn with a violet rune burning along the spine and wing-shaped guards.', { scythehorn: 2, duskscale: 2, duskclaw: 1 }, M('swordshield', 32, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Curved dusk steel.'), { reqLevel: 16 }),
   weapon('darkgreatsword', 'twosword', 'Gloomreaver Greatsword', 'darksycledragon', 'A sickle-curved greatsword with a glowing notch where the blade begins to bend.', { scythehorn: 4, duskscale: 3, gloommembrane: 1 }, M('twohand', 48, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A curved greatsword of dusk.'), { reqLevel: 18 }),
@@ -343,33 +353,33 @@ GEAR.push(
 const BUDGE_ARMOR = 'budgedragon';
 const DARK_ARMOR = 'darksycledragon';
 const YETI_ARMOR = 'snowyeti';
-function armorSet(monster, set, defs) {
+function armorSet(monster, set, defs, extra = {}) {
   for (const [slot, id, name, def, desc, recipe, bonus] of defs) {
-    GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe, ...(bonus ? { bonus } : {}) });
+    GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe, ...extra, ...(bonus ? { bonus } : {}) });
   }
 }
 
 GEAR.push(
-  { id: 'budgeshield', type: 'armor', slot: 'shield', name: 'Budgescale Shield', monster: BUDGE_ARMOR, set: 'budgeset', def: 2, desc: 'A scale-faced kite shield with a horn boss and a gold-banded rim.', recipe: { budgescale: 5, budgehorn: 1, budgehide: 1 } },
+  { id: 'budgeshield', type: 'armor', slot: 'shield', name: 'Budgescale Shield', monster: BUDGE_ARMOR, set: 'budgeset', def: 3, desc: 'A scale-faced kite shield with a horn boss and a gold-banded rim.', recipe: { budgescale: 5, budgehorn: 1, budgehide: 1 }, reqLevel: BUDGE_STR },
   { id: 'darkshield', type: 'armor', slot: 'shield', name: 'Duskscale Shield', monster: DARK_ARMOR, set: 'darksyceset', def: 4, desc: 'An indigo scale shield with a gloom gem and a silver blade fin on each side.', recipe: { duskscale: 5, scythehorn: 1, gloommembrane: 1 } },
   { id: 'yetishield', type: 'armor', slot: 'shield', name: 'Glacierplate Shield', monster: YETI_ARMOR, set: 'yetiset', def: 3, desc: 'A slab of frost-shard plate in a rime-fur rim, with a frostheart blue boss and a claw fin on each side.', recipe: { frostshard: 4, rimefur: 3, frostheart: 1 } },
 );
 
 armorSet(BUDGE_ARMOR, 'budgeleather', [
   ['helm', 'budgeleatherhelm', 'Budgehide Cap', 1, 'A stitched hide cap with two short horn studs and a scale brow.', { budgehide: 3, budgescale: 1 }],
-  ['chest', 'budgeleatherchest', 'Budgehide Jerkin', 2, 'Laced green hide over a scale-trimmed collar. Light enough to run in.', { budgehide: 6, budgescale: 3 }],
+  ['chest', 'budgeleatherchest', 'Budgehide Jerkin', 3, 'Laced green hide over a scale-trimmed collar. Light enough to run in.', { budgehide: 6, budgescale: 3 }],
   ['arms', 'budgeleathergloves', 'Budgehide Gloves', 1, 'Supple hide gloves with a claw-bone bracer on each wrist.', { budgehide: 2, budgeclaw: 1 }],
-  ['legs', 'budgeleatherlegs', 'Budgehide Leggings', 1, 'Strapped hide leggings with scale knee patches.', { budgehide: 4, budgescale: 2 }],
+  ['legs', 'budgeleatherlegs', 'Budgehide Leggings', 2, 'Strapped hide leggings with scale knee patches.', { budgehide: 4, budgescale: 2 }],
   ['boots', 'budgeleatherboots', 'Budgehide Boots', 1, 'Soft-soled hide boots with a folded cuff and claw-bone toes.', { budgehide: 2, budgeclaw: 1 }],
-]);
+], { reqLevel: BUDGE_STR });
 armorSet(BUDGE_ARMOR, 'budgecloth', [
   ['helm', 'budgeclothhood', 'Emberweave Hood', 1, 'A deep green hood with a gold-edged brim and a horn-tipped point.', { budgemembrane: 2, budgehide: 1 }],
-  ['chest', 'budgeclothrobe', 'Emberweave Robe', 2, 'Flowing wing-silk robes with a gold sash and ember trim.', { budgemembrane: 5, budgehide: 2 }],
+  ['chest', 'budgeclothrobe', 'Emberweave Robe', 3, 'Flowing wing-silk robes with a gold sash and ember trim.', { budgemembrane: 5, budgehide: 2 }],
   ['arms', 'budgeclothgloves', 'Emberweave Gloves', 0, 'Silk gloves under wide cuffs edged in gold thread.', { budgemembrane: 2, budgeclaw: 1 }],
   ['legs', 'budgeclothlegs', 'Emberweave Trousers', 1, 'Light silk trousers tied at the knee with golden cord.', { budgemembrane: 3, budgehide: 1 }],
   ['boots', 'budgeclothboots', 'Emberweave Slippers', 0, 'Soft silk slippers with curled toes.', { budgemembrane: 2, budgehide: 1 }],
-  ['book', 'budgebook', 'Budgefang Grimoire', 0, 'A scale-bound spellbook with a fang clasp. Its pages smell of smoke.', { budgemembrane: 2, budgehorn: 1, budgefang: 1, budgehide: 1 }, { mana: 12, spell: 0.04 }],
-]);
+  ['book', 'budgebook', 'Budgefang Grimoire', 0, 'A scale-bound spellbook with a fang clasp. Its pages smell of smoke.', { budgemembrane: 2, budgehorn: 1, budgefang: 1, budgehide: 1 }, { mana: 16, spell: 0.05 }],
+], { reqLevel: BUDGE_STR });
 armorSet(DARK_ARMOR, 'darkleather', [
   ['helm', 'darkleatherhelm', 'Duskhide Cowl', 2, 'A close-fitting indigo cowl with a swept violet fin.', { duskhide: 3, duskclaw: 1 }],
   ['chest', 'darkleatherchest', 'Duskhide Jerkin', 4, 'Indigo hide with violet lacing and a scale collar. Quiet as a shadow.', { duskhide: 6, duskscale: 3 }],
@@ -546,9 +556,9 @@ GEAR.push(
 const set = (id, name, monster, tier, role, stats, bonus) => ({ id, name, monster, tier, role, hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0, ...stats, bonus });
 export const SETS = [
   ...METALS.map(metalSetDef),
-  set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 4 }, 'Full set: +4 max health (2 hearts).'),
-  set('budgeleather', 'Budgehide Leathers', BUDGE_ARMOR, 'leather', 'Ranger', { stamina: 20, ranged: 0.06 }, 'Full set: +20 max stamina and +6% ranged damage.'),
-  set('budgecloth', 'Emberweave Robes', BUDGE_ARMOR, 'cloth', 'Mage', { mana: 20, spell: 0.06 }, 'Full set: +20 max mana and +6% spell damage.'),
+  set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 6 }, 'Full set: +6 max health (3 hearts).'),
+  set('budgeleather', 'Budgehide Leathers', BUDGE_ARMOR, 'leather', 'Ranger', { stamina: 28, ranged: 0.08 }, 'Full set: +28 max stamina and +8% ranged damage.'),
+  set('budgecloth', 'Emberweave Robes', BUDGE_ARMOR, 'cloth', 'Mage', { mana: 28, spell: 0.08 }, 'Full set: +28 max mana and +8% spell damage.'),
   set('darksyceset', 'Duskscale Plate', DARK_ARMOR, 'metal', 'Warrior', { hp: 4, mana: 40 }, 'Full set: +4 max health (2 hearts) and +40 max mana.'),
   set('darkleather', 'Duskhide Leathers', DARK_ARMOR, 'leather', 'Ranger', { stamina: 40, crit: 0.08 }, 'Full set: +40 max stamina and +8% critical chance.'),
   set('darkcloth', 'Gloomweave Robes', DARK_ARMOR, 'cloth', 'Mage', { mana: 60, spell: 0.16 }, 'Full set: +60 max mana and +16% spell damage.'),
