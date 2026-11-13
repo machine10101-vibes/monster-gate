@@ -443,7 +443,7 @@ export function mountJournal(body, game) {
 
   const challengeDetail = (pane) => {
     const sel = String(state.selected || 'board');
-    if (sel.startsWith('b')) {
+    if (/^b\d+$/.test(sel)) {
       const i = Number(sel.slice(1));
       const slot = game.bounties?.slot(i);
       pane.appendChild(el('h3', 'qj-title', slot ? slot.label.toUpperCase() : 'BOUNTY'));

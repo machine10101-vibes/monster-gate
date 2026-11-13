@@ -181,4 +181,6 @@ test('slice wiring: rift button, guest-session block, journal gear reward', () =
   assert.match(main, /hellspire: this\.world\.demonKeep/);
   assert.match(main, /grantFound\(e\.gear\)/);
   assert.match(main, /enterRiftFromGate/);
+  const journalUi = src('../src/ui/journal.js');
+  assert.match(journalUi, /\/\^b\\d\+\$\/\.test\(sel\)/);
 });
