@@ -69,6 +69,17 @@ test('MG-UI-MENU-2 chat uses gold journal chrome, not cyan', () => {
   assert.doesNotMatch(theme, /#world-chat \.wc-send[\s\S]{0,200}#3ec8d4/);
 });
 
+test('MG-UI-21 title panel fits short landscape and DEBUG stays off the tagline', () => {
+  const theme = src('src/ui/theme.css');
+  const style = src('src/style.css');
+  assert.match(theme, /#debug-badge \{[\s\S]*right:\s*calc\(10px/);
+  assert.match(theme, /#debug-badge \{[\s\S]*left:\s*auto/);
+  assert.match(style, /#debug-badge \{[\s\S]*right:\s*calc\(10px/);
+  assert.match(theme, /#title \.title-inner \{[\s\S]*max-height:\s*calc\(100dvh - 16px\)/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*8px 16px 14px/);
+  assert.match(theme, /#title \.touch-only \{[\s\S]*padding:\s*0 8px 8px/);
+});
+
 test('MG-UI-MENU-3 title and character select use the journal gold', () => {
   const theme = src('src/ui/theme.css');
   assert.match(theme, /#title \{[\s\S]*#070d16/);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, ensureDebugStarterWeapon, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack,
+  DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, ensureDebugStarterWeapon, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
@@ -252,7 +252,9 @@ test('debug tank spawn is ~20x HP, hits back, and stays out of saves', () => {
   assert.ok(mon.debugTank);
   assert.equal(mon.maxHp, 18 * DEBUG_TANK_HP_MUL);
   assert.equal(mon.hp, 18 * DEBUG_TANK_HP_MUL);
-  assert.ok(mon.cd >= 1.6);
+  assert.equal(mon.state, 'chase');
+  assert.ok(mon.def.aggro >= 12);
+  assert.ok(mon.tankCd > 0 && mon.tankCd < 1);
   assert.match(mon.name, /tank/i);
   assert.equal(monsterIsHostile(mon.type), true);
   const online = { ...game, mmo: { send() {} }, worldView: {} };
@@ -265,10 +267,11 @@ test('debug tank spawn is ~20x HP, hits back, and stays out of saves', () => {
   assert.equal(slim.maxHp, 10 * DEBUG_TANK_HP_MUL);
 });
 
-test('oasis landing frames the pool above the hotbar clearance', () => {
+test('MG-UI-22 oasis landing frames the pool above the hotbar clearance', () => {
   const oasis = resolveSpot('oasis');
-  assert.ok(Math.hypot(oasis.x - 0, oasis.z - 432) > 40, 'stand back from the water');
-  const cam = { yaw: 0, targetYaw: 0, pitch: 0.8, dist: 12, targetDist: 12 };
+  assert.ok(Math.hypot(oasis.x - 0, oasis.z - 432) > 70, 'stand back from the water');
+  assert.ok(oasis.z >= 432 + 32 + 48, 'south / bottom side of the pool');
+  const cam = { yaw: 0, targetYaw: 0, pitch: 0.8, dist: 12, targetDist: 12, lookAhead: 0 };
   const game = {
     world: { realm: 'over', heightAt: () => 3.2, revealAround() {} },
     player: { pos: { set(x, y, z) { this.x = x; this.y = y; this.z = z; }, x: 0, y: 0, z: 0 }, yaw: 0, syncObj() {} },
@@ -280,10 +283,51 @@ test('oasis landing frames the pool above the hotbar clearance', () => {
   assert.ok(spot);
   assert.equal(cam.pitch, OASIS_CAM.pitch);
   assert.equal(cam.dist, OASIS_CAM.dist);
-  assert.ok(cam.pitch < 0.7, 'look toward the horizon so the pool sits above --hud-clear-bottom');
+  assert.equal(cam.lookAhead, OASIS_CAM.lookAhead);
+  assert.ok(cam.pitch <= 0.34, 'look toward the horizon so the pool sits above --hud-clear-bottom');
+  assert.ok(OASIS_CAM.lookAhead >= 16);
   assert.ok(game.snapped);
   const flagsSrc = readFileSync(new URL('../src/debug/flags.js', import.meta.url), 'utf8');
   assert.match(flagsSrc, /hud-clear-bottom/);
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(main, /lookAhead/);
+});
+
+test('debug tank standing next to the hunter drops HP on a 1.5-2s cadence', () => {
+  const player = {
+    pos: { x: 0, z: 0 },
+    hp: 20,
+    maxHp: 20,
+    dead: false,
+    hurt(dmg) { this.hp -= dmg; return true; },
+  };
+  const mon = applyDebugTank({
+    type: 'slime',
+    x: 1.1,
+    z: 0,
+    name: 'Gate Slime',
+    hp: 18,
+    maxHp: 18,
+    cd: 4,
+    state: 'idle',
+    def: { aggro: 9, dmg: 5 },
+  });
+  const game = { debug: { enabled: true }, player, monsters: [mon], mmo: null };
+  assert.equal(mon.state, 'chase');
+  assert.equal(mon.def.dmg, 2);
+  assert.equal(tickDebugTank(game, 0.1), 0);
+  assert.equal(player.hp, 20);
+  assert.equal(tickDebugTank(game, 0.2), 1);
+  assert.ok(player.hp < 20, 'first melee lands');
+  const after = player.hp;
+  assert.equal(tickDebugTank(game, 0.5), 0);
+  assert.equal(player.hp, after);
+  assert.ok(DEBUG_TANK_CADENCE >= 1.5 && DEBUG_TANK_CADENCE <= 2);
+  assert.equal(tickDebugTank(game, DEBUG_TANK_CADENCE), 1);
+  assert.ok(player.hp < after, 'second hit after the cadence');
+  const online = { ...game, mmo: { send() {} } };
+  player.hp = 20;
+  assert.equal(tickDebugTank(online, 2), 0);
 });
 
 test('debug freeze does not write the hunter save', () => {

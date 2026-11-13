@@ -24,7 +24,7 @@ export const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
 /** HUD name while standing at the living water, even on a neighboring dune tile. */
 export function oasisAreaName(x, z) {
   const d = Math.hypot(Number(x) - OASIS.x, Number(z) - OASIS.z);
-  if (d <= OASIS.r + OASIS.shore + 18) return 'Oasis';
+  if (d <= OASIS.r + OASIS.shore + 40) return 'Oasis';
   return null;
 }
 /**

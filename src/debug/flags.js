@@ -16,16 +16,21 @@ const MINE = { rampX0: 88, z: 66 };
 const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
 const SAND_MINE = { x: -74, z: 514 };
 /**
- * Dry south-east shore on the Oasis tile, far enough that the pool sits
- * ahead of the hunter (above --hud-clear-bottom) instead of under the hotbar.
+ * Dry south shore on the Oasis tile. The hunter stands on the bottom side of
+ * the pool relative to the camera so the water sits in the upper-middle of
+ * the frame, above --hud-clear-bottom, instead of under the hotbar fade.
  */
-const OASIS_DRY = { x: OASIS.x + 16, z: OASIS.z + OASIS.r + 30 };
-export const OASIS_CAM = { pitch: 0.46, dist: 20 };
+const OASIS_DRY = { x: OASIS.x, z: OASIS.z + OASIS.r + 52 };
+export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
 export const DEBUG_TANK_HP_MUL = 20;
+export const DEBUG_TANK_AGGRO = 12;
+export const DEBUG_TANK_REACH = 2.8;
+export const DEBUG_TANK_CADENCE = 1.7;
+export const DEBUG_TANK_DMG = 2;
 
 export function oasisHudName(x, z) {
   const d = Math.hypot(Number(x) - OASIS.x, Number(z) - OASIS.z);
-  if (d <= OASIS.r + OASIS.shore + 18) return 'Oasis';
+  if (d <= OASIS.r + OASIS.shore + 40) return 'Oasis';
   return null;
 }
 
@@ -339,10 +344,46 @@ export function applyDebugTank(mon) {
   mon.hp = hp;
   mon.debugTank = true;
   mon.debugSpawn = true;
-  mon.cd = Math.max(Number(mon.cd) || 0, 1.8);
+  mon.puppet = false;
+  const prev = mon.def || {};
+  mon.def = {
+    ...prev,
+    aggro: Math.max(Number(prev.aggro) || 0, DEBUG_TANK_AGGRO),
+    dmg: Math.max(1, Math.min(Number(prev.dmg) || DEBUG_TANK_DMG, DEBUG_TANK_DMG)),
+  };
+  mon.state = 'chase';
+  mon.cd = 0.2;
+  mon.tankCd = 0.25;
+  mon.hitCd = 0;
   const label = String(mon.name || 'Monster').replace(/ \(tank\)$/i, '');
   mon.name = `${label} (tank)`;
   return mon;
+}
+
+/** Dedicated melee loop so tank spawns hit even if type-specific AI never connects. */
+export function tickDebugTank(game, dt = 1 / 60) {
+  if (!game?.debug || debugOnlineBlocked(game)) return 0;
+  const P = game.player;
+  if (!P || P.dead) return 0;
+  let hits = 0;
+  for (const m of game.monsters || []) {
+    if (!m?.debugTank || m.dead) continue;
+    if (m.state === 'idle' || m.state === 'wander' || !m.state) m.state = 'chase';
+    const px = P.pos?.x ?? P.x;
+    const pz = P.pos?.z ?? P.z;
+    const dist = Math.hypot((px ?? 0) - m.x, (pz ?? 0) - m.z);
+    const aggro = Number(m.def?.aggro) || DEBUG_TANK_AGGRO;
+    if (dist > aggro) continue;
+    m.tankCd = (Number(m.tankCd) || 0) - dt;
+    if (dist > DEBUG_TANK_REACH) continue;
+    if (m.tankCd > 0) continue;
+    m.tankCd = DEBUG_TANK_CADENCE;
+    const dmg = Math.max(1, Number(m.def?.dmg) || DEBUG_TANK_DMG);
+    if (typeof P.hurt === 'function') P.hurt(dmg, m.x, m.z, 4);
+    else if (P.hp != null) P.hp = Math.max(0, Number(P.hp) - dmg);
+    hits += 1;
+  }
+  return hits;
 }
 
 export function spawnDebugMonster(game, search, opts = {}) {
@@ -387,6 +428,7 @@ export function teleportDebug(game, raw) {
   }
   const y = game.world?.heightAt?.(spot.x, spot.z) ?? 3.2;
   game.player.pos.set(spot.x, y, spot.z);
+  if (game.cam) game.cam.lookAhead = 0;
   if (spot.id === 'oasis') {
     const yaw = Math.atan2(OASIS.x - spot.x, OASIS.z - spot.z);
     game.player.yaw = yaw;
@@ -396,6 +438,7 @@ export function teleportDebug(game, raw) {
       game.cam.pitch = OASIS_CAM.pitch;
       game.cam.targetDist = OASIS_CAM.dist;
       game.cam.dist = OASIS_CAM.dist;
+      game.cam.lookAhead = OASIS_CAM.lookAhead;
     }
   }
   game.player.syncObj?.();
