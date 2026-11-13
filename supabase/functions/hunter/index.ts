@@ -2,10 +2,10 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { mergeAccountProgress } from "./huntMerge.js";
 import { loginMessageOk, verifyKleverSignature } from "./verify.ts";
+import { UNLINKED_CODE, UNLINKED_MESSAGE } from "../_shared/linkAuth.js";
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
 const TOKEN_RE = /^[0-9a-f]{64}$/;
-const TOKEN_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_BODY = 300_000;
 const MAX_PROGRESS = 262144;
 
@@ -62,18 +62,21 @@ async function auth(admin: Admin, body: Record<string, unknown>): Promise<Respon
   if (!ADDRESS_RE.test(address) || !loginMessageOk(message, address) || !verifyKleverSignature(message, signature, address)) {
     return json({ error: "The Klever signature was not accepted." }, 401);
   }
-
-  await admin.from("hunter_sessions").delete().lt("expires_at", new Date().toISOString());
-
-  const token = hex(crypto.getRandomValues(new Uint8Array(32)));
-  const expiresAt = new Date(Date.now() + TOKEN_MS).toISOString();
-  const { error } = await admin.from("hunter_sessions").insert({
-    token_hash: await sha256Hex(token),
-    address,
-    expires_at: expiresAt,
-  });
+  const { data, error } = await admin
+    .from("hunter_accounts")
+    .select("user_id")
+    .eq("klever_address", address)
+    .maybeSingle();
   if (error) return json({ error: "The guild record could not be opened." }, 503);
-  return json({ token, expiresAt });
+  const row = data as { user_id?: string } | null;
+  if (!row?.user_id) {
+    return json({ error: UNLINKED_MESSAGE, code: UNLINKED_CODE, created: false }, 401);
+  }
+  return json({
+    error: "This wallet is linked to an email account. Use Log in with Klever.",
+    code: "linked-email",
+    created: false,
+  }, 401);
 }
 
 async function load(admin: Admin, body: Record<string, unknown>): Promise<Response> {

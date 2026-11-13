@@ -15,5 +15,5 @@ export function decorateFrame(el) {
 
 export function decorateAllFrames(root = typeof document !== 'undefined' ? document : null) {
   if (!root?.querySelectorAll) return;
-  root.querySelectorAll('.mg-frame, .panel-card, .account-panel, .cs-panel, .cs-confirm-box, #dialog').forEach(decorateFrame);
+  root.querySelectorAll('.mg-frame, .panel-card, .account-panel, .wallet-unlinked, .wallet-link-card, .cs-panel, .cs-confirm-box, #dialog').forEach(decorateFrame);
 }
