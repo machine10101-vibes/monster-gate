@@ -92,28 +92,51 @@ const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
 function pickQuality() {
   const saved = localStorage.getItem('mg-quality');
   const found = QUALITIES.find((q) => q.id === saved);
-  if (found && !isIOS()) return found;
-  // iPadOS reports a desktop Mac with many cores. A large screen at that
-  // setting blows the tab at the end of loading, and Safari restarts the page.
-  if (isIOS()) return found || QUALITIES[0];
+  if (found) return found;
   const touch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   const cores = navigator.hardwareConcurrency || 4;
   if (touch) return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
   return cores >= 8 ? QUALITIES[2] : QUALITIES[1];
 }
 
-/** Keep the iPad drawing buffer small enough that the first frame does not kill the tab. */
-function budgetFor(q) {
-  if (!isIOS()) return q;
-  return { ...q, dpr: 1, shadowSize: Math.min(q.shadowSize, 1024) };
+/** iPad-sized, including Brave's desktop site where the screen is still a tablet. */
+function largeScreen() {
+  const w = Math.max(window.screen?.width || 0, window.innerWidth || 0);
+  const h = Math.max(window.screen?.height || 0, window.innerHeight || 0);
+  return Math.min(w, h) >= 744 || w * h > 700000;
+}
+
+/**
+ * iPad Safari and iPad Brave die at the end of loading if the first real frame
+ * is a full-size multisampled buffer plus a shadow map plus every shader at once.
+ */
+function survivalBudget(q, heavy) {
+  const w = Math.max(window.screen?.width || 0, window.innerWidth || 1);
+  const h = Math.max(window.screen?.height || 0, window.innerHeight || 1);
+  const dprCap = heavy ? Math.max(0.6, Math.min(1, Math.sqrt(800000 / (w * h)))) : 1;
+  return {
+    ...q,
+    id: heavy ? 'low' : q.id,
+    label: heavy ? 'Low' : q.label,
+    density: heavy ? Math.min(q.density, 0.45) : q.density,
+    motes: heavy ? Math.min(q.motes, 80) : q.motes,
+    gateMotes: heavy ? Math.min(q.gateMotes, 60) : q.gateMotes,
+    dpr: Math.min(q.dpr, Math.round(dprCap * 100) / 100),
+    shadowSize: heavy ? 512 : Math.min(q.shadowSize, 1024),
+    shadows: heavy ? false : q.shadows,
+  };
 }
 
 class Game {
   constructor() {
     this.canvas = document.getElementById('game');
-    const retry = isIOS() && bootWasKilled();
+    const killed = bootWasKilled();
     markBoot();
-    this.quality = budgetFor(retry ? QUALITIES[0] : pickQuality());
+    const ios = isIOS();
+    this.heavyBoot = killed || ((ios || isTablet()) && largeScreen());
+    this.lightBoot = ios || this.heavyBoot;
+    const base = this.heavyBoot ? QUALITIES[0] : pickQuality();
+    this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : base;
     this.bootFrames = 0;
     this.hud = new HUD();
     this.audio = new Audio8();
@@ -188,20 +211,22 @@ class Game {
   }
 
   initRenderer() {
-    // iPad Safari reloads the tab when the framebuffer peaks at the end of loading.
+    // iPad Safari and Brave reload the tab when the framebuffer peaks at the end of loading.
     // No multisample buffer, and no preserved backbuffer, on that browser.
-    const ios = isIOS();
+    const lite = this.lightBoot;
     const r = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: !ios,
+      antialias: !lite,
       alpha: false,
-      powerPreference: ios ? 'default' : 'high-performance',
+      powerPreference: lite ? 'default' : 'high-performance',
       preserveDrawingBuffer: false,
     });
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.NoToneMapping;
-    r.shadowMap.enabled = true;
+    r.setClearColor(0x0b0d10, 1);
+    r.shadowMap.enabled = !lite;
     r.shadowMap.type = THREE.PCFShadowMap;
+    r.debug.checkShaderErrors = !lite;
     this.renderer = r;
     this.canvas.addEventListener('webglcontextlost', (ev) => {
       ev.preventDefault();
@@ -307,10 +332,7 @@ class Game {
     this.snapCamera();
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
     this.bindUI();
-    this.applyQuality();
     progress(0.98, 'Ready');
-    // Compiling every shader at once is the spike that makes iPad Safari flash white and reload.
-    if (!isIOS()) this.renderer.compile(this.scene, this.camera);
     const account = readAccount();
     const klever = readSession();
     const session = account && klever
@@ -321,7 +343,11 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
-    if (!isIOS() && this.charSelect?.active) this.renderer.compile(this.scene, this.camera);
+    if (this.lightBoot) await this.settleGpu();
+    else {
+      this.applyQuality();
+      this.renderer.compile(this.scene, this.camera);
+    }
     progress(1, 'Ready');
 
     document.getElementById('loading').classList.add('hidden');
@@ -999,17 +1025,67 @@ class Game {
 
   /* ------------------------------ quality ------------------------------ */
   cycleQuality() {
-    const i = QUALITIES.indexOf(this.quality);
-    this.quality = QUALITIES[(i + 1) % QUALITIES.length];
-    localStorage.setItem('mg-quality', this.quality.id);
+    const i = Math.max(0, QUALITIES.findIndex((q) => q.id === this.quality.id));
+    const next = QUALITIES[(i + 1) % QUALITIES.length];
+    localStorage.setItem('mg-quality', next.id);
+    const base = this.heavyBoot ? QUALITIES[0] : next;
+    this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : next;
     this.applyQuality();
     this.hud.toast(`Graphics: ${this.quality.label} (foliage density applies on reload)`, 2600);
+  }
+
+  /**
+   * Compile the visible shaders into a tiny buffer before the real one exists.
+   * On iPad the crash is the moment those two costs land together.
+   */
+  async settleGpu() {
+    const r = this.renderer;
+    r.shadowMap.enabled = false;
+    if (this.sky?.sun) this.sky.sun.castShadow = false;
+    const hold = [];
+    const hide = (obj) => {
+      if (!obj) return;
+      hold.push([obj, obj.visible]);
+      obj.visible = false;
+    };
+    hide(this.world?.group);
+    hide(this.world?.cave?.group);
+    hide(this.player?.obj);
+    hide(this.snowfall?.points);
+    hide(this.ashfall?.points);
+    hide(this.fx?.motes);
+    hide(this.fx?.gateMotes);
+    for (const m of this.monsters || []) hide(m.obj);
+    for (const n of this.ambient?.npcs || []) hide(n.obj);
+    const w = Math.max(2, Math.round(window.innerWidth));
+    const h = Math.max(2, Math.round(window.innerHeight));
+    r.setPixelRatio(0.35);
+    r.setSize(w, h, false);
+    this.snapCamera();
+    const draw = () => {
+      try {
+        r.render(this.scene, this.camera);
+      } catch (err) {
+        this.reportFault(err);
+      }
+    };
+    const wait = () => new Promise((resolve) => setTimeout(resolve, 40));
+    draw();
+    await wait();
+    if (this.world?.group) this.world.group.visible = true;
+    draw();
+    await wait();
+    for (const [obj, vis] of hold) obj.visible = vis;
+    draw();
+    await wait();
+    this.applyQuality();
   }
 
   applyQuality() {
     const q = this.quality;
     if (this.vfx) this.vfx.density = q.density;
-    this.renderer.shadowMap.enabled = q.shadows;
+    this.renderer.shadowMap.enabled = !!q.shadows;
+    if (this.sky?.sun) this.sky.sun.castShadow = !!q.shadows;
     const sh = this.sky.sun.shadow;
     if (sh.mapSize.x !== q.shadowSize) {
       sh.mapSize.set(q.shadowSize, q.shadowSize);

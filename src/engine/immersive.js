@@ -9,14 +9,27 @@ export function isFullscreen() {
 }
 
 /**
- * iPhone, iPad, and iPadOS Safari in desktop mode (Macintosh + touch).
- * That browser kills the tab and reloads it when the GPU budget is blown.
+ * iPhone, iPad, and iPadOS browsers that pretend to be a desktop Mac.
+ * Brave on iPad does both: its desktop site is a Macintosh Safari string, and
+ * Shields reports maxTouchPoints as 0, so a touch-count check never sees it.
+ * The tab is killed and reloaded when the GPU budget is blown.
  */
-export function isIOS() {
-  const ua = navigator.userAgent || '';
+export function detectIOS(nav, win = {}) {
+  const ua = nav?.userAgent || '';
   if (/iPad|iPhone|iPod/i.test(ua)) return true;
-  const touch = navigator.maxTouchPoints || 0;
-  return touch > 1 && (navigator.platform === 'MacIntel' || /Macintosh/i.test(ua));
+  const points = nav?.maxTouchPoints || 0;
+  const mac = nav?.platform === 'MacIntel' || /Macintosh/i.test(ua);
+  if (points > 1 && mac) return true;
+  // Every iOS WebKit app exposes this. Desktop Safari and desktop Brave do not.
+  if (typeof nav?.standalone === 'boolean') return true;
+  // iOS Brave, including desktop mode. Desktop Brave identifies as Chrome.
+  if (/Brave/i.test(ua) && /AppleWebKit\/605/i.test(ua)) return true;
+  if (mac && 'ontouchend' in win && /AppleWebKit\/605/i.test(ua) && !/Chrome|CriOS|Edg\//.test(ua)) return true;
+  return false;
+}
+
+export function isIOS() {
+  return detectIOS(navigator, window);
 }
 
 /** iPad, including iPadOS Safari which presents itself as a desktop Mac. */
