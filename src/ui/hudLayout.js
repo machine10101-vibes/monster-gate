@@ -66,15 +66,52 @@ export function plateAnchorRect(x, y, w, h) {
 export const HUD_SAFE_IDS = [
   'minimap-wrap',
   'center-bottom',
+  'bar-wrap',
+  'hotbar',
+  'hearts-row',
   'quest',
   'menu-col',
   'touch-btns',
+  'tb-talk',
   'stick',
   'hud-corner-right',
   'cast-buttons',
 ];
 
-export function measureHudSafeRects(doc = typeof document !== 'undefined' ? document : null) {
+/** Keep labels out of the band just above the hearts / hotbar fade. */
+export const HUD_SAFE_PAD = 16;
+export const HUD_HOTBAR_FADE = 24;
+
+export function hudSafeMargin(height) {
+  const h = Number(height);
+  if (Number.isFinite(h) && h > 500) return 14;
+  return HUD_SAFE_PAD;
+}
+
+export function inflateRect(r, pad, extra = {}) {
+  const top = pad + (Number(extra.top) || 0);
+  const right = pad + (Number(extra.right) || 0);
+  const bottom = pad + (Number(extra.bottom) || 0);
+  const left = pad + (Number(extra.left) || 0);
+  return {
+    id: r.id,
+    x: r.x - left,
+    y: r.y - top,
+    w: r.w + left + right,
+    h: r.h + top + bottom,
+  };
+}
+
+export function padHudSafeRects(rects, pad = HUD_SAFE_PAD) {
+  const m = Number(pad);
+  const margin = Number.isFinite(m) ? m : HUD_SAFE_PAD;
+  return (rects || []).map((r) => {
+    const hotbar = r.id === 'center-bottom' || r.id === 'hotbar' || r.id === 'bar-wrap' || r.id === 'hearts-row';
+    return inflateRect(r, margin, hotbar ? { top: HUD_HOTBAR_FADE } : {});
+  });
+}
+
+export function measureHudSafeRects(doc = typeof document !== 'undefined' ? document : null, opts = {}) {
   if (!doc?.getElementById) return [];
   const out = [];
   for (const id of HUD_SAFE_IDS) {
@@ -85,10 +122,12 @@ export function measureHudSafeRects(doc = typeof document !== 'undefined' ? docu
     if (!r || r.width < 4 || r.height < 4) continue;
     out.push({ id, x: r.x, y: r.y, w: r.width, h: r.height });
   }
-  return out;
+  const h = opts.height ?? doc.defaultView?.innerHeight ?? doc.documentElement?.clientHeight;
+  const pad = opts.pad ?? hudSafeMargin(h);
+  return padHudSafeRects(out, pad);
 }
 
-export function nameplateHitsHud(plate, safe, pad = -2) {
+export function nameplateHitsHud(plate, safe, pad = 0.5) {
   if (!plate || !safe?.length) return false;
   return safe.some((s) => overlap(plate, s, pad));
 }

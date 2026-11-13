@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
 import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
-import { nameplateHitsHud, overlap, plateAnchorRect } from '../src/ui/hudLayout.js';
+import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, hudSafeMargin, nameplateHitsHud, overlap, padHudSafeRects, plateAnchorRect } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -426,4 +426,27 @@ test('MG-UI-30 nameplates that hit HUD safe rects are culled and sit below the H
   assert.match(style, /\.nameplate\.hud-occluded/);
   assert.match(hud, /measureHudSafeRects/);
   assert.match(hud, /nameplateHitsHud/);
+});
+
+test('MG-UI-30 pads HUD rects so a label in the hotbar fade band is culled', () => {
+  const hearts = { id: 'center-bottom', x: 220, y: 310, w: 400, h: 76 };
+  const pip = { id: 'npc-child', x: 328, y: 268, w: 124, h: 32 };
+  assert.equal(pip.y + pip.h, 300);
+  assert.ok(hearts.y - (pip.y + pip.h) >= 10, 'sits about 10px above the hearts');
+  assert.equal(nameplateHitsHud(pip, [hearts]), false, 'unpadded hearts miss the fade band');
+  const padded = padHudSafeRects([hearts], HUD_SAFE_PAD);
+  assert.equal(nameplateHitsHud(pip, padded), true, '16px pad plus hotbar fade catches Pip');
+  assert.ok(padded[0].y <= hearts.y - HUD_SAFE_PAD - HUD_HOTBAR_FADE);
+  assert.equal(hudSafeMargin(390), 16);
+  assert.equal(hudSafeMargin(800), 14);
+  const talk = { id: 'tb-talk', x: 620, y: 140, w: 48, h: 48 };
+  const nearTalk = { x: 668, y: 128, w: 110, h: 30 };
+  assert.equal(nameplateHitsHud(nearTalk, [talk]), false);
+  assert.equal(nameplateHitsHud(nearTalk, padHudSafeRects([talk], 16)), true);
+  const hud = src('src/ui/hud.js');
+  const layout = src('src/ui/hudLayout.js');
+  assert.match(layout, /HUD_SAFE_PAD = 16/);
+  assert.match(layout, /tb-talk/);
+  assert.match(layout, /padHudSafeRects/);
+  assert.match(hud, /measureHudSafeRects/);
 });
