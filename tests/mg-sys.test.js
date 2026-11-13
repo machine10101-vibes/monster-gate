@@ -52,13 +52,19 @@ test('BAL-5 knights hit 5 and dusk hammer needs Strength 20', () => {
   assert.equal(hammer.item.dmg, 42);
 });
 
-test('BAL-6 mining ladder has iron, coal, mithril, adamant', () => {
+test('BAL-6 mining ladder has iron, coal, mithril, adamite', () => {
   assert.equal(ROCKS.iron.level, 15);
   assert.equal(ROCKS.coal.level, 30);
-  assert.equal(ROCKS.mithril.level, 50);
-  assert.equal(ROCKS.adamant.level, 70);
+  assert.equal(ROCKS.mithril.level, 45);
+  assert.equal(ROCKS.adamite.level, 60);
+  assert.equal(ROCKS.titanium.level, 75);
+  assert.equal(ROCKS.platinum.level, 90);
   assert.equal(SMELTS.steel.out, 'steel_bar');
   assert.equal(SMELTS.mithril.out, 'mithril_bar');
+  assert.equal(SMELTS.adamite.out, 'adamite_bar');
+  assert.ok(!ROCKS.tin);
+  assert.ok(!ROCKS.adamant);
+  assert.ok(!ROCKS.steel);
 });
 
 test('MG-SYS-2 guest join times out instead of waiting forever', () => {

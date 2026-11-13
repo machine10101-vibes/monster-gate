@@ -5,6 +5,7 @@ import { DARK } from '../data/darksycle.js';
 import { YETI } from '../data/yeti.js';
 import { holyHammerVoxels, demonSwordVoxels, demonShieldVoxels } from './knightWeapons.js';
 import { jungleWeapons, jungleShield, jungleBook, JUNGLE_DUAL, JUNGLE_TALL, JUNGLE_EDGE, JUNGLE_SHIELD_SETS, JUNGLE_BOOK_SETS } from './weaponsJungle.js';
+import { METALS, METAL_SET_IDS } from '../data/metals.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
 export const WEAPON_SIZE = 0.015;
@@ -29,6 +30,7 @@ const EDGE_HOLD = new Set([
   'yetisword', 'yetigreatsword', 'yetidual',
   'demonsword',
   'ironsword', 'irongreatsword',
+  ...METALS.flatMap((m) => [`${m.id}sword`, `${m.id}greatsword`]),
   ...JUNGLE_EDGE,
 ]);
 
@@ -105,6 +107,7 @@ const THEMES = {
     guard: 0xb8923a, guardHi: 0xe0bb52, glow: 0xffc94a, glow2: 0xfff0b0, wood: 0x7a4e2c, string: 0xe8e0c8,
     membrane: 0x8a3a2a, membraneHi: 0xb04a36, claw: 0xdfe2e8, horn: 0xb4b8c0, hornDark: 0x7a7e88,
   },
+  ...Object.fromEntries(METALS.map((m) => [m.id, m.weaponTheme])),
   orc: {
     wrap: 0x4a3018, wrapLo: 0x2a1a0e, wrapHi: 0x6a4830, blade: 0x7a7f88, edge: 0xb4b9c1, dark: 0x4e5258,
     guard: 0x6a655c, guardHi: 0x9a9488, glow: 0xc8ccd2, glow2: 0xe6dcc4, wood: 0x4a3018, string: 0xe8e0c8,
@@ -433,17 +436,20 @@ function maul(T, o) {
   return c.done();
 }
 
-function ironHammer() {
-  const T = THEMES.iron;
+function metalHammer(T = THEMES.iron) {
   const c = ctx();
   haft(c, T, -6, 62, 2, T.wood, 0);
   wrapRod(c, T, -6, 18, 2.2);
   ringAt(c, 18, 2.2, T.guard, 1);
   ringAt(c, 56, 2.4, T.guard, 2);
-  blockHead(c, T, { z0: 50, z1: 76, hx: 7, hy: 9, bands: [[50, 52], [74, 76]], scale: false, fill: 0x8d939c });
+  blockHead(c, T, { z0: 50, z1: 76, hx: 7, hy: 9, bands: [[50, 52], [74, 76]], scale: false, fill: T.dark });
   for (let z = 53; z < 74; z++) for (const [x, y] of [[-7, 0], [6, 0]]) c.set(x, y, z, J(shade(T.dark, 1.1), x, y, z, 36, 0.05));
   for (const x of [-4, 3]) for (const z of [51, 75]) c.set(x, 8, z, T.edge);
   return c.done();
+}
+
+function ironHammer() {
+  return metalHammer(THEMES.iron);
 }
 
 function ironAxe() {
@@ -978,6 +984,15 @@ const BUILDERS = {
   ...BOWS,
   axe: ironAxe,
   knife: carvingKnife,
+  ...Object.fromEntries(METALS.flatMap((m) => {
+    const T = THEMES[m.id] || THEMES.iron;
+    return [
+      [`${m.id}sword`, () => sword(T, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } })],
+      [`${m.id}greatsword`, () => sword(T, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } })],
+      [`${m.id}spear`, () => spear(T, false)],
+      [`${m.id}hammer`, () => metalHammer(T)],
+    ];
+  })),
   ironsword: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } }),
   irongreatsword: () => sword(THEMES.iron, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } }),
   ironspear: () => spear(THEMES.iron, false),
@@ -1018,7 +1033,12 @@ export function buildWeaponVoxels(kind) {
 
 /* ----------------------------- shields/books ------------------------ */
 
-const themeOf = (setId) => (setId === 'iron' ? THEMES.iron : setId.startsWith('dark') ? THEMES.dark : setId.startsWith('yeti') ? THEMES.frost : THEMES.budge);
+const themeOf = (setId) => {
+  if (METAL_SET_IDS.includes(setId)) return THEMES[setId] || THEMES.iron;
+  if (setId.startsWith('dark')) return THEMES.dark;
+  if (setId.startsWith('yeti')) return THEMES.frost;
+  return THEMES.budge;
+};
 
 /** Flat shield (face up on +y), 48 wide and deep with raised rim, boss and relief. */
 export function buildShieldModel(setId) {

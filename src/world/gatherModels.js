@@ -1,5 +1,6 @@
 import { VoxelModel, hash3, jitter, mix, shade } from '../engine/voxel.js';
 import { bundle } from './models.js';
+import { METALS } from '../data/metals.js';
 
 const J = (c, x, y, z, s = 0, a = 0.07) => jitter(c, a, hash3(x, y, z, s));
 
@@ -19,12 +20,8 @@ function blob(m, cx, cy, cz, rx, ry, rz, color, seed, noise = 0.3) {
 }
 
 const ORES = {
-  copper: { vein: 0xe0823a, hi: 0xffb86a, lo: 0xa8501e, patina: 0x4aa58a, spark: 0xffd9a0 },
-  tin: { vein: 0xc4d2e8, hi: 0xf4f8ff, lo: 0x7f8ca6, patina: 0x8fb4d8, spark: 0xffffff },
-  iron: { vein: 0x8a6a5a, hi: 0xc8a090, lo: 0x5a4038, patina: 0x6a5048, spark: 0xe8d0c0 },
   coal: { vein: 0x2a2a32, hi: 0x5a5a66, lo: 0x141418, patina: 0x3a3a44, spark: 0x9a9aaa },
-  mithril: { vein: 0x4a7ab0, hi: 0x8ec4ff, lo: 0x2a5080, patina: 0x6a9ad0, spark: 0xd0e8ff },
-  adamant: { vein: 0x3a8a4a, hi: 0x7ad090, lo: 0x246034, patina: 0x4aaa5a, spark: 0xc8f0d0 },
+  ...Object.fromEntries(METALS.filter((m) => m.oreLook).map((m) => [m.id, m.oreLook])),
 };
 
 const NEIGHBORS = [
@@ -108,7 +105,7 @@ export function buildOreRock(kind, seed = 1, depleted = false) {
   return bundle([[M, 0.08, 12, 0, 12]]);
 }
 
-/** Cart on a short pair of rails, heaped with copper and tin. Long axis on x. */
+/** Cart on a short pair of rails, heaped with copper and iron. Long axis on x. */
 export function buildMineCart(seed = 5) {
   const M = new VoxelModel(34, 22, 22);
   const wood = (x, y, z) => J(y % 4 === 0 ? 0x7a4c28 : 0x946036, x, y, z, seed, 0.08);
@@ -140,7 +137,7 @@ export function buildMineCart(seed = 5) {
       for (let y = 5; y < 5 + Math.max(0, h - 4); y++) {
         const roll = hash3(x, y, z, seed + 3);
         const cu = hash3(x >> 1, z >> 1, 0, seed + 4) > 0.5;
-        const base = roll > 0.55 ? (cu ? ORES.copper.vein : ORES.tin.vein) : roll > 0.25 ? 0x7d828b : 0x5f646d;
+        const base = roll > 0.55 ? (cu ? ORES.copper.vein : ORES.iron.vein) : roll > 0.25 ? 0x7d828b : 0x5f646d;
         M.set(x, y + 4, z, J(base, x, y, z, seed + 5, 0.1), roll > 0.97);
       }
     }
@@ -179,7 +176,7 @@ export function buildOrePile(seed = 7) {
   blob(M, 11, 3, 9, 8, 4.4, 6.2, (x, y, z) => {
     const r = hash3(x, y, z, seed);
     const cu = hash3(x >> 2, z >> 2, 0, seed + 1) > 0.5;
-    return J(r > 0.6 ? (cu ? ORES.copper.vein : ORES.tin.vein) : r > 0.3 ? 0x7d828b : 0x5f646d, x, y, z, seed, 0.1);
+    return J(r > 0.6 ? (cu ? ORES.copper.vein : ORES.iron.vein) : r > 0.3 ? 0x7d828b : 0x5f646d, x, y, z, seed, 0.1);
   }, seed, 0.5);
   return bundle([[M, 0.0625, 11, 0, 9]]);
 }
@@ -271,7 +268,7 @@ export function buildDock({ length = 11.1, width = 2.4, baseY = -1.5, deckY = 1,
 function oreChunk(kind) {
   const ore = ORES[kind] || ORES.iron;
   const M = new VoxelModel(16, 14, 16);
-  const seed = { copper: 4, tin: 9, iron: 14, coal: 19, mithril: 24, adamant: 29 }[kind] || 9;
+  const seed = { copper: 4, iron: 14, coal: 19, mithril: 24, adamite: 29, titanium: 34, platinum: 39 }[kind] || 9;
   blob(M, 8, 5, 8, 6, 4.4, 5.6, (x, y, z) => J(mix(0x6f747d, 0x8e939c, hash3(x >> 1, y >> 1, z >> 1, seed)), x, y, z, seed, 0.07), seed, 0.4);
   blob(M, 5, 3, 9, 3.6, 3, 3.4, (x, y, z) => J(mix(0x626770, 0x80858e, hash3(x >> 1, y >> 1, z >> 1, seed + 1)), x, y, z, seed + 1, 0.07), seed + 1, 0.4);
   const spots = [[8, 9, 7], [11, 6, 9], [5, 7, 5], [9, 5, 12], [4, 4, 9]];
@@ -779,12 +776,8 @@ function tintFish(id, mode) {
 }
 
 const GOODS_MODELS = {
-  copper_ore: () => oreChunk('copper'),
-  tin_ore: () => oreChunk('tin'),
-  iron_ore: () => oreChunk('iron'),
+  ...Object.fromEntries(METALS.filter((m) => m.ore).map((m) => [m.oreId, () => oreChunk(m.id)])),
   coal: () => oreChunk('coal'),
-  mithril_ore: () => oreChunk('mithril'),
-  adamant_ore: () => oreChunk('adamant'),
   shrimp: shrimpModel,
   trout: troutModel,
   pikeminnow: pikeMinnowModel,
@@ -816,10 +809,7 @@ const GOODS_MODELS = {
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),
   maple_logs: () => logStack('maple'),
-  iron_bar: ironBar,
-  steel_bar: () => tintBar(0xb8c0c8, 0x6e7680),
-  mithril_bar: () => tintBar(0x8ec4ff, 0x2a5080),
-  adamant_bar: () => tintBar(0x7ad090, 0x246034),
+  ...Object.fromEntries(METALS.map((m) => [m.barId, () => tintBar(m.theme.plateHi, m.theme.plateLo)])),
   arrowhead: arrowHead,
   feather,
   birch_shaft: () => arrowShaft('birch'),
@@ -829,10 +819,6 @@ const GOODS_MODELS = {
   iron_arrow: ironArrow,
   quiver: quiverModel,
 };
-
-function ironBar() {
-  return tintBar(0xd7dee6, 0x6e7680);
-}
 
 function tintBar(hi, lo) {
   const M = new VoxelModel(22, 8, 8);

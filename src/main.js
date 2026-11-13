@@ -2684,11 +2684,11 @@ class Game {
     }
     if (this.smithyNear && !this.smithyHinted) {
       this.smithyHinted = true;
-      this.hud.toast('The Smithy - press F to smelt copper and tin into iron bars', 2800);
+      this.hud.toast('The Smithy - press F to smelt ore into bars', 2800);
     }
     if (this.smithyNear) {
       const [sx, sy, vis] = this.screenOf(s.x, s.y + 3.2, s.z, true);
-      this.hud.plate('smithy', 'The Smithy<small>F · smelt iron</small>');
+      this.hud.plate('smithy', 'The Smithy<small>F · smelt bars</small>');
       this.hud.placePlate('smithy', sx, sy, vis);
     } else this.hud.removePlate('smithy');
     if (this.hud.panelId === 'smithy' && d > 5.2) this.hud.closePanel();

@@ -42,7 +42,7 @@ const NPC_DEFS = [
     lines: [
       'Steel and leather, friend. That greatsword on your back has seen better days.',
       'Wraiths cannot take a hit from the hammer. Heavy swings, heavy knockback.',
-      'Smelt the pit ore in the smithy beside us, then bring me the bars. Monster parts work too. The forge turns them into weapons and armor.',
+      'Smelt the pit ore in the smithy beside us, then bring me the bars. Copper first, then iron, then steel from iron and coal. Monster parts work too. The forge turns them into weapons and armor.',
     ],
   },
   {

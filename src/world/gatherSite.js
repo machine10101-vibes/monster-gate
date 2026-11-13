@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { DOCK, LAKE, MINE, TOWN, WATER_Y, ZONE } from './terrain.js';
 import { FISH } from '../data/gathering.js';
 import { SAND_MINE } from './desert.js';
+import { originOf, TILES } from './tiles.js';
 import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock, buildWoodStump } from './gatherModels.js';
 import { buildOak } from './models.js';
 import { goodsVoxels } from './gatherModels.js';
@@ -9,24 +10,31 @@ import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
 
 /** Rocks around the pit floor: angle from +x in degrees, ore type. */
-const ROCK_SPOTS = [
+export const ROCK_SPOTS = [
   { type: 'copper', a: -62, r: 3.7 },
   { type: 'copper', a: 4, r: 3.9 },
   { type: 'copper', a: 66, r: 3.7 },
-  { type: 'tin', a: -124, r: 3.5 },
-  { type: 'tin', a: 126, r: 3.5 },
+  { type: 'copper', a: -124, r: 3.5 },
+  { type: 'copper', a: 126, r: 3.5 },
   { type: 'iron', a: 180, r: 2.4 },
 ];
 
 /** Deepwell pit floor, world offsets from SAND_MINE. */
-const DEEPWELL_SPOTS = [
+export const DEEPWELL_SPOTS = [
   { type: 'iron', dx: -7, dz: 5 },
   { type: 'iron', dx: 8, dz: -4 },
   { type: 'coal', dx: -10, dz: -6 },
   { type: 'coal', dx: 6, dz: 9 },
   { type: 'mithril', dx: 1, dz: -9 },
   { type: 'mithril', dx: -5, dz: 11 },
-  { type: 'adamant', dx: 11, dz: 2 },
+  { type: 'adamite', dx: 11, dz: 2 },
+  { type: 'adamite', dx: -12, dz: 8 },
+];
+
+/** Higher-tier seams on later tiles, local tile coords. */
+export const ZONE_MINES = [
+  { kind: 'cinderfall', type: 'titanium', spots: [[108, 96], [118, 72], [92, 110]] },
+  { kind: 'glimmerfrost', type: 'platinum', spots: [[112, 36], [46, 104], [120, 92]] },
 ];
 
 export const FISH_SPOTS = [
@@ -406,9 +414,27 @@ function buildDeepwellMine(world) {
   world.rockNodes = nodes;
 }
 
+function buildZoneMines(world) {
+  const nodes = world.rockNodes || [];
+  let i = 80;
+  for (const site of ZONE_MINES) {
+    const tile = TILES.find((t) => t.kind === site.kind);
+    if (!tile) continue;
+    const o = originOf(tile);
+    const cx = o.x + 72;
+    const cz = o.z + 72;
+    for (const [lx, lz] of site.spots) {
+      nodes.push(addRock(world, site.type, o.x + lx, o.z + lz, i, cx, cz));
+      i += 1;
+    }
+  }
+  world.rockNodes = nodes;
+}
+
 export function buildGatherSites(world) {
   buildMine(world);
   buildDeepwellMine(world);
+  buildZoneMines(world);
   buildLake(world);
   buildRiver(world);
   buildIceHoles(world);

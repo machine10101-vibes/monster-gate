@@ -1,6 +1,7 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_FROM_LOG, SHAFT_IDS, SKILL_ORDER, SMELTS, levelForXp, xpForLevel } from '../data/gathering.js';
+import { aliasGearId, aliasGoodId } from '../data/metals.js';
 import { PORTAL_IDS } from '../data/portals.js';
 import { readJson, savesFrozen } from './saveio.js';
 import {
@@ -101,6 +102,7 @@ export class Progress {
     this.data.xp = normalizeXp(this.data.xp);
     this.data.goods = normalizeGoods(this.data.goods);
     this.data.materials = normalizeMaterials(this.data.materials);
+    migrateGearIds(this.data);
     if (!this.data.crafted || typeof this.data.crafted !== 'object') this.data.crafted = {};
     this.data.crafted.knife = true;
     this.data.hunter = normalizeHunter(this.data.hunter);
@@ -235,7 +237,18 @@ export class Progress {
   }
 
   canCraft(gear) {
+    if ((gear.reqSmith | 0) > this.level('smithing')) return false;
     return this.recipeReady(gear) && this.wouldFitCraft(gear);
+  }
+
+  craftLock(gear) {
+    if (!gear || gear.found) return 'found';
+    if (this.crafted(gear.id)) return 'crafted';
+    const need = gear.reqSmith | 0;
+    if (need && this.level('smithing') < need) return `smith:${need}`;
+    if (!this.recipeReady(gear)) return 'parts';
+    if (!this.wouldFitCraft(gear)) return 'full';
+    return '';
   }
 
   /** Monster parts and smelted goods share a recipe. */
@@ -271,6 +284,7 @@ export class Progress {
       if (g.type === 'armor') this.data.armor[g.slot] = id;
       else if (g.type === 'weapon') this.data.weapon = id;
     }
+    if (g.forgeXp > 0) this.addXp('smithing', g.forgeXp);
     this.save();
     if (g.slot === 'quiver') {
       if (!this.data.ammo && this.good('iron_arrow') > 0) this.data.ammo = 'iron_arrow';
@@ -605,6 +619,7 @@ export class Progress {
   smeltCan(id) {
     const rec = SMELTS[id];
     if (!rec) return 0;
+    if ((rec.level | 0) > this.level('smithing')) return 0;
     const byIng = rec.ins.reduce((n, [good, need]) => Math.min(n, Math.floor(this.good(good) / need)), 999);
     let n = 0;
     while (n < byIng) {
@@ -617,6 +632,14 @@ export class Progress {
     return n;
   }
 
+  smeltLocked(id) {
+    const rec = SMELTS[id];
+    if (!rec) return 'unknown';
+    if ((rec.level | 0) > this.level('smithing')) return `smith:${rec.level}`;
+    if (this.smeltCan(id) < 1) return 'parts';
+    return '';
+  }
+
   /** Run a named smelt. Pass `all` to drain the bag. */
   smelt(id, all = false) {
     const rec = SMELTS[id];
@@ -625,12 +648,13 @@ export class Progress {
     if (!rec || n < 1) return 0;
     for (const [good, need] of rec.ins) this.takeGood(good, need * n);
     this.addGood(rec.out, rec.n * n);
+    if (rec.xp > 0) this.addXp('smithing', rec.xp * n);
     return n * rec.n;
   }
 
-  /** One copper and one tin become one iron bar. Pass `all` to run the whole stack. */
+  /** Starter copper smelt. Pass `all` to run the whole stack. */
   smeltBars(all = false) {
-    return this.smelt('iron', all);
+    return this.smelt('copper', all);
   }
 
   /** One iron bar becomes fifteen arrowheads. */
@@ -923,7 +947,8 @@ function emptyStorage() {
 function storageEntry(item) {
   if (!item || typeof item !== 'object') return null;
   const k = item.k;
-  const id = typeof item.id === 'string' ? item.id : '';
+  const rawId = typeof item.id === 'string' ? item.id : '';
+  const id = k === 'good' ? aliasGoodId(rawId) : k === 'gear' ? aliasGearId(rawId) : rawId;
   let n = item.n | 0;
   if (!id || n < 1) return null;
   n = Math.min(n, 99999);
@@ -1009,10 +1034,32 @@ function normalizeGoods(raw) {
     const src = { ...raw };
     const oldShafts = src.arrow_shaft | 0;
     if (oldShafts > 0) src.birch_shaft = (src.birch_shaft | 0) + oldShafts;
-    for (const id of Object.keys(GOODS)) {
-      const n = src[id] | 0;
-      if (n > 0) out[id] = n;
+    for (const [rawId, n] of Object.entries(src)) {
+      const id = aliasGoodId(rawId);
+      const got = n | 0;
+      if (got > 0 && GOODS[id]) out[id] = (out[id] | 0) + got;
     }
   }
   return out;
+}
+
+function migrateGearIds(data) {
+  if (data.crafted && typeof data.crafted === 'object') {
+    const next = { ...data.crafted };
+    for (const id of Object.keys(data.crafted)) {
+      const live = aliasGearId(id);
+      if (live !== id) {
+        if (data.crafted[id]) next[live] = true;
+        delete next[id];
+      }
+    }
+    data.crafted = next;
+  }
+  if (data.armor && typeof data.armor === 'object') {
+    for (const slot of Object.keys(data.armor)) {
+      const id = data.armor[slot];
+      if (typeof id === 'string') data.armor[slot] = aliasGearId(id);
+    }
+  }
+  if (typeof data.weapon === 'string') data.weapon = aliasGearId(data.weapon);
 }
