@@ -38,6 +38,8 @@ worldView.setStatus('waking', { secondsLeft, elapsedMs })
 4. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` back to 30, `elapsedMs` back to 0).
 5. As soon as `/healthz` returns ok, call `setStatus('connecting')` (or `reconnecting` on a later attempt) and then open the socket. After `welcome`, call `setStatus('online', { online })`. `'online'` is what closes the wake screen.
 
+A `name_taken` error (duplicate hunter name) is fatal. The client calls `setStatus('error', { code: 'name_taken', message })` and does not reconnect.
+
 `GET /healthz` sends CORS headers so the GitHub Pages origin (`https://machine10101-vibes.github.io`) can read the response.
 
 ## Auth
@@ -238,6 +240,7 @@ AOI patch. Nearby hunters (≤ 32 units) are considered at 15 Hz; the outer ring
 | `debug` | a `debug` or `unlock` flag was sent. The socket is closed if this arrives before welcome. |
 | `auth` | missing / invalid token; guests are rejected |
 | `persist` | character load / create failed |
+| `name_taken` | the hunter name is already used by another account. Message: "That hunter name is already taken." The socket is closed. |
 | `rate` | move or chat too fast |
 | `teleport` | move jumped further than 40 units |
 | `chat` | empty / invalid channel |

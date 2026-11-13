@@ -302,13 +302,20 @@ export class MmoClient {
       this.nearby.delete(msg.id);
       this.view?.removePlayer?.(msg.id);
     } else if (msg.type === TYPES.error) {
+      if (msg.code === 'name_taken') {
+        this.fatal = true;
+        const message = msg.message || 'That hunter name is already taken.';
+        toast(this.game, message);
+        this.dispose('error', { code: 'name_taken', message });
+        return;
+      }
       if (msg.code === 'auth' || (msg.code === 'zone_full' && !this.you)) {
         this.fatal = true;
         toast(this.game, msg.message || (msg.code === 'zone_full' ? 'That town is full.' : 'Sign in to hunt online. Guests stay solo.'));
         this.dispose('offline', msg.message);
         return;
       }
-      this.view?.setStatus?.({ status: this.view.status || 'online', detail: msg.message || msg.code });
+      this.setStatus('error', { code: msg.code || 'error', message: msg.message || msg.code });
     }
   }
 

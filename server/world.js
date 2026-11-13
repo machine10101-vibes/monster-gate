@@ -198,7 +198,9 @@ export class World {
         if (!row) row = await this.persist.createCharacter(ident.userId, ident.name, { look: hello.look });
       } catch (err) {
         if (!slot) {
-          send(session.ws, errorFrame('persist', err.message || 'Could not load your hunter.'));
+          const code = err?.code === 'name_taken' ? 'name_taken' : 'persist';
+          const fallback = code === 'name_taken' ? 'That hunter name is already taken.' : 'Could not load your hunter.';
+          send(session.ws, errorFrame(code, err.message || fallback));
           session.ws.close();
           return;
         }

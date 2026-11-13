@@ -271,3 +271,20 @@ test('debug and unlock flags are rejected', async () => {
   b.close();
   await srv.close();
 });
+
+test('a taken hunter name is rejected with name_taken', async () => {
+  const { openPersistence } = await import('../store.js');
+  const persist = await openPersistence({ memory: true });
+  await persist.createCharacter(ANN, 'Ann');
+  const srv = await startWorld({ persist });
+  const b = await open(srv.url);
+  const msgs = [];
+  collect(b, msgs);
+  const closed = new Promise((resolve) => b.once('close', resolve));
+  b.send(encode('hello', { token: 'bea', name: 'Ann' }));
+  await waitUntil(() => msgs.some((m) => m.type === 'error' && m.code === 'name_taken'));
+  const err = msgs.find((m) => m.code === 'name_taken');
+  assert.match(err.message, /already taken/i);
+  await closed;
+  await srv.close();
+});
