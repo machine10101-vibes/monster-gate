@@ -1,7 +1,8 @@
 import { ARMOR_SLOTS, DEF_PER_POINT, DROPS, GEAR, MATERIALS, SETS, corePieces, gearById } from '../data/catalog.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
-import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_FROM_LOG, SHAFT_IDS, SKILL_ORDER, levelForXp, xpForLevel } from '../data/gathering.js';
+import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_FROM_LOG, SHAFT_IDS, SKILL_ORDER, SMELTS, levelForXp, xpForLevel } from '../data/gathering.js';
 import { PORTAL_IDS } from '../data/portals.js';
+import { readJson } from './saveio.js';
 
 const ANON_KEY = 'monster-gate-hunter-v1';
 
@@ -12,14 +13,18 @@ export function saveKey(address) {
   return address ? `${ANON_KEY}:${address}` : ANON_KEY;
 }
 
-function readRaw(key) {
-  try {
-    const raw = JSON.parse(localStorage.getItem(key) || 'null');
-    if (raw && typeof raw === 'object') return raw;
-  } catch {
-    /* corrupt save */
-  }
-  return null;
+function readRaw(key, into) {
+  const got = readJson(key);
+  if (got.corrupt && into) into.saveWarning = key;
+  return got.data;
+}
+
+/** Class pick grants 2 points. One more every 8 slayer kills. Chickens do not count. */
+export const SKILL_POINT_PER_KILLS = 8;
+
+export function skillPointsEarned(classId, kills, chicken) {
+  if (!classId) return 0;
+  return 2 + Math.floor(Math.max(0, (kills | 0) - (chicken | 0)) / SKILL_POINT_PER_KILLS);
 }
 
 const blank = () => ({
@@ -45,7 +50,8 @@ export class Progress {
     this.address = null;
     this.revision = 0;
     this.onCloud = null;
-    this.loadRaw(readRaw(ANON_KEY));
+    this.saveWarning = null;
+    this.loadRaw(readRaw(ANON_KEY, this));
   }
 
   /**
@@ -56,12 +62,12 @@ export class Progress {
    */
   useAddress(address) {
     this.address = address;
-    const own = readRaw(saveKey(address));
+    const own = readRaw(saveKey(address), this);
     if (own) {
       this.loadRaw(own);
       return 'loaded';
     }
-    const anon = readRaw(ANON_KEY);
+    const anon = readRaw(ANON_KEY, this);
     this.loadRaw(anon);
     // Do not stamp savedAt here. The guild record may already hold a newer hunt.
     this.save(false);
@@ -76,7 +82,7 @@ export class Progress {
   /** Bind to one character's own hunt. Nothing is claimed from older saves. */
   useCharacter(key) {
     this.address = key;
-    this.loadRaw(readRaw(saveKey(key)));
+    this.loadRaw(readRaw(saveKey(key), this));
     this.save(false);
   }
 
@@ -216,8 +222,10 @@ export class Progress {
     const g = gearById(id);
     if (!g || this.crafted(id)) return false;
     this.data.crafted[id] = true;
-    if (g.type === 'weapon' && !this.data.weapon) this.data.weapon = id;
-    if (g.type === 'armor' && !this.data.armor[g.slot]) this.data.armor[g.slot] = id;
+    if (this.meetsReq(g)) {
+      if (g.type === 'weapon' && !this.data.weapon) this.data.weapon = id;
+      if (g.type === 'armor' && !this.data.armor[g.slot]) this.data.armor[g.slot] = id;
+    }
     this.save();
     return true;
   }
@@ -232,8 +240,10 @@ export class Progress {
     }
     this._filling = false;
     this.data.crafted[id] = true;
-    if (g.type === 'armor') this.data.armor[g.slot] = id;
-    else if (g.type === 'weapon') this.data.weapon = id;
+    if (this.meetsReq(g)) {
+      if (g.type === 'armor') this.data.armor[g.slot] = id;
+      else if (g.type === 'weapon') this.data.weapon = id;
+    }
     this.save();
     if (g.slot === 'quiver') {
       if (!this.data.ammo && this.good('iron_arrow') > 0) this.data.ammo = 'iron_arrow';
@@ -248,10 +258,17 @@ export class Progress {
     return g.type === 'armor' ? this.data.armor[g.slot] === id : this.data.weapon === id;
   }
 
+  meetsReq(gear) {
+    const need = gear?.reqLevel | 0;
+    if (!need) return true;
+    return this.level('strength') >= need;
+  }
+
   toggleWear(id) {
     const g = gearById(id);
     if (!g || !this.crafted(id)) return;
     const off = this.worn(id);
+    if (!off && !this.meetsReq(g)) return;
     if (g.type === 'armor') this.data.armor[g.slot] = off ? null : id;
     else this.data.weapon = off ? null : id;
     this.save();
@@ -345,7 +362,7 @@ export class Progress {
   }
 
   skillPoints() {
-    const earned = (this.classId ? 2 : 0) + Math.floor((this.totalKills() - this.kills('chicken')) / 2);
+    const earned = skillPointsEarned(this.classId, this.totalKills(), this.kills('chicken'));
     let spent = 0;
     const learned = this.data.skills?.learned || {};
     for (const id of Object.keys(learned)) {
@@ -486,15 +503,27 @@ export class Progress {
     return true;
   }
 
+  /** How many times a smelt recipe can run with the current bag. */
+  smeltCan(id) {
+    const rec = SMELTS[id];
+    if (!rec) return 0;
+    return rec.ins.reduce((n, [good, need]) => Math.min(n, Math.floor(this.good(good) / need)), 999);
+  }
+
+  /** Run a named smelt. Pass `all` to drain the bag. */
+  smelt(id, all = false) {
+    const rec = SMELTS[id];
+    const can = this.smeltCan(id);
+    const n = all ? can : Math.min(1, can);
+    if (!rec || n < 1) return 0;
+    for (const [good, need] of rec.ins) this.takeGood(good, need * n);
+    this.addGood(rec.out, rec.n * n);
+    return n * rec.n;
+  }
+
   /** One copper and one tin become one iron bar. Pass `all` to run the whole stack. */
   smeltBars(all = false) {
-    const can = Math.min(this.good('copper_ore'), this.good('tin_ore'));
-    const n = all ? can : Math.min(1, can);
-    if (n < 1) return 0;
-    this.takeGood('copper_ore', n);
-    this.takeGood('tin_ore', n);
-    this.addGood('iron_bar', n);
-    return n;
+    return this.smelt('iron', all);
   }
 
   /** One iron bar becomes fifteen arrowheads. */

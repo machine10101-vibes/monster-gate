@@ -740,8 +740,9 @@ export class Catalog {
         ? g.stats.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')
         : `<div><small>Slot</small><b>${SLOT_LABEL[g.slot]}</b></div><div><small>Defense</small><b>+${g.def}</b></div>${g.bonus ? `<div><small>Bonus</small><b>${bonusText(g.bonus)}</b></div>` : ''}`;
     const kindTag = g.type === 'weapon' ? WEAPON_LABEL[g.wtype] : `${set ? TIER_LABEL[set.tier] + ' ' : ''}${SLOT_LABEL[g.slot]}`;
+    const reqTag = g.reqLevel ? `<span>Strength ${g.reqLevel}</span>` : '';
     info.innerHTML = `<h3>${esc(g.name)}</h3>
-      <div class="cat-tags"><span>${kindTag}</span><span>From ${esc(m.name)}</span></div>
+      <div class="cat-tags"><span>${kindTag}</span><span>From ${esc(m.name)}</span>${reqTag}</div>
       <p>${esc(g.desc)}</p>
       <div class="cat-stats">${stats}</div>`;
     if (g.found) info.appendChild(el('p', 'cat-muted', g.monster === 'orcscout' ? 'Orc Scouts drop this. It is not forged at the smithy.' : `${m.name}s drop this whole, and only rarely (1 to 2%). It cannot be forged.`));
@@ -776,8 +777,10 @@ export class Catalog {
       if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the forge beside Greyrock Pit, just outside Oakhollow.'));
     } else {
       const worn = pr.worn(g.id);
-      const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip' : 'Wear');
+      const locked = !worn && g.reqLevel && !pr.meetsReq(g);
+      const b = el('button', 'cat-btn go', worn ? 'Unequip' : locked ? `Need Strength ${g.reqLevel}` : g.type === 'weapon' ? 'Equip' : 'Wear');
       b.type = 'button';
+      b.disabled = !!locked;
       b.onclick = () => {
         this.game.wearPiece(g.id);
         this.render();

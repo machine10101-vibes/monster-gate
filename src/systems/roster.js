@@ -1,6 +1,7 @@
 import { Progress, saveKey } from './progress.js';
 import { CLASSES } from '../data/skills.js';
 import { SKILL_ORDER } from '../data/gathering.js';
+import { dropKey, readJson as readStored, writeJson } from './saveio.js';
 
 export const MAX_CHARACTERS = 8;
 const META_KEY = 'monster-gate-roster-v1';
@@ -82,30 +83,10 @@ function defaultName(label) {
   return titled.length >= 2 ? titled : 'Hunter';
 }
 
-function readJson(key) {
-  try {
-    const raw = JSON.parse(localStorage.getItem(key) || 'null');
-    if (raw && typeof raw === 'object') return raw;
-  } catch {
-    /* corrupt entry */
-  }
-  return null;
-}
-
-function writeJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-function dropKey(key) {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    /* already gone */
-  }
+function readJson(key, roster) {
+  const got = readStored(key);
+  if (got.corrupt && roster) roster.saveWarning = key;
+  return got.data;
 }
 
 function newId() {
@@ -163,6 +144,7 @@ export class Roster {
     this.last = null;
     this.savedAt = 0;
     this.revision = 0;
+    this.saveWarning = null;
     this.load();
   }
 
@@ -175,11 +157,11 @@ export class Roster {
   }
 
   hunt(id) {
-    return readJson(this.huntKey(id)) || null;
+    return readJson(this.huntKey(id), this) || null;
   }
 
   load() {
-    const meta = readJson(`${META_KEY}:${this.owner}`);
+    const meta = readJson(`${META_KEY}:${this.owner}`, this);
     this.chars = [];
     this.deleted = [];
     this.last = null;
@@ -204,8 +186,8 @@ export class Roster {
 
   /** Hunts saved before characters existed become the account's first character. */
   migrate() {
-    const own = readJson(saveKey(this.owner));
-    const anon = own ? null : readJson(saveKey(null));
+    const own = readJson(saveKey(this.owner), this);
+    const anon = own ? null : readJson(saveKey(null), this);
     const old = own || anon;
     if (!old) return;
     const name = defaultName(this.label);

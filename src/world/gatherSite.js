@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DOCK, LAKE, MINE, TOWN, WATER_Y, ZONE } from './terrain.js';
 import { FISH } from '../data/gathering.js';
+import { SAND_MINE } from './desert.js';
 import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock, buildWoodStump } from './gatherModels.js';
 import { buildOak } from './models.js';
 import { goodsVoxels } from './gatherModels.js';
@@ -14,6 +15,18 @@ const ROCK_SPOTS = [
   { type: 'copper', a: 66, r: 3.7 },
   { type: 'tin', a: -124, r: 3.5 },
   { type: 'tin', a: 126, r: 3.5 },
+  { type: 'iron', a: 180, r: 2.4 },
+];
+
+/** Deepwell pit floor, world offsets from SAND_MINE. */
+const DEEPWELL_SPOTS = [
+  { type: 'iron', dx: -7, dz: 5 },
+  { type: 'iron', dx: 8, dz: -4 },
+  { type: 'coal', dx: -10, dz: -6 },
+  { type: 'coal', dx: 6, dz: 9 },
+  { type: 'mithril', dx: 1, dz: -9 },
+  { type: 'mithril', dx: -5, dz: 11 },
+  { type: 'adamant', dx: 11, dz: 2 },
 ];
 
 export const FISH_SPOTS = [
@@ -88,6 +101,37 @@ function ground(world, x, z) {
   return world.heightAt(x, z);
 }
 
+function addRock(world, type, x, z, i, cx, cz) {
+  const gy = ground(world, x, z);
+  const full = partsToGroup(world, buildOreRock(type, 3 + i * 2, false));
+  const dead = partsToGroup(world, buildOreRock(type, 3 + i * 2, true));
+  const root = new THREE.Group();
+  root.position.set(x, gy, z);
+  root.rotation.y = hashAngle(i);
+  dead.visible = false;
+  root.add(full, dead);
+  world.group.add(root);
+  const inward = Math.atan2(cz - z, cx - x);
+  const node = {
+    id: `${type}${i}`,
+    type,
+    x,
+    z,
+    y: gy,
+    standX: x + Math.cos(inward) * 1.45,
+    standZ: z + Math.sin(inward) * 1.45,
+    root,
+    full,
+    dead,
+    ready: true,
+    respawnT: 0,
+    pop: 0,
+  };
+  world.circle(x, z, 0.78);
+  world.occupy(x, z, 1.6);
+  return node;
+}
+
 function buildMine(world) {
   const m = world.models;
   const y = MINE.floorH;
@@ -96,33 +140,7 @@ function buildMine(world) {
     const ang = (spot.a * Math.PI) / 180;
     const x = MINE.x + Math.cos(ang) * spot.r;
     const z = MINE.z + Math.sin(ang) * spot.r;
-    const gy = ground(world, x, z);
-    const full = partsToGroup(world, buildOreRock(spot.type, 3 + i * 2, false));
-    const dead = partsToGroup(world, buildOreRock(spot.type, 3 + i * 2, true));
-    const root = new THREE.Group();
-    root.position.set(x, gy, z);
-    root.rotation.y = hashAngle(i);
-    dead.visible = false;
-    root.add(full, dead);
-    world.group.add(root);
-    const inward = Math.atan2(MINE.z - z, MINE.x - x);
-    nodes.push({
-      id: `${spot.type}${i}`,
-      type: spot.type,
-      x,
-      z,
-      y: gy,
-      standX: x + Math.cos(inward) * 1.45,
-      standZ: z + Math.sin(inward) * 1.45,
-      root,
-      full,
-      dead,
-      ready: true,
-      respawnT: 0,
-      pop: 0,
-    });
-    world.circle(x, z, 0.78);
-    world.occupy(x, z, 1.6);
+    nodes.push(addRock(world, spot.type, x, z, i, MINE.x, MINE.z));
   });
   world.rockNodes = nodes;
 
@@ -379,8 +397,18 @@ function buildWoods(world) {
   world.woodGroves = WOOD_GROVES;
 }
 
+function buildDeepwellMine(world) {
+  const nodes = world.rockNodes || [];
+  const { x: cx, z: cz } = SAND_MINE;
+  DEEPWELL_SPOTS.forEach((spot, i) => {
+    nodes.push(addRock(world, spot.type, cx + spot.dx, cz + spot.dz, 40 + i, cx, cz));
+  });
+  world.rockNodes = nodes;
+}
+
 export function buildGatherSites(world) {
   buildMine(world);
+  buildDeepwellMine(world);
   buildLake(world);
   buildRiver(world);
   buildIceHoles(world);

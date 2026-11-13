@@ -22,7 +22,7 @@ export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
   { id: 'pick', icon: 'pick', name: 'Iron Pickaxe', kind: 'melee', dmg: 6, reach: 2.2, arc: 1.6, dur: 0.34, hit: 0.14, stam: 6, knock: 3, held: 'pick', desc: 'Quick swings, light damage.' },
   { id: 'axe', icon: 'axe', name: 'Woodcutter Axe', kind: 'melee', style: 'twohand', dmg: 8, reach: 2.3, arc: 1.8, dur: 0.44, hit: 0.2, stam: 9, knock: 4, held: 'axe', desc: 'Two-handed chops.' },
-  { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', style: 'twohand', dmg: 15, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'A two-handed hammer. Slow, bone-shaking blows.' },
+  { id: 'hammer', icon: 'hammer', name: 'Stone Hammer', kind: 'melee', style: 'twohand', dmg: 10, reach: 2.4, arc: 2.3, dur: 0.7, hit: 0.34, stam: 16, knock: 8, held: 'hammer', desc: 'A two-handed hammer. Slow, bone-shaking blows.' },
   { id: 'bow', icon: 'bow', name: 'Short Bow', kind: 'ranged', style: 'shortbow', dmg: 7, dur: 0.5, stam: 7, held: 'bow', desc: 'A short bow. Loose arrows at range.' },
   { id: 'stone', icon: 'stone', name: 'Throwing Stone', kind: 'throw', dmg: 4, dur: 0.38, stam: 4, count: 12, held: 'stone', desc: 'Pocket-sized pain.' },
   { id: 'potion', icon: 'potion', name: 'Healing Potion', kind: 'use', count: 10, held: 'potion', heal: 8, desc: 'Restores 8 health.' },

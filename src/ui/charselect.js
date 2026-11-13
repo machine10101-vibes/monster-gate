@@ -69,7 +69,9 @@ export class CharacterSelect {
     g.sky.setHour(18.4);
     try {
       this.stage.show();
-      $('cs-account').textContent = g.wallet?.email || shortAddress(g.wallet?.address || '');
+      $('cs-account').textContent = g.wallet?.kind === 'guest'
+        ? 'Playing as guest'
+        : (g.wallet?.email || shortAddress(g.wallet?.address || ''));
       g.paintCloudStatus?.();
       this.filter = '';
       $('cs-search').value = '';
