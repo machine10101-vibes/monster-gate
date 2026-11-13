@@ -393,24 +393,49 @@ const SWORDS = {
 
 /**
  * Maul heads carry their spikes out to the sides, with a broad cheek facing
- * down the haft. Turn the head a quarter around its middle so a spike points
- * forward, the way a sword's edge leads a cut. The iron mallet's caps already
+ * down the haft. Turn the head a quarter around the haft so a spike points
+ * forward. The pivot is the barrel, not the spike tip, and the haft stays put
+ * so the head remains seated on the handle. The iron mallet's caps already
  * face down the haft, so it is left alone.
  */
 function turnStrike(c, zMin) {
-  const head = [];
-  let mnz = 1e9;
-  let mxz = -1e9;
+  const cells = [];
   c.each((x, y, z, col, glow) => {
-    if (z < zMin) return;
-    head.push([x, y, z, col, glow]);
-    mnz = Math.min(mnz, z);
-    mxz = Math.max(mxz, z);
+    if (z >= zMin) cells.push([x, y, z, col, glow]);
   });
-  if (!head.length) return;
-  const cz = Math.round((mnz + mxz) / 2);
+  if (!cells.length) return;
+  const bulk = new Map();
+  for (const [x, y, z] of cells) {
+    if (Math.hypot(x + 0.5, y + 0.5) > 12) continue;
+    bulk.set(z, (bulk.get(z) || 0) + 1);
+  }
+  let peak = 0;
+  for (const n of bulk.values()) peak = Math.max(peak, n);
+  let sum = 0;
+  let cnt = 0;
+  for (const [z, n] of bulk) {
+    if (n < peak * 0.5) continue;
+    sum += z * n;
+    cnt += n;
+  }
+  const cz = cnt ? Math.round(sum / cnt) : zMin;
+  const onHaft = (x, y) => Math.hypot(x + 0.5, y + 0.5) <= 2.7;
+  const head = cells.filter(([x, y, z]) => !(onHaft(x, y) && z <= zMin + 10));
   for (const [x, y, z] of head) c.clear(x, y, z);
-  for (const [x, y, z, col, glow] of head) c.set(-(z - cz), y, x + cz, col, glow);
+  const moved = [];
+  let back = 1e9;
+  for (const [x, y, z, col, glow] of head) {
+    const nx = -(z - cz);
+    const nz = x + cz;
+    moved.push([nx, y, nz, col, glow]);
+    if (Math.hypot(nx + 0.5, y + 0.5) < 12) back = Math.min(back, nz);
+  }
+  let tip = zMin - 1;
+  c.each((x, y, z) => {
+    if (onHaft(x, y)) tip = Math.max(tip, z);
+  });
+  const dz = Math.round(tip - 6 - back);
+  for (const [x, y, z, col, glow] of moved) c.set(x, y, z + dz, col, glow);
 }
 
 /** Banded block head with rounded corners. */
