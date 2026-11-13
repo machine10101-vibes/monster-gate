@@ -406,3 +406,44 @@ test('a second accept of the same request fails after the first succeeds', async
   b.ws.close();
 });
 
+
+test('empty social target names return name and do not resolve to Hunter', async (t) => {
+  const srv = await start(t);
+  const a = await join(srv, 'ann', 'Ann');
+  const h = await join(srv, 'bea', 'Hunter');
+  assert.equal(h.welcome.you.name, 'Hunter');
+
+  async function expectName(type, payload) {
+    const before = a.msgs.filter((m) => m.type === 'error' && m.code === 'name').length;
+    a.ws.send(encode(type, payload));
+    await waitUntil(() => a.msgs.filter((m) => m.type === 'error' && m.code === 'name').length > before);
+  }
+
+  for (const empty of ['', '   ']) {
+    await expectName('friend_request', { name: empty });
+    await pace(null, 300);
+    await expectName('party_invite', { name: empty });
+    await pace(null, 300);
+    await expectName('whisper', { to: empty, text: 'Hi' });
+    await pace(null, 300);
+    await expectName('whisper', { name: empty, text: 'Hi' });
+    await pace(null, 300);
+    await expectName('block', { name: empty });
+    await pace(null, 300);
+  }
+
+  assert.equal(h.msgs.some((m) => m.type === 'friend_request'), false);
+  assert.equal(h.msgs.some((m) => m.type === 'party_invite'), false);
+  assert.equal(h.msgs.some((m) => m.type === 'chat' && m.channel === 'whisper'), false);
+  assert.equal((latest(a.msgs, 'friend_list')?.blocked || []).length, 0);
+  assert.equal(a.msgs.some((m) => m.type === 'error' && m.code !== 'name' && m.code !== undefined && ['not_found', 'whisper', 'already', 'full'].includes(m.code)), false);
+
+  a.ws.send(encode('friend_request', { name: 'Hunter' }));
+  await waitUntil(() => h.msgs.some((m) => m.type === 'friend_request' && m.from?.user_id === ANN));
+  a.ws.send(encode('whisper', { to: 'Hunter', text: 'Real name works.' }));
+  await waitUntil(() => h.msgs.some((m) => m.type === 'chat' && m.channel === 'whisper' && m.text === 'Real name works.'));
+
+  a.ws.close();
+  h.ws.close();
+  await srv.close();
+});

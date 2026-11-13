@@ -7,7 +7,7 @@
  * Block and ignore are process-local until the persistence API adds them.
  */
 
-import { TYPES, cleanName, cleanText, ProtocolError } from './protocol.js';
+import { TYPES, cleanTargetName, cleanText, ProtocolError } from './protocol.js';
 import {
   FRIENDS_CAP, WELCOME_FEATURES, callFriends, isUserId, requireUserId, SocialError,
 } from './friends.js';
@@ -61,7 +61,7 @@ export function createSocialRuntime(world, opts = {}) {
   }
 
   function findByName(raw) {
-    const name = cleanName(raw);
+    const name = cleanTargetName(raw);
     if (!name) return null;
     const hit = names.get(name.toLowerCase());
     if (hit) {
@@ -83,7 +83,7 @@ export function createSocialRuntime(world, opts = {}) {
       if (known) return { userId: id, name: known.name, id: known.id || '', live: null };
       return { userId: id, name: '', id: '', live: null, unknown: true };
     }
-    const name = cleanName(msg.name);
+    const name = cleanTargetName(msg.name);
     if (!name) throw new SocialError('name', 'Need a hunter name.');
     const hit = findByName(name);
     if (!hit?.userId) throw new SocialError('not_found', 'No hunter by that name.');
@@ -115,7 +115,7 @@ export function createSocialRuntime(world, opts = {}) {
       if (live) return live;
       throw new SocialError('offline', 'They are not online.');
     }
-    const name = cleanName(msg.name);
+    const name = cleanTargetName(msg.name);
     if (!name) throw new SocialError('name', 'Need a hunter name.');
     const hit = findByName(name);
     const live = hit?.userId ? sessionByUser(hit.userId) : (hit?.id ? sessionById(hit.id) : null);
@@ -365,7 +365,7 @@ export function createSocialRuntime(world, opts = {}) {
 
   function friendQuery(msg) {
     if (msg.user_id && isUserId(msg.user_id)) return requireUserId(msg.user_id);
-    const name = cleanName(msg.name || msg.user_id || msg.id);
+    const name = cleanTargetName(msg.name || msg.user_id || msg.id);
     if (!name) throw new SocialError('name', 'Need a hunter name.');
     return name;
   }
@@ -492,19 +492,32 @@ export function createSocialRuntime(world, opts = {}) {
     broadcastParty(party);
   }
 
+  function resolveWhisperTarget(msg) {
+    const toRaw = typeof msg.to === 'string' ? msg.to : '';
+    const to = toRaw.trim();
+    if (to) {
+      const byId = sessionById(to) || (isUserId(to) ? sessionByUser(requireUserId(to)) : null);
+      if (byId) return byId;
+      const name = cleanTargetName(to);
+      if (!name) throw new SocialError('name', 'Need a hunter name.');
+      const hit = findByName(name);
+      const live = hit?.userId ? sessionByUser(hit.userId) : null;
+      if (!live) throw new SocialError('whisper', 'Could not whisper.');
+      return live;
+    }
+    const name = cleanTargetName(msg.name);
+    if (!name) throw new SocialError('name', 'Need a hunter name.');
+    const hit = findByName(name);
+    const live = hit?.userId ? sessionByUser(hit.userId) : null;
+    if (!live) throw new SocialError('whisper', 'Could not whisper.');
+    return live;
+  }
+
   function whisper(session, msg) {
     const text = cleanText(msg.text);
     if (!text) throw new ProtocolError('chat', 'Empty chat.');
     if (session.limiter && !session.limiter.allowChat()) throw new ProtocolError('rate', 'Slow down.');
-    let target = null;
-    if (typeof msg.to === 'string' && msg.to) {
-      target = sessionById(msg.to) || (isUserId(msg.to) ? sessionByUser(requireUserId(msg.to)) : null);
-      if (!target) {
-        const hit = findByName(msg.to);
-        target = hit?.userId ? sessionByUser(hit.userId) : null;
-      }
-    }
-    if (!target) throw new SocialError('whisper', 'Could not whisper.');
+    const target = resolveWhisperTarget(msg);
     if (target.id === session.id) throw new SocialError('self', 'That hunter is you.');
     if (isBlocked(session.userId, target.userId)) throw new SocialError('blocked', 'Blocked.');
     if (isIgnoredBy(target.userId, session.userId)) throw new SocialError('ignored', 'They are ignoring invites.');

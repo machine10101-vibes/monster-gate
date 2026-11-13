@@ -232,7 +232,7 @@ AOI patch. Nearby hunters (≤ 32 units) are considered at 15 Hz; the outer ring
 
 ### friend_request / friend_accept / friend_decline / friend_remove / friend_list
 
-Friends are keyed by account `user_id`. Lookup by hunter `name` is resolved server-side (case-insensitive, trimmed, 16 characters). Guests cannot use friends (`error` `auth`). A hunter may have at most **100** accepted friends (pending outgoing requests count toward the cap too).
+Friends are keyed by account `user_id`. Lookup by hunter `name` is resolved server-side (case-insensitive, trimmed, 16 characters). An empty, whitespace-only, or otherwise invalid `name` is `error` `name` — it is never treated as "Hunter". Guests cannot use friends (`error` `auth`). A hunter may have at most **100** accepted friends (pending outgoing requests count toward the cap too).
 
 ```json
 { "v": 1, "type": "friend_request", "name": "Bram" }
@@ -247,7 +247,7 @@ Friends are keyed by account `user_id`. Lookup by hunter `name` is resolved serv
 
 ### block / unblock / ignore / unignore
 
-Block: they cannot friend, invite, or whisper you; you do not see their world or zone chat. Ignore: drop whispers and invites, still see them in the world. These lists are capped at 100 each.
+Block: they cannot friend, invite, or whisper you; you do not see their world or zone chat. Ignore: drop whispers and invites, still see them in the world. These lists are capped at 100 each. Lookup by `name` uses the same rules as friends (empty or invalid `name` is `error` `name`, not "Hunter").
 
 ```json
 { "v": 1, "type": "block", "user_id": "uuid" }
@@ -258,7 +258,7 @@ Block: they cannot friend, invite, or whisper you; you do not see their world or
 
 ### party_invite / party_accept / party_decline / party_leave / party_kick / party_promote
 
-Parties are in-memory on the world server (not a save file). Max **4** including the leader. Invites expire after **60 seconds**. The target must be online. Only the leader may kick or promote. You cannot kick yourself (leave instead). A hunter may have one pending incoming party invite; a new invite from the same leader replaces the old one, and an invite from another leader returns `busy`. The party disbands when fewer than two members remain. If the leader leaves or disconnects, the oldest remaining member is promoted.
+Parties are in-memory on the world server (not a save file). Max **4** including the leader. Invites expire after **60 seconds**. The target must be online. Invite by `name` uses the same rules as friends (empty or invalid `name` is `error` `name`, not "Hunter"). Only the leader may kick or promote. You cannot kick yourself (leave instead). A hunter may have one pending incoming party invite; a new invite from the same leader replaces the old one, and an invite from another leader returns `busy`. The party disbands when fewer than two members remain. If the leader leaves or disconnects, the oldest remaining member is promoted.
 
 ```json
 { "v": 1, "type": "party_invite", "id": "u_…" }
@@ -277,7 +277,7 @@ Parties are in-memory on the world server (not a save file). Max **4** including
 { "v": 1, "type": "chat", "channel": "whisper", "to": "u_…", "text": "Meet at the well." }
 ```
 
-Text is trimmed to 120 characters, same rate as chat. The server echoes a `chat` frame with `channel: "whisper"` to both sides.
+`to` may be a hunter id, account `user_id`, or hunter name. A `name` field is also accepted. Empty or whitespace-only names are `error` `name`, not a player named Hunter. Text is trimmed to 120 characters, same rate as chat. The server echoes a `chat` frame with `channel: "whisper"` to both sides.
 
 ## Server → client (social)
 
@@ -370,7 +370,7 @@ Shared XP and loot (`loot_roll` / `loot_result`, 8% bonus per extra member in-zo
 | `not_leader` | kick or promote from a member |
 | `not_in_party` | leave, kick, or promote with no party |
 | `in_party` | target is already in another party |
-| `name` | empty or invalid hunter name |
+| `name` | empty, whitespace-only, or invalid hunter name on a social target (`friend_request`, `party_invite`, `block`, `whisper`, and other name lookups). Empty names are not treated as Hunter. |
 | `whisper` | whisper failed (offline, blocked, or feature off) |
 | `busy` | target has a pending invite from another leader |
 

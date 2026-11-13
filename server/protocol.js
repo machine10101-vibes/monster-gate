@@ -79,6 +79,12 @@ export function cleanName(raw) {
   return String(raw || 'Hunter').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX) || 'Hunter';
 }
 
+/** Trim a social *target* name. Empty or whitespace-only input stays empty; never defaults to Hunter. */
+export function cleanTargetName(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
+}
+
 export function cleanText(raw) {
   return String(raw || '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
 }
