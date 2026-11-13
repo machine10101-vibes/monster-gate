@@ -1,6 +1,7 @@
 /**
  * The guild record on Supabase. The browser only talks to the hunter function.
  * Email accounts are Supabase Auth users. The publishable key only identifies the project.
+ * Wallet-keyed hunter_sessions tokens cannot load or save a hunt.
  */
 
 const TOKEN_KEY = 'monster-gate-cloud-token';
@@ -45,24 +46,9 @@ export async function cloudEnabled() {
   return !!(cfg.url && cfg.key);
 }
 
-function readToken(address) {
-  try {
-    const raw = JSON.parse(sessionStorage.getItem(TOKEN_KEY) || 'null');
-    if (raw?.address === address && typeof raw.token === 'string' && Date.parse(raw.expiresAt) > Date.now() + 60_000) {
-      return raw.token;
-    }
-  } catch {
-    /* a bad cache just means we sign the session in again */
-  }
-  return '';
-}
-
-function storeToken(address, token, expiresAt) {
-  try {
-    sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ address, token, expiresAt }));
-  } catch {
-    /* the token still works until this page closes */
-  }
+/** Hunts sync only for email (including Klever-linked email) sessions. */
+export function cloudHuntAllowed(session) {
+  return session?.kind === 'email';
 }
 
 export function clearCloudToken() {
@@ -90,70 +76,11 @@ export async function guildPost(body, keepalive = false) {
   return { status: res.status, json };
 }
 
-async function ensureToken(session) {
-  const existing = readToken(session.address);
-  if (existing) return existing;
-  const res = await guildPost({
-    op: 'auth',
-    address: session.address,
-    message: session.message,
-    signature: session.signature,
-  });
-  if (!res || res.status !== 200 || typeof res.json.token !== 'string') {
-    throw new Error(res?.json?.error || 'The guild record could not be opened.');
-  }
-  storeToken(session.address, res.json.token, res.json.expiresAt);
-  return res.json.token;
-}
-
-async function withToken(session, body, keepalive) {
-  const token = await ensureToken(session);
-  let res = await guildPost({ ...body, token }, keepalive);
-  if (res?.status === 401) {
-    clearCloudToken();
-    const again = await ensureToken(session);
-    res = await guildPost({ ...body, token: again }, keepalive);
-  }
-  return res;
-}
-
-function stamp(data) {
-  const progress = { ...data };
-  if (!Number.isFinite(Number(progress.savedAt))) progress.savedAt = Date.now();
-  return progress;
-}
-
-/** Pull the hunt saved to this wallet. Null means this wallet has no row yet. */
-export async function pullHunt(session) {
-  const res = await withToken(session, { op: 'load' }, false);
-  if (!res || res.status !== 200) throw new Error(res?.json?.error || 'The guild record could not be opened.');
-  if (!res.json.progress) return null;
-  return {
-    progress: res.json.progress,
-    revision: Number(res.json.revision) || 0,
-    savedAt: Number(res.json.savedAt) || 0,
-  };
-}
-
-/** Push this hunt. A 409 means another device saved a newer one. */
+/** Push this hunt. Email sessions only. A 409 means another device saved a newer one. */
 export async function pushHunt(session, data, keepalive = false) {
-  if (session?.kind === 'email') {
-    const { pushEmailHunt } = await import('./account.js');
-    return pushEmailHunt(session, data, keepalive);
-  }
-  const progress = stamp(data);
-  if (progress !== data) data.savedAt = progress.savedAt;
-  const res = await withToken(session, { op: 'save', progress }, keepalive);
-  if (res?.status === 409) {
-    return {
-      conflict: true,
-      progress: res.json.progress,
-      revision: Number(res.json.revision) || 0,
-      savedAt: Number(res.json.savedAt) || 0,
-    };
-  }
-  if (!res || res.status !== 200) throw new Error(res?.json?.error || 'The guild record could not be saved.');
-  return { revision: Number(res.json.revision) || 0, savedAt: Number(res.json.savedAt) || 0 };
+  if (!cloudHuntAllowed(session)) return { error: true };
+  const { pushEmailHunt } = await import('./account.js');
+  return pushEmailHunt(session, data, keepalive);
 }
 
 /**
@@ -224,17 +151,12 @@ export async function reconcileHunt(progress, remote, push) {
  * A download that finishes is still applied.
  */
 export async function syncHunt(session, progress, gate = { open: true }) {
-  if (session?.kind === 'email') {
-    const { syncEmailHunt } = await import('./account.js');
-    return syncEmailHunt(session, progress, gate);
+  if (!cloudHuntAllowed(session)) {
+    clearCloudToken();
+    return { state: 'off', replaced: false };
   }
-  const cfg = await loadCloudConfig();
-  if (!cfg.url || !cfg.key) return { state: 'off', replaced: false };
-  const remote = await pullHunt(session);
-  return reconcileHunt(progress, remote, () => {
-    if (!gate.open) return Promise.resolve({ abandoned: true });
-    return pushHunt(session, progress.data);
-  });
+  const { syncEmailHunt } = await import('./account.js');
+  return syncEmailHunt(session, progress, gate);
 }
 
 /** Debounce gameplay saves so a fight does not write the guild record on every hit. */
