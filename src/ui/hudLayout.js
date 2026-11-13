@@ -7,7 +7,9 @@
 export const MENU_COUNT = 11;
 export const QUEST_KEY = 'mg-quest-open';
 export const ACTION_GAP = 8;
+export const MENU_INSET = 4;
 export const QUEST_MAX_W = 340;
+export const TOUCH_ATTACK_W = 84;
 
 export const HUD_VIEWPORTS = [
   { name: 'phone-landscape', w: 844, h: 390, touch: true },
@@ -67,7 +69,7 @@ export function hudRects(vp, { questOpen = false } = {}) {
   const touch = !!vp.touch;
   const short = h <= 500;
   const menu = fitMenuButtons(h, { touch });
-  const colX = w - 4 - menu.colW;
+  const colX = w - MENU_INSET - menu.colW;
 
   const mmScale = touch ? 0.78 : 1;
   const mm = 142 * mmScale;
@@ -101,7 +103,7 @@ export function hudRects(vp, { questOpen = false } = {}) {
   const bubbleH = (short ? 160 : 190) * ui;
   const bubbleBottom = touch && w <= 1100 ? 90 : 18;
   const bubbles = touch
-    ? rect('bubbles', w - 4 - menu.colW - ACTION_GAP - bubbleW, h - bubbleBottom - bubbleH, bubbleW, bubbleH)
+    ? rect('bubbles', w - MENU_INSET - menu.colW - ACTION_GAP - bubbleW, h - bubbleBottom - bubbleH, bubbleW, bubbleH)
     : null;
 
   const chatW = short && touch ? Math.min(240, w * 0.36) : 80;
@@ -152,7 +154,34 @@ export function applyHudLayout(el, vp) {
   el.style.setProperty('--hud-clear-bottom', `${clear}px`);
   el.style.setProperty('--hud-menu-bottom', `${menuBottom}px`);
   el.style.setProperty('--hud-action-gap', `${ACTION_GAP}px`);
+  el.style.setProperty('--hud-menu-inset', `${MENU_INSET}px`);
   return menu;
+}
+
+/**
+ * CSS-equivalent bounding rects for the touch action cluster vs #menu-col.
+ * Origin is bottom-right, so scale does not eat the gap on the menu side.
+ */
+export function touchActionRects(vp) {
+  const w = vp.w;
+  const h = vp.h;
+  const menu = fitMenuButtons(h, { touch: true });
+  const short = h <= 500;
+  const ui = Math.max(1, Math.min(1.5, h / 820));
+  const scale = short ? ui * 0.92 : ui;
+  const boxW = short ? 180 : 220;
+  const boxH = short ? 160 : 190;
+  const bottom = w <= 1100 ? 90 : 18;
+  const right = MENU_INSET + menu.colW + ACTION_GAP;
+  const visualW = boxW * scale;
+  const visualH = boxH * scale;
+  const cluster = rect('cluster', w - right - visualW, h - bottom - visualH, visualW, visualH);
+  const attackW = TOUCH_ATTACK_W * scale;
+  const attackH = TOUCH_ATTACK_W * scale;
+  const attack = rect('attack', cluster.x + cluster.w - attackW, cluster.y + cluster.h - attackH, attackW, attackH);
+  const menuRect = rect('menu', w - MENU_INSET - menu.colW, h - 6 - menu.height, menu.colW, menu.height);
+  const gap = menuRect.x - (attack.x + attack.w);
+  return { menu: menuRect, cluster, attack, gap, scale, right };
 }
 
 export function readQuestOpen(store) {

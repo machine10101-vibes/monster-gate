@@ -753,6 +753,7 @@ export class HUD {
         ...(game.debug && !game.mmo && !game.worldView
           ? [
               ['Spawn monster', '<button id="set-spawn">Spawn</button>'],
+              ['Spawn tanky monster (debug)', '<button id="set-spawn-tank">Spawn tank</button>'],
               ['Auto-attack (debug)', `<button id="set-autoatk">${game.debug.autoAttack ? 'On' : 'Off'}</button>`],
             ]
           : []),
@@ -810,6 +811,7 @@ export class HUD {
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
       document.getElementById('set-spawn')?.addEventListener('click', () => game.debugSpawn?.());
+      document.getElementById('set-spawn-tank')?.addEventListener('click', () => game.debugSpawnTank?.());
       document.getElementById('set-autoatk')?.addEventListener('click', () => {
         const on = !game.debug?.autoAttack;
         game.setDebugAutoAttack?.(on);

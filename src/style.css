@@ -39,7 +39,7 @@ body {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: #0b0d10;
+  background: #070308;
   color: #fff;
   font-family: var(--font-body);
   overscroll-behavior: none;
@@ -665,7 +665,7 @@ body.touch #cast-buttons {
 }
 #touch-btns {
   position: absolute;
-  right: calc(18px + var(--safe-r));
+  right: var(--hud-action-right, calc(var(--hud-menu-inset, 4px) + var(--menu-col-w, 44px) + var(--hud-action-gap, 8px) + var(--safe-r)));
   bottom: calc(18px + var(--safe-b));
   width: 220px;
   height: 190px;

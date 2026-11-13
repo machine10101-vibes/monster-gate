@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_SPOTS, DEBUG_ONLINE_CODE, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, ensureDebugStarterWeapon, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, tickDebugAutoAttack,
+  DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, ensureDebugStarterWeapon, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack,
 } from '../src/debug/flags.js';
 import { DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
@@ -125,10 +125,12 @@ test('debug monster spawn is inert without ?debug=1 and picks a zone mob with th
   const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
   assert.match(hud, /game\.debug && !game\.mmo && !game\.worldView/);
   assert.match(hud, /Spawn monster/);
+  assert.match(hud, /Spawn tanky monster \(debug\)/);
   assert.match(hud, /Auto-attack \(debug\)/);
   const flagsSrc = readFileSync(new URL('../src/debug/flags.js', import.meta.url), 'utf8');
   assert.match(flagsSrc, /F9/);
-  assert.match(flagsSrc, /debugSpawn/);
+  assert.match(flagsSrc, /shiftKey/);
+  assert.match(flagsSrc, /debugSpawnTank/);
 });
 
 test('debug spawn is offline-only; World 1 rejects debug messages with code debug', () => {
@@ -226,6 +228,62 @@ test('debug-granted starter weapon is stripped from a save written in a debug se
   } finally {
     freezeSaves(false);
   }
+});
+
+test('debug tank spawn is ~20x HP, hits back, and stays out of saves', () => {
+  const spawned = [];
+  const game = {
+    debug: { enabled: true },
+    rank: 0,
+    zone: 'Oakhollow',
+    player: { pos: { x: 72, y: 3, z: 73 }, yaw: 0 },
+    world: { playable: () => true, isWater: () => false, zoneAt: () => 3, landAt: () => ({ kind: 'oakhollow' }) },
+    spawner: {
+      spawn(type, x, z) {
+        const mon = { type, x, z, name: 'Gate Slime', hp: 18, maxHp: 18, cd: 0.4 };
+        spawned.push(mon);
+        return mon;
+      },
+    },
+    hud: { toast() {} },
+    mmo: null,
+  };
+  const mon = spawnDebugMonster(game, '?debug=1', { tank: true });
+  assert.ok(mon.debugTank);
+  assert.equal(mon.maxHp, 18 * DEBUG_TANK_HP_MUL);
+  assert.equal(mon.hp, 18 * DEBUG_TANK_HP_MUL);
+  assert.ok(mon.cd >= 1.6);
+  assert.match(mon.name, /tank/i);
+  assert.equal(monsterIsHostile(mon.type), true);
+  const online = { ...game, mmo: { send() {} }, worldView: {} };
+  const rejected = spawnDebugMonster(online, '?debug=1&mmo=1', { tank: true });
+  assert.equal(rejected.code, 'debug');
+  const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
+  assert.match(hud, /set-spawn-tank/);
+  assert.match(hud, /game\.debug && !game\.mmo && !game\.worldView/);
+  const slim = applyDebugTank({ hp: 10, maxHp: 10, name: 'Boar', cd: 0 });
+  assert.equal(slim.maxHp, 10 * DEBUG_TANK_HP_MUL);
+});
+
+test('oasis landing frames the pool above the hotbar clearance', () => {
+  const oasis = resolveSpot('oasis');
+  assert.ok(Math.hypot(oasis.x - 0, oasis.z - 432) > 40, 'stand back from the water');
+  const cam = { yaw: 0, targetYaw: 0, pitch: 0.8, dist: 12, targetDist: 12 };
+  const game = {
+    world: { realm: 'over', heightAt: () => 3.2, revealAround() {} },
+    player: { pos: { set(x, y, z) { this.x = x; this.y = y; this.z = z; }, x: 0, y: 0, z: 0 }, yaw: 0, syncObj() {} },
+    cam,
+    hud: { toast() {} },
+    snapCamera() { this.snapped = true; },
+  };
+  const spot = teleportDebug(game, 'oasis');
+  assert.ok(spot);
+  assert.equal(cam.pitch, OASIS_CAM.pitch);
+  assert.equal(cam.dist, OASIS_CAM.dist);
+  assert.ok(cam.pitch < 0.7, 'look toward the horizon so the pool sits above --hud-clear-bottom');
+  assert.ok(game.snapped);
+  const flagsSrc = readFileSync(new URL('../src/debug/flags.js', import.meta.url), 'utf8');
+  assert.match(flagsSrc, /hud-clear-bottom/);
 });
 
 test('debug freeze does not write the hunter save', () => {

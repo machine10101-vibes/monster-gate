@@ -24,6 +24,7 @@ import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { BUILD_ID } from './ui/buildId.js';
+import { mountLoading } from './ui/boot.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
 import { Journal } from './systems/journal.js';
@@ -47,12 +48,13 @@ import { loginWithKlever } from './wallet/link.js';
 import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
 import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
-
-const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
+
+const CLOUD_AUTOSAVE_MS = 30000;
+const loadingScreen = typeof document !== 'undefined' ? mountLoading() : null;
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
@@ -322,8 +324,11 @@ class Game {
     const fill = document.getElementById('load-fill');
     const text = document.getElementById('load-text');
     const progress = (p, t) => {
-      fill.style.width = Math.round(p * 100) + '%';
-      text.textContent = t;
+      if (loadingScreen) loadingScreen.setProgress(p, t);
+      else {
+        if (fill) fill.style.width = Math.round(p * 100) + '%';
+        if (text) text.textContent = t;
+      }
     };
     this.world = new World(this.quality);
     await this.world.build(progress);
@@ -378,7 +383,8 @@ class Game {
     if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
-    document.getElementById('loading').classList.add('hidden');
+    if (loadingScreen) await loadingScreen.dismiss();
+    else document.getElementById('loading')?.classList.add('hidden');
     if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
     this.last = performance.now();
     this.loop = this.loop.bind(this);
