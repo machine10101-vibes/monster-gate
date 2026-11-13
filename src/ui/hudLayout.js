@@ -104,6 +104,7 @@ export const HUD_SAFE_IDS = [
   'debug-badge',
   'world-status',
   'world-status-slot',
+  'world-chat',
   'cast-buttons',
 ];
 
@@ -171,6 +172,53 @@ export function nameplateOutsideViewport(plate, vp, inset = VIEWPORT_PLATE_INSET
   const h = Number(vp.h);
   if (!Number.isFinite(w) || !Number.isFinite(h) || w < 2 || h < 2) return false;
   return plate.x < pad || plate.y < pad || plate.x + plate.w > w - pad || plate.y + plate.h > h - pad;
+}
+
+/**
+ * Shift a bottom-center plate anchor so its visual box misses `rects`
+ * (and the viewport inset). Prefers right of the blocker, then left, then
+ * above. Returns the original point when it already clears.
+ */
+export function nudgeAnchorOffRects(anchorX, anchorY, w, h, rects, vp, gap = 8) {
+  const ax = Number(anchorX) || 0;
+  const ay = Number(anchorY) || 0;
+  const width = Math.max(1, Number(w) || 1);
+  const height = Math.max(1, Number(h) || 1);
+  const air = Number.isFinite(Number(gap)) ? Number(gap) : 8;
+  const boxAt = (x, y) => plateAnchorRect(x, y, width, height);
+  const inVp = (b) => !vp || !nameplateOutsideViewport(b, vp);
+  const misses = (b, list) => !nameplateHitsHud(b, list) && inVp(b);
+  if (misses(boxAt(ax, ay), rects)) return { x: ax, y: ay, moved: false };
+
+  const blockers = Array.isArray(rects) ? rects : [];
+  const chat = blockers.filter((r) => r.id === 'world-chat');
+  const candidates = [];
+  for (const r of blockers) {
+    candidates.push({ x: r.x + r.w + air + width / 2, y: ay });
+    candidates.push({ x: r.x - air - width / 2, y: ay });
+    candidates.push({ x: ax, y: r.y - air });
+    candidates.push({ x: r.x + r.w + air + width / 2, y: r.y - air });
+    candidates.push({ x: r.x - air - width / 2, y: r.y - air });
+  }
+  for (const c of candidates) {
+    if (misses(boxAt(c.x, c.y), blockers)) return { x: c.x, y: c.y, moved: true };
+  }
+  if (chat.length) {
+    for (const c of candidates) {
+      if (misses(boxAt(c.x, c.y), chat)) return { x: c.x, y: c.y, moved: true };
+    }
+  }
+  let x = ax;
+  let y = ay;
+  if (vp) {
+    const pad = VIEWPORT_PLATE_INSET;
+    const b = boxAt(x, y);
+    if (b.x < pad) x += pad - b.x;
+    if (b.x + b.w > vp.w - pad) x -= b.x + b.w - (vp.w - pad);
+    if (b.y < pad) y += pad - b.y;
+    if (b.y + b.h > vp.h - pad) y -= b.y + b.h - (vp.h - pad);
+  }
+  return { x, y, moved: x !== ax || y !== ay };
 }
 
 /**

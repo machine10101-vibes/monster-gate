@@ -23,7 +23,7 @@ import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
-import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
+import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -449,11 +449,12 @@ export class HUD {
       });
     }
     for (const t of stackNameplates(rows)) {
-      if (!t.visible) {
+      if (!t.visible && !t.el.classList.contains('you')) {
         t.el.style.display = 'none';
         t.el.classList.remove('hud-occluded');
         continue;
       }
+      t.el.style.display = '';
       t.el.style.top = t.y.toFixed(0) + 'px';
       t.el.style.zIndex = String(Math.max(1, 90 - Math.floor(t.d)));
     }
@@ -474,6 +475,16 @@ export class HUD {
       const box = el.getBoundingClientRect?.();
       const size = measurePlateSize(el, { w: box?.width || 0, h: box?.height || 0 });
       if (!box || size.w < 2 || size.h < 2) {
+        el.classList.remove('hud-occluded');
+        continue;
+      }
+      const own = el.classList.contains('you') || el.dataset.pid === 'local-chat';
+      if (own) {
+        const ax = parseFloat(el.dataset.sx) || parseFloat(el.style.left) || 0;
+        const ay = parseFloat(el.dataset.sy) || parseFloat(el.style.top) || 0;
+        const nudged = nudgeAnchorOffRects(ax, ay, size.w, size.h, safe, vp);
+        el.style.left = nudged.x.toFixed(0) + 'px';
+        el.style.top = nudged.y.toFixed(0) + 'px';
         el.classList.remove('hud-occluded');
         continue;
       }

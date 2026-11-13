@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  ANIM, CHAT_MAX, REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
+  ANIM, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S, REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
   SnapshotBuffer, WorldView, angLerp, animName, animOf,
   normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
 } from '../src/net/worldView.js';
@@ -274,13 +274,25 @@ test('a mock chat send from you is marked local and opens a player bubble', () =
   const game = stubGame();
   const view = new WorldView(game, { spawnRemote: stubRemote });
   view.live = true;
-  view.pushChat({ channel: 'world', from: { id: 'you', name: 'Test' }, text: 'test' });
-  assert.equal(view.localSay, 'test');
+  view.pushChat({ channel: 'world', from: { id: 'you', name: 'Test' }, text: 'zephyr20' });
+  assert.equal(view.localSay, 'zephyr20');
   assert.ok(view.localSayT > 0);
+  assert.equal(view.localPin.text, 'zephyr20');
+  assert.equal(view.localPinT, LOCAL_PIN_S);
+  view.pushChat({ channel: 'world', from: { id: 'herald', name: 'Herald' }, text: 'Seven hunters are already in Oakhollow.' });
+  assert.equal(view.localPin.text, 'zephyr20', 'crowd lines do not replace the pinned own line');
+  view.update(LOCAL_BUBBLE_S + 0.5);
+  assert.equal(view.localSay, '');
+  assert.ok(view.localPinT > 0);
+  assert.equal(view.localPin.text, 'zephyr20');
+  view.update(LOCAL_PIN_S);
+  assert.equal(view.localPin, null);
   const wv = src('../src/net/worldView.js');
   assert.match(wv, /wc-you/);
+  assert.match(wv, /wc-pin/);
   assert.match(wv, /local-chat/);
   assert.match(wv, /layoutInteractPlates/);
+  assert.equal(LOCAL_PIN_S, 15);
 });
 
 test('waking overlay is inert without ?mmo=1', () => {

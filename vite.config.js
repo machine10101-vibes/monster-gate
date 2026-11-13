@@ -9,9 +9,33 @@ export function publicBase(env = process.env) {
   return v.endsWith('/') ? v : `${v}/`;
 }
 
+/**
+ * Production tag for title / character-select / Settings.
+ * `VITE_BUILD_ID` wins. A gh-pages checkout stamps `origin/main`, not the
+ * deploy branch SHA (or a stale working-tree HEAD).
+ */
+export function resolveBuildId({ env = process.env, branch = '', headSha = '', mainSha = '' } = {}) {
+  const raw = env?.VITE_BUILD_ID;
+  if (raw != null && String(raw).trim() !== '') return String(raw).trim();
+  if (String(branch) === 'gh-pages' && mainSha) return String(mainSha).trim();
+  return (headSha && String(headSha).trim()) || 'dev';
+}
+
+function git(cmd) {
+  return execSync(cmd, { encoding: 'utf8' }).trim();
+}
+
 function shortSha() {
   try {
-    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+    const branch = git('git rev-parse --abbrev-ref HEAD');
+    const headSha = git('git rev-parse --short HEAD');
+    let mainSha = '';
+    try {
+      mainSha = git('git rev-parse --short origin/main');
+    } catch {
+      mainSha = '';
+    }
+    return resolveBuildId({ env: process.env, branch, headSha, mainSha });
   } catch {
     return 'dev';
   }
