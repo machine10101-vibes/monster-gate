@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
 import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
-import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, overlap, padHudSafeRects, plateAnchorRect } from '../src/ui/hudLayout.js';
+import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, overlap, padHudSafeRects, plateAnchorRect, platesCollide } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -505,11 +505,43 @@ test('MG-UI-33 stacks the full name+subtitle box and culls labels that hug the c
   assert.equal(nameplateHitsHud(hug, padHudSafeRects([clock], 16)), true, 'padded clock culls it');
   const hud = src('src/ui/hud.js');
   const layout = src('src/ui/hudLayout.js');
-  assert.match(layout, /PLATE_STACK_GAP = 10/);
+  assert.match(layout, /PLATE_STACK_GAP = 16/);
   assert.match(layout, /measurePlateSize/);
+  assert.match(layout, /platesCollide/);
   assert.match(layout, /debug-badge/);
   assert.match(layout, /btn-fs/);
   assert.match(layout, /btn-snd/);
   assert.match(layout, /'clock'/);
   assert.match(hud, /measurePlateSize/);
+});
+
+test('MG-UI-33 side-by-side plates within the gap stack or hide', () => {
+  const left = { id: 'npc-child', x: 400, y: 140, d: 3.2, w: 124, h: 32 };
+  const leftBox = plateAnchorRect(left.x, left.y, left.w, left.h);
+  const sameRow = (gapPx) => {
+    const w = 220;
+    const x = leftBox.x + leftBox.w + gapPx + w / 2;
+    return { id: 'market', x, y: 140, d: 6.1, w, h: 32 };
+  };
+  const touchBox = plateAnchorRect(sameRow(0).x, 140, 220, 32);
+  assert.equal(Math.abs(touchBox.x - (leftBox.x + leftBox.w)) < 0.01, true);
+  assert.equal(platesCollide(leftBox, touchBox, 10), true, 'touching side-by-side collides');
+  assert.equal(platesCollide(leftBox, plateAnchorRect(sameRow(4).x, 140, 220, 32), 10), true, '4px horizontal gap collides');
+  assert.equal(platesCollide(leftBox, plateAnchorRect(sameRow(9).x, 140, 220, 32), 10), true, '9px horizontal gap collides');
+  assert.equal(platesCollide(leftBox, plateAnchorRect(sameRow(11).x, 140, 220, 32), 10), false, 'beyond the 10px gap stays');
+
+  const touch = stackNameplates([left, sameRow(0)], { gap: 10 });
+  const touchVis = touch.filter((r) => r.visible);
+  assert.equal(touchVis.length, 2);
+  assert.notEqual(touchVis[0].y, touchVis[1].y, 'touching row stacks vertically');
+  const near = stackNameplates([left, sameRow(4)], { gap: 10 });
+  const nearVis = near.filter((r) => r.visible);
+  assert.equal(nearVis.length, 2);
+  assert.notEqual(nearVis[0].y, nearVis[1].y, 'near-touching row stacks vertically');
+  const pipDalla = stackNameplates([left, sameRow(13)]);
+  const pipDallaVis = pipDalla.filter((r) => r.visible);
+  assert.equal(pipDallaVis.length, 2);
+  assert.notEqual(pipDallaVis[0].y, pipDallaVis[1].y, '12–13px Pip/Dalla row still stacks at the default gap');
+  const hide = stackNameplates([left, sameRow(0)], { gap: 10, maxLift: 0 });
+  assert.ok(hide.some((r) => !r.visible), 'farther side-by-side label hides when it cannot lift');
 });
