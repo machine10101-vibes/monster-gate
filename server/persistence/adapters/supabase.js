@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { alreadyImported, conflict, invalid, nameTaken, notFound, PersistenceError } from '../errors.js';
+import { alreadyImported, conflict, invalid, nameTaken, notFound, unavailable } from '../errors.js';
 import { requireUserId } from '../ids.js';
 import { requireName } from '../names.js';
 import { blankState, characterView, columnsFromState, sanitizeState } from '../schema.js';
@@ -7,17 +7,8 @@ import { blankState, characterView, columnsFromState, sanitizeState } from '../s
 const ACCEPT_URL = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i;
 const LOCAL_URL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
-export function createSupabaseAdapter({ url, serviceRoleKey } = {}) {
-  const supabaseUrl = String(url || process.env.SUPABASE_URL || '').replace(/\/$/, '');
-  const key = String(serviceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!supabaseUrl || !(ACCEPT_URL.test(supabaseUrl) || LOCAL_URL.test(supabaseUrl))) {
-    throw invalid('SUPABASE_URL is missing or not a Supabase project URL.');
-  }
-  if (!key) throw invalid('SUPABASE_SERVICE_ROLE_KEY is required for character persistence.');
-
-  const db = createClient(supabaseUrl, key, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
+  const db = client || createRemoteClient(url, serviceRoleKey);
 
   return {
     kind: 'supabase',
@@ -111,17 +102,38 @@ export function createSupabaseAdapter({ url, serviceRoleKey } = {}) {
   };
 }
 
-function wrap(error, extra = {}) {
-  const code = error?.code;
+function createRemoteClient(url, serviceRoleKey) {
+  const supabaseUrl = String(url || process.env.SUPABASE_URL || '').replace(/\/$/, '');
+  const key = String(serviceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!supabaseUrl || !(ACCEPT_URL.test(supabaseUrl) || LOCAL_URL.test(supabaseUrl))) {
+    throw invalid('SUPABASE_URL is missing or not a Supabase project URL.');
+  }
+  if (!key) throw invalid('SUPABASE_SERVICE_ROLE_KEY is required for character persistence.');
+  return createClient(supabaseUrl, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
+/**
+ * Map a PostgREST / Postgres error onto PersistenceError.
+ * Unique name is the non-PK unique index (`characters_name_lower_idx`).
+ * A bare 23505 is name_taken, not a generic persist failure.
+ */
+export function mapSupabaseError(error, extra = {}) {
+  const code = String(error?.code || '');
   const message = error?.message || 'Supabase request failed.';
+  const blob = [message, error?.details, error?.hint, error?.constraint].filter(Boolean).join(' ');
+
   if (code === '23505') {
-    if (/characters_name/i.test(message) || /name/i.test(error?.details || '')) {
-      return nameTaken(extra.name);
-    }
-    if (/characters_pkey|user_id/i.test(message)) {
-      return invalid('This account already has a character.', extra);
-    }
+    const pk = /characters_pkey|\(user_id\)|\buser_id\b/i.test(blob);
+    const named = /characters_name|lower\(\s*name\s*\)|\bname\b/i.test(blob);
+    if (pk && !named) return invalid('This account already has a character.', extra);
+    return nameTaken(extra.name);
   }
   if (code === '23503') return invalid('userId is not a known auth user.', extra);
-  return new PersistenceError('unavailable', message, { cause: error, ...extra });
+  return unavailable(message, { cause: error, ...extra });
+}
+
+function wrap(error, extra = {}) {
+  return mapSupabaseError(error, extra);
 }
