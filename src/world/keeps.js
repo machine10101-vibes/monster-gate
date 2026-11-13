@@ -140,8 +140,9 @@ export function raiseKeep(world, land, keep) {
     world.putAt(banners[Math.abs(lx) % 2], x, z, theta + Math.PI, 0.9);
     world.circle(x, z, 0.3);
   }
-  // Three posts on the ground in front of the gate. The wall sits at +H, so these stand outside it.
-  const posts = [[-16, H + 8], [16, H + 8], [0, H + 16]].map(([lx, lz]) => {
+  // Three in the courtyard, clear of the fountain at (0, 12) and the keep at (0, -12),
+  // and three on the ground in front of the gate. The wall sits at +H.
+  const posts = [[-9, 10], [9, 10], [0, 22], [-16, H + 8], [16, H + 8], [0, H + 16]].map(([lx, lz]) => {
     const [x, z] = F.at(lx, lz);
     return [x - cx, z - cz];
   });
