@@ -2825,7 +2825,7 @@ class Game {
     }
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
-    else if (!blocked) tickDebugAutoAttack(this);
+    else if (!blocked) tickDebugAutoAttack(this, this.rawDt);
     if (inp.take('evade') && !blocked) this.doEvade();
     if (inp.take('bolt') && !blocked) this.castSlot(0);
     if (inp.take('skill') && !blocked) this.castSlot(1);

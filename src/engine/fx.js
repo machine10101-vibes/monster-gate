@@ -53,8 +53,8 @@ export class FX {
       const c = Array.isArray(color) ? color[Math.floor(Math.random() * color.length)] : color;
       this.emit(x, y, z, dxr * sp, Math.random() * 3 + 0.5, dzr * sp, c, 0.05 + Math.random() * 0.05, 0.22 + Math.random() * 0.18, 7);
     }
-    this.emit(x, y, z, 0, 0, 0, 0xffffff, 0.2 + power * 0.1, 0.08, 0);
-    this.emit(x, y, z, 0, 0, 0, 0xfff2c0, 0.32 + power * 0.14, 0.04, 0);
+    this.emit(x, y, z, 0, 0, 0, 0xffffff, 0.07 + power * 0.03, 0.05, 0);
+    this.emit(x, y, z, 0, 0, 0, 0xfff2c0, 0.1 + power * 0.04, 0.04, 0);
     this.vfx?.hit(x, y, z, dx, dz, Array.isArray(color) ? color[0] : color, power);
   }
 

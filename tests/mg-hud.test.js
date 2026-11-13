@@ -76,9 +76,33 @@ test('MG-UI-21 title panel fits short landscape and DEBUG stays off the tagline'
   assert.match(theme, /#debug-badge \{[\s\S]*left:\s*auto/);
   assert.match(style, /#debug-badge \{[\s\S]*right:\s*calc\(10px/);
   assert.match(theme, /#title \.title-inner \{[\s\S]*max-height:\s*calc\(100dvh - 16px\)/);
-  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*6px 16px 22px/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*6px 16px 16px/);
   assert.match(theme, /#title \.touch-only \{[\s\S]*padding:\s*0 8px 8px/);
-  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.touch-only \{[\s\S]*padding:\s*10px 8px 16px/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.touch-only \{[\s\S]*padding:\s*8px 8px 12px/);
+});
+
+test('MG-UI-25 DEBUG sits under open Menu and Settings panels', () => {
+  const theme = src('src/ui/theme.css');
+  const style = src('src/style.css');
+  assert.match(theme, /#debug-badge \{[\s\S]*z-index:\s*20/);
+  assert.match(style, /#debug-badge \{[\s\S]*z-index:\s*20/);
+  assert.match(theme, /html\.panel-open #debug-badge/);
+  assert.match(style, /html\.panel-open #debug-badge/);
+  assert.match(theme, /html:has\(#panel:not\(\.hidden\)\) #debug-badge/);
+  assert.match(style, /#panel \{[\s\S]*z-index:\s*20/);
+  assert.match(theme, /#panel \{[\s\S]*z-index:\s*50/);
+  const flags = src('src/debug/flags.js');
+  assert.match(flags, /getElementById\('app'\)/);
+});
+
+test('MG-UI-26 short-landscape title does not overlap Play as guest', () => {
+  const theme = src('src/ui/theme.css');
+  const html = src('index.html');
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.wallet-status \{[\s\S]*display:\s*none/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*body\.touch #title \.start \{[\s\S]*min-height:\s*30px/);
+  assert.match(html, /class="touch-only"/);
+  assert.doesNotMatch(html, /Play as a guest or sign in/);
+  assert.match(html, /Guest or sign in, pick a hunter upright/);
 });
 
 test('MG-UI-23 DEBUG sits under the clock while hunting, 8px off the menu', () => {
@@ -302,4 +326,17 @@ test('offline cursor uses local gear; mmo uses snapshot held for the local id', 
   view.applyDelta({ upsert: [{ id: 'me', held: 'darkhammer', yaw: 0.2 }] });
   assert.equal(view.localHeld, 'darkhammer');
   assert.equal(equippedHeldKind(game), 'darkhammer');
+});
+
+test('MG-UI-27 hit glow is small and on the monster, player swing stays subtle', () => {
+  const vfx = src('src/engine/vfx.js');
+  const hit = vfx.slice(vfx.indexOf('hit(x, y, z'), vfx.indexOf('/* ----------------------------- update'));
+  assert.match(hit, /0xffffff,\s*0\.28 \+ power \* 0\.1/);
+  assert.doesNotMatch(hit, /0\.9 \+ power \* 0\.5/);
+  const swing = src('src/systems/skillfx.js');
+  const melee = swing.slice(swing.indexOf('export function meleeSwing'), swing.indexOf('/* ------------------------------------------------------------------ */\n/* skills'));
+  assert.match(melee, /spec\.c,\s*0\.42,\s*0\.1/);
+  assert.doesNotMatch(melee, /1\.3,\s*0\.14/);
+  const monsters = src('src/entities/monsters.js');
+  assert.match(monsters, /emissive\.setRGB\(0\.38, 0\.32, 0\.22\)/);
 });

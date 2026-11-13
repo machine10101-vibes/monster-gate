@@ -382,7 +382,7 @@ h1 em,
   }
   #title .title-inner {
     max-height: calc(100dvh - 16px);
-    padding: 6px 16px 22px;
+    padding: 6px 16px 16px;
     overflow: hidden;
   }
   #title h1 {
@@ -394,23 +394,34 @@ h1 em,
     letter-spacing: 1px;
   }
   #title .wallet-status {
-    min-height: 0;
-    margin: 0 auto 6px;
-    font-size: 12px;
+    display: none;
   }
   #title .account-choices {
     gap: 6px;
     margin-bottom: 4px;
+    flex: none;
   }
-  #title .account-choices .start {
-    min-height: 32px;
+  #title .account-choices .start,
+  body.touch #title .account-choices .start,
+  body.touch #title .start {
+    min-height: 30px;
+    padding: 6px 12px;
+    animation: none;
   }
   #title .touch-only {
     display: block;
-    margin-top: auto;
-    padding: 10px 8px 16px;
-    font-size: 13px;
-    line-height: 1.4;
+    margin-top: 8px;
+    padding: 8px 8px 12px;
+    font-size: 12px;
+    line-height: 1.35;
+    flex: none;
+  }
+  body.touch #title .title-inner {
+    padding: 6px 14px 16px;
+  }
+  body.touch #title h1 {
+    margin: 2px 0 6px;
+    font-size: clamp(18px, 6.4vh, 28px);
   }
 }
 #title .account-choices .start {
@@ -439,6 +450,7 @@ h1 em,
 #loading {
   --load-chrome: 128px;
   overflow: hidden;
+  isolation: isolate;
   background:
     radial-gradient(ellipse 72% 58% at 50% 36%, rgba(176, 22, 28, 0.42), transparent 64%),
     radial-gradient(ellipse at 50% 100%, rgba(70, 8, 12, 0.55), transparent 52%),
@@ -461,7 +473,7 @@ h1 em,
   gap: 14px;
   width: min(92vw, calc((100dvh - var(--load-chrome)) * 1.5));
   padding: 4px 8px 12px;
-  background: none;
+  background: transparent;
   border: 0;
 }
 .load-stage {
@@ -469,7 +481,7 @@ h1 em,
   width: min(92vw, calc((100dvh - var(--load-chrome)) * 1.5));
   max-height: calc(100dvh - var(--load-chrome));
   aspect-ratio: 3 / 2;
-  background: none;
+  background: transparent;
   border: 0;
   box-shadow: none;
   overflow: visible;
@@ -491,7 +503,8 @@ h1 em,
   50% { opacity: 0.95; transform: scale(1.05); }
 }
 .load-poster,
-#load-video {
+#load-video,
+.load-stage canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -500,11 +513,21 @@ h1 em,
   object-position: center;
   display: block;
   pointer-events: none;
-  background: none;
+  background: transparent;
   border: 0;
-  /* Full transparency well inside the 3:2 box so the clip edge never shows. */
-  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 50%, #000 18%, transparent 64%);
-  mask-image: radial-gradient(ellipse 62% 58% at 50% 50%, #000 18%, transparent 64%);
+  /* Clip pixels are opaque black. Screen-blend them away over the red surround,
+     and fade alpha to 0 before the 3:2 box edge. */
+  mix-blend-mode: screen;
+  -webkit-mask-image:
+    radial-gradient(ellipse 70% 66% at 50% 48%, #000 22%, transparent 72%),
+    linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  mask-image:
+    radial-gradient(ellipse 70% 66% at 50% 48%, #000 22%, transparent 72%),
+    linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  -webkit-mask-composite: source-in, source-in;
+  mask-composite: intersect;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -512,14 +535,6 @@ h1 em,
 }
 .load-poster { z-index: 0; }
 #load-video { z-index: 1; }
-.load-stage::after {
-  content: '';
-  position: absolute;
-  inset: -4%;
-  z-index: 2;
-  pointer-events: none;
-  background: radial-gradient(ellipse 54% 50% at 50% 50%, transparent 28%, rgba(7, 3, 8, 0.55) 58%, #070308 76%);
-}
 .load-meter {
   width: min(460px, 86vw);
   padding: 0 16px;
@@ -1322,12 +1337,17 @@ body.debug-session #mock-wallet-badge {
   left: auto;
   right: calc(10px + var(--safe-r));
   transform: none;
-  z-index: 90;
+  z-index: 20;
 }
 body.hunting #debug-badge {
   top: calc(8px + 34px + 8px + var(--safe-t));
   left: auto;
   right: calc(var(--hud-clock-gap) + var(--menu-col-w) + var(--hud-menu-inset) + var(--safe-r));
+}
+html.panel-open #debug-badge,
+html.windows-open #debug-badge,
+html:has(#panel:not(.hidden)) #debug-badge {
+  visibility: hidden;
 }
 
 /* Weapon cursor: canvas only. Menus and buttons keep a normal pointer. */

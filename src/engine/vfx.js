@@ -782,12 +782,12 @@ export class VFX {
     });
   }
 
-  /** Bright hit flare with a camera facing ring and fast sparks. */
+  /** Hit flare on the struck target. White is small so it does not wash out the hunter. */
   hit(x, y, z, dx, dz, color = 0xffe27a, power = 1) {
     const col = Array.isArray(color) ? color[0] : color;
-    this.glow(x, y, z, 0xffffff, 0.9 + power * 0.5, 0.12, { grow: 0.8, pow: 1.2 });
-    this.glow(x, y, z, col, 1.6 + power * 0.8, 0.24, { grow: 0.9 });
-    this.ring(x, y, z, { axis: 'cam', color: col, r0: 0.12, r1: 0.55 + power * 0.35, life: 0.2, thick: 0.28, fill: 0.3 });
+    this.glow(x, y, z, 0xffffff, 0.28 + power * 0.1, 0.07, { grow: 0.2, pow: 1.1, gain: 0.4 });
+    this.glow(x, y, z, col, 0.7 + power * 0.22, 0.16, { grow: 0.35, gain: 0.65 });
+    this.ring(x, y, z, { axis: 'cam', color: col, r0: 0.1, r1: 0.38 + power * 0.18, life: 0.16, thick: 0.16, fill: 0.18 });
     const l = Math.hypot(dx, dz) || 1;
     const ux = dx / l;
     const uz = dz / l;

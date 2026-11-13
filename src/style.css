@@ -4415,7 +4415,7 @@ body.touch #world-chat .wc-log { height: 84px; font-size: 13px; }
   left: auto;
   right: calc(10px + var(--safe-r));
   transform: none;
-  z-index: 90;
+  z-index: 20;
   padding: 6px 10px;
   font-family: var(--font-px);
   font-size: clamp(11px, 0.6vw + 9px, 14px);
@@ -4431,4 +4431,9 @@ body.hunting #debug-badge {
   top: calc(8px + 34px + 8px + var(--safe-t));
   left: auto;
   right: calc(var(--hud-clock-gap) + var(--menu-col-w) + var(--hud-menu-inset) + var(--safe-r));
+}
+html.panel-open #debug-badge,
+html.windows-open #debug-badge,
+html:has(#panel:not(.hidden)) #debug-badge {
+  visibility: hidden;
 }

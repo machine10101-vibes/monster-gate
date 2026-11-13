@@ -150,9 +150,16 @@ test('MG-UI-20 loading stage fills the largest 3:2 box above the bar', () => {
   assert.match(theme, /#loading #load-text \{[\s\S]*white-space:\s*nowrap/);
   assert.match(theme, /#loading #load-text \{[\s\S]*font-size:\s*14px/);
   assert.match(theme, /#load-tip \{[\s\S]*font-size:\s*15px/);
-  assert.match(theme, /mask-image:\s*radial-gradient\(ellipse 62% 58%/);
-  assert.match(theme, /transparent 64%/);
-  assert.match(theme, /\.load-stage::after \{[\s\S]*#070308/);
+  assert.match(theme, /#load-video[\s\S]{0,900}mix-blend-mode:\s*screen/);
+  assert.match(theme, /mask-image:\s*radial-gradient\(ellipse 70% 66%/);
+  assert.match(theme, /linear-gradient\(to right, transparent 0%, #000 14%/);
+  assert.match(theme, /linear-gradient\(to bottom, transparent 0%, #000 12%/);
+  assert.match(theme, /-webkit-mask-image:/);
+  assert.match(theme, /mask-composite:\s*intersect/);
+  assert.match(theme, /\.load-poster,\s*\n#load-video,\s*\n\.load-stage canvas \{[\s\S]*background:\s*transparent/);
+  assert.match(theme, /\.load-stage \{[\s\S]*background:\s*transparent/);
+  assert.match(theme, /\.load-shell \{[\s\S]*background:\s*transparent/);
+  assert.doesNotMatch(theme, /\.load-stage::after \{/);
 });
 
 test('index.html loading markup has the clip, no extra title, bar below', () => {

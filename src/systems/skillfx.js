@@ -341,10 +341,10 @@ export function meleeSwing(game, p, it, combo, reach) {
   const z = p.pos.z;
   const big = it.style === 'twohand' || it.dur > 0.5;
   const radius = Math.max(1.3, reach * 0.88);
-  const thick = reach * (big ? 0.5 : 0.36);
+  const thick = reach * (big ? 0.32 : 0.22);
   if (heavy) {
-    v.slashArc(x, p.pos.y + 1.15, z, yaw, { radius: radius * 1.05, thick: thick * 1.3, sweep: 2.5, color: 0xffd27a, hot: 0xffffff, tilt: 1.2, life: 0.32, sweepT: 0.17, grow: 0.15, tail: 0.85 });
-    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius: radius * 0.9, thick: thick * 0.7, sweep: 2.2, color: spec.c, hot: 0xffffff, tilt: 1.1, life: 0.26, sweepT: 0.14, delay: 0 });
+    v.slashArc(x, p.pos.y + 1.15, z, yaw, { radius: radius * 1.05, thick: thick * 1.15, sweep: 2.5, color: 0xffd27a, hot: spec.c, tilt: 1.2, life: 0.32, sweepT: 0.17, grow: 0.15, tail: 0.85 });
+    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius: radius * 0.9, thick: thick * 0.6, sweep: 2.2, color: spec.c, hot: spec.c, tilt: 1.1, life: 0.26, sweepT: 0.14, delay: 0 });
     const gx = x + f.x * reach * 0.85;
     const gz = z + f.z * reach * 0.85;
     v.ring(gx, game.world.heightAt(gx, gz) + 0.1, gz, { color: 0xffd27a, r0: 0.2, r1: 1.7, life: 0.32, thick: 0.16, fill: 0.2 });
@@ -352,13 +352,13 @@ export function meleeSwing(game, p, it, combo, reach) {
     v.scorch(gx, gz, 0.9, 0x3a2e20, 0.35, 3);
   } else {
     const dir = combo === 1 ? -1 : 1;
-    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius, thick, sweep: 2.1 + (it.arc || 2) * 0.2, color: spec.c, hot: spec.h, tilt: dir * 0.38, flip: dir, life: 0.22, sweepT: 0.12 });
+    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius, thick, sweep: 2.1 + (it.arc || 2) * 0.2, color: spec.c, hot: spec.c, tilt: dir * 0.38, flip: dir, life: 0.2, sweepT: 0.11, gain: 0.7 });
     if (it.style === 'dual') {
       v.slashArc(x, p.pos.y + 1.1, z, yaw, { radius: radius * 0.9, thick: thick * 0.8, sweep: 2.0, color: spec.c, hot: spec.h, tilt: -dir * 0.5, flip: -dir, life: 0.2, sweepT: 0.11, delay: 0 });
     }
   }
   const h = handPos(p);
-  v.glow(h.x + f.x * 0.5, h.y, h.z + f.z * 0.5, spec.c, 1.3, 0.14);
+  v.glow(h.x + f.x * 0.55, h.y, h.z + f.z * 0.55, spec.c, 0.42, 0.1, { grow: 0.15, gain: 0.55 });
 }
 
 /* ------------------------------------------------------------------ */

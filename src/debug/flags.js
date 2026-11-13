@@ -22,10 +22,11 @@ const SAND_MINE = { x: -74, z: 514 };
  */
 const OASIS_DRY = { x: OASIS.x, z: OASIS.z + OASIS.r + 52 };
 export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
-/** ~16 Hunter Blade hits; ~20-30s of steady low-level clicks, faster with auto-attack. */
+/** ~18 Hunter Blade hits; ~20s of steady auto-attack at low level. */
 export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;
 export const DEBUG_STARTER_DMG = 9;
+export const DEBUG_AUTO_CADENCE = 1.15;
 export const DEBUG_TANK_AGGRO = 12;
 export const DEBUG_TANK_REACH = 2.8;
 export const DEBUG_TANK_CADENCE = 1.7;
@@ -138,7 +139,7 @@ function showBadge() {
   el.id = 'debug-badge';
   el.textContent = 'DEBUG';
   el.title = 'Tester session. The hunter save is not written.';
-  document.body.appendChild(el);
+  (document.getElementById('app') || document.body).appendChild(el);
   document.body.classList.add('debug-session');
 }
 
@@ -312,12 +313,17 @@ export function setDebugAutoAttack(game, on) {
   return game.debug.autoAttack;
 }
 
-export function tickDebugAutoAttack(game) {
+export function tickDebugAutoAttack(game, dt = 0) {
   if (!game?.debug?.autoAttack || debugOnlineBlocked(game)) return false;
   if (game.uiBlocking || !game.started) return false;
   const P = game.player;
   if (!P || P.dead) return false;
   if (P.state === 'attack' || P.state === 'roll' || P.state === 'stagger' || P.state === 'use') return false;
+  const step = Number(dt) || 0;
+  if (step > 0) {
+    game.debug.autoAtkCd = Math.max(0, Number(game.debug.autoAtkCd) || 0) - step;
+    if (game.debug.autoAtkCd > 0) return false;
+  }
   const from = P.pos || P;
   const it = game.carried?.(game.items?.[game.sel]) || game.items?.[game.sel] || {};
   const reach = Number(it.reach) || 2.6;
@@ -329,7 +335,10 @@ export function tickDebugAutoAttack(game) {
   if (!m.debugTank && !monsterIsHostile(m.type)) return false;
   const d = Math.hypot(m.x - from.x, m.z - from.z) || 1;
   P.yaw = Math.atan2((m.x - from.x) / d, (m.z - from.z) / d);
+  const stam = P.stamina;
   game.doAttack?.();
+  if (P.stamina != null && stam != null) P.stamina = stam;
+  if (step > 0) game.debug.autoAtkCd = DEBUG_AUTO_CADENCE;
   return true;
 }
 
@@ -338,10 +347,17 @@ export function debugTankHp(base) {
   return Math.min(n, DEBUG_TANK_HP_CAP);
 }
 
-/** Steady Hunter Blade swings until the tank is dead. Auto-attack is faster. */
-export function debugTankKillBudget(hp, { dmg = DEBUG_STARTER_DMG, swingSec = 1.5 } = {}) {
+/** Steady auto-attack until the tank is dead (~20s at low level). */
+export function debugTankKillBudget(hp, { dmg = DEBUG_STARTER_DMG, swingSec = DEBUG_AUTO_CADENCE } = {}) {
   const swings = Math.ceil(Math.max(1, Number(hp) || 1) / Math.max(1, dmg));
   return { swings, sec: swings * swingSec };
+}
+
+export function debugTankHpLabel(mon) {
+  if (!mon) return '';
+  const hp = Math.max(0, Math.round(Number(mon.hp) || 0));
+  const max = Math.max(1, Math.round(Number(mon.maxHp) || 1));
+  return `${hp}/${max}`;
 }
 
 /** Always drop a coin on a debug tank so testers see the normal kill/loot path. */
