@@ -2,7 +2,7 @@
 
 Presentation layer for nearby hunters, name tags, snapshot interpolation, the chat panel, the online count, and connection / reconnect UI.
 
-This module **does not open sockets**. `src/net/mmo.js` (owned by the world-server teammate, gated by `?mmo=1`) should call into it.
+This module **does not open sockets**. `src/net/mmo.js` (gated by `?mmo=1`) calls into it. Protocol: `PROTOCOL.md`.
 
 Live GitHub Pages is unchanged unless the page is opened with `?mmo=1`.
 

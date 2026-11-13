@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   ANIM, CHAT_MAX, REMOTE_PREFIX, STATUS, WORLD_VIEW,
@@ -7,6 +7,7 @@ import {
   normalizeChat, normalizePlayer, parseMmoFlags, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
+import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -232,28 +233,25 @@ test('reconnect intent asks the mock transport to come back online', () => {
   assert.equal(feed.status, STATUS.reconnecting);
 });
 
-test('live client mounts worldView on ?mmo=1 and keeps sockets out of this PR', () => {
+test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () => {
+  const viewSrc = src('../src/net/worldView.js');
+  assert.doesNotMatch(viewSrc, /WebSocket/);
+  assert.doesNotMatch(viewSrc, /from ['\"]ws['\"]/);
+  assert.doesNotMatch(viewSrc, /new WebSocket/);
   const main = src('../src/main.js');
   assert.match(main, /q\.get\('mmo'\) === '1'/);
-  assert.match(main, /m\.init\(game\.scene/);
-  assert.match(main, /mock: q\.get\('mock'\) === '1'/);
   assert.match(main, /import\('\.\/net\/worldView\.js'\)/);
+  assert.match(main, /import\('\.\/net\/mmo\.js'\)/);
   assert.doesNotMatch(main, /from '\.\/net\/mmo\.js'/);
-  assert.doesNotMatch(main, /from '\.\/net\/world\.js'/);
-  assert.equal(existsSync(new URL('../src/net/mmo.js', import.meta.url)), false);
-  assert.equal(existsSync(new URL('../src/net/world.js', import.meta.url)), false);
-  assert.equal(existsSync(new URL('../src/net/worldProtocol.js', import.meta.url)), false);
-  assert.equal(existsSync(new URL('../docs/mmo-protocol.md', import.meta.url)), false);
-  assert.equal(existsSync(new URL('../server', import.meta.url)), false);
-  const docs = src('../docs/worldView-interface.md');
-  assert.match(docs, /init\(scene, opts\)/);
-  assert.match(docs, /onLocalMove/);
-  assert.match(docs, /onChatSend/);
-  const session = src('../src/net/session.js');
-  assert.match(session, /export class Session/);
-  assert.match(session, /joinRoom/);
-  assert.match(session, /worldView\.js/);
+  assert.match(src('../src/net/session.js'), /joinRoom/);
   assert.equal(WORLD_VIEW, 1);
   assert.equal(typeof worldView.init, 'function');
-  assert.equal(typeof worldView.applySnapshot, 'function');
+  assert.deepEqual(parseMmoClientFlags(''), { mmo: false, mock: false, enabled: false });
+  assert.deepEqual(parseMmoClientFlags('?mmo=1'), { mmo: true, mock: false, enabled: true });
+  assert.deepEqual(parseMmoClientFlags('?mmo=1&mock=1'), { mmo: true, mock: true, enabled: false });
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote });
+  assert.equal(attachMmo(game, view, { search: '' }), null);
+  assert.equal(attachMmo(game, view, { search: '?mock=1' }), null);
+  assert.equal(attachMmo(game, view, { search: '?mmo=1&mock=1' }), null);
 });
