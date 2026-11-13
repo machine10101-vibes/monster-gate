@@ -261,6 +261,7 @@ export class Input {
       })
     );
     document.getElementById('dialog').addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.dlg-choice')) return;
       e.stopPropagation();
       this.press('talk');
     });

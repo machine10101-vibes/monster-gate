@@ -15,6 +15,7 @@ import { flushThumbs, renderThumb } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
 import { mountTeleport } from './teleport.js';
 import { mountCarve, mountSmithy } from './smithy.js';
+import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
 
 export const ITEMS = [
@@ -83,7 +84,7 @@ export class HUD {
       banner: $('banner'), bannerMain: $('banner-main'), bannerSub: $('banner-sub'),
       minimap: $('minimap'), nameplates: $('nameplates'), damage: $('damage-layer'),
       qText: $('q-text'), qCount: $('q-count'), qFill: $('q-fill'), gold: $('gold'), rank: $('rank'),
-      dialog: $('dialog'), dlgName: $('dlg-name'), dlgText: $('dlg-text'),
+      dialog: $('dialog'), dlgName: $('dlg-name'), dlgText: $('dlg-text'), dlgChoices: $('dlg-choices'),
       panel: $('panel'), panelTitle: $('panel-title'), panelBody: $('panel-body'),
       hurt: $('hurt-flash'), faint: $('faint'), area: $('area-label'), talk: $('tb-talk'),
       sun: document.querySelector('#clock .sun'),
@@ -242,10 +243,40 @@ export class HUD {
   showDialog(name, text) {
     this.el.dlgName.textContent = name;
     this.el.dlgText.textContent = text;
+    this.clearChoices();
     this.el.dialog.classList.remove('hidden');
   }
   hideDialog() {
+    this.clearChoices();
     this.el.dialog.classList.add('hidden');
+  }
+  showChoices(choices, onPick) {
+    const box = this.el.dlgChoices;
+    if (!box) return;
+    box.innerHTML = '';
+    box.classList.remove('hidden');
+    const hint = this.el.dialog.querySelector('small');
+    if (hint) hint.textContent = 'Choose a reply';
+    for (const c of choices) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dlg-choice';
+      b.textContent = c.label;
+      b.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        onPick(c.id);
+      });
+      box.appendChild(b);
+    }
+  }
+  clearChoices() {
+    const box = this.el.dlgChoices;
+    if (box) {
+      box.innerHTML = '';
+      box.classList.add('hidden');
+    }
+    const hint = this.el.dialog?.querySelector('small');
+    if (hint) hint.textContent = 'Tap or press F to continue';
   }
   get dialogOpen() {
     return !this.el.dialog.classList.contains('hidden');
@@ -395,7 +426,10 @@ export class HUD {
   openPanel(name, game) {
     this.runCleanup();
     this.panelId = name;
-    this.el.panel.querySelector('.panel-card')?.classList.toggle('wide', name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve');
+    const card = this.el.panel.querySelector('.panel-card');
+    const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
+    card?.classList.toggle('wide', wide);
+    card?.classList.toggle('adventures', name === 'quest');
     const body = this.el.panelBody;
     const title = this.el.panelTitle;
     body.innerHTML = '';
@@ -466,10 +500,8 @@ export class HUD {
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
         : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
     } else if (name === 'quest') {
-      title.textContent = 'Hunt Log';
-      const q = game.quest;
-      const pct = Math.round((q.n / Math.max(1, q.total)) * 100);
-      add(`<div class="quest-card"><b>${q.text}</b><span>${q.n} / ${q.total}</span><i style="width:${pct}%"></i></div><p class="panel-help">Monsters defeated: <b>${game.kills}</b>. The Monster Gate in the northern forest keeps sending creatures. Slay them for guild gold.</p>`);
+      title.textContent = '';
+      this.cleanup = mountJournal(body, game);
     } else if (name === 'bag') {
       title.textContent = 'Inventory';
       this.cleanup = mountBag(body, game);
@@ -674,6 +706,8 @@ export class HUD {
   closePanel() {
     this.runCleanup();
     this.panelId = null;
+    this.journalRefresh = null;
+    this.el.panel.querySelector('.panel-card')?.classList.remove('adventures', 'wide');
     this.el.panel.classList.add('hidden');
   }
   get panelOpen() {
