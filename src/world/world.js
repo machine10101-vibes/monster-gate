@@ -7,6 +7,8 @@ import {
 } from './terrain.js';
 import { STARTER, TILES } from './tiles.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
+import { openSouthfordDesert } from './desert.js';
+import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
 import * as M from './models.js';
@@ -326,6 +328,7 @@ export class World {
     for (let x = 0; x < W; x++) northEdge[x] = this.data.H[(W - 1) * W + x];
     this.south = generateSouthford(northEdge);
     openValeSides(this.south);
+    openSouthfordDesert(this.south);
     const southTile = TILES.find((t) => t.kind === 'southford');
     this.lands = [
       { role: 'oak', x0: 0, z0: 0, data: this.data, tileId: STARTER.id, rim: {} },
@@ -450,6 +453,7 @@ export class World {
       arctic: buildArcticModels(),
       volcanic: buildVolcanicModels(),
       jungle: buildJungleModels(),
+      desert: buildDesertModels(),
       keeps: buildKeepModels(),
     };
     void q;

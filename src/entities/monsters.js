@@ -1762,6 +1762,7 @@ export class Monster {
 }
 
 const JUNGLE_QUOTA = { tiger: 5, raptor: 7, cursedpirate: 6, pirate: 7 };
+const DESERT_QUOTA = { sandworm: 4, scorpion: 6 };
 
 export class Spawner {
   constructor(game) {
@@ -1801,6 +1802,15 @@ export class Spawner {
       for (const [type, n] of Object.entries(JUNGLE_QUOTA)) {
         for (let i = 0; i < Math.ceil(n * 0.7); i++) {
           const at = this.jungleSpot(type, 0);
+          if (at) this.spawn(type, at.x, at.z, false);
+        }
+      }
+    }
+    const desert = w.desert;
+    if (desert) {
+      for (const [type, n] of Object.entries(DESERT_QUOTA)) {
+        for (let i = 0; i < n; i++) {
+          const at = this.desertSpot(type, 0);
           if (at) this.spawn(type, at.x, at.z, false);
         }
       }
@@ -1865,6 +1875,7 @@ export class Spawner {
     this.fillYetis();
     this.fillKnights();
     this.fillJungle();
+    this.fillDesert();
     const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
     if (alive >= this.max) return;
     const spot = this.pickSpot();
@@ -2000,6 +2011,51 @@ export class Spawner {
       const at = this.jungleSpot(type);
       if (!at) continue;
       this.jungleT = 0;
+      this.spawn(type, at.x, at.z);
+      return;
+    }
+  }
+
+  desertSpot(type, minFromPlayer = 16) {
+    const g = this.game;
+    const w = g.world;
+    const D = w.desert;
+    if (!D) return null;
+    const P = g.player.pos;
+    const mine = D.mine;
+    const oasis = D.oasis;
+    for (let n = 0; n < 24; n++) {
+      const land = D.lands[(n + (type === 'sandworm' ? 0 : 1)) % D.lands.length];
+      const x = land.x0 + 12 + this.rng.range(0, 120);
+      const z = land.z0 + 12 + this.rng.range(0, 100);
+      if (!w.playable(x, z)) continue;
+      const zn = w.zoneAt(x, z);
+      if (zn === ZONE.WATER || zn === ZONE.MINE) continue;
+      const h = w.heightAt(x, z);
+      if (h < 0.9 || h > 6.5) continue;
+      if (Math.hypot(x - mine.x, z - mine.z) < mine.rimR + 2) continue;
+      if (Math.hypot(x - oasis.x, z - oasis.z) < oasis.r + 6) continue;
+      if (minFromPlayer && Math.hypot(x - P.x, z - P.z) < minFromPlayer) continue;
+      return { x, z };
+    }
+    return null;
+  }
+
+  fillDesert() {
+    const g = this.game;
+    const D = g.world.desert;
+    if (!D) return;
+    const P = g.player.pos;
+    const near = D.lands.some((l) => P.x >= l.x0 - 30 && P.x < l.x0 + 174 && P.z >= l.z0 - 30 && P.z < l.z0 + 174);
+    if (!near) return;
+    this.desertT = (this.desertT || 0) + 1;
+    if (this.desertT < 4) return;
+    for (const [type, quota] of Object.entries(DESERT_QUOTA)) {
+      const n = g.monsters.filter((m) => !m.dead && m.type === type).length;
+      if (n >= quota) continue;
+      const at = this.desertSpot(type);
+      if (!at) continue;
+      this.desertT = 0;
       this.spawn(type, at.x, at.z);
       return;
     }
