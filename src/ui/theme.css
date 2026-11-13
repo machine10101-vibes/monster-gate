@@ -399,23 +399,28 @@ h1 em,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  width: min(720px, 94vw);
+  gap: 18px;
+  width: min(760px, 96vw);
   padding: 8px 8px 18px;
+  background: none;
+  border: 0;
 }
 .load-stage {
   position: relative;
-  width: min(672px, 94vw, calc((100dvh - 96px) * 1.5));
+  width: min(720px, 96vw, calc((100dvh - 108px) * 1.5));
   aspect-ratio: 3 / 2;
-  isolation: isolate;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
 }
 .load-glow {
   position: absolute;
-  inset: 6% 10%;
+  inset: 8% 12%;
   z-index: 0;
-  background: radial-gradient(ellipse at 50% 48%, rgba(220, 36, 28, 0.5), transparent 70%);
-  filter: blur(22px);
-  opacity: 0.65;
+  background: radial-gradient(ellipse at 50% 48%, rgba(220, 36, 28, 0.55), transparent 72%);
+  filter: blur(28px);
+  opacity: 0.7;
   pointer-events: none;
 }
 #loading.held .load-glow {
@@ -435,32 +440,37 @@ h1 em,
   object-position: center;
   display: block;
   pointer-events: none;
+  background: none;
+  border: 0;
+  -webkit-mask-image: radial-gradient(ellipse 78% 74% at 50% 52%, #000 46%, transparent 82%);
+  mask-image: radial-gradient(ellipse 78% 74% at 50% 52%, #000 46%, transparent 82%);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 .load-poster { z-index: 0; }
 #load-video { z-index: 1; }
-.load-vignette {
-  position: absolute;
-  inset: -10%;
-  z-index: 2;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 56% 58% at 50% 48%, transparent 38%, rgba(7, 3, 8, 0.5) 68%, #070308 100%);
-}
 .load-meter {
-  width: min(440px, 90vw);
+  width: min(460px, 86vw);
+  padding: 0 16px;
 }
 #loading .load-bar {
   position: relative;
   width: 100%;
-  height: 12px;
+  height: 22px;
   margin: 0 auto;
   overflow: visible;
   background: #12060a;
-  border: 2px solid var(--mg-gold);
-  box-shadow: 0 0 0 1px #3a1c10, 0 0 16px rgba(180, 20, 20, 0.35);
+  border: 3px solid var(--mg-gold-hi);
+  box-shadow:
+    0 0 0 1px var(--mg-gold-edge),
+    0 0 0 2px #1a0808,
+    0 0 18px rgba(180, 20, 20, 0.4);
   border-radius: 0;
 }
 #loading .load-bar i {
+  display: block;
   height: 100%;
   background: linear-gradient(#ff6a4a, #8a1010);
   box-shadow: 0 0 10px rgba(255, 60, 40, 0.65);
@@ -468,27 +478,37 @@ h1 em,
 .load-cap {
   position: absolute;
   top: 50%;
-  left: -7px;
-  width: 10px;
-  height: 10px;
+  left: -11px;
+  width: 16px;
+  height: 16px;
   transform: translateY(-50%) rotate(45deg);
-  background: radial-gradient(circle at 30% 30%, #ff7a6a, #8a1218);
-  border: 1px solid var(--mg-gold-hi);
-  box-shadow: 0 0 8px rgba(255, 50, 40, 0.7);
-  z-index: 2;
+  background: radial-gradient(circle at 30% 30%, #ff8a7a, #8a1218 62%);
+  border: 2px solid var(--mg-gold-hi);
+  box-shadow: 0 0 0 1px var(--mg-gold-edge), 0 0 10px rgba(255, 50, 40, 0.8);
+  z-index: 4;
 }
 .load-cap-end {
   left: auto;
-  right: -7px;
+  right: -11px;
 }
 #loading #load-text {
-  margin: 10px 0 0;
-  color: #c9a08a;
-  font-size: 12px;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mg-gold-bright);
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  line-height: 1;
+  text-shadow: 0 1px 0 #1a0808, 0 0 8px #000;
+  pointer-events: none;
 }
 #load-tip {
-  min-height: 2.6em;
-  margin: 8px 0 0;
+  min-height: 2.4em;
+  margin: 12px 0 0;
   color: var(--mg-gold-hi);
   font-size: 13px;
   line-height: 1.35;
@@ -536,10 +556,10 @@ h1 em,
 .load-runes span:nth-child(4) { bottom: 6%; right: 5%; }
 
 @media (max-height: 500px) {
-  .load-shell { gap: 8px; padding: 4px 8px 8px; }
-  .load-stage { width: min(672px, 86vw, calc((100dvh - 72px) * 1.5)); }
-  #load-tip { min-height: 1.4em; font-size: 12px; }
-  #loading #load-text { margin-top: 6px; }
+  .load-shell { gap: 12px; padding: 4px 8px 10px; }
+  .load-stage { width: min(720px, 88vw, calc((100dvh - 78px) * 1.5)); }
+  #loading .load-bar { height: 20px; }
+  #load-tip { min-height: 1.4em; margin-top: 10px; font-size: 12px; }
 }
 @media (max-width: 420px) {
   .load-stage { width: min(672px, 94vw, calc((100dvh - 110px) * 1.5)); }

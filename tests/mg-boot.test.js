@@ -154,6 +154,9 @@ test('index.html loading markup has the clip, no extra title, bar below', () => 
   assert.doesNotMatch(loading, /\sloop\b/);
   assert.doesNotMatch(loading, /<h1>/);
   assert.doesNotMatch(loading, /MONSTER\s*<em>GATE/);
+  assert.doesNotMatch(loading, /load-vignette/);
+  assert.ok(loading.indexOf('class="load-bar"') < loading.indexOf('id="load-text"'));
+  assert.ok(loading.indexOf('id="load-text"') < loading.indexOf('id="load-tip"'));
   assert.ok(loading.indexOf('id="load-video"') < loading.indexOf('id="load-fill"'));
   assert.ok(loading.indexOf('id="load-fill"') < loading.indexOf('id="load-tip"'));
 });
@@ -184,7 +187,14 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /loadingScreen\.dismiss/);
   assert.match(theme, /#loading\.held \.load-glow/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
-  assert.match(theme, /\.load-vignette/);
+  assert.match(theme, /mask-image:\s*radial-gradient/);
+  assert.match(theme, /#loading \.load-bar \{[\s\S]*height:\s*22px/);
+  assert.match(theme, /\.load-cap \{[\s\S]*rotate\(45deg\)/);
+  assert.doesNotMatch(theme, /\.load-vignette/);
+  assert.doesNotMatch(html, /load-vignette/);
+  const loading = html.slice(html.indexOf('id="loading"'), html.indexOf('id="title"'));
+  assert.ok(loading.indexOf('id="load-text"') > loading.indexOf('class="load-bar"'));
+  assert.ok(loading.indexOf('id="load-text"') < loading.indexOf('id="load-tip"'));
 
   for (const rel of [
     'public/brand/loading.mp4',
