@@ -22,7 +22,10 @@ const SAND_MINE = { x: -74, z: 514 };
  */
 const OASIS_DRY = { x: OASIS.x, z: OASIS.z + OASIS.r + 52 };
 export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
-export const DEBUG_TANK_HP_MUL = 20;
+/** ~16 Hunter Blade hits; ~20-30s of steady low-level clicks, faster with auto-attack. */
+export const DEBUG_TANK_HP_MUL = 8;
+export const DEBUG_TANK_HP_CAP = 160;
+export const DEBUG_STARTER_DMG = 9;
 export const DEBUG_TANK_AGGRO = 12;
 export const DEBUG_TANK_REACH = 2.8;
 export const DEBUG_TANK_CADENCE = 1.7;
@@ -276,7 +279,7 @@ export function debugSpawnSpot(game) {
   if (!game?.player?.pos) return null;
   const { x: ux, z: uz, from: p } = spawnOffset(game);
   let spot = null;
-  for (const dist of [2.6, 2.2, 3.0, 3.4, 2.0]) {
+  for (const dist of [2.0, 2.2, 2.4, 2.6, 1.8]) {
     const x = p.x + ux * dist;
     const z = p.z + uz * dist;
     const w = game.world;
@@ -285,7 +288,7 @@ export function debugSpawnSpot(game) {
     spot = { x, z, dist };
     break;
   }
-  if (!spot) spot = { x: p.x + ux * 2.6, z: p.z + uz * 2.6, dist: 2.6 };
+  if (!spot) spot = { x: p.x + ux * 2.2, z: p.z + uz * 2.2, dist: 2.2 };
   return spot;
 }
 
@@ -313,13 +316,41 @@ export function tickDebugAutoAttack(game) {
   if (!game?.debug?.autoAttack || debugOnlineBlocked(game)) return false;
   if (game.uiBlocking || !game.started) return false;
   const P = game.player;
-  if (!P || P.dead || P.state !== 'idle') return false;
-  const reach = Number(game.carried?.(game.items?.[game.sel])?.reach) || 2.6;
-  const m = game.nearestMonster?.(reach + 0.35, P.pos);
-  if (!m || !monsterIsHostile(m.type)) return false;
-  const d = Math.hypot(m.x - P.pos.x, m.z - P.pos.z) || 1;
-  P.yaw = Math.atan2((m.x - P.pos.x) / d, (m.z - P.pos.z) / d);
+  if (!P || P.dead) return false;
+  if (P.state === 'attack' || P.state === 'roll' || P.state === 'stagger' || P.state === 'use') return false;
+  const from = P.pos || P;
+  const it = game.carried?.(game.items?.[game.sel]) || game.items?.[game.sel] || {};
+  const reach = Number(it.reach) || 2.6;
+  let m = game.nearestMonster?.(reach + 2.4, from);
+  if (!m || m.dead) {
+    m = (game.monsters || []).find((row) => row?.debugTank && !row.dead) || null;
+  }
+  if (!m || m.dead) return false;
+  if (!m.debugTank && !monsterIsHostile(m.type)) return false;
+  const d = Math.hypot(m.x - from.x, m.z - from.z) || 1;
+  P.yaw = Math.atan2((m.x - from.x) / d, (m.z - from.z) / d);
   game.doAttack?.();
+  return true;
+}
+
+export function debugTankHp(base) {
+  const n = Math.round(Math.max(1, Number(base) || 18) * DEBUG_TANK_HP_MUL);
+  return Math.min(n, DEBUG_TANK_HP_CAP);
+}
+
+/** Steady Hunter Blade swings until the tank is dead. Auto-attack is faster. */
+export function debugTankKillBudget(hp, { dmg = DEBUG_STARTER_DMG, swingSec = 1.5 } = {}) {
+  const swings = Math.ceil(Math.max(1, Number(hp) || 1) / Math.max(1, dmg));
+  return { swings, sec: swings * swingSec };
+}
+
+/** Always drop a coin on a debug tank so testers see the normal kill/loot path. */
+export function grantDebugTankLoot(game, mon) {
+  if (!mon?.debugTank || !game) return false;
+  const x = Number(mon.x) || 0;
+  const y = (Number(mon.y) || 0) + 0.6;
+  const z = Number(mon.z) || 0;
+  game.dropCoin?.(x, y, z, 4);
   return true;
 }
 
@@ -339,7 +370,7 @@ export function debugOnlineReject() {
 export function applyDebugTank(mon) {
   if (!mon) return mon;
   const base = Math.max(1, Number(mon.maxHp || mon.hp || 18));
-  const hp = Math.round(base * DEBUG_TANK_HP_MUL);
+  const hp = debugTankHp(base);
   mon.maxHp = hp;
   mon.hp = hp;
   mon.debugTank = true;
@@ -350,6 +381,7 @@ export function applyDebugTank(mon) {
     ...prev,
     aggro: Math.max(Number(prev.aggro) || 0, DEBUG_TANK_AGGRO),
     dmg: Math.max(1, Math.min(Number(prev.dmg) || DEBUG_TANK_DMG, DEBUG_TANK_DMG)),
+    gold: prev.gold || [3, 6],
   };
   mon.state = 'chase';
   mon.cd = 0.2;

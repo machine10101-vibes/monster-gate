@@ -161,8 +161,13 @@ export class HUD {
     $('btn-snd').style.backgroundImage = `url(${iconURL('snd')})`;
     decorateAllFrames();
     this.bindQuestToggle();
+    this.bindPanelClose();
     this.syncWindows();
     this.layoutHud();
+  }
+
+  bindPanelClose() {
+    bindPanelClose(this.el.panel?.querySelector('#panel-close') || document.getElementById('panel-close'), () => this.closePanel());
   }
 
   layoutHud() {
@@ -752,6 +757,7 @@ export class HUD {
         ['Build', `<b id="set-build">${BUILD_ID}</b>`],
         ...(game.debug && !game.mmo && !game.worldView
           ? [
+              ['Debug session', '<b id="set-debug-flag">DEBUG</b>'],
               ['Spawn monster', '<button id="set-spawn">Spawn</button>'],
               ['Spawn tanky monster (debug)', '<button id="set-spawn-tank">Spawn tank</button>'],
               ['Auto-attack (debug)', `<button id="set-autoatk">${game.debug.autoAttack ? 'On' : 'Off'}</button>`],
@@ -918,6 +924,21 @@ export class HUD {
 }
 
 export { TOWN };
+
+/** Close inventory, bank, shop, and every other #panel overlay. */
+export function bindPanelClose(btn, onClose) {
+  if (!btn || btn.dataset.closeBound === '1' || typeof onClose !== 'function') return btn;
+  btn.dataset.closeBound = '1';
+  const go = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    onClose(e);
+  };
+  btn.addEventListener('pointerup', go);
+  btn.addEventListener('click', go);
+  btn.addEventListener('touchend', go, { passive: false });
+  return btn;
+}
 
 
 function mountMarket(body, game) {

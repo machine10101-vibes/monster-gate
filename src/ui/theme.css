@@ -9,6 +9,7 @@
   --hud-action-gap: 8px;
   --hud-menu-inset: 4px;
   --hud-action-right: calc(var(--hud-menu-inset) + var(--menu-col-w) + var(--hud-action-gap) + var(--safe-r));
+  --hud-clock-gap: 8px;
   --mg-navy: #0b1524;
   --mg-navy-2: #0c1828;
   --mg-navy-3: #101c2e;
@@ -260,6 +261,10 @@
 /* panels ---------------------------------------------------------------- */
 #panel {
   z-index: 50;
+  pointer-events: auto;
+}
+#panel.hidden {
+  pointer-events: none;
 }
 #panel:not(.hidden) .panel-card {
   animation: mg-panel-in 0.18s ease-out;
@@ -273,10 +278,11 @@
   top: 0;
   z-index: 3;
   margin: 0;
-  padding: 16px 52px 10px 18px;
+  padding: 16px 56px 10px 18px;
   font-size: 12px;
   background: linear-gradient(#24344a, #101c2e 85%);
   border-bottom: 1px solid rgba(231, 197, 106, 0.32);
+  pointer-events: none;
 }
 #panel-body {
   padding: 14px 16px 4px;
@@ -289,14 +295,18 @@
 }
 #panel-close {
   position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 4;
-  width: 28px;
-  height: 28px;
+  right: 6px;
+  top: 6px;
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   font-family: var(--font-px);
-  font-size: 10px;
+  font-size: 12px;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .panel-row {
   background: #0e1a2b;
@@ -356,21 +366,24 @@ h1 em,
   max-height: calc(100dvh - 16px);
   box-sizing: border-box;
   padding: 28px 28px 22px;
+  display: flex;
+  flex-direction: column;
 }
 #title .touch-only {
   margin-top: 14px;
   padding: 0 8px 8px;
   line-height: 1.35;
+  flex: none;
 }
 @media (max-height: 500px) {
   #title {
     align-items: center;
-    padding: 8px;
+    padding: 8px 8px 12px;
   }
   #title .title-inner {
     max-height: calc(100dvh - 16px);
-    padding: 8px 16px 14px;
-    overflow: auto;
+    padding: 6px 16px 22px;
+    overflow: hidden;
   }
   #title h1 {
     margin: 2px 0 6px;
@@ -390,12 +403,14 @@ h1 em,
     margin-bottom: 4px;
   }
   #title .account-choices .start {
-    min-height: 34px;
+    min-height: 32px;
   }
   #title .touch-only {
-    margin-top: 8px;
-    padding: 0 6px 8px;
-    font-size: 12px;
+    display: block;
+    margin-top: auto;
+    padding: 10px 8px 16px;
+    font-size: 13px;
+    line-height: 1.4;
   }
 }
 #title .account-choices .start {
@@ -422,7 +437,7 @@ h1 em,
 
 /* Brand boot: video already carries the wordmark. Bar + tips sit under it. */
 #loading {
-  --load-chrome: 118px;
+  --load-chrome: 128px;
   overflow: hidden;
   background:
     radial-gradient(ellipse 72% 58% at 50% 36%, rgba(176, 22, 28, 0.42), transparent 64%),
@@ -487,8 +502,9 @@ h1 em,
   pointer-events: none;
   background: none;
   border: 0;
-  -webkit-mask-image: radial-gradient(ellipse 78% 74% at 50% 52%, #000 46%, transparent 82%);
-  mask-image: radial-gradient(ellipse 78% 74% at 50% 52%, #000 46%, transparent 82%);
+  /* Full transparency well inside the 3:2 box so the clip edge never shows. */
+  -webkit-mask-image: radial-gradient(ellipse 62% 58% at 50% 50%, #000 18%, transparent 64%);
+  mask-image: radial-gradient(ellipse 62% 58% at 50% 50%, #000 18%, transparent 64%);
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -496,6 +512,14 @@ h1 em,
 }
 .load-poster { z-index: 0; }
 #load-video { z-index: 1; }
+.load-stage::after {
+  content: '';
+  position: absolute;
+  inset: -4%;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(ellipse 54% 50% at 50% 50%, transparent 28%, rgba(7, 3, 8, 0.55) 58%, #070308 76%);
+}
 .load-meter {
   width: min(460px, 86vw);
   padding: 0 16px;
@@ -503,7 +527,7 @@ h1 em,
 #loading .load-bar {
   position: relative;
   width: 100%;
-  height: 22px;
+  height: 26px;
   margin: 0 auto;
   overflow: visible;
   background: #12060a;
@@ -546,7 +570,7 @@ h1 em,
   align-items: center;
   justify-content: center;
   color: var(--mg-gold-bright);
-  font-size: 11px;
+  font-size: 14px;
   letter-spacing: 0.4px;
   line-height: 1;
   white-space: nowrap;
@@ -558,8 +582,8 @@ h1 em,
   min-height: 2.4em;
   margin: 12px 0 0;
   color: var(--mg-gold-hi);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 1.4;
   text-shadow: 0 1px 0 #1a0808;
 }
 .load-embers {
@@ -906,7 +930,7 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
 #hud-corner-right {
   position: absolute;
   top: calc(8px + var(--safe-t));
-  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
+  right: calc(var(--hud-clock-gap) + var(--menu-col-w) + var(--hud-menu-inset) + var(--safe-r));
   z-index: 12;
   display: flex;
   flex-direction: column;
@@ -990,7 +1014,7 @@ body.touch #top-right {
 }
 body.touch #hud-corner-right {
   top: calc(8px + var(--safe-t));
-  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
+  right: calc(var(--hud-clock-gap) + var(--menu-col-w) + var(--hud-menu-inset) + var(--safe-r));
   max-width: min(220px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
 }
 body.touch #touch-btns,
@@ -1299,6 +1323,11 @@ body.debug-session #mock-wallet-badge {
   right: calc(10px + var(--safe-r));
   transform: none;
   z-index: 90;
+}
+body.hunting #debug-badge {
+  top: calc(8px + 34px + 8px + var(--safe-t));
+  left: auto;
+  right: calc(var(--hud-clock-gap) + var(--menu-col-w) + var(--hud-menu-inset) + var(--safe-r));
 }
 
 /* Weapon cursor: canvas only. Menus and buttons keep a normal pointer. */

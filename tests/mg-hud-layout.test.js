@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   ACTION_GAP,
+  CLOCK_GAP,
   HUD_CLEAR_PAIRS,
   HUD_VIEWPORTS,
   MENU_COUNT,
@@ -63,7 +64,22 @@ test('HUD rects do not collide at 844x390, 390x844, 1280x800, 1920x1080', () => 
       assert.ok(gap >= ACTION_GAP - 0.01, `${vp.name} action gap ${gap}`);
     }
     assert.equal(overlap(rects.quest, rects.minimap), false, `${vp.name} quest vs minimap`);
+    const clockGap = rects.menu.x - (rects.clock.x + rects.clock.w);
+    assert.ok(clockGap >= CLOCK_GAP - 0.01, `${vp.name} clock vs menu ${clockGap}`);
+    assert.ok(rects.menu.x - (rects.debug.x + rects.debug.w) >= CLOCK_GAP - 0.01, `${vp.name} debug vs menu`);
+    assert.equal(overlap(rects.debug, rects.clock), false, `${vp.name} debug vs clock`);
   }
+});
+
+test('MG-UI-23 clock chip has 8px clearance from the menu at 844x390', () => {
+  const vp = { name: 'phone-landscape', w: 844, h: 390, touch: true };
+  const rects = hudRects(vp);
+  assert.ok(rects.clock);
+  assert.equal(overlap(rects.clock, rects.menu), false);
+  assert.ok(rects.menu.x - (rects.clock.x + rects.clock.w) >= 8);
+  assert.ok(rects.menu.x - (rects.debug.x + rects.debug.w) >= 8);
+  assert.equal(overlap(rects.debug, rects.clock), false);
+  assert.equal(overlap(rects.debug, rects.menu), false);
 });
 
 test('MG-UI-17 844x390 action-button bounding rects leave at least 8px from #menu-col', () => {
@@ -106,6 +122,7 @@ test('applyHudLayout writes CSS variables', () => {
   assert.equal(props['--menu-btn'], `${fit.size}px`);
   assert.equal(props['--menu-col-w'], `${fit.colW}px`);
   assert.ok(Number.parseInt(props['--hud-clear-bottom'], 10) >= dialogClearance({ w: 844, h: 390, touch: true }));
+  assert.equal(props['--hud-clock-gap'], '8px');
   assert.ok(fit.size >= 32);
 });
 

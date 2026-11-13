@@ -8,6 +8,9 @@ export const MENU_COUNT = 11;
 export const QUEST_KEY = 'mg-quest-open';
 export const ACTION_GAP = 8;
 export const MENU_INSET = 4;
+export const CLOCK_GAP = 8;
+export const CLOCK_W = 78;
+export const CLOCK_H = 34;
 export const QUEST_MAX_W = 340;
 export const TOUCH_ATTACK_W = 84;
 
@@ -117,7 +120,13 @@ export function hudRects(vp, { questOpen = false } = {}) {
     chat = rect('chat', 8, h - 8 - mm - 12 - chatH, chatW, chatH);
   }
 
-  const out = { menu: menuCol, minimap, quest, hotbar, hearts, chat };
+  const clockRight = MENU_INSET + menu.colW + CLOCK_GAP;
+  const clock = rect('clock', w - clockRight - CLOCK_W, 8, CLOCK_W, CLOCK_H);
+  const debugW = 88;
+  const debugH = 28;
+  const debug = rect('debug', w - clockRight - debugW, 8 + CLOCK_H + CLOCK_GAP, debugW, debugH);
+
+  const out = { menu: menuCol, minimap, quest, hotbar, hearts, chat, clock, debug };
   if (bubbles) out.bubbles = bubbles;
   out.menuFit = menu;
   return out;
@@ -130,6 +139,9 @@ export const HUD_CLEAR_PAIRS = [
   ['menu', 'quest'],
   ['menu', 'chat'],
   ['menu', 'bubbles'],
+  ['menu', 'clock'],
+  ['menu', 'debug'],
+  ['clock', 'debug'],
   ['quest', 'minimap'],
   ['chat', 'minimap'],
   ['chat', 'quest'],
@@ -155,6 +167,7 @@ export function applyHudLayout(el, vp) {
   el.style.setProperty('--hud-menu-bottom', `${menuBottom}px`);
   el.style.setProperty('--hud-action-gap', `${ACTION_GAP}px`);
   el.style.setProperty('--hud-menu-inset', `${MENU_INSET}px`);
+  el.style.setProperty('--hud-clock-gap', `${CLOCK_GAP}px`);
   return menu;
 }
 

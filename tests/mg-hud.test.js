@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
-import { minimapArrowAngle } from '../src/ui/hud.js';
+import { bindPanelClose, minimapArrowAngle } from '../src/ui/hud.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -76,8 +76,52 @@ test('MG-UI-21 title panel fits short landscape and DEBUG stays off the tagline'
   assert.match(theme, /#debug-badge \{[\s\S]*left:\s*auto/);
   assert.match(style, /#debug-badge \{[\s\S]*right:\s*calc\(10px/);
   assert.match(theme, /#title \.title-inner \{[\s\S]*max-height:\s*calc\(100dvh - 16px\)/);
-  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*8px 16px 14px/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*6px 16px 22px/);
   assert.match(theme, /#title \.touch-only \{[\s\S]*padding:\s*0 8px 8px/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.touch-only \{[\s\S]*padding:\s*10px 8px 16px/);
+});
+
+test('MG-UI-23 DEBUG sits under the clock while hunting, 8px off the menu', () => {
+  const theme = src('src/ui/theme.css');
+  const style = src('src/style.css');
+  const hud = src('src/ui/hud.js');
+  assert.match(theme, /body\.hunting #debug-badge \{[\s\S]{0,220}--hud-clock-gap/);
+  assert.match(style, /body\.hunting #debug-badge \{[\s\S]{0,220}--hud-clock-gap/);
+  assert.match(theme, /--hud-clock-gap:\s*8px/);
+  assert.match(theme, /#hud-corner-right \{[\s\S]*--hud-clock-gap/);
+  assert.match(hud, /set-debug-flag/);
+});
+
+test('MG-UI-24 close fires on click, pointerup, and touchend', () => {
+  const hits = [];
+  const listeners = {};
+  const btn = {
+    dataset: {},
+    addEventListener(type, fn) { listeners[type] = fn; },
+  };
+  bindPanelClose(btn, () => hits.push('close'));
+  listeners.click({ preventDefault() {}, stopPropagation() {} });
+  listeners.pointerup({ preventDefault() {}, stopPropagation() {} });
+  listeners.touchend({ preventDefault() {}, stopPropagation() {} });
+  assert.equal(hits.length, 3);
+  bindPanelClose(btn, () => hits.push('again'));
+  assert.equal(hits.length, 3);
+});
+
+test('MG-UI-24 inventory close is 44px and handles click plus pointer/touch', () => {
+  const theme = src('src/ui/theme.css');
+  const style = src('src/style.css');
+  const hud = src('src/ui/hud.js');
+  const html = src('index.html');
+  assert.match(html, /id="panel-close"[^>]*type="button"/);
+  assert.match(theme, /#panel-close \{[\s\S]*min-width:\s*44px/);
+  assert.match(theme, /#panel-close \{[\s\S]*min-height:\s*44px/);
+  assert.match(theme, /#panel-close \{[\s\S]*z-index:\s*40/);
+  assert.match(style, /body\.touch #panel-close \{[\s\S]*min-width:\s*44px/);
+  assert.match(theme, /#panel \{[\s\S]*pointer-events:\s*auto/);
+  assert.match(hud, /bindPanelClose/);
+  assert.match(hud, /pointerup/);
+  assert.match(hud, /touchend/);
 });
 
 test('MG-UI-MENU-3 title and character select use the journal gold', () => {

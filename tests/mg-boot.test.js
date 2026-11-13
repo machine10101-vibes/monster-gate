@@ -146,8 +146,13 @@ test('MG-UI-20 loading stage fills the largest 3:2 box above the bar', () => {
   const stage = theme.slice(theme.indexOf('.load-stage {'), theme.indexOf('.load-glow'));
   assert.match(stage, /min\(92vw,\s*calc\(\(100dvh - var\(--load-chrome\)\) \* 1\.5\)\)/);
   assert.doesNotMatch(stage, /720px/);
-  assert.match(theme, /#loading \{[\s\S]*--load-chrome:\s*118px/);
+  assert.match(theme, /#loading \{[\s\S]*--load-chrome:\s*128px/);
   assert.match(theme, /#loading #load-text \{[\s\S]*white-space:\s*nowrap/);
+  assert.match(theme, /#loading #load-text \{[\s\S]*font-size:\s*14px/);
+  assert.match(theme, /#load-tip \{[\s\S]*font-size:\s*15px/);
+  assert.match(theme, /mask-image:\s*radial-gradient\(ellipse 62% 58%/);
+  assert.match(theme, /transparent 64%/);
+  assert.match(theme, /\.load-stage::after \{[\s\S]*#070308/);
 });
 
 test('index.html loading markup has the clip, no extra title, bar below', () => {
@@ -197,7 +202,7 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(theme, /#loading\.held \.load-glow/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
   assert.match(theme, /mask-image:\s*radial-gradient/);
-  assert.match(theme, /#loading \.load-bar \{[\s\S]*height:\s*22px/);
+  assert.match(theme, /#loading \.load-bar \{[\s\S]*height:\s*26px/);
   assert.match(theme, /\.load-cap \{[\s\S]*rotate\(45deg\)/);
   assert.doesNotMatch(theme, /\.load-vignette/);
   assert.doesNotMatch(html, /load-vignette/);
