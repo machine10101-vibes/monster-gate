@@ -31,6 +31,8 @@ export async function startWorld(extra = {}) {
     zoneCap: extra.zoneCap,
     monsters: extra.monsters,
     nodes: extra.nodes,
+    allowedOrigins: extra.allowedOrigins,
+    env: extra.env,
   });
   srv.url = `ws://127.0.0.1:${srv.port}`;
   return srv;
