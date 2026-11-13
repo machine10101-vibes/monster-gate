@@ -633,4 +633,6 @@ test('MG-UI-38 pin shares the log stack so the panel height stays put', () => {
   assert.match(style, /#world-chat \.wc-log \{[\s\S]*?overflow:\s*hidden/);
   assert.match(style, /#world-chat \.wc-log \{[\s\S]*?justify-content:\s*flex-end/);
   assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*body\.touch #world-chat \.wc-stack \{[\s\S]*height:\s*64px/);
+  assert.match(style, /-webkit-line-clamp:\s*2/);
+  assert.match(style, /#world-chat \.wc-pin p\.wc-you \{[\s\S]*?text-overflow:\s*ellipsis/);
 });

@@ -4331,6 +4331,17 @@ body.touch #dialog { z-index: 74; }
   color: #e8edf2;
 }
 #world-chat .wc-log p { margin: 0; }
+#world-chat .wc-log p.wc-clamp {
+  flex: none;
+  width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: calc(1.25em * 2);
+  max-height: calc(1.25em * 2);
+}
 #world-chat .wc-log p.wc-you {
   margin: 0 0 4px;
   padding: 1px 4px;
@@ -4343,8 +4354,10 @@ body.touch #dialog { z-index: 74; }
 #world-chat .wc-pin {
   display: none;
   flex: none;
-  margin: 0 6px 6px;
-  padding: 6px 8px;
+  min-width: 0;
+  margin: 0 6px 4px;
+  padding: 2px 8px;
+  overflow: hidden;
   background: rgba(42, 32, 12, 0.94);
   border-top: 0;
   border-left: 3px solid var(--mg-gold, #c6a15a);
@@ -4357,6 +4370,9 @@ body.touch #dialog { z-index: 74; }
   background: transparent;
   border: 0;
   color: #e8edf2;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 #world-chat .wc-pin p.wc-you b { color: #e7c56a; }
 #world-chat .wc-pin-mark {
@@ -4438,7 +4454,11 @@ body.touch #world-chat {
   width: min(250px, 54vw);
 }
 body.touch #world-chat .wc-stack { height: 84px; }
-body.touch #world-chat .wc-log { font-size: 13px; }
+body.touch #world-chat .wc-log {
+  font-size: 13px;
+  line-height: 1.25;
+  padding: 2px 8px;
+}
 
 @media (max-width: 820px) {
   #world-chat {

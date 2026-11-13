@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   ANIM, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S, REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
-  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows,
+  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows, planLogCull, newestKeepIndex,
   normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
@@ -334,6 +334,42 @@ test('MG-UI-38 log cull hides rows that do not fully fit', () => {
   assert.match(style, /body\.touch #world-chat \.wc-stack \{[\s\S]*?height:\s*84px/);
   assert.match(theme, /body\.touch #world-chat \.wc-stack \{[\s\S]*?height:\s*64px/);
   assert.doesNotMatch(theme, /body\.touch #world-chat \.wc-log \{[\s\S]*?height:\s*64px/);
+});
+
+test('MG-UI-39 newest wrapped row stays visible while the pin shows', () => {
+  const herald = [{ id: 'herald', top: 0, bottom: 50, pinned: false }];
+  const emptyLog = planLogCull(herald, 0, 24, { keepNewest: false });
+  assert.deepEqual(emptyLog.hide, [0], 'without the pin a row that cannot fit is hidden');
+  const withPin = planLogCull(herald, 0, 24, { keepNewest: true });
+  assert.deepEqual(withPin.hide, [], 'pin keeps the newest non-pin row');
+  assert.equal(withPin.keepIndex, 0);
+  assert.equal(withPin.clampNewest, true, 'newest row is clamped instead of hidden');
+  const afterSend = [
+    { id: 'herald', top: 0, bottom: 40, pinned: false },
+    { id: 'you', top: 40, bottom: 58, pinned: true },
+  ];
+  assert.equal(newestKeepIndex(afterSend, true), 0, 'skip the pinned own echo');
+  const mixed = planLogCull(afterSend, 0, 28, { keepNewest: true });
+  assert.equal(mixed.keepIndex, 0);
+  assert.deepEqual(mixed.hide, [1], 'own echo hides while the pin shows; Herald stays');
+  const roomy = [
+    { id: 'herald', top: 0, bottom: 24, pinned: false },
+    { id: 'you', top: 24, bottom: 40, pinned: true },
+  ];
+  assert.deepEqual(planLogCull(roomy, 0, 64, { keepNewest: true }).hide, [1], 'pin echo hides even if it would fit');
+  const older = [
+    { id: 'bram', top: -10, bottom: 8, pinned: false },
+    { id: 'herald', top: 8, bottom: 40, pinned: false },
+  ];
+  const rest = planLogCull(older, 0, 28, { keepNewest: true });
+  assert.deepEqual(rest.hide, [0], 'older rows still hide whole');
+  const wv = src('../src/net/worldView.js');
+  const style = src('../src/style.css');
+  assert.match(wv, /keepNewest/);
+  assert.match(wv, /wc-clamp/);
+  assert.match(style, /-webkit-line-clamp:\s*2/);
+  assert.match(style, /#world-chat \.wc-log p\.wc-clamp \{[\s\S]*?min-height:\s*calc\(1\.25em \* 2\)/);
+  assert.match(style, /#world-chat \.wc-pin p\.wc-you \{[\s\S]*?text-overflow:\s*ellipsis/);
 });
 
 test('waking overlay is inert without ?mmo=1', () => {
