@@ -1,6 +1,11 @@
 /* Journal / quest panel is the visual source of truth for every menu. */
 
 :root {
+  --menu-btn: 44px;
+  --menu-gap: 8px;
+  --menu-col-w: 44px;
+  --hud-clear-bottom: 120px;
+  --hud-menu-bottom: 6px;
   --mg-navy: #0b1524;
   --mg-navy-2: #0c1828;
   --mg-navy-3: #101c2e;
@@ -35,6 +40,7 @@
   --mg-small: 14px;
   --mg-label: 8px;
   --mg-frame-border: 2px solid var(--mg-gold);
+  --mg-chat-border: 4px solid var(--mg-gold);
   --mg-frame-shadow: 0 0 0 1px var(--mg-gold-edge), 0 0 0 4px var(--mg-ink), 0 22px 50px rgba(0, 0, 0, 0.72);
   --mg-tex: radial-gradient(80% 40% at 50% 0%, rgba(231, 197, 106, 0.08), transparent 70%);
   --mg-scroll-track: #0e1a2c;
@@ -116,8 +122,6 @@
 
 .mg-btn,
 .qj-action,
-.start,
-.cs-btn,
 .wg-btn,
 .sk-btn,
 .dlg-choice,
@@ -131,6 +135,17 @@
   border: 2px solid var(--mg-blue-edge);
   border-radius: var(--mg-radius);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 0 var(--mg-blue-shadow);
+}
+.start,
+#title .account-choices .start,
+.cs-btn {
+  font-family: var(--font-px);
+  letter-spacing: 0.5px;
+  color: var(--mg-gold-title);
+  background: linear-gradient(var(--mg-quiet-hi), var(--mg-quiet-lo));
+  border: 2px solid var(--mg-gold-hi);
+  border-radius: var(--mg-radius);
+  box-shadow: 0 0 0 1px var(--mg-gold-edge), inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 3px 0 var(--mg-ink);
 }
 .mg-btn:hover,
 .qj-action:hover,
@@ -331,8 +346,13 @@ h1 em,
   animation: none;
   border-radius: var(--mg-radius);
 }
+#title .title-inner {
+  max-width: min(540px, 92vw);
+  padding: 28px 28px 22px;
+}
 #title .account-choices .start {
   animation: none;
+  border-color: var(--mg-gold-hi);
 }
 .account-panel {
   padding: 12px 14px 8px;
@@ -368,10 +388,10 @@ h1 em,
   left: 50%;
   right: auto;
   top: auto;
-  bottom: max(12px, calc(96px * var(--ui) + var(--safe-b)));
+  bottom: max(16px, calc(var(--hud-clear-bottom, 120px) + var(--safe-b)));
   transform: translateX(-50%);
   width: min(560px, calc(100vw - 24px - var(--safe-l) - var(--safe-r)));
-  max-height: calc(100dvh - var(--safe-t) - var(--safe-b) - 120px);
+  max-height: calc(100dvh - var(--safe-t) - var(--hud-clear-bottom, 120px) - 24px);
   overflow-x: hidden;
   overflow-y: auto;
   z-index: 40;
@@ -386,19 +406,21 @@ h1 em,
   color: var(--mg-ink-text);
 }
 body.touch #dialog {
-  top: max(96px, 36vh);
-  bottom: auto;
+  top: auto;
+  bottom: max(16px, calc(var(--hud-clear-bottom, 200px) + var(--safe-b)));
   left: 50%;
   transform: translateX(-50%);
-  width: min(420px, calc(100vw - 128px - var(--safe-l) - var(--safe-r)));
-  max-height: min(40vh, calc(100dvh - 240px));
+  width: min(420px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
+  max-height: calc(100dvh - var(--safe-t) - var(--hud-clear-bottom, 200px) - 24px);
 }
 @media (max-height: 520px) {
   #dialog,
   body.touch #dialog {
-    bottom: max(8px, calc(64px + var(--safe-b)));
-    max-height: calc(100dvh - var(--safe-t) - 80px);
-    width: min(420px, calc(100vw - 160px - var(--safe-l) - var(--safe-r)));
+    top: auto;
+    left: 50%;
+    bottom: max(16px, calc(var(--hud-clear-bottom, 120px) + var(--safe-b)));
+    max-height: calc(100dvh - var(--safe-t) - var(--hud-clear-bottom, 120px) - 16px);
+    width: min(420px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
   }
 }
 #toast {
@@ -407,6 +429,80 @@ body.touch #dialog {
   color: var(--mg-gold-bright);
   padding: 8px 14px;
 }
+
+#nameplates {
+  z-index: 8;
+}
+html.windows-open #nameplates,
+#app:has(#panel:not(.hidden)) #nameplates,
+#app:has(#dialog:not(.hidden)) #nameplates {
+  visibility: hidden;
+}
+
+#quest {
+  min-width: 0;
+  padding: 0;
+  pointer-events: auto;
+}
+#quest.open {
+  min-width: min(220px, calc(100vw - var(--menu-col-w) - 48px));
+  width: max-content;
+  max-width: min(280px, calc(100vw - var(--menu-col-w) - 32px));
+}
+body.touch #quest.open {
+  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+}
+#top-left:has(#quest.open) {
+  min-width: min(220px, calc(100vw - var(--menu-col-w) - 48px));
+}
+body.touch #top-left:has(#quest.open) {
+  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+}
+#quest.open .q-body {
+  white-space: nowrap;
+}
+#quest .q-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+}
+#quest .q-title {
+  margin: 0;
+}
+#quest .q-arrow {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--mg-gold-hi);
+}
+#quest:not(.open) .q-track { display: none; }
+#quest.open .q-arrow { transform: rotate(180deg); }
+#quest .q-track {
+  padding: 0 10px 8px;
+}
+
+.build-id {
+  position: absolute;
+  right: calc(8px + var(--safe-r));
+  bottom: calc(4px + var(--safe-b));
+  z-index: 35;
+  font-family: var(--font-px);
+  font-size: 7px;
+  letter-spacing: 0.4px;
+  color: rgba(243, 226, 176, 0.55);
+  pointer-events: none;
+  text-shadow: 0 1px 0 #000;
+}
+body:has(#hud:not(.hidden)) .build-id { display: none; }
 #faint {
   background: rgba(7, 13, 22, 0.84);
 }
@@ -423,6 +519,14 @@ body.touch #dialog {
 #charselect {
   --gold: #e7c56a;
   --gold-dim: #8a6a32;
+}
+#charselect .cs-panel,
+#charselect .cs-form {
+  position: absolute;
+  left: auto;
+  right: max(16px, var(--safe-r));
+  max-width: calc(100vw - 32px - var(--safe-l) - var(--safe-r));
+  box-sizing: border-box;
 }
 .cs-panel {
   background:
@@ -500,6 +604,7 @@ body.touch #world-status {
 }
 body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
 #world-chat .wc-body {
+  border: var(--mg-chat-border);
   box-shadow: 0 0 0 1px var(--mg-gold-edge), 0 8px 18px rgba(0, 0, 0, 0.45);
 }
 #world-chat .wc-tabs {
@@ -519,17 +624,17 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
   border-top-color: var(--mg-gold-hi);
 }
 
-/* HUD: status stays top-right; menu buttons live in side columns -------- */
+/* HUD: status sits inboard of a single right-edge menu column ---------- */
 #hud-corner-right {
   position: absolute;
   top: calc(8px + var(--safe-t));
-  right: calc(8px + var(--safe-r));
+  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
   z-index: 12;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  max-width: min(280px, calc(100vw - 24px - var(--safe-l) - var(--safe-r)));
+  max-width: min(280px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
   pointer-events: none;
 }
 #hud-corner-right > * { pointer-events: auto; }
@@ -565,29 +670,26 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
   justify-content: flex-end;
   flex: none;
 }
-.menu-col {
+.menu-col,
+#menu-col {
   position: absolute;
   z-index: 12;
+  right: calc(4px + var(--safe-r));
+  bottom: calc(var(--hud-menu-bottom, 6px) + var(--safe-b));
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: var(--menu-gap);
+  width: var(--menu-col-w);
   pointer-events: none;
 }
 .menu-col .mbtn { pointer-events: auto; }
-#menu-col-left {
-  left: calc(8px + var(--safe-l));
-  bottom: calc(8px + 142px * var(--ui) + 12px + var(--safe-b));
-}
-#menu-col-right {
-  right: calc(8px + var(--safe-r));
-  bottom: calc(12px + var(--safe-b));
-}
 .mbtn {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
+  width: var(--menu-btn);
+  height: var(--menu-btn);
+  min-width: var(--menu-btn);
+  min-height: var(--menu-btn);
   background: linear-gradient(#24344a, #15263a);
   border: 2px solid var(--mg-gold);
   box-shadow: 0 0 0 1px var(--mg-gold-edge);
@@ -597,7 +699,7 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
   background-color: var(--mg-navy);
 }
 #hints {
-  right: calc(8px + 52px + var(--safe-r));
+  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
 }
 
 body.touch #hud-corner-right,
@@ -609,21 +711,17 @@ body.touch #top-right {
 }
 body.touch #hud-corner-right {
   top: calc(8px + var(--safe-t));
-  right: calc(8px + var(--safe-r));
-  max-width: min(220px, calc(100vw - 16px - var(--safe-l) - var(--safe-r) - 120px));
+  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
+  max-width: min(220px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
 }
-body.touch #menu-col-left {
-  left: calc(8px + var(--safe-l));
-  bottom: calc(90px + 118px * var(--ui) + 12px + var(--safe-b));
-}
-body.touch #menu-col-right {
-  right: calc(8px + var(--safe-r));
-  bottom: calc(90px + 220px * var(--ui) + 16px + var(--safe-b));
+body.touch #touch-btns {
+  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
 }
 body.touch #world-chat {
-  left: calc(34px + 118px * var(--ui) + 10px + var(--safe-l));
+  left: calc(8px + var(--safe-l));
   width: min(140px, 38vw);
-  bottom: calc(90px + 118px * var(--ui) + 88px + var(--safe-b));
+  bottom: auto;
+  top: calc(6px + 142px * 0.78 + 12px + var(--safe-t));
   max-height: 120px;
 }
 body.touch.mmo-view #top-left,
@@ -656,34 +754,32 @@ body.mmo-view #top-left {
   }
   body.touch #top-left,
   body.mmo-view #top-left {
-    left: calc(8px + var(--safe-l));
-    top: calc(8px + var(--safe-t) + 124px);
+    left: calc(8px + 142px * 0.78 + 8px + var(--safe-l));
+    top: calc(8px + var(--safe-t));
     max-width: min(200px, calc(100vw - 24px - var(--safe-l) - var(--safe-r) - 160px));
   }
 }
 
-/* Phone landscape: wrap columns inboard of the stick and attack cluster. */
+/* Phone landscape: keep the right-edge column; shift bubbles inboard. */
 @media (max-height: 500px) {
   html, body, #app, #hud {
     overflow: hidden;
     max-height: 100dvh;
   }
-  body.touch #menu-col-left {
-    flex-flow: row wrap-reverse;
-    width: 96px;
-    left: calc(34px + 118px * var(--ui) + 10px + var(--safe-l));
-    bottom: calc(8px + var(--safe-b));
+  :root {
+    --menu-btn: 32px;
+    --menu-gap: 2px;
+    --menu-col-w: 32px;
   }
-  body.touch #menu-col-right {
-    flex-flow: row wrap-reverse;
-    width: 96px;
-    right: calc(18px + 240px * var(--ui) + var(--safe-r));
-    bottom: calc(8px + var(--safe-b));
+  #menu-col .mbtn kbd { display: none; }
+  body.touch #touch-btns {
+    right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
   }
   body.touch #world-chat {
-    left: calc(34px + 118px * var(--ui) + 10px + var(--safe-l));
-    bottom: calc(8px + 148px + var(--safe-b));
-    width: min(240px, 42vw);
+    left: calc(8px + 142px * 0.78 + 8px + var(--safe-l));
+    bottom: calc(90px + 118px * var(--ui) + 12px + var(--safe-b));
+    top: auto;
+    width: min(240px, 36vw);
     max-height: 88px;
     overflow: hidden;
   }
@@ -692,22 +788,23 @@ body.mmo-view #top-left {
   }
   #dialog,
   body.touch #dialog {
-    top: 50%;
-    bottom: auto;
-    transform: translate(-50%, -50%);
-    width: min(320px, 42vw);
-    max-height: 36vh;
+    top: auto;
+    left: 50%;
+    bottom: max(12px, calc(var(--hud-clear-bottom, 120px) + var(--safe-b)));
+    transform: translateX(-50%);
+    width: min(320px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
+    max-height: calc(100dvh - var(--safe-t) - var(--hud-clear-bottom, 120px) - 12px);
   }
 }
 
-/* Chat: sits beside the left column so the toggle stays hittable. */
+/* Chat: above the minimap on desktop; inboard of the stick on phones. */
 #world-chat {
   display: flex;
   flex-direction: column-reverse;
   align-items: flex-start;
   gap: 6px;
   z-index: 19;
-  left: calc(8px + 52px + var(--safe-l));
+  left: calc(8px + var(--safe-l));
 }
 #world-chat .wc-toggle {
   min-width: 44px;

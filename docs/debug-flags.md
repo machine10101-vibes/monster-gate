@@ -9,11 +9,13 @@ Session-only tools for layout and combat checks. **Inert unless the URL has `?de
 | `?debug=1` | Enable debug. Required for the rest. |
 | `&tp=<zone>` | Teleport after Enter World to a named spot. |
 | `&unlock=1` | Grant levels (skills 40), catalog discoveries, dusk-scale gear, Ashen Brand, gold, portals, and open the keep-assault quest so those fights are reachable. |
+| Spawn monster | Offline only, with `?debug=1`: Settings → **Spawn monster**, or **F9** on desktop. Spawns a zone-appropriate monster a few meters in front of you. Hidden and inert when `?mmo=1` is set. World 1 rejects debug messages with error code `debug`. |
 | `?mockwallet=<address>` | Session-only Klever stand-in. A green **MOCK WALLET** badge shows. Does not create an account. |
 
 Examples:
 
 ```
+https://monstergate.online/?debug=1
 https://monstergate.online/?debug=1&tp=oakhollow
 https://monstergate.online/?debug=1&unlock=1&tp=hellspire
 https://monstergate.online/?debug=1&tp=greyrock
@@ -25,7 +27,7 @@ The old GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` re
 
 Without `debug=1`, `tp` and `unlock` do nothing.
 
-**World view:** if the URL also has `?mmo=1`, debug is fully inert — no unlocks, teleports, gear grants, or DEBUG badge. The console warns that debug is disabled for world-view sessions. Use debug on a visit without `mmo=1`.
+**World view:** if the URL also has `?mmo=1`, debug is fully inert — no unlocks, teleports, gear grants, Spawn monster, F9, or DEBUG badge. The console warns that debug is disabled for world-view sessions. World 1 rejects debug messages with error code `debug`. Use debug on a visit without `mmo=1`.
 
 Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&mockwake=90` waits 90 seconds so testers can sit through **Almost there…**, Retry, and Play offline.
 
@@ -37,7 +39,7 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `goldenmeadow` | `goldmead`, `goldmeadow` | Goldmead clearing |
 | `greyrock` | `greyrock pit`, `pit` | Greyrock Pit ramp |
 | `forge` | `bram`, `bramsforge` | Bram's forge by Greyrock |
-| `oasis` | `greenbowl` | Desert oasis pool (HUD label: Oasis) |
+| `oasis` | `greenbowl` | Dry east shore of the desert oasis (HUD label: Oasis) |
 | `deepwell` | | Deepwell sand pit |
 | `cinderfall` | | Cinderfall volcano (titanium) |
 | `glimmerfrost` | | Glimmerfrost glacier (platinum) |

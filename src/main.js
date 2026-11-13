@@ -22,6 +22,7 @@ import { attachDebug } from './debug/flags.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
+import { BUILD_ID } from './ui/buildId.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
 import { Journal } from './systems/journal.js';
@@ -100,14 +101,22 @@ const ZONE_NAMES = {
 
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
 
+function isDesktopGraphics() {
+  try {
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches
+      && !window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return true;
+  }
+}
+
 function pickQuality() {
   const saved = localStorage.getItem('mg-quality');
   const found = QUALITIES.find((q) => q.id === saved);
   if (found) return found;
-  const touch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+  if (isDesktopGraphics()) return QUALITIES[1];
   const cores = navigator.hardwareConcurrency || 4;
-  if (touch) return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
-  return cores >= 8 ? QUALITIES[2] : QUALITIES[1];
+  return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
 }
 
 /**
@@ -148,6 +157,9 @@ class Game {
     this.hud = new HUD();
     this.audio = new Audio8();
     this.input = new Input(this.canvas);
+    this.hud.layoutHud();
+    const buildEl = document.getElementById('build-id');
+    if (buildEl) buildEl.textContent = BUILD_ID;
     this.time = 0;
     this.hitstopT = 0;
     this.punchAmt = 0;
@@ -1070,10 +1082,9 @@ class Game {
   enterImmersive({ gesture = false, lock = false } = {}) {
     document.documentElement.classList.add('landscape-full');
     const now = performance.now();
-    const cooled = !this.fsTriedAt || now - this.fsTriedAt > 900;
     const tablet = isTablet();
-    // A tablet toolbar only hides from a real tap. Retrying on a timer is rejected and leaves the header up.
-    if (!isFullscreen() && !this.fsPending && (gesture || (!tablet && cooled))) {
+    // Fullscreen only from a real tap. Orientation change must not prompt on its own.
+    if (!isFullscreen() && !this.fsPending && gesture) {
       this.fsTriedAt = now;
       this.fsPending = true;
       requestGameFullscreen(lock && gesture).then((ok) => {
@@ -1200,6 +1211,7 @@ class Game {
     hideUniforms.uHideRadius.value = Math.max(180, Math.min(cw, ch) * 0.42);
     const ui = Math.max(1, Math.min(1.5, h / 820));
     document.documentElement.style.setProperty('--ui', ui.toFixed(3));
+    this.hud?.layoutHud?.();
   }
 
   adaptResolution(rawMs) {

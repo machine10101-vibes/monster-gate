@@ -50,6 +50,8 @@ test('MG-UI-10 dialogue stays absolutely positioned and clamped on screen', () =
   assert.match(theme, /#dialog \{[\s\S]*position:\s*absolute/);
   assert.match(theme, /#dialog \{[\s\S]*max-height:\s*calc\(100dvh/);
   assert.match(theme, /body\.touch #dialog \{[\s\S]*max-height:\s*calc\(100dvh/);
+  assert.match(theme, /#dialog \{[\s\S]*--hud-clear-bottom/);
+  assert.match(theme, /body\.touch #dialog \{[\s\S]*--hud-clear-bottom/);
 });
 
 test('MG-UI-9 landscape chat stays off the quest HUD and the page cannot scroll', () => {
@@ -91,20 +93,57 @@ test('MG-UI-11 oasis landing is labeled Oasis and the water bed tint varies', ()
   assert.match(src('src/world/world.js'), /macro \* 2\.4/);
 });
 
-test('side columns split character menus left and world menus right', () => {
+test('menu buttons sit in one right-edge column', () => {
   const html = src('index.html');
   const theme = src('src/ui/theme.css');
-  assert.match(html, /id="menu-col-left"/);
-  assert.match(html, /id="menu-col-right"/);
+  assert.match(html, /id="menu-col"/);
   assert.match(html, /id="hud-corner-right"/);
   assert.match(html, /data-panel="bag"/);
   assert.match(html, /data-panel="settings"/);
   assert.doesNotMatch(html, /id="menu-buttons"/);
-  assert.match(theme, /#menu-col-left/);
-  assert.match(theme, /#menu-col-right/);
+  assert.doesNotMatch(html, /id="menu-col-left"/);
+  assert.match(theme, /#menu-col/);
   assert.match(theme, /flex-direction:\s*column-reverse/);
-  assert.match(theme, /\.mbtn \{[\s\S]*min-width:\s*44px/);
-  assert.match(theme, /body\.touch #menu-col-left/);
+  assert.match(theme, /\.mbtn \{[\s\S]*min-width:\s*var\(--menu-btn\)/);
+  assert.match(theme, /body\.touch #touch-btns \{[\s\S]*--menu-col-w/);
+});
+
+test('MG-UI-13 nameplates sit below windows and hide while a window is open', () => {
+  const theme = src('src/ui/theme.css');
+  assert.match(theme, /#nameplates \{[\s\S]*z-index:\s*8/);
+  assert.match(theme, /html\.windows-open #nameplates/);
+  assert.match(src('src/ui/hud.js'), /syncWindows/);
+});
+
+test('MG-UI-14 character select panel stays absolutely placed in the viewport', () => {
+  const theme = src('src/ui/theme.css');
+  assert.match(theme, /#charselect \.cs-panel,[\s\S]*position:\s*absolute/);
+  assert.match(theme, /#charselect \.cs-panel,[\s\S]*max-width:\s*calc\(100vw/);
+});
+
+test('MG-UI-15 expanded quest dropdown has a 220px min-width clamped to the viewport', () => {
+  const theme = src('src/ui/theme.css');
+  assert.match(theme, /#quest\.open \{[\s\S]*min-width:\s*min\(220px/);
+  assert.match(theme, /body\.touch #quest\.open \{[\s\S]*min-width:\s*min\(220px/);
+});
+
+test('build id is shown in Settings', () => {
+  assert.match(src('src/ui/hud.js'), /set-build/);
+  assert.match(src('src/ui/buildId.js'), /VITE_BUILD_ID/);
+  assert.match(src('index.html'), /id="build-id"/);
+  assert.match(src('vite.config.js'), /VITE_BUILD_ID/);
+});
+
+test('fullscreen is requested only from a user tap', () => {
+  const main = src('src/main.js');
+  assert.match(main, /if \(!isFullscreen\(\) && !this\.fsPending && gesture\)/);
+  assert.doesNotMatch(main, /gesture \|\| \(!tablet && cooled\)/);
+});
+
+test('graphics default to Medium on desktop when nothing is saved', () => {
+  const main = src('src/main.js');
+  assert.match(main, /isDesktopGraphics/);
+  assert.match(main, /if \(isDesktopGraphics\(\)\) return QUALITIES\[1\]/);
 });
 
 test('weapon cursor maps each weapon type and dusk-tints Duskbreaker', () => {

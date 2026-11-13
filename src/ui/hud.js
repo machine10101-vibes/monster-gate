@@ -21,6 +21,8 @@ import { mountWalletSettings } from '../wallet/settings.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
+import { BUILD_ID } from './buildId.js';
+import { applyHudLayout, readQuestOpen, writeQuestOpen } from './hudLayout.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -158,6 +160,41 @@ export class HUD {
     $('btn-fs').style.backgroundImage = `url(${iconURL('fs')})`;
     $('btn-snd').style.backgroundImage = `url(${iconURL('snd')})`;
     decorateAllFrames();
+    this.bindQuestToggle();
+    this.syncWindows();
+    this.layoutHud();
+  }
+
+  layoutHud() {
+    const touch = document.body.classList.contains('touch');
+    applyHudLayout(document.documentElement, {
+      w: window.innerWidth || 1280,
+      h: window.innerHeight || 800,
+      touch,
+    });
+  }
+
+  bindQuestToggle() {
+    const box = document.getElementById('quest');
+    const btn = document.getElementById('quest-toggle');
+    if (!box || !btn) return;
+    const apply = (open) => {
+      box.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    apply(readQuestOpen());
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const open = !box.classList.contains('open');
+      apply(open);
+      writeQuestOpen(open);
+    });
+  }
+
+  syncWindows() {
+    const open = this.panelOpen || this.dialogOpen;
+    document.documentElement.classList.toggle('windows-open', !!open);
   }
 
   buildHotbar(items, onSelect) {
@@ -294,10 +331,12 @@ export class HUD {
     this.el.dlgText.textContent = text;
     this.clearChoices();
     this.el.dialog.classList.remove('hidden');
+    this.syncWindows();
   }
   hideDialog() {
     this.clearChoices();
     this.el.dialog.classList.add('hidden');
+    this.syncWindows();
   }
   showChoices(choices, onPick) {
     const box = this.el.dlgChoices;
@@ -708,6 +747,8 @@ export class HUD {
             ]
           : []),
         ['Graphics quality', `<button id="set-q">${q.label}</button>`],
+        ['Build', `<b id="set-build">${BUILD_ID}</b>`],
+        ...(game.debug && !game.mmo && !game.worldView ? [['Spawn monster', '<button id="set-spawn">Spawn</button>']] : []),
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
@@ -761,8 +802,10 @@ export class HUD {
         document.getElementById('set-wcur').textContent = weaponCursorEnabled() ? 'On' : 'Off';
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
+      document.getElementById('set-spawn')?.addEventListener('click', () => game.debugSpawn?.());
     }
     this.el.panel.classList.remove('hidden');
+    this.syncWindows();
   }
   runCleanup() {
     const fn = this.cleanup;
@@ -775,6 +818,7 @@ export class HUD {
     this.journalRefresh = null;
     this.el.panel.querySelector('.panel-card')?.classList.remove('adventures', 'wide');
     this.el.panel.classList.add('hidden');
+    this.syncWindows();
   }
   get panelOpen() {
     return !this.el.panel.classList.contains('hidden');

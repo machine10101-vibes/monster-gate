@@ -506,15 +506,15 @@ export class World {
         void main() {
           vec2 p = vWorld.xz;
           float macro = vn(p * 0.055);
-          float mid = vn(p * 0.22 + vec2(uTime * 0.045, -uTime * 0.03));
-          float fine = vn(p * 0.85 + vec2(-uTime * 0.07, uTime * 0.05));
-          float cell = 1.15 + macro * 2.4 + mid * 0.8;
-          vec2 q = floor(p * cell + vec2(mid - 0.5, fine - 0.5) * 1.4) / cell;
-          float n = vn(q * 0.7 + vec2(uTime * 0.1, uTime * 0.07)) * 0.42 + mid * 0.33 + fine * 0.25;
+          float mid = vn(p * 0.16 + vec2(uTime * 0.018, -uTime * 0.012));
+          float fine = vn(p * 0.4 + vec2(-uTime * 0.02, uTime * 0.016));
+          float cell = 1.15 + macro * 2.4 + mid * 0.35;
+          vec2 q = mix(p, floor(p * cell) / cell, 0.22);
+          float n = vn(q * 0.45) * 0.5 + mid * 0.35 + fine * 0.15;
           vec3 col = mix(uDeep, uShallow, smoothstep(0.18, 0.88, n));
           col = mix(col, uDeep * 0.72, smoothstep(0.55, 1.0, macro) * 0.4);
-          float sparkle = step(0.9, vn(p * 2.6 + uTime * 0.55)) * 0.4;
-          float ripple = step(0.78, n) * 0.16;
+          float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.05;
+          float ripple = smoothstep(0.9, 1.0, n) * 0.04;
           col += uSky * (sparkle + ripple);
           col *= uLight;
           gl_FragColor = vec4(col, 0.78);

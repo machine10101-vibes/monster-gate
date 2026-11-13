@@ -301,14 +301,11 @@ export function mountSocialHud(game) {
     const isFriend = (snap.friends || []).some((f) => matchPerson(f, player));
     const inParty = social?.isPartyMember?.(player.id, player.name);
     menu.hidden = false;
-    const whisperOn = caps.whisper;
+    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty });
     menu.innerHTML = `
       <b>${escapeHtml(player.name)}</b>
       ${offline ? '<p class="mg-social-note">Friends and parties are <b>Online only</b>.</p>' : ''}
-      <button type="button" data-act="friend" ${offline || isSelf || isFriend ? 'disabled' : ''}>${isFriend ? 'Friends' : 'Add friend'}</button>
-      <button type="button" data-act="party" ${offline || isSelf || inParty ? 'disabled' : ''}>${inParty ? 'In party' : 'Invite to party'}</button>
-      <button type="button" data-act="whisper" ${offline || isSelf || !whisperOn ? 'disabled' : ''}>Whisper</button>
-      <button type="button" data-act="block" ${offline || isSelf || !caps.block ? 'disabled' : ''}>Block</button>`;
+      ${items.map((it) => `<button type="button" data-act="${it.act}" ${it.disabled ? 'disabled' : ''}>${it.label}</button>`).join('')}`;
     for (const c of CORNERS) {
       if (menu.querySelector(`:scope > .mg-corner.${c}`)) continue;
       const i = document.createElement('i');
@@ -327,14 +324,20 @@ export function mountSocialHud(game) {
       const res = await report(game, await social.inviteToParty(player.id || player.name));
       if (res?.ok) toast(game, `${player.name} joined the party`, 1600);
     };
-    menu.querySelector('[data-act="whisper"]').onclick = () => {
-      hideMenu();
-      focusWhisper(game, player);
-    };
-    menu.querySelector('[data-act="block"]').onclick = async () => {
-      hideMenu();
-      await report(game, await social.blockPlayer(player.id || player.name));
-    };
+    const whisperBtn = menu.querySelector('[data-act="whisper"]');
+    if (whisperBtn) {
+      whisperBtn.onclick = () => {
+        hideMenu();
+        focusWhisper(game, player);
+      };
+    }
+    const blockBtn = menu.querySelector('[data-act="block"]');
+    if (blockBtn) {
+      blockBtn.onclick = async () => {
+        hideMenu();
+        await report(game, await social.blockPlayer(player.id || player.name));
+      };
+    }
   };
 
   const onPlate = (e) => {
@@ -437,6 +440,17 @@ function observeChat(onChat) {
   });
   mo.observe(hud, { childList: true });
   return () => mo.disconnect();
+}
+
+/** Nameplate actions. Whisper and block appear only when welcome.features lists them. */
+export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false } = {}) {
+  const items = [
+    { act: 'friend', label: isFriend ? 'Friends' : 'Add friend', disabled: !!(offline || isSelf || isFriend) },
+    { act: 'party', label: inParty ? 'In party' : 'Invite to party', disabled: !!(offline || isSelf || inParty) },
+  ];
+  if (!offline && caps.whisper) items.push({ act: 'whisper', label: 'Whisper', disabled: !!isSelf });
+  if (!offline && caps.block) items.push({ act: 'block', label: 'Block', disabled: !!isSelf });
+  return items;
 }
 
 export { tintPlates, escapeHtml };

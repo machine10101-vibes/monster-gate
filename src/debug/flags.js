@@ -12,8 +12,10 @@ import { freezeSaves } from '../systems/saveio.js';
 import { originOf, TILES } from '../world/tiles.js';
 
 const MINE = { rampX0: 88, z: 66 };
-const OASIS = { x: 0, z: 432 };
+const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
 const SAND_MINE = { x: -74, z: 514 };
+/** East shore, outside the pool and the wet ring. */
+const OASIS_DRY = { x: OASIS.x + OASIS.r + OASIS.shore + 10, z: OASIS.z - 10 };
 
 function paramsOf(search) {
   const raw = String(search ?? '');
@@ -26,7 +28,7 @@ export const DEBUG_SPOTS = {
   goldenmeadow: { kind: 'goldmead' },
   greyrock: { x: MINE.rampX0 + 4, z: MINE.z },
   forge: { live: 'forge', x: 86.3, z: 72.8 },
-  oasis: { x: OASIS.x + 12, z: OASIS.z },
+  oasis: { x: OASIS_DRY.x, z: OASIS_DRY.z },
   deepwell: { x: SAND_MINE.x + 22, z: SAND_MINE.z },
   cinderfall: { kind: 'cinderfall' },
   glimmerfrost: { kind: 'glimmerfrost' },
@@ -164,6 +166,120 @@ export function grantDebugUnlock(progress, journal) {
   }
 }
 
+const ZONE_MOBS = {
+  oakhollow: ['chicken', 'slime'],
+  town: ['chicken', 'slime'],
+  goldenmeadow: ['slime', 'boar'],
+  field: ['slime', 'boar'],
+  whispering: ['boar', 'slime'],
+  forest: ['boar', 'slime'],
+  greystone: ['boar', 'slime'],
+  gate: ['slime', 'voidslime', 'wraith'],
+  southford: ['slime', 'boar'],
+  oasis: ['scorpion', 'sandworm'],
+  greenbowl: ['scorpion', 'sandworm'],
+  sunspill: ['scorpion', 'sandworm'],
+  glassroad: ['scorpion', 'sandworm'],
+  deepwell: ['scorpion', 'sandworm'],
+  mirrormere: ['tiger', 'raptor', 'pirate'],
+  brookside: ['boar', 'slime'],
+  silverrun: ['tiger', 'raptor'],
+  runmouth: ['cursedpirate', 'pirate'],
+  longacre: ['boar', 'slime'],
+  cinderfall: ['demonknight'],
+  hellspire: ['demonknight'],
+  glimmerfrost: ['snowyeti'],
+  dawnspire: ['holyknight'],
+  endlessfield: ['keepwarden'],
+  warfield: ['keepwarden'],
+  goldmead: ['slime', 'boar'],
+  cave: ['slime', 'wraith'],
+  rift: ['voidslime', 'wraith'],
+};
+
+function landKindOf(game, x, z) {
+  const land = game?.world?.landAt?.(x, z);
+  return String(land?.kind || land?.banner?.[1] || '').toLowerCase();
+}
+
+/** Level-appropriate monster id for the hunter's current zone. */
+export function pickDebugMonsterType(game) {
+  const p = game?.player?.pos;
+  const x = p?.x ?? 72;
+  const z = p?.z ?? 73;
+  const realm = game?.world?.realm;
+  if (realm === 'cave') return 'slime';
+  if (realm === 'rift') return 'voidslime';
+  const kind = landKindOf(game, x, z);
+  const zoneName = String(game?.zone ?? game?.hud?.el?.area?.textContent ?? '').toLowerCase();
+  const compact = zoneName.replace(/\s+/g, '');
+  const key = kind || compact;
+  const names = Object.keys(ZONE_MOBS).sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    if (key.includes(name) || zoneName.includes(name) || compact.includes(name)) {
+      const list = ZONE_MOBS[name];
+      const rank = Math.max(0, game?.rank | 0);
+      return list[Math.min(list.length - 1, rank > 4 ? list.length - 1 : rank > 1 ? 1 : 0)] || list[0];
+    }
+  }
+  const zn = game?.world?.zoneAt?.(x, z);
+  if (zn === 3 || zn === 5) return 'chicken';
+  if (zn === 6) return 'slime';
+  if (zn === 1) return 'boar';
+  return 'slime';
+}
+
+/** World 1 replies with this code if a debug frame ever reaches the socket. */
+export const DEBUG_ONLINE_CODE = 'debug';
+
+export function debugOnlineBlocked(game, search) {
+  if (game?.mmo || game?.worldView) return true;
+  const src = search ?? (typeof location !== 'undefined' ? location.search : '');
+  return parseDebugFlags(src).blocked;
+}
+
+export function debugOnlineReject() {
+  return { ok: false, code: DEBUG_ONLINE_CODE, message: 'Debug tools are offline only.' };
+}
+
+export function spawnDebugMonster(game, search) {
+  if (debugOnlineBlocked(game, search)) return debugOnlineReject();
+  if (!game?.debug || !game.spawner?.spawn || !game.player?.pos) return null;
+  const p = game.player.pos;
+  const yaw = Number(game.player.yaw) || 0;
+  const type = pickDebugMonsterType(game) || 'slime';
+  let spot = null;
+  for (const dist of [5, 4, 6, 3.5, 7]) {
+    const x = p.x + Math.sin(yaw) * dist;
+    const z = p.z + Math.cos(yaw) * dist;
+    const w = game.world;
+    if (w?.playable && !w.playable(x, z)) continue;
+    if (w?.isWater?.(x, z)) continue;
+    spot = { x, z, dist };
+    break;
+  }
+  if (!spot) {
+    spot = { x: p.x + Math.sin(yaw) * 5, z: p.z + Math.cos(yaw) * 5, dist: 5 };
+  }
+  const mon = game.spawner.spawn(type, spot.x, spot.z, true);
+  game.hud?.toast?.(`DEBUG · ${mon?.name || type}`, 1800);
+  return mon;
+}
+
+function bindDebugSpawn(game) {
+  if (game._debugSpawnBound) return;
+  game._debugSpawnBound = true;
+  game.debugSpawn = () => spawnDebugMonster(game);
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'F9' || e.repeat) return;
+    if (!game.debug || debugOnlineBlocked(game)) return;
+    const tag = e.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    e.preventDefault();
+    spawnDebugMonster(game);
+  });
+}
+
 export function teleportDebug(game, raw) {
   const spot = resolveSpot(raw, game?.world);
   if (!spot || !game?.player?.pos) return null;
@@ -199,7 +315,7 @@ export function attachDebug(game, search) {
   const src = search ?? (typeof location !== 'undefined' ? location.search : '');
   const flags = parseDebugFlags(src);
   if (flags.blocked) {
-    console.warn('[Monster Gate] Debug flags (?debug=1, &tp=, &unlock=1) are ignored while ?mmo=1 is present, so the world-view session is not teleported, unlocked, or badged.');
+    console.warn('[Monster Gate] Debug flags (?debug=1, &tp=, &unlock=1, spawn, F9) are ignored while ?mmo=1 is present, so the world-view session is not teleported, unlocked, spawned, or badged. World 1 rejects debug messages with error code debug.');
     return null;
   }
   if (!flags.enabled) return null;
@@ -216,5 +332,6 @@ export function attachDebug(game, search) {
     };
   }
   if (game.started) applySession(game, flags);
+  if (typeof window !== 'undefined') bindDebugSpawn(game);
   return flags;
 }

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_SPOTS, attachDebug, canonicalSpot, debugSpotKeys, grantDebugUnlock, parseDebugFlags, resolveSpot,
+  DEBUG_SPOTS, DEBUG_ONLINE_CODE, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpotKeys, grantDebugUnlock, parseDebugFlags, pickDebugMonsterType, resolveSpot, spawnDebugMonster,
 } from '../src/debug/flags.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
 import { Progress, saveKey } from '../src/systems/progress.js';
@@ -86,6 +87,64 @@ test('every documented tp key resolves', () => {
   assert.equal(resolveSpot('dawnspire keep').id, 'dawnspire');
   assert.equal(resolveSpot('nope'), null);
   assert.ok(DEBUG_SPOTS.oakhollow);
+  const oasis = resolveSpot('oasis');
+  assert.ok(Math.hypot(oasis.x - 0, oasis.z - 432) > 32, 'oasis spawn is outside the pool');
+});
+
+test('debug monster spawn is inert without ?debug=1 and picks a zone mob with the flag', () => {
+  const spawned = [];
+  const game = {
+    debug: null,
+    rank: 0,
+    zone: 'Oakhollow',
+    player: { pos: { x: 72, y: 3, z: 73 }, yaw: 0 },
+    world: { playable: () => true, isWater: () => false, zoneAt: () => 3, landAt: () => ({ kind: 'oakhollow', banner: ['Village', 'Oakhollow'] }) },
+    spawner: { spawn(type, x, z) { spawned.push({ type, x, z }); return { name: type }; } },
+    hud: { toast() {} },
+  };
+  assert.equal(spawnDebugMonster(game), null);
+  assert.equal(spawned.length, 0);
+  game.debug = { enabled: true };
+  const mon = spawnDebugMonster(game);
+  assert.ok(mon);
+  assert.equal(spawned[0].type, 'chicken');
+  assert.ok(spawned[0].z > game.player.pos.z);
+  assert.equal(pickDebugMonsterType({ zone: 'Oasis', player: { pos: { x: 0, z: 400 } }, world: { landAt: () => ({ kind: 'greenbowl' }) } }), 'scorpion');
+  assert.equal(pickDebugMonsterType({ zone: 'Endless Field', player: { pos: { x: 0, z: 0 } }, world: { landAt: () => ({ kind: 'warfield' }) } }), 'keepwarden');
+  assert.equal(parseDebugFlags('?debug=1').enabled, true);
+  const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
+  assert.match(hud, /game\.debug && !game\.mmo && !game\.worldView \? \[\[.Spawn monster./);
+  const flagsSrc = readFileSync(new URL('../src/debug/flags.js', import.meta.url), 'utf8');
+  assert.match(flagsSrc, /F9/);
+  assert.match(flagsSrc, /debugSpawn/);
+});
+
+test('debug spawn is offline-only; World 1 rejects debug messages with code debug', () => {
+  const spawned = [];
+  const game = {
+    debug: { enabled: true },
+    mmo: { send() {} },
+    worldView: {},
+    player: { pos: { x: 72, y: 3, z: 73 }, yaw: 0 },
+    spawner: { spawn(type, x, z) { spawned.push({ type, x, z }); return { name: type }; } },
+    hud: { toast() {} },
+  };
+  assert.equal(debugOnlineBlocked(game, '?debug=1&mmo=1'), true);
+  const rejected = debugOnlineReject();
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.code, DEBUG_ONLINE_CODE);
+  assert.equal(rejected.code, 'debug');
+  const res = spawnDebugMonster(game, '?debug=1&mmo=1');
+  assert.equal(res.code, 'debug');
+  assert.equal(spawned.length, 0);
+  assert.equal(game.debugSpawn, undefined);
+  freezeSaves(false);
+  const attached = attachDebug({ progress: { sessionOnly: false } }, '?debug=1&mmo=1');
+  assert.equal(attached, null);
+  const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
+  assert.match(hud, /!game\.mmo && !game\.worldView/);
+  const docs = readFileSync(new URL('../docs/debug-flags.md', import.meta.url), 'utf8');
+  assert.match(docs, /error code `debug`/);
 });
 
 test('debug freeze does not write the hunter save', () => {

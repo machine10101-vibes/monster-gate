@@ -36,14 +36,15 @@ export const ERRORS = {
   not_in_party: 'not_in_party',
   in_party: 'in_party',
   name: 'name',
+  persist: 'persist',
   whisper: 'whisper',
   busy: 'busy',
 };
 
 export const ERROR_TEXT = {
-  [ERRORS.auth]: 'Sign in with an account to use friends.',
+  [ERRORS.auth]: 'Sign in to use friends and parties',
   [ERRORS.rate]: 'Slow down.',
-  [ERRORS.not_found]: 'No hunter by that name.',
+  [ERRORS.not_found]: 'No hunter by that name',
   [ERRORS.self]: 'That hunter is you.',
   [ERRORS.already]: 'Already done.',
   [ERRORS.pending]: 'Already waiting.',
@@ -55,7 +56,8 @@ export const ERROR_TEXT = {
   [ERRORS.not_leader]: 'Only the leader can do that.',
   [ERRORS.not_in_party]: 'You are not in a party.',
   [ERRORS.in_party]: 'They are already in a party.',
-  [ERRORS.name]: 'Need a hunter name.',
+  [ERRORS.name]: 'No hunter by that name',
+  [ERRORS.persist]: "Couldn't save, try again",
   [ERRORS.whisper]: 'Could not whisper.',
   [ERRORS.busy]: 'They already have an invite.',
 };

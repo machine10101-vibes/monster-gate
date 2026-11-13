@@ -1,4 +1,4 @@
-import { parseSocialFlags } from './constants.js';
+import { errorMessage, parseSocialFlags } from './constants.js';
 import { MockSocial } from './mock.js';
 import { MmoSocial } from './mmo.js';
 import { OfflineSocial } from './offline.js';
@@ -34,6 +34,9 @@ export function attachSocial(game, search) {
   if (typeof window !== 'undefined') window.__social = session;
   session.uiOff = mountSocialHud(game);
   session.subscribe((snap, evt) => {
+    if (evt?.type === 'error' && evt.code) {
+      game?.hud?.toast?.(errorMessage(evt.code, evt.message), 2400);
+    }
     if (evt?.type === 'whisper' && evt.text && game.worldView?.pushChat) {
       game.worldView.pushChat({
         channel: 'whisper',

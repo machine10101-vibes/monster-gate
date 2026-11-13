@@ -30,6 +30,7 @@ export class MmoSocial {
     this.game = opts.game || null;
     this.client = opts.client || opts.game?.mmo || null;
     this.online = false;
+    this.guest = false;
     this.caps = { friends: false, party: false, whisper: false, block: false };
     this.state = emptySnapshot('mmo');
     this.state.mode = 'mmo';
@@ -112,6 +113,7 @@ export class MmoSocial {
       name: cleanHunterName(you.name) || this.state.self.name || 'Hunter',
       user_id: String(you.user_id || you.userId || ''),
     };
+    this.guest = !!you.guest;
     this.online = !you.guest || this.caps.party;
     this.state.online = true;
   }
@@ -134,7 +136,7 @@ export class MmoSocial {
       return;
     }
     if (type === 'error' && msg.code) {
-      this.emit('error', { code: msg.code, message: msg.message });
+      this.emit('error', { code: msg.code, message: msg.message || errorMessage(msg.code) });
       return;
     }
     if (!SOCIAL_INBOUND.has(type) && type !== 'chat') return;
@@ -247,6 +249,9 @@ export class MmoSocial {
   }
 
   async act(name, a, b) {
+    if (this.guest && guestNeedsAuth(name)) {
+      return { ok: false, code: ERRORS.auth, message: errorMessage(ERRORS.auth) };
+    }
     if (!this.canSend(name)) {
       return { ok: false, code: ERRORS.offline, message: 'The world server does not have this yet.' };
     }
@@ -293,6 +298,11 @@ export class MmoSocial {
 
 function applyFeatures(caps, feats) {
   const list = Array.isArray(feats) ? feats : feats && typeof feats === 'object' ? Object.keys(feats).filter((k) => feats[k]) : [];
+  if (!list.length) return;
+  caps.friends = false;
+  caps.party = false;
+  caps.whisper = false;
+  caps.block = false;
   for (const f of list) {
     const key = String(f).toLowerCase();
     if (key === 'friends' || key === 'friend') caps.friends = true;
@@ -300,6 +310,10 @@ function applyFeatures(caps, feats) {
     if (key === 'whisper') caps.whisper = true;
     if (key === 'block' || key === 'ignore') caps.block = true;
   }
+}
+
+function guestNeedsAuth(type) {
+  return type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore' || type === 'whisper';
 }
 
 function asList(rows) {

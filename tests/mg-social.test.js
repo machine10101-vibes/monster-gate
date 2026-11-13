@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  ERRORS, FRIENDS_CAP, INVITE_TTL_MS, MAX_PARTY, parseSocialFlags,
+  ERRORS, ERROR_TEXT, FRIENDS_CAP, INVITE_TTL_MS, MAX_PARTY, errorMessage, parseSocialFlags,
 } from '../src/social/constants.js';
 import {
   clampPartySize, lootWinner, needGreedResolve, nextLootTurn, splitGold, splitXp,
@@ -12,6 +12,7 @@ import { MmoSocial } from '../src/social/mmo.js';
 import { OfflineSocial } from '../src/social/offline.js';
 import { SocialSession } from '../src/social/session.js';
 import { attachSocial } from '../src/social/index.js';
+import { hunterMenuItems } from '../src/social/ui.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -226,6 +227,7 @@ test('mmo adapter feature-detects missing methods and welcome.features', async (
   assert.equal(mmo.caps.friends, true);
   assert.equal(mmo.caps.party, true);
   assert.equal(mmo.caps.whisper, true);
+  assert.equal(mmo.caps.block, true);
   assert.equal(mmo.state.self.user_id, 'uuid-1');
 
   client.friendRequest = (name) => { calls.push(['friendRequest', name]); return { ok: true }; };
@@ -267,6 +269,58 @@ test('attachSocial picks backends from the query string', () => {
   a.dispose();
   b.dispose();
   c.dispose();
+});
+
+test('social error codes map to friendly friends/party copy', () => {
+  assert.equal(errorMessage(ERRORS.name), 'No hunter by that name');
+  assert.equal(errorMessage(ERRORS.not_found), 'No hunter by that name');
+  assert.equal(errorMessage(ERRORS.persist), "Couldn't save, try again");
+  assert.equal(errorMessage(ERRORS.auth), 'Sign in to use friends and parties');
+  assert.equal(ERROR_TEXT[ERRORS.full], 'That list is full.');
+  assert.equal(ERROR_TEXT[ERRORS.already], 'Already done.');
+  assert.equal(ERROR_TEXT[ERRORS.self], 'That hunter is you.');
+  for (const code of ['full', 'already', 'self', 'not_found', 'name', 'persist', 'auth']) {
+    assert.ok(errorMessage(code).length > 3, code);
+    assert.notEqual(errorMessage(code), code);
+  }
+});
+
+test('nameplate menu lists whisper and block only when welcome.features includes them', () => {
+  const none = hunterMenuItems({ friends: true, party: true, whisper: false, block: false });
+  assert.deepEqual(none.map((i) => i.act), ['friend', 'party']);
+  const all = hunterMenuItems({ friends: true, party: true, whisper: true, block: true });
+  assert.deepEqual(all.map((i) => i.act), ['friend', 'party', 'whisper', 'block']);
+  const offline = hunterMenuItems({ whisper: true, block: true }, { offline: true });
+  assert.deepEqual(offline.map((i) => i.act), ['friend', 'party']);
+});
+
+test('mmo adapter treats guests as auth and welcome.features as the cap list', async () => {
+  const client = { onFrame() {}, sendWhisper() {}, blockPlayer() {}, friendRequest() {} };
+  const mmo = new MmoSocial({ client });
+  mmo.detectFromClient(client);
+  assert.equal(mmo.caps.whisper, true);
+  mmo.onFrame({
+    v: 1,
+    type: 'welcome',
+    features: ['friends', 'party'],
+    you: { id: 'g1', name: 'Guest', guest: true },
+  });
+  assert.equal(mmo.caps.friends, true);
+  assert.equal(mmo.caps.party, true);
+  assert.equal(mmo.caps.whisper, false);
+  assert.equal(mmo.caps.block, false);
+  const auth = await mmo.act('friend_request', 'Bram');
+  assert.equal(auth.ok, false);
+  assert.equal(auth.code, ERRORS.auth);
+  assert.equal(auth.message, 'Sign in to use friends and parties');
+  const persist = [];
+  mmo.subscribe((_snap, evt) => persist.push(evt));
+  mmo.onFrame({ v: 1, type: 'error', code: 'persist' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'name' });
+  assert.equal(persist[0].code, 'persist');
+  assert.equal(persist[0].message, "Couldn't save, try again");
+  assert.equal(persist[1].message, 'No hunter by that name');
+  mmo.dispose();
 });
 
 test('friends cap constant and SOCIAL_SPEC cover the protocol', () => {

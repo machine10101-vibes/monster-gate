@@ -305,7 +305,8 @@ Existing world codes (`protocol`, `auth`, `rate`, `teleport`, `chat`) stay. Soci
 | `not_leader` | Kick / promote / loot-mode from a member |
 | `not_in_party` | Leave / kick / promote with no party |
 | `in_party` | Target is already in another party |
-| `name` | Empty or invalid hunter name |
+| `name` | Empty or invalid hunter name (UI: No hunter by that name) |
+| `persist` | Friends or party write failed (UI: Couldn't save, try again) |
 | `whisper` | Whisper failed (offline, blocked, or feature off) |
 | `busy` | Target has a pending invite from another leader |
 
