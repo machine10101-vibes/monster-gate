@@ -18,11 +18,12 @@
     <link rel="icon" href="./favicon.ico" sizes="any" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <script type="module" crossorigin src="/assets/index-B32VWqRf.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Bs-I_WZP.css">
+    <script type="module" crossorigin src="/assets/index-BPdrznky.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CI6w6bZU.css">
   </head>
   <body>
     <div id="app">
+      <div id="build-id" class="build-id" aria-hidden="true"></div>
       <canvas id="game"></canvas>
 
       <div id="hud" class="hidden">
@@ -34,10 +35,15 @@
         </div>
         <div id="top-left">
           <div id="quest">
-            <div class="q-title">Quest</div>
-            <div class="q-body"><span id="q-text">Slay 5 Gate monsters</span> <b id="q-count">0/5</b></div>
-            <div class="q-bar"><i id="q-fill"></i></div>
-            <div class="q-gold"><span class="coin"></span><b id="gold">0</b></div>
+            <button type="button" id="quest-toggle" class="q-head" aria-expanded="false" aria-controls="q-track">
+              <span class="q-title">Quest</span>
+              <span class="q-arrow" aria-hidden="true">▾</span>
+            </button>
+            <div id="q-track" class="q-track">
+              <div class="q-body"><span id="q-text">Slay 5 Gate monsters</span> <b id="q-count">0/5</b></div>
+              <div class="q-bar"><i id="q-fill"></i></div>
+              <div class="q-gold"><span class="coin"></span><b id="gold">0</b></div>
+            </div>
           </div>
         </div>
 
@@ -53,14 +59,12 @@
             </div>
           </div>
         </div>
-        <nav id="menu-col-left" class="menu-col" aria-label="Character menus">
+        <nav id="menu-col" class="menu-col" aria-label="Game menus">
           <button class="mbtn" data-panel="bag" title="Inventory"><i class="ico bag"></i><kbd>B</kbd></button>
           <button class="mbtn" data-panel="gear" title="Character — equipped"><i class="ico gear"></i><kbd>E</kbd></button>
           <button class="mbtn" data-panel="stats" title="Hunter stats"><i class="ico stats"></i><kbd>H</kbd></button>
           <button class="mbtn" data-panel="spellbook" title="Skill and spell book"><i class="ico tome"></i><kbd>G</kbd></button>
           <button class="mbtn" data-panel="catalog"><i class="ico book"></i><kbd>C</kbd></button>
-        </nav>
-        <nav id="menu-col-right" class="menu-col" aria-label="World menus">
           <button class="mbtn" data-panel="quest"><i class="ico quest"></i><kbd>Q</kbd></button>
           <button class="mbtn" data-panel="map"><i class="ico map"></i><kbd>M</kbd></button>
           <button class="mbtn" data-panel="friends" title="Friends and party"><i class="ico friends"></i><kbd>P</kbd></button>
@@ -145,7 +149,7 @@
       </div>
 
       <div id="title" class="hidden">
-        <div class="title-inner">
+        <div class="title-inner mg-frame">
           <small>A 3D pixel monster hunting adventure</small>
           <h1>MONSTER <em>GATE</em></h1>
           <p id="wallet-status" class="wallet-status" aria-live="polite">Play as a guest on this device, or sign in to keep the hunt on your account.</p>
