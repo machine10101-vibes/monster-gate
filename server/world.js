@@ -10,6 +10,7 @@ import {
   playerPatch, playerView, quantizedPlayer, readChat, readGather, readHello, readMove,
   ProtocolError,
 } from './protocol.js';
+import { PersistErrorCodes } from './persistence/index.js';
 import { openPersistence } from './store.js';
 
 function send(ws, type, extra) {
@@ -198,9 +199,12 @@ export class World {
         if (!row) row = await this.persist.createCharacter(ident.userId, ident.name, { look: hello.look });
       } catch (err) {
         if (!slot) {
-          const code = err?.code === 'name_taken' ? 'name_taken' : 'persist';
-          const fallback = code === 'name_taken' ? 'That hunter name is already taken.' : 'Could not load your hunter.';
-          send(session.ws, errorFrame(code, err.message || fallback));
+          if (err?.code === PersistErrorCodes.NAME_TAKEN) {
+            send(session.ws, errorFrame('name_taken', err.message));
+            session.ws.close();
+            return;
+          }
+          send(session.ws, errorFrame('persist', err.message || 'Could not load your hunter.'));
           session.ws.close();
           return;
         }
