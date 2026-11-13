@@ -2980,6 +2980,14 @@ class Game {
 
 const game = new Game();
 window.__game = game;
+try {
+  const q = new URLSearchParams(location.search);
+  if (q.get('mmo') === '1') {
+    import('./net/worldView.js').then((m) => m.init(game.scene, { game, mock: q.get('mock') === '1' })).catch((err) => console.warn('world view', err));
+  }
+} catch {
+  /* query parsing failed; stay offline */
+}
 game.load().catch((e) => {
   console.error(e);
   document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;

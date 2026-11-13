@@ -39,6 +39,8 @@ export function poseOf(player) {
 /**
  * The host's browser is the world. Friends join with a short code.
  * Matchmaking uses a public relay; the hunt itself is peer-to-peer.
+ * Shared-world presentation is src/net/worldView.js, mounted from main when ?mmo=1.
+ * src/net/mmo.js (not this file) owns the world socket and calls into worldView.
  */
 export class Session {
   constructor(game) {
