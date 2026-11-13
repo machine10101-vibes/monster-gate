@@ -10,7 +10,13 @@ export const IDLE_MS = 30_000;
 export const PING_MS = 15_000;
 export const RESUME_MS = 60_000;
 export const AOI_RADIUS = 96;
+export const AOI_NEAR = 32;
+export const AOI_FAR_HZ = 4;
+export const QUANT_POS = 0.1;
+export const QUANT_YAW = 0.05;
+export const QUANT_MOVE = 0.05;
 export const SAVE_MS = 15_000;
+export const DEFAULT_ZONE_CAP = 150;
 
 export const SPEED_MAX = 16;
 export const TELEPORT_MAX = 40;
@@ -123,7 +129,21 @@ export function parseMessage(raw) {
   if (!msg || typeof msg !== 'object' || Array.isArray(msg)) throw new ProtocolError('protocol', 'Not an object.');
   if (msg.v !== PROTOCOL) throw new ProtocolError('protocol', `Need protocol ${PROTOCOL}.`);
   if (typeof msg.type !== 'string' || !msg.type) throw new ProtocolError('protocol', 'Missing type.');
+  assertNoClientFlags(msg);
   return msg;
+}
+
+/** Client debug/unlock flags are never accepted on the world socket. */
+export function assertNoClientFlags(msg) {
+  if (!msg || typeof msg !== 'object') return;
+  const flagged = (obj) => obj && typeof obj === 'object'
+    && ['debug', 'unlock'].some((k) => {
+      const v = obj[k];
+      return v !== undefined && v !== null && v !== false && v !== 0 && v !== '0' && v !== '';
+    });
+  if (flagged(msg) || flagged(msg.flags)) {
+    throw new ProtocolError('debug', 'Debug and unlock flags are not accepted.');
+  }
 }
 
 export function readHello(msg) {
@@ -229,6 +249,79 @@ export function nodeView(n) {
 
 export function errorFrame(code, message) {
   return encode(TYPES.error, { code, message: String(message || code) });
+}
+
+
+export function quant(n, step) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 0;
+  return Math.round((Math.round(v / step) * step) * 1e6) / 1e6;
+}
+
+export function quantizedPlayer(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    x: quant(p.x, QUANT_POS),
+    y: quant(p.y, QUANT_POS),
+    z: quant(p.z, QUANT_POS),
+    yaw: quant(p.yaw, QUANT_YAW),
+    move: quant(p.move, QUANT_MOVE),
+    anim: p.anim,
+    held: p.held,
+    sheath: p.sheath,
+    look: p.look ?? null,
+    armor: p.armor || {},
+    zone: p.zone,
+    hp: p.hp,
+  };
+}
+
+const POSE_KEYS = ['name', 'x', 'y', 'z', 'yaw', 'move', 'anim', 'held', 'sheath', 'zone', 'hp'];
+
+function sameLook(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function sameArmor(a, b) {
+  return JSON.stringify(a || {}) === JSON.stringify(b || {});
+}
+
+/**
+ * Sparse pose patch. First sighting (`full` or no `prev`) is a complete
+ * quantized view. Later ticks only include id + fields that changed.
+ * Clients must merge patches onto the last known player.
+ */
+export function playerPatch(prev, next, { full = false } = {}) {
+  if (full || !prev) {
+    return { ...next };
+  }
+  const patch = { id: next.id };
+  let changed = false;
+  for (const key of POSE_KEYS) {
+    if (prev[key] !== next[key]) {
+      patch[key] = next[key];
+      changed = true;
+    }
+  }
+  if (!sameLook(prev.look, next.look)) {
+    patch.look = next.look;
+    changed = true;
+  }
+  if (!sameArmor(prev.armor, next.armor)) {
+    patch.armor = next.armor;
+    changed = true;
+  }
+  return changed ? patch : null;
+}
+
+export function parseZoneCap(env = process.env, override) {
+  if (override != null && Number.isFinite(Number(override))) return Math.max(0, Math.floor(Number(override)));
+  const raw = env?.ZONE_CAP;
+  if (raw === undefined || raw === '') return DEFAULT_ZONE_CAP;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_ZONE_CAP;
+  return Math.floor(n);
 }
 
 export function inAoi(observer, other, radius = AOI_RADIUS) {

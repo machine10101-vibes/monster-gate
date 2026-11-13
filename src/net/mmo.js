@@ -78,6 +78,7 @@ export class MmoClient {
     this.bound = false;
     this.fatal = false;
     this.entities = { monsters: [], nodes: [] };
+    this.nearby = new Map();
   }
 
   bind() {
@@ -160,6 +161,8 @@ export class MmoClient {
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
       this.setStatus({ status: 'online', online: msg.online });
     } else if (msg.type === TYPES.snapshot) {
+      this.nearby = new Map();
+      for (const p of msg.players || []) if (p?.id) this.nearby.set(p.id, { ...p });
       this.view?.applySnapshot?.(msg.players || [], { online: msg.online, zone: msg.zone });
       if (msg.online != null) this.view?.setOnlineCount?.(msg.online);
       if (msg.entities) this.entities = {
@@ -167,17 +170,26 @@ export class MmoClient {
         nodes: msg.entities.nodes || [],
       };
     } else if (msg.type === TYPES.delta) {
-      this.view?.applyDelta?.({ upsert: msg.upsert || [], remove: msg.remove || [] });
+      const upsert = [];
+      for (const row of msg.upsert || []) {
+        if (!row?.id) continue;
+        const merged = { ...(this.nearby.get(row.id) || {}), ...row };
+        this.nearby.set(row.id, merged);
+        upsert.push(merged);
+      }
+      for (const id of msg.remove || []) this.nearby.delete(id);
+      this.view?.applyDelta?.({ upsert, remove: msg.remove || [] });
       if (msg.online != null) this.view?.setOnlineCount?.(msg.online);
       this.applyEntityDelta(msg.entities);
     } else if (msg.type === TYPES.chat) {
       this.view?.pushChat?.(msg);
     } else if (msg.type === TYPES.leave && msg.id) {
+      this.nearby.delete(msg.id);
       this.view?.removePlayer?.(msg.id);
     } else if (msg.type === TYPES.error) {
-      if (msg.code === 'auth') {
+      if (msg.code === 'auth' || (msg.code === 'zone_full' && !this.you)) {
         this.fatal = true;
-        toast(this.game, msg.message || 'Sign in to hunt online. Guests stay solo.');
+        toast(this.game, msg.message || (msg.code === 'zone_full' ? 'That town is full.' : 'Sign in to hunt online. Guests stay solo.'));
         this.dispose('offline', msg.message);
         return;
       }

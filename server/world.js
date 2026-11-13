@@ -2,12 +2,13 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify, originAllowed, parseOrigins } from './auth.js';
-import { createMonsters, createNodes, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
+import { appearanceFromState, createMonsters, createNodes, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
 import { applyMove, createLimiter } from './limits.js';
 import {
-  AOI_RADIUS, HELLO_MS, IDLE_MS, PROTOCOL, RESUME_MS, SAVE_MS, TICK_HZ, TYPES,
-  encode, errorFrame, inAoi, monsterView, nodeView, parseMessage, playerView,
-  readChat, readGather, readHello, readMove, ProtocolError,
+  AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, HELLO_MS, IDLE_MS, PROTOCOL, RESUME_MS, SAVE_MS, TICK_HZ, TYPES,
+  encode, errorFrame, inAoi, monsterView, nodeView, parseMessage, parseZoneCap,
+  playerPatch, playerView, quantizedPlayer, readChat, readGather, readHello, readMove,
+  ProtocolError,
 } from './protocol.js';
 import { openPersistence } from './store.js';
 
@@ -28,6 +29,11 @@ export class World {
     this.tickMs = opts.tickMs ?? Math.round(1000 / TICK_HZ);
     this.verifyToken = opts.verifyToken;
     this.aoi = opts.aoi ?? AOI_RADIUS;
+    this.aoiNear = opts.aoiNear ?? AOI_NEAR;
+    this.farHz = opts.farHz ?? AOI_FAR_HZ;
+    this.farEvery = Math.max(1, Math.round(TICK_HZ / this.farHz));
+    this.zoneCap = parseZoneCap(this.env, opts.zoneCap);
+    this.tickCount = 0;
     this.players = new Map();
     this.byUser = new Map();
     this.resume = new Map();
@@ -68,6 +74,24 @@ export class World {
     return this.players.size;
   }
 
+  zoneCount(zone, exceptId) {
+    let n = 0;
+    for (const p of this.players.values()) {
+      if (p.zone === zone && p.id !== exceptId) n++;
+    }
+    return n;
+  }
+
+  zoneIsFull(zone, exceptId) {
+    return this.zoneCap > 0 && this.zoneCount(zone, exceptId) >= this.zoneCap;
+  }
+
+  rejectZoneFull(session, zone) {
+    const cap = this.zoneCap;
+    const name = zone || 'This area';
+    send(session.ws, errorFrame('zone_full', `${name} is full (${cap} hunters). Try another town or try again later.`));
+  }
+
   accept(ws) {
     const session = {
       ws,
@@ -98,7 +122,9 @@ export class World {
     try {
       msg = parseMessage(data);
     } catch (err) {
-      send(session.ws, errorFrame(err.code || 'protocol', err.message));
+      const code = err instanceof ProtocolError ? err.code : (err.code || 'protocol');
+      send(session.ws, errorFrame(code, err.message));
+      if ((code === 'auth' || code === 'debug') && !session.authed) session.ws.close();
       return;
     }
     try {
@@ -115,7 +141,7 @@ export class World {
     } catch (err) {
       const code = err instanceof ProtocolError ? err.code : 'protocol';
       send(session.ws, errorFrame(code, err.message));
-      if (code === 'auth' && !session.authed) session.ws.close();
+      if ((code === 'auth' || code === 'debug') && !session.authed) session.ws.close();
     }
   }
 
@@ -182,17 +208,29 @@ export class World {
     const pose = slot?.pose || spawnPoseFromRow(row, hello);
     session.id = slot?.id || `u_${ident.userId}`;
     session.userId = ident.userId;
+    const spawnZone = pose.zone || zoneAt(pose.x, pose.z);
+    if (!slot && this.zoneIsFull(spawnZone, session.id)) {
+      this.rejectZoneFull(session, spawnZone);
+      session.ws.close();
+      return;
+    }
     session.guest = false;
     session.authed = true;
     session.resumed = !!slot;
+    session.interest = new Map();
+    session.lastOnline = -1;
+    const appear = appearanceFromState(row?.state);
+    const gear = row ? appear : { look: pose.look, armor: pose.armor || {}, weapon: pose.weapon ?? null, held: pose.held || 'blade' };
     Object.assign(session, {
       name: ident.name || pose.name,
       x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw,
       move: pose.move ?? 0, anim: pose.anim ?? 0,
-      held: pose.held || 'blade', sheath: pose.sheath ?? null,
-      look: hello.look || pose.look,
-      armor: hello.armor && Object.keys(hello.armor).length ? hello.armor : (pose.armor || {}),
-      zone: pose.zone || zoneAt(pose.x, pose.z),
+      held: gear.held || 'blade',
+      weapon: gear.weapon ?? null,
+      sheath: pose.sheath ?? null,
+      look: gear.look,
+      armor: gear.armor || {},
+      zone: spawnZone,
       hp: pose.hp ?? 20,
       movedAt: 0,
     });
@@ -204,6 +242,9 @@ export class World {
       protocol: PROTOCOL,
       tickHz: TICK_HZ,
       aoi: this.aoi,
+      aoiNear: this.aoiNear,
+      farHz: this.farHz,
+      zoneCap: this.zoneCap,
       resumeToken: token,
       resumed: !!slot,
       you: { id: session.id, name: session.name, guest: false },
@@ -248,9 +289,19 @@ export class World {
       return;
     }
     const prevZone = session.zone;
+    const prevX = session.x, prevY = session.y, prevZ = session.z, prevYaw = session.yaw;
     Object.assign(session, result.pose);
     if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
+    }
+    if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
+      this.rejectZoneFull(session, session.zone);
+      session.x = prevX;
+      session.y = prevY;
+      session.z = prevZ;
+      session.yaw = prevYaw;
+      session.zone = prevZone;
+      return;
     }
     this.dirty.add(session.id);
     const zoneChanged = session.zone !== prevZone;
@@ -322,10 +373,14 @@ export class World {
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
       this.dirty.delete(session.id);
       this.rememberResume(session);
+      const online = this.players.size;
       for (const other of this.players.values()) {
-        if (inAoi(other, session, this.aoi) || other.zone === session.zone) {
+        const watched = other.interest?.has(session.id);
+        if (watched || inAoi(other, session, this.aoi)) {
+          other.interest?.delete(session.id);
+          other.lastOnline = online;
           send(other.ws, TYPES.leave, { id: session.id });
-          send(other.ws, TYPES.delta, { upsert: [], remove: [session.id], online: this.players.size });
+          send(other.ws, TYPES.delta, { remove: [session.id], online });
         }
       }
       this.persistPose(session, true);
@@ -334,8 +389,17 @@ export class World {
   }
 
   sendSnapshot(session) {
+    if (!session.interest) session.interest = new Map();
+    session.interest.clear();
+    const players = [];
+    for (const p of this.nearbyPlayers(session)) {
+      const q = quantizedPlayer(p);
+      session.interest.set(p.id, q);
+      players.push(q);
+    }
+    session.lastOnline = this.players.size;
     send(session.ws, TYPES.snapshot, {
-      players: this.nearbyPlayers(session).map((p) => playerView(p)),
+      players,
       entities: this.entitiesPayload(session),
       online: this.players.size,
       zone: session.zone,
@@ -368,30 +432,58 @@ export class World {
       if (t - expired.at > RESUME_MS) this.resume.delete(expired.token);
     }
 
-    const dirtyPlayers = [...this.dirty];
+    this.tickCount += 1;
+    const farTick = this.tickCount % this.farEvery === 0;
     const dirtyMonsters = this.monsters.filter((m) => this.dirtyMonsters.has(m.id));
     const dirtyNodes = this.nodes.filter((n) => this.dirtyNodes.has(n.id));
     const hasEntityDelta = dirtyMonsters.length || dirtyNodes.length;
-    if (!dirtyPlayers.length && !hasEntityDelta) return;
+    const dirtyPlayers = this.dirty.size;
+    // Pose broadcasts stay inside the 96-unit AOI. Near hunters (aoiNear)
+    // get ~15 Hz patches; the outer ring is about farHz (default 4 Hz).
+    if (!dirtyPlayers && !hasEntityDelta && !farTick) return;
 
-    for (const p of this.players.values()) {
+    const online = this.players.size;
+    for (const observer of this.players.values()) {
+      if (!observer.interest) observer.interest = new Map();
       const upsert = [];
-      for (const id of dirtyPlayers) {
-        if (id === p.id) continue;
-        const other = this.players.get(id);
-        if (other && inAoi(p, other, this.aoi)) upsert.push(playerView(other));
+      const remove = [];
+      for (const other of this.players.values()) {
+        if (other.id === observer.id) continue;
+        const prev = observer.interest.get(other.id);
+        const visible = inAoi(observer, other, this.aoi);
+        if (!visible) {
+          if (prev) {
+            remove.push(other.id);
+            observer.interest.delete(other.id);
+          }
+          continue;
+        }
+        const near = inAoi(observer, other, this.aoiNear);
+        const due = near || farTick || !prev;
+        if (!due) continue;
+        const q = quantizedPlayer(other);
+        const patch = playerPatch(prev, q, { full: !prev });
+        if (!patch) continue;
+        observer.interest.set(other.id, q);
+        upsert.push(patch);
       }
       const entityDelta = {};
       if (hasEntityDelta) {
-        const mon = dirtyMonsters.filter((m) => inAoi(p, m, this.aoi)).map(monsterView);
-        const nodes = dirtyNodes.filter((n) => inAoi(p, n, this.aoi)).map(nodeView);
+        const mon = dirtyMonsters.filter((m) => inAoi(observer, m, this.aoi)).map(monsterView);
+        const nodes = dirtyNodes.filter((n) => inAoi(observer, n, this.aoi)).map(nodeView);
         if (mon.length) entityDelta.monsters = { upsert: mon, remove: [] };
         if (nodes.length) entityDelta.nodes = { upsert: nodes, remove: [] };
       }
-      if (!upsert.length && !entityDelta.monsters && !entityDelta.nodes) continue;
-      const payload = { upsert, remove: [], online: this.players.size };
+      if (!upsert.length && !remove.length && !entityDelta.monsters && !entityDelta.nodes) continue;
+      const payload = {};
+      if (upsert.length) payload.upsert = upsert;
+      if (remove.length) payload.remove = remove;
+      if (observer.lastOnline !== online) {
+        payload.online = online;
+        observer.lastOnline = online;
+      }
       if (entityDelta.monsters || entityDelta.nodes) payload.entities = entityDelta;
-      send(p.ws, TYPES.delta, payload);
+      send(observer.ws, TYPES.delta, payload);
     }
     this.dirty.clear();
     this.dirtyMonsters.clear();
@@ -410,7 +502,16 @@ function listen(server, port) {
 }
 
 function healthBody(world) {
-  return JSON.stringify({ ok: true, protocol: PROTOCOL, players: world.size, tickHz: TICK_HZ });
+  return JSON.stringify({
+    ok: true,
+    protocol: PROTOCOL,
+    players: world.size,
+    tickHz: TICK_HZ,
+    aoi: world.aoi,
+    aoiNear: world.aoiNear,
+    farHz: world.farHz,
+    zoneCap: world.zoneCap,
+  });
 }
 
 export async function createWorldServer(options = {}) {
@@ -425,6 +526,9 @@ export async function createWorldServer(options = {}) {
     tickMs: options.tickMs,
     verifyToken: options.verifyToken,
     aoi: options.aoi,
+    aoiNear: options.aoiNear,
+    farHz: options.farHz,
+    zoneCap: options.zoneCap,
     monsters: options.monsters,
     nodes: options.nodes,
   });

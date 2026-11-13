@@ -7,9 +7,12 @@ JSON WebSocket messages for the authoritative World 1 server (`server/`) and the
 | **Version** | `1` |
 | **Field** | every envelope has `"v": 1` and `"type"` |
 | **Transport** | UTF-8 JSON text frames, max 8 KiB |
-| **Tick** | server sends area-of-interest `delta` at **15 Hz** |
-| **AOI** | same realm (over / cave) and within **96** world units |
+| **Tick** | area-of-interest `delta`: **15 Hz** near (≤ 32 units), **~4 Hz** in the outer ring (32–96 units) |
+| **AOI** | same realm (over / cave) and within **96** world units. Pose broadcasts never go past this radius. |
+| **Deltas** | only changed, quantized fields (`x,z` to 0.1). Clients must merge patches onto the last known player. |
+| **Zone cap** | `ZONE_CAP` (default **150**) hunters per place name. Further joins get `error` `zone_full`. `0` means no cap. |
 | **Auth** | required. A verified Supabase access token on `hello`. Guests are rejected and stay offline / solo. |
+| **Appearance** | `armor`, `held` (from saved `weapon`), and `look` are taken from the character row. Client values are ignored. `debug` / `unlock` flags are rejected (`error` `debug`). |
 
 Mismatching `v` is an `error` with code `protocol`. Unknown `type` is ignored.
 
@@ -101,6 +104,8 @@ First message. The server closes the socket if it does not arrive within 5 secon
 { "v": 1, "type": "hello", "token": "<supabase access_token>", "resume": "<resumeToken, optional>", "name": "Hunter", "look": {}, "armor": {}, "zone": "Oakhollow" }
 ```
 
+`look` is applied only when the server **creates** a new character. On a later join, `look`, `armor`, and `held` (from the saved `weapon` field) come from the loaded row. Client-sent `armor` / `held` / `look` are ignored. A `debug` or `unlock` flag on any frame is rejected (`error` `debug`) and the socket is closed if the hunter has not yet been welcomed.
+
 ### move
 
 About 10 Hz from the client (the view fires `onLocalMove` at ~10 Hz). Faster bursts are dropped (`error` `rate`). Speed above 16 u/s is clamped. A jump further than 40 units in one update is rejected (`error` `teleport`) and the last pose is kept.
@@ -108,6 +113,8 @@ About 10 Hz from the client (the view fires `onLocalMove` at ~10 Hz). Faster bur
 ```json
 { "v": 1, "type": "move", "x": 74.1, "y": 3.2, "z": 70.4, "yaw": 1.2, "anim": 0, "move": 0.8, "held": "blade", "sheath": "blade", "look": {}, "armor": {}, "zone": "Oakhollow" }
 ```
+
+Client-sent `armor`, `held`, and `look` on `move` are ignored or clamped to the saved character. Only the server's values are broadcast to other hunters.
 
 ### chat
 
@@ -149,7 +156,7 @@ A hunter with no frames for 30 s is disconnected.
 ### welcome
 
 ```json
-{ "v": 1, "type": "welcome", "protocol": 1, "tickHz": 15, "aoi": 96, "resumeToken": "…", "resumed": false, "you": { "id": "u_…", "name": "Hunter", "guest": false } }
+{ "v": 1, "type": "welcome", "protocol": 1, "tickHz": 15, "aoi": 96, "aoiNear": 32, "farHz": 4, "zoneCap": 150, "resumeToken": "…", "resumed": false, "you": { "id": "u_…", "name": "Hunter", "guest": false } }
 ```
 
 ### snapshot
@@ -167,13 +174,13 @@ Full nearby set (players, monsters, nodes) in AOI. Ids omitted are gone.
 
 ### delta
 
-AOI patch, ~15 Hz, only dirty nearby objects.
+AOI patch. Nearby hunters (≤ 32 units) are considered at 15 Hz; the outer ring (32–96) at about 4 Hz. Unchanged hunters are skipped. After the first full sighting, `upsert` entries are **sparse**: `id` plus only the fields that changed, with `x,y,z` quantized to 0.1 and `yaw`/`move` to 0.05. Empty `upsert` / `remove` / `online` keys are omitted. Clients must merge each patch onto the last known player (the flag-gated `mmo.js` already does this before it calls `worldView`).
 
 ```json
 {
   "v": 1, "type": "delta",
   "upsert": [ { "id": "u_…", "x": 71.2, "z": 74.1 } ],
-  "remove": [],
+  "remove": ["u_gone"],
   "entities": { "monsters": { "upsert": [], "remove": [] }, "nodes": { "upsert": [], "remove": [] } },
   "online": 12
 }
@@ -206,19 +213,22 @@ AOI patch, ~15 Hz, only dirty nearby objects.
 | code | when |
 | --- | --- |
 | `protocol` | bad JSON, wrong `v`, missing `hello` |
+| `debug` | a `debug` or `unlock` flag was sent. The socket is closed if this arrives before welcome. |
 | `auth` | missing / invalid token; guests are rejected |
 | `persist` | character load / create failed |
 | `rate` | move or chat too fast |
 | `teleport` | move jumped further than 40 units |
 | `chat` | empty / invalid channel |
 | `gather` | unknown node, not ready, or too far |
+| `zone_full` | the place already has `ZONE_CAP` hunters (default 150). The socket is closed on hello; a move into a full zone is rejected and the last pose is kept. |
 
 ## Limits
 
 | | |
 | --- | --- |
-| Tick | 15 Hz deltas of nearby hunters and dirty entities |
-| AOI | 96 world units, same realm |
+| Tick | 15 Hz near (≤ 32 units); ~4 Hz in the 32–96 ring |
+| AOI | 96 world units, same realm; pose broadcasts do not leave this radius |
+| Zone cap | `ZONE_CAP` default 150 per place name; `0` disables the cap |
 | Move | 12 messages / s; 16 u/s clamp; 40 u teleport reject |
 | Chat | 2 / s, 6 / 10 s, 120 characters |
 | Heartbeat | ping/pong; idle 30 s |
@@ -228,4 +238,4 @@ AOI patch, ~15 Hz, only dirty nearby objects.
 
 ## Health
 
-`GET /healthz` (also `/health` and `/`) returns `{ ok, protocol, players, tickHz }`.
+`GET /healthz` (also `/health` and `/`) returns `{ ok, protocol, players, tickHz, aoi, aoiNear, farHz, zoneCap }`.
