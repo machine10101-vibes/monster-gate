@@ -341,7 +341,7 @@ export class World {
     const atlas = buildAtlas();
     this.atlas = atlas;
     this.mats = {
-      terrain: patchHide(toonMaterial({ map: atlas.texture, vertexColors: true }), 'terrain'),
+      terrain: toonMaterial({ map: atlas.texture, vertexColors: true }),
       solid: patchHide(toonMaterial({ vertexColors: true }), 'solid'),
       cover: patchHide(toonMaterial({ vertexColors: true }), 'cover'),
       glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
