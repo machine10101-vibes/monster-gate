@@ -24,7 +24,7 @@ const NPC_DEFS = [
       'Welcome to the Hunter Guild! The Monster Gate to the north has been restless again.',
       'Slay five creatures and the guild board will pay you in gold. Use Space to roll away from danger.',
       'Hold Shift to raise your shield. Blocking a charging boar is very satisfying.',
-      'Monster parts can be forged into gear. Bram the blacksmith keeps the forge by the south road.',
+      'Monster parts can be forged into gear. Bram the blacksmith keeps the forge by Greyrock Pit, just outside town.',
       'Lira the alchemist sells healing draughts and spirit philters from her stall on the south road.',
       'When the hunt starts to stick, press K. Warrior, Ranger, and Mage each keep three paths, and the same points raise your attributes.',
     ],
@@ -35,12 +35,12 @@ const NPC_DEFS = [
     title: 'Blacksmith',
     spot: 'smith',
     service: 'forge',
-    yaw: -Math.PI / 2,
+    yaw: -0.85,
     look: { skin: 0xc58a5e, hair: 0x1c1410, hairStyle: 'short', beard: true, tunic: 0x6a4a32, sleeve: 0x6a4a32, apron: 0x3e3a38, pants: 0x2a2220, boots: 0x1f1814, bracer: true, seed: 5, metal: 0x777a80 },
     lines: [
       'Steel and leather, friend. That greatsword on your back has seen better days.',
       'Wraiths cannot take a hit from the hammer. Heavy swings, heavy knockback.',
-      'Bring me monster parts and the forge will turn them into weapons and armor. Step up and have a look.',
+      'Smelt the pit ore in the smithy beside us, then bring me the bars. Monster parts work too. The forge turns them into weapons and armor.',
     ],
   },
   {

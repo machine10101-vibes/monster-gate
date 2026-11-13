@@ -55,7 +55,7 @@ export function mountSmithy(body, game) {
     if (!can) {
       const note = document.createElement('p');
       note.className = 'cat-muted';
-      note.textContent = 'Mine copper and tin in the Greyrock Pit, east of town.';
+      note.textContent = 'Copper and tin are in the Greyrock Pit, right beside the smithy.';
       body.appendChild(note);
     }
     flushThumbs(200);

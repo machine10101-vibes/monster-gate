@@ -139,7 +139,7 @@ function buildMine(world) {
   world.place(buildOrePile(), MINE.x - 3.4, ground(world, MINE.x - 3.4, MINE.z + 3.8), MINE.z + 3.8, 0.5, 1.2);
 
   const rim = [
-    [90.4, 61.6, 'barrel', 0], [91.4, 61.3, 'crate', 0], [90.2, 70.6, 'crate', 1], [91.2, 71.2, 'barrel', 1],
+    [90.4, 61.6, 'barrel', 0], [91.4, 61.3, 'crate', 0], [96.4, 72.6, 'crate', 1], [97.2, 74.2, 'barrel', 1],
     [106.6, 61.2, 'crate', 0], [107.3, 70.4, 'barrel', 0],
   ];
   for (const [x, z, kind, k] of rim) {
