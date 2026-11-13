@@ -1137,14 +1137,18 @@ body.mmo-view #top-left {
   }
   body.touch #world-chat {
     left: calc(8px + 142px * 0.78 + 8px + var(--safe-l));
-    bottom: calc(90px + 118px * var(--ui) + 12px + var(--safe-b));
+    bottom: calc(96px + var(--safe-b));
     top: auto;
-    width: min(240px, 36vw);
-    max-height: 88px;
+    width: min(280px, 42vw);
+    max-height: min(168px, calc(100dvh - 72px));
     overflow: hidden;
   }
   body.touch #world-chat .wc-log {
-    height: 32px;
+    height: 64px;
+  }
+  body.touch #world-chat:not(.collapsed) .wc-toggle {
+    min-height: 32px;
+    padding: 4px 10px;
   }
   #dialog,
   body.touch #dialog {
@@ -1583,6 +1587,12 @@ body.weapon-cursor-on #social-menu {
 #social-menu button:disabled { opacity: 0.45; }
 
 #world-chat .wc-log b.wc-name { cursor: pointer; }
+#world-chat .wc-log p.wc-you {
+  background: rgba(18, 36, 52, 0.96);
+  border-color: var(--mg-gold);
+  color: var(--mg-ink-text);
+}
+#world-chat .wc-log p.wc-you b { color: var(--mg-gold-hi); }
 #world-chat .wc-log .wc-wh {
   font-style: normal;
   font-size: 10px;

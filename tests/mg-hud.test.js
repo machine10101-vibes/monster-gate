@@ -545,3 +545,40 @@ test('MG-UI-33 side-by-side plates within the gap stack or hide', () => {
   const hide = stackNameplates([left, sameRow(0)], { gap: 10, maxLift: 0 });
   assert.ok(hide.some((r) => !r.visible), 'farther side-by-side label hides when it cannot lift');
 });
+
+test('MG-UI-34 chat bubbles use padded HUD cull including the Online counter', () => {
+  const layout = src('src/ui/hudLayout.js');
+  const hud = src('src/ui/hud.js');
+  const style = src('src/style.css');
+  assert.match(layout, /world-status/);
+  assert.match(layout, /world-status-slot/);
+  const online = { id: 'world-status', x: 620, y: 8, w: 120, h: 28 };
+  const bubble = { x: 580, y: 10, w: 160, h: 36 };
+  assert.equal(nameplateHitsHud(bubble, [online]), true, 'bubble over Online hits the raw chip');
+  const hug = { x: 530, y: 10, w: 80, h: 28 };
+  assert.equal(hug.x + hug.w, 610);
+  assert.equal(nameplateHitsHud(hug, [online]), false, '10px left of Online misses the raw chip');
+  assert.equal(nameplateHitsHud(hug, padHudSafeRects([online], 16)), true, 'padded Online culls a nearby bubble');
+  assert.match(style, /\.nameplate \.say \{[\s\S]*line-height:\s*1\.45/);
+  assert.match(style, /\.nameplate \.say \{[\s\S]*overflow:\s*visible/);
+  assert.match(style, /#nameplates \{[\s\S]*overflow:\s*visible/);
+  assert.match(hud, /cullPlatesOverHud/);
+});
+
+test('MG-UI-35 hunter plates join NPC declutter and large touch panels stay centered', () => {
+  const hud = src('src/ui/hud.js');
+  const style = src('src/style.css');
+  const mock = src('src/net/worldMock.js');
+  assert.match(hud, /if \(el\.classList\.contains\('mon'\)\) continue/);
+  assert.doesNotMatch(hud, /contains\('hunter'\)/);
+  assert.match(mock, /name: 'Sera'/);
+  assert.match(mock, /name: 'Corvin'/);
+  assert.match(mock, /name: 'Tamsin'/);
+  assert.doesNotMatch(mock, /name: 'Lira'/);
+  assert.doesNotMatch(mock, /name: 'Dalla'/);
+  assert.doesNotMatch(mock, /name: 'Mira'/);
+  assert.match(style, /@media \(min-width: 1024px\) and \(min-height: 640px\) \{[\s\S]*body\.touch #panel \{[\s\S]*align-items:\s*center/);
+  assert.match(style, /@media \(min-width: 1024px\) and \(min-height: 640px\) \{[\s\S]*max-width:\s*min\(560px/);
+  assert.match(style, /#panel \{[\s\S]*align-items:\s*center[\s\S]*justify-content:\s*center/);
+  assert.match(style, /p\.wc-you/);
+});

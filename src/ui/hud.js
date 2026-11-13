@@ -436,7 +436,7 @@ export class HUD {
     const rows = [];
     for (const [id, el] of this.plates) {
       if (el.style.display === 'none') continue;
-      if (el.classList.contains('mon') || el.classList.contains('hunter')) continue;
+      if (el.classList.contains('mon')) continue;
       const size = measurePlateSize(el);
       rows.push({
         id,

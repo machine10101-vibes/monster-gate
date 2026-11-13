@@ -311,6 +311,8 @@ export class WorldView {
     this.live = false;
     this.collapsed = false;
     this.localHeld = null;
+    this.localSay = '';
+    this.localSayT = 0;
   }
 
   localPlayerId() {
@@ -494,6 +496,10 @@ export class WorldView {
     if (row) {
       row.say = msg.text;
       row.sayT = 4.2;
+    }
+    if (msg.from.id === 'you' || this.isLocalId(msg.from.id)) {
+      this.localSay = msg.text;
+      this.localSayT = 4.2;
     }
     this.paintChat();
   }
@@ -797,6 +803,10 @@ export class WorldView {
       this.emit({ type: 'zone', zone: z });
       this.paintChat();
     }
+    if (this.localSayT > 0) {
+      this.localSayT -= dt;
+      if (this.localSayT <= 0) this.localSay = '';
+    }
     const tags = [];
     for (const row of this.actors.values()) {
       if (row.sayT > 0) {
@@ -825,31 +835,28 @@ export class WorldView {
   layoutHunterTags(tags) {
     const g = this.game;
     if (!g?.hud) return;
+    const p = g.player?.pos;
+    if (this.localSay && this.localSayT > 0 && p && g.screenOf) {
+      const [sx, sy, vis] = g.screenOf(p.x, p.y + 2.35, p.z, true);
+      g.hud.plate('local-chat', `<i class="say">${escapeHtml(this.localSay)}</i>`, 'hunter you');
+      g.hud.placePlate('local-chat', sx, sy, !!vis, { dist: 0.2, zIndex: 92 });
+    } else {
+      g.hud.removePlate?.('local-chat');
+    }
     const rows = tags.slice().sort((a, b) => a.d - b.d);
-    const used = [];
-    const hit = (x, y) => used.some((u) => Math.abs(u.x - x) < 88 && Math.abs(u.y - y) < 22);
     for (const t of rows) {
       const fade = t.d >= 26 ? 0 : t.d <= 10 ? 1 : 1 - (t.d - 10) / 16;
       if (!t.vis || fade < 0.18) {
         g.hud.placePlate(t.id, t.sx, t.sy, false);
         continue;
       }
-      let y = t.sy;
-      let n = 0;
-      while (n < 6 && hit(t.sx, y)) {
-        y -= 22;
-        n += 1;
-      }
-      if (hit(t.sx, y)) {
-        g.hud.placePlate(t.id, t.sx, t.sy, false);
-        continue;
-      }
-      used.push({ x: t.sx, y });
-      g.hud.placePlate(t.id, t.sx, y, true, {
+      g.hud.placePlate(t.id, t.sx, t.sy, true, {
+        dist: t.d,
         opacity: Math.max(0.35, fade),
         zIndex: Math.max(1, 80 - Math.floor(t.d)),
       });
     }
+    g.hud.layoutInteractPlates?.();
   }
 
   emitMove() {
@@ -1024,10 +1031,14 @@ export class WorldView {
       const who = escapeHtml(m.from.name);
       const text = escapeHtml(m.text);
       const pid = escapeHtml(m.from.id);
+      const mine = m.from.id === 'you' || this.isLocalId(m.from.id);
       const tag = m.channel === 'whisper' ? '<i class="wc-wh">whisper</i> ' : '';
-      return `<p>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
+      const cls = mine ? ' class="wc-you"' : '';
+      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
     }).join('');
-    this.ui.log.scrollTop = this.ui.log.scrollHeight;
+    const youLine = this.ui.log.querySelector('p.wc-you:last-of-type');
+    if (youLine) youLine.scrollIntoView({ block: 'nearest' });
+    else this.ui.log.scrollTop = this.ui.log.scrollHeight;
     this.paintHud();
   }
 
