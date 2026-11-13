@@ -1,6 +1,7 @@
 import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
 import { GOODS, GOODS_ORDER } from '../data/gathering.js';
 import { STORAGE_SLOTS } from '../systems/progress.js';
+import { splitStacks, storageVisual } from '../systems/stacks.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 const POTIONS = [
@@ -184,8 +185,8 @@ export function mountStorage(body, game) {
     closeAsk();
     const groups = collect(game);
     if (!groups[tab].some((it) => it.key === sel)) sel = groups[tab][0]?.key || null;
-    const slots = game.progress.data.storage;
-    if (slot != null && !slots[slot]) slot = null;
+    const cells = storageVisual(game.progress.data.storage, STORAGE_SLOTS);
+    if (slot != null && !cells[slot]) slot = null;
     body.innerHTML = '';
 
     const root = document.createElement('div');
@@ -284,7 +285,7 @@ export function mountStorage(body, game) {
     right.appendChild(head);
     const hold = document.createElement('div');
     hold.className = 'stash-slots';
-    slots.forEach((s, index) => {
+    cells.forEach((s, index) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'stash-slot' + (s ? '' : ' empty') + (index === slot ? ' sel' : '');
@@ -303,7 +304,7 @@ export function mountStorage(body, game) {
             name: labelOf(s),
             max: s.n,
             verb: 'Take',
-            run: (n) => game.takeFromCrate(index, n),
+            run: (n) => game.takeFromCrate(s.src, n),
             done: () => paint(),
           });
         } else b.onclick = () => {
@@ -314,7 +315,7 @@ export function mountStorage(body, game) {
       hold.appendChild(b);
     });
     right.appendChild(hold);
-    const picked = slot != null ? slots[slot] : null;
+    const picked = slot != null ? cells[slot] : null;
     if (!touch && picked) {
       const row = document.createElement('div');
       row.className = 'bag-acts';
@@ -323,7 +324,7 @@ export function mountStorage(body, game) {
       all.className = 'bag-act';
       all.textContent = picked.n > 1 ? 'Take all' : 'Take';
       all.onclick = () => {
-        game.takeFromCrate(slot);
+        game.takeFromCrate(picked.src, picked.n);
         paint();
       };
       row.appendChild(all);
@@ -333,7 +334,7 @@ export function mountStorage(body, game) {
         one.className = 'bag-act';
         one.textContent = 'Take 1';
         one.onclick = () => {
-          game.takeFromCrate(slot, 1);
+          game.takeFromCrate(picked.src, 1);
           paint();
         };
         row.appendChild(one);
@@ -358,15 +359,19 @@ function collect(game) {
   const pr = game.progress;
   const goods = [];
   for (const id of GOODS_ORDER) {
-    const n = pr.good(id);
-    if (!n) continue;
-    goods.push({ key: 'g' + id, k: 'good', id, n, name: GOODS[id].name, badge: String(n), canvas: () => renderThumb({ kind: 'good', id }, 72) });
+    const total = pr.good(id);
+    if (!total) continue;
+    splitStacks(total).forEach((n, i) => {
+      goods.push({ key: 'g' + id + ':' + i, k: 'good', id, n, name: GOODS[id].name, badge: String(n), canvas: () => renderThumb({ kind: 'good', id }, 72) });
+    });
   }
   const parts = [];
   for (const id of MATERIAL_ORDER) {
-    const n = pr.count(id);
-    if (!n) continue;
-    parts.push({ key: 'p' + id, k: 'part', id, n, name: MATERIALS[id].name, badge: String(n), canvas: () => renderThumb({ kind: 'material', id }, 72) });
+    const total = pr.count(id);
+    if (!total) continue;
+    splitStacks(total).forEach((n, i) => {
+      parts.push({ key: 'p' + id + ':' + i, k: 'part', id, n, name: MATERIALS[id].name, badge: String(n), canvas: () => renderThumb({ kind: 'material', id }, 72) });
+    });
   }
   const gear = GEAR.filter((g) => pr.crafted(g.id) && !pr.storedGear(g.id)).map((g) => ({
     key: 'w' + g.id,
@@ -380,16 +385,18 @@ function collect(game) {
   const potions = [];
   for (const it of POTIONS) {
     const live = game.items.find((i) => i.id === it.id);
-    const n = live?.count | 0;
-    if (!n) continue;
-    potions.push({
-      key: 'u' + it.id,
-      k: 'potion',
-      id: it.id,
-      n,
-      name: it.name,
-      badge: String(n),
-      canvas: () => renderThumb({ kind: 'held', id: it.held }, 72),
+    const total = live?.count | 0;
+    if (!total) continue;
+    splitStacks(total).forEach((n, i) => {
+      potions.push({
+        key: 'u' + it.id + ':' + i,
+        k: 'potion',
+        id: it.id,
+        n,
+        name: it.name,
+        badge: String(n),
+        canvas: () => renderThumb({ kind: 'held', id: it.held }, 72),
+      });
     });
   }
   return { goods, parts, gear, potions };

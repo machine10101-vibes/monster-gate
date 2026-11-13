@@ -757,7 +757,7 @@ export class Catalog {
         return;
       }
       const can = this.forge && pr.canCraft(g);
-      const b = el('button', 'cat-btn' + (can ? ' go' : ''), !this.forge ? 'Forge at the smithy' : pr.canCraft(g) ? 'Forge it' : 'Missing parts');
+      const b = el('button', 'cat-btn' + (can ? ' go' : ''), !this.forge ? 'Forge at the smithy' : can ? 'Forge it' : pr.recipeReady(g) ? 'Inventory full' : 'Missing parts');
       b.type = 'button';
       b.disabled = !can;
       b.onclick = () => {
