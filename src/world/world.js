@@ -7,6 +7,8 @@ import {
 } from './terrain.js';
 import { STARTER, TILES } from './tiles.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
+import { openSouthfordDesert } from './desert.js';
+import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
 import * as M from './models.js';
@@ -123,7 +125,7 @@ export class World {
     if (z >= 0 && z <= 30 && x >= 58 && x <= 86 && h > 0.4 && h < 8.6) return true;
     if (x >= 0 && x <= 46 && z >= 48 && z <= 80 && h > 0.4 && h < 8.6) return true;
     if (x >= 108 && x < W && z >= 82 && z <= 108 && h > 0.4 && h < 8.6) return true;
-    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W - 8 && x >= 14 && x <= 130) return h < 8.6;
+    if (this.south && z >= SOUTH_Z && z < SOUTH_Z + W && x >= 14 && x <= 130) return h < 8.6;
     const lz = z - SOUTH_Z;
     if (this.south && x >= 0 && x <= 22 && lz >= 64 && lz <= 108 && h > 0.4 && h < 8.6) return true;
     if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
@@ -326,6 +328,7 @@ export class World {
     for (let x = 0; x < W; x++) northEdge[x] = this.data.H[(W - 1) * W + x];
     this.south = generateSouthford(northEdge);
     openValeSides(this.south);
+    openSouthfordDesert(this.south);
     const southTile = TILES.find((t) => t.kind === 'southford');
     this.lands = [
       { role: 'oak', x0: 0, z0: 0, data: this.data, tileId: STARTER.id, rim: {} },
@@ -450,6 +453,7 @@ export class World {
       arctic: buildArcticModels(),
       volcanic: buildVolcanicModels(),
       jungle: buildJungleModels(),
+      desert: buildDesertModels(),
       keeps: buildKeepModels(),
     };
     void q;

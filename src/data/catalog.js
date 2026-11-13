@@ -28,9 +28,13 @@ export const MATERIALS = {
   scimitar: { name: 'Pirate Scimitar', desc: 'A curved cutlass blade with a brass guard. Salt-stained but sharp.' },
   pirategold: { name: 'Pirate Gold', desc: 'A fistful of doubloons and gold buttons. Spends the same on land.' },
   piratebone: { name: 'Pirate Bones', desc: 'Yellowed bones from a pirate who never made port.' },
+  sandspine: { name: 'Sand Spine', desc: 'A pale bone spike from a sand worm\'s ridge. It is still warm from the dune.' },
+  wormplate: { name: 'Worm Plate', desc: 'A curved plate of sand-coloured hide, ridged like a dune.' },
+  scorpchitin: { name: 'Scorpion Chitin', desc: 'A plate of gold-brown shell. Light, and harder than it looks.' },
+  scorpsting: { name: 'Scorpion Sting', desc: 'The hooked tip of a desert scorpion\'s tail. The point is still sharp.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -68,6 +72,14 @@ export const DROPS = {
   raptor: [
     { id: 'raptorskin', chance: 1, qty: [1, 3], rate: 'Common' },
     { id: 'raptorclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
+  ],
+  sandworm: [
+    { id: 'wormplate', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'sandspine', chance: 0.75, qty: [1, 2], rate: 'Common' },
+  ],
+  scorpion: [
+    { id: 'scorpchitin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'scorpsting', chance: 0.55, qty: [1, 1], rate: 'Uncommon' },
   ],
   pirate: [
     { id: 'scimitar', chance: 0.6, qty: [1, 1], rate: 'Common' },
@@ -139,6 +151,14 @@ export const MONSTERS = [
   {
     id: 'pirate', name: 'Pirate', level: 5, temper: 'Greedy', style: 'Melee', habitat: 'The shipyard docks and the jungle gate on the western coast',
     desc: 'A cutthroat in a navy coat, tricorn hat and red bandana. It swings a curved cutlass and lunges when you are out of reach.',
+  },
+  {
+    id: 'sandworm', name: 'Sand Spine Worm', level: 8, temper: 'Patient', style: 'Ambusher', habitat: 'The desert oasis south of Southford, tiles 74, 75, 84 and 85',
+    desc: 'A long sand-coloured worm with a ridge of pale bone spines. It travels under the dune, the spines cutting a wake, then breaches where you stand and bites. The ridge thrashes before it sinks again.',
+  },
+  {
+    id: 'scorpion', name: 'Desert Scorpion', level: 6, temper: 'Wary', style: 'Skirmisher', habitat: 'The dunes around the oasis south of Southford',
+    desc: 'A gold-brown scorpion with eight legs, two heavy claws and a tail curled over its back. It scuttles sideways, snaps with the claws up close, and brings the sting down when you step back.',
   },
   {
     id: 'cursedpirate', name: 'Cursed Pirate', level: 7, temper: 'Vengeful', style: 'Melee', habitat: 'Deep in the jungle oasis, west of Brookside',

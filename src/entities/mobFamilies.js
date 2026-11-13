@@ -1,5 +1,6 @@
 import * as beasts from './beastAI.js';
 import * as pirates from './pirateAI.js';
+import * as desert from './desertAI.js';
 
 /**
  * Jungle and shipyard monsters live in their own modules. Each family exports:
@@ -12,7 +13,7 @@ import * as pirates from './pirateAI.js';
  *   animate(m, dt, ctx) -> { rootY, rootX }
  *   dead(m, dt, ctx)
  */
-export const FAMILIES = [beasts, pirates];
+export const FAMILIES = [beasts, pirates, desert];
 
 export const FAMILY_BY_TYPE = new Map();
 export const FAMILY_DEFS = {};

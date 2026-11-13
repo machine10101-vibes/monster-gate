@@ -5,6 +5,7 @@ import { TILES } from './tiles.js';
 import { ARCTIC_SPECS, arcticFeature, paintArcticCell, frostGoldmead, dressArctic } from './arctic.js';
 import { JUNGLE_SPECS, jungleFeature, paintJungleCell, dressJungle, finishJungle } from './jungle.js';
 import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount } from './volcanic.js';
+import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert, openLongacreSouth, openDunesEast } from './desert.js';
 import { buildHouse } from './models.js';
 
 /**
@@ -342,6 +343,7 @@ const SPECS = {
   ...ARCTIC_SPECS,
   ...VOLCANIC_SPECS,
   ...JUNGLE_SPECS,
+  ...DESERT_SPECS,
 };
 
 const HAY = 6;
@@ -449,6 +451,7 @@ function applyFeature(h, x, z, spec) {
   if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.volcanic) return volcanicFeature(h, x, z, spec);
   if (spec.jungle) return jungleFeature(h, x, z, spec);
+  if (spec.desert) return desertFeature(h, x, z, spec);
   if (spec.camp) {
     const [cx, cz, r] = spec.camp;
     const dx = (x - cx) / (r * 0.78);
@@ -564,6 +567,10 @@ function makeTile(spec, edges) {
         paintVolcanicCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
         continue;
       }
+      if (spec.desert) {
+        paintDesertCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
+        continue;
+      }
       forest[i] = k === PATH || k === WATER || k === FARM ? 0 : spec.forest * (0.55 + n * 0.7);
       if (k === WATER || h < 0.35) {
         zone[i] = ZONE.WATER;
@@ -643,15 +650,23 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'tigerwood') return { n: rowOf(made.canopy, W - 1), e: colOf(made.sunken, 0) };
   if (kind === 'pirateshore') return { n: rowOf(made.sunken, W - 1) };
   if (kind === 'shellbeach') return { n: rowOf(made.tigerwood, W - 1), e: colOf(made.pirateshore, 0) };
+  if (kind === 'sunspill') return { n: rowOf(made.longacre, W - 1), w: colOf(made.pirateshore, W - 1) };
+  if (kind === 'glassroad') return { n: rowOf(south, W - 1), w: colOf(made.sunspill, W - 1) };
+  if (kind === 'deepwell') return { n: rowOf(made.sunspill, W - 1) };
+  if (kind === 'greenbowl') return { n: rowOf(made.glassroad, W - 1), w: colOf(made.deepwell, W - 1) };
   return {};
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl'];
   const made = {};
   const lands = [];
   for (const kind of order) {
+    if (kind === 'sunspill') {
+      openLongacreSouth(made.longacre);
+      openDunesEast(made.pirateshore);
+    }
     const spec = { ...SPECS[kind], kind };
     const tile = TILES.find((t) => t.kind === kind);
     const edges = specEdges(kind, oak, south, made);
@@ -688,6 +703,7 @@ export function generateRing(oak, south) {
     });
   }
   frostGoldmead(made.goldmead);
+  carveDesert(lands.filter((l) => DESERT_SPECS[l.kind]));
   return lands;
 }
 
@@ -816,6 +832,10 @@ function dressLand(world, land) {
   }
   if (spec.volcanic) {
     dressVolcanic(world, land, spec);
+    return;
+  }
+  if (spec.desert) {
+    dressDesert(world, land, spec);
     return;
   }
   reserveLongacre(world, land);

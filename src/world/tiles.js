@@ -21,6 +21,7 @@ const BIOMES = {
   I: { id: 'arctic', name: 'Arctic', color: '#d6ebf8', blurb: 'Snowfields, glass-blue ice and long white winds.' },
   V: { id: 'volcanic', name: 'Volcanic wasteland', color: '#5a2c28', blurb: 'Black stone, drifting ash and rivers of fire.' },
   D: { id: 'ruins', name: 'Ruins', color: '#8d6e9c', blurb: 'Something old broke here.' },
+  Q: { id: 'oasis', name: 'Desert oasis', color: '#e6c56a', blurb: 'Dry dunes around a living pool.' },
 };
 
 const CODES = [
@@ -31,8 +32,8 @@ const CODES = [
   'RRMMMFIIWA',
   'MRLMOMAHMM',
   'CRMMRMAHDD',
-  'SCCRRRHDDS',
-  'SSCRHHDDSS',
+  'SCCQQRHDDS',
+  'SSCQQHDDSS',
   'SSSCSCSSSS',
 ];
 
@@ -58,6 +59,10 @@ const RING = {
   '1,6': ['tigerwood', 'Southwest of the oasis. Runmouth is a steaming jungle hollow with a wrecked pirate ship half swallowed by roots, haunted by Cursed Pirates.'],
   '2,7': ['pirateshore', 'South of Southmead. The jungle thins to a palm beach at Dunes, where two pirate ships are moored and a long fishing pier runs out over deep water.'],
   '1,7': ['shellbeach', 'West of Dunes. Shellbeach is a sweep of white sand, shells and driftwood between the jungle and the sea, with a pirate ship dock on the shore.'],
+  '3,7': ['sunspill', 'South of Longacre, where the fields dry out. Sunspill is open dune, sandstone and scrub, with the west shore of the oasis pool in its southeast corner.'],
+  '4,7': ['glassroad', 'South of Southford. The vale road comes down through the rim into Glassroad, a dry dune land whose southwest corner holds the oasis pool.'],
+  '3,8': ['deepwell', 'South of Sunspill. Deepwell is desert dune and a south beach, with a mining pit three times the span of Greyrock cut into the sand.'],
+  '4,8': ['greenbowl', 'South of Glassroad. Greenbowl is the living heart of the oasis: palms, reeds and still water, drying to dune and then to the southern sea.'],
   '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Mara\'s Acre and Wend Farm sit on the long fields, with a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
 };
@@ -70,8 +75,8 @@ const NAMES = [
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Old Acre', 'Harrowfen', 'Reedbank', 'Frogmarsh'],
   ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Greenrows', 'Blackfen', 'Broken Arch', 'Old Stones'],
-  ['Seagate', 'Shellbeach', 'Dunes', 'Rivermouth', 'Lowford', 'Reedford', 'Saltfen', 'Drowned Hall', 'Sunken Yard', 'Grey Sea'],
-  ['Open Water', 'West Deep', 'Pale Shore', 'Harbor', 'Brine', 'Sedge', 'Ruinwater', 'Black Reef', 'South Deep', 'East Deep'],
+  ['Seagate', 'Shellbeach', 'Dunes', 'Sunspill', 'Glassroad', 'Reedford', 'Saltfen', 'Drowned Hall', 'Sunken Yard', 'Grey Sea'],
+  ['Open Water', 'West Deep', 'Pale Shore', 'Deepwell', 'Greenbowl', 'Sedge', 'Ruinwater', 'Black Reef', 'South Deep', 'East Deep'],
   ['Far West', 'Whale Road', 'Glass Sea', 'South Strand', 'Midsea', 'East Strand', 'Kelp', 'Quiet Deep', 'Last Water', 'Far East'],
 ];
 
