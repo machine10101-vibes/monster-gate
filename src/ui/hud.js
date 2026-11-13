@@ -193,8 +193,10 @@ export class HUD {
   }
 
   syncWindows() {
-    const open = this.panelOpen || this.dialogOpen;
+    const panel = this.panelOpen;
+    const open = panel || this.dialogOpen;
     document.documentElement.classList.toggle('windows-open', !!open);
+    document.documentElement.classList.toggle('panel-open', !!panel);
   }
 
   buildHotbar(items, onSelect) {
@@ -748,7 +750,12 @@ export class HUD {
           : []),
         ['Graphics quality', `<button id="set-q">${q.label}</button>`],
         ['Build', `<b id="set-build">${BUILD_ID}</b>`],
-        ...(game.debug && !game.mmo && !game.worldView ? [['Spawn monster', '<button id="set-spawn">Spawn</button>']] : []),
+        ...(game.debug && !game.mmo && !game.worldView
+          ? [
+              ['Spawn monster', '<button id="set-spawn">Spawn</button>'],
+              ['Auto-attack (debug)', `<button id="set-autoatk">${game.debug.autoAttack ? 'On' : 'Off'}</button>`],
+            ]
+          : []),
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
@@ -803,6 +810,12 @@ export class HUD {
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
       document.getElementById('set-spawn')?.addEventListener('click', () => game.debugSpawn?.());
+      document.getElementById('set-autoatk')?.addEventListener('click', () => {
+        const on = !game.debug?.autoAttack;
+        game.setDebugAutoAttack?.(on);
+        const btn = document.getElementById('set-autoatk');
+        if (btn) btn.textContent = game.debug?.autoAttack ? 'On' : 'Off';
+      });
     }
     this.el.panel.classList.remove('hidden');
     this.syncWindows();

@@ -4,6 +4,7 @@ import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX,
 import { aliasGearId, aliasGoodId } from '../data/metals.js';
 import { PORTAL_IDS } from '../data/portals.js';
 import { readJson, savesFrozen } from './saveio.js';
+import { huntSavePayload, stripDebugGrantedInPlace } from '../debug/transient.js';
 import {
   BAG_SLOTS,
   bagSlotsFrom,
@@ -111,19 +112,22 @@ export class Progress {
     this.data.ammo = normalizeAmmo(this.data.ammo);
     this.data.quiverLoad = normalizeLoad(this.data.quiverLoad);
     releaseStoredGear(this.data);
+    stripDebugGrantedInPlace(this.data);
   }
 
   save(echo = true) {
     if (this.sessionOnly || savesFrozen()) return;
     if (echo) this.data.savedAt = Date.now();
+    const payload = huntSavePayload(this.data);
+    if (echo) payload.savedAt = this.data.savedAt;
     try {
-      localStorage.setItem(saveKey(this.address), JSON.stringify(this.data));
+      localStorage.setItem(saveKey(this.address), JSON.stringify(payload));
     } catch {
       /* storage unavailable */
     }
     if (echo && this.address && typeof this.onCloud === 'function') {
       try {
-        this.onCloud(this.data);
+        this.onCloud(payload);
       } catch {
         /* the local hunt is already written */
       }

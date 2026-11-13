@@ -255,6 +255,9 @@
 }
 
 /* panels ---------------------------------------------------------------- */
+#panel {
+  z-index: 50;
+}
 #panel:not(.hidden) .panel-card {
   animation: mg-panel-in 0.18s ease-out;
 }
@@ -438,6 +441,10 @@ html.windows-open #nameplates,
 #app:has(#dialog:not(.hidden)) #nameplates {
   visibility: hidden;
 }
+html.panel-open #dialog {
+  visibility: hidden;
+  pointer-events: none;
+}
 
 #quest {
   min-width: 0;
@@ -446,20 +453,47 @@ html.windows-open #nameplates,
 }
 #quest.open {
   min-width: min(220px, calc(100vw - var(--menu-col-w) - 48px));
-  width: max-content;
-  max-width: min(280px, calc(100vw - var(--menu-col-w) - 32px));
+  width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 32px));
+  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 32px));
+  max-height: min(42vh, calc(100dvh - var(--safe-t) - 24px));
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 body.touch #quest.open {
   min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
 }
 #top-left:has(#quest.open) {
   min-width: min(220px, calc(100vw - var(--menu-col-w) - 48px));
+  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 32px));
 }
 body.touch #top-left:has(#quest.open) {
   min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+}
+#quest.open .q-track {
+  max-height: inherit;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 #quest.open .q-body {
-  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+#quest.open #q-text {
+  flex: 1 1 12em;
+  min-width: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
 }
 #quest .q-head {
   display: flex;
@@ -699,7 +733,8 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
   background-color: var(--mg-navy);
 }
 #hints {
-  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
+  right: calc(8px + var(--menu-col-w) + var(--hud-action-gap, 8px) + var(--safe-r));
+  bottom: calc(var(--hud-clear-bottom, 190px) + 8px + var(--safe-b));
 }
 
 body.touch #hud-corner-right,
@@ -715,7 +750,7 @@ body.touch #hud-corner-right {
   max-width: min(220px, calc(100vw - 24px - var(--menu-col-w) - var(--safe-l) - var(--safe-r)));
 }
 body.touch #touch-btns {
-  right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
+  right: calc(4px + var(--menu-col-w) + var(--hud-action-gap, 8px) + var(--safe-r));
 }
 body.touch #world-chat {
   left: calc(8px + var(--safe-l));
@@ -772,8 +807,14 @@ body.mmo-view #top-left {
     --menu-col-w: 32px;
   }
   #menu-col .mbtn kbd { display: none; }
+  #hints {
+    display: none;
+  }
   body.touch #touch-btns {
-    right: calc(8px + var(--menu-col-w) + 8px + var(--safe-r));
+    width: 180px;
+    height: 160px;
+    right: calc(4px + var(--menu-col-w) + var(--hud-action-gap, 8px) + var(--safe-r));
+    transform: scale(calc(var(--ui) * 0.92));
   }
   body.touch #world-chat {
     left: calc(8px + 142px * 0.78 + 8px + var(--safe-l));

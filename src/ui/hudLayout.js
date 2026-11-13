@@ -6,6 +6,8 @@
 
 export const MENU_COUNT = 11;
 export const QUEST_KEY = 'mg-quest-open';
+export const ACTION_GAP = 8;
+export const QUEST_MAX_W = 340;
 
 export const HUD_VIEWPORTS = [
   { name: 'phone-landscape', w: 844, h: 390, touch: true },
@@ -73,9 +75,10 @@ export function hudRects(vp, { questOpen = false } = {}) {
     ? rect('minimap', 8, 6, mm, mm)
     : rect('minimap', 8, h - 8 - mm, mm, mm);
 
-  const questMax = Math.max(96, Math.min(220, w - menu.colW - (touch ? mm + 28 : 32)));
+  const questCap = Math.min(QUEST_MAX_W, Math.floor(w * 0.45), w - menu.colW - (touch ? mm + 28 : 32));
+  const questMax = Math.max(96, questCap);
   const questW = questOpen ? questMax : 96;
-  const questH = questOpen ? 92 : 28;
+  const questH = questOpen ? Math.min(160, Math.max(92, Math.floor(h * 0.32))) : 28;
   const quest = touch
     ? rect('quest', 8 + mm + 8, 6, questW, questH)
     : rect('quest', 8, 8, questW, questH);
@@ -94,11 +97,11 @@ export function hudRects(vp, { questOpen = false } = {}) {
   }
 
   const ui = Math.max(1, Math.min(1.5, h / 820));
-  const bubbleW = 220;
-  const bubbleH = 190 * ui;
+  const bubbleW = short ? 180 : 220;
+  const bubbleH = (short ? 160 : 190) * ui;
   const bubbleBottom = touch && w <= 1100 ? 90 : 18;
   const bubbles = touch
-    ? rect('bubbles', w - 8 - menu.colW - 8 - bubbleW, h - bubbleBottom - bubbleH, bubbleW, bubbleH)
+    ? rect('bubbles', w - 4 - menu.colW - ACTION_GAP - bubbleW, h - bubbleBottom - bubbleH, bubbleW, bubbleH)
     : null;
 
   const chatW = short && touch ? Math.min(240, w * 0.36) : 80;
@@ -148,6 +151,7 @@ export function applyHudLayout(el, vp) {
   el.style.setProperty('--menu-col-w', `${menu.colW}px`);
   el.style.setProperty('--hud-clear-bottom', `${clear}px`);
   el.style.setProperty('--hud-menu-bottom', `${menuBottom}px`);
+  el.style.setProperty('--hud-action-gap', `${ACTION_GAP}px`);
   return menu;
 }
 

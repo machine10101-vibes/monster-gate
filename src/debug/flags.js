@@ -4,18 +4,25 @@
  * See docs/debug-flags.md.
  */
 
-import { GEAR, MONSTERS } from '../data/catalog.js';
+import { GEAR, MONSTERS, monsterById } from '../data/catalog.js';
 import { QUESTS } from '../data/quests.js';
 import { PORTAL_IDS } from '../data/portals.js';
 import { SKILL_ORDER, xpForLevel } from '../data/gathering.js';
 import { freezeSaves } from '../systems/saveio.js';
 import { originOf, TILES } from '../world/tiles.js';
+import { DEBUG_STARTER_ID, markDebugGranted } from './transient.js';
 
 const MINE = { rampX0: 88, z: 66 };
 const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
 const SAND_MINE = { x: -74, z: 514 };
-/** East shore, outside the pool and the wet ring. */
-const OASIS_DRY = { x: OASIS.x + OASIS.r + OASIS.shore + 10, z: OASIS.z - 10 };
+/** Dry south-east shore on the Oasis (greenbowl) tile, pool in view to the north-west. */
+const OASIS_DRY = { x: OASIS.x + 14, z: OASIS.z + OASIS.r + OASIS.shore + 8 };
+
+export function oasisHudName(x, z) {
+  const d = Math.hypot(Number(x) - OASIS.x, Number(z) - OASIS.z);
+  if (d <= OASIS.r + OASIS.shore + 18) return 'Oasis';
+  return null;
+}
 
 function paramsOf(search) {
   const raw = String(search ?? '');
@@ -167,8 +174,8 @@ export function grantDebugUnlock(progress, journal) {
 }
 
 const ZONE_MOBS = {
-  oakhollow: ['chicken', 'slime'],
-  town: ['chicken', 'slime'],
+  oakhollow: ['slime', 'boar'],
+  town: ['slime', 'boar'],
   goldenmeadow: ['slime', 'boar'],
   field: ['slime', 'boar'],
   whispering: ['boar', 'slime'],
@@ -202,11 +209,26 @@ function landKindOf(game, x, z) {
   return String(land?.kind || land?.banner?.[1] || '').toLowerCase();
 }
 
-/** Level-appropriate monster id for the hunter's current zone. */
+export function monsterIsHostile(id) {
+  const type = String(id || '');
+  if (!type || type === 'chicken') return false;
+  const cat = monsterById(type);
+  if (cat?.style === 'Passive') return false;
+  return true;
+}
+
+function firstHostile(list, rank = 0) {
+  const ids = (list || []).filter(monsterIsHostile);
+  if (!ids.length) return 'slime';
+  return ids[Math.min(ids.length - 1, rank > 4 ? ids.length - 1 : rank > 1 ? 1 : 0)] || ids[0];
+}
+
+/** Level-appropriate hostile monster id for the hunter's current zone. Never a chicken. */
 export function pickDebugMonsterType(game) {
   const p = game?.player?.pos;
   const x = p?.x ?? 72;
   const z = p?.z ?? 73;
+  const rank = Math.max(0, game?.rank | 0);
   const realm = game?.world?.realm;
   if (realm === 'cave') return 'slime';
   if (realm === 'rift') return 'voidslime';
@@ -217,16 +239,78 @@ export function pickDebugMonsterType(game) {
   const names = Object.keys(ZONE_MOBS).sort((a, b) => b.length - a.length);
   for (const name of names) {
     if (key.includes(name) || zoneName.includes(name) || compact.includes(name)) {
-      const list = ZONE_MOBS[name];
-      const rank = Math.max(0, game?.rank | 0);
-      return list[Math.min(list.length - 1, rank > 4 ? list.length - 1 : rank > 1 ? 1 : 0)] || list[0];
+      return firstHostile(ZONE_MOBS[name], rank);
     }
   }
   const zn = game?.world?.zoneAt?.(x, z);
-  if (zn === 3 || zn === 5) return 'chicken';
   if (zn === 6) return 'slime';
   if (zn === 1) return 'boar';
   return 'slime';
+}
+
+function spawnOffset(game) {
+  const p = game.player.pos;
+  const yaw = Number(game.player.yaw) || 0;
+  const camYaw = Number(game.cam?.yaw ?? yaw);
+  const awayX = -Math.sin(camYaw);
+  const awayZ = -Math.cos(camYaw);
+  const faceX = Math.sin(yaw);
+  const faceZ = Math.cos(yaw);
+  const x = awayX * 0.7 + faceX * 0.3;
+  const z = awayZ * 0.7 + faceZ * 0.3;
+  const len = Math.hypot(x, z) || 1;
+  return { x: x / len, z: z / len, from: p };
+}
+
+export function debugSpawnSpot(game) {
+  if (!game?.player?.pos) return null;
+  const { x: ux, z: uz, from: p } = spawnOffset(game);
+  let spot = null;
+  for (const dist of [2.6, 2.2, 3.0, 3.4, 2.0]) {
+    const x = p.x + ux * dist;
+    const z = p.z + uz * dist;
+    const w = game.world;
+    if (w?.playable && !w.playable(x, z)) continue;
+    if (w?.isWater?.(x, z)) continue;
+    spot = { x, z, dist };
+    break;
+  }
+  if (!spot) spot = { x: p.x + ux * 2.6, z: p.z + uz * 2.6, dist: 2.6 };
+  return spot;
+}
+
+/** Equip the Hunter Blade for this debug session only. Never persisted. */
+export function ensureDebugStarterWeapon(game) {
+  if (!game?.debug || debugOnlineBlocked(game) || !game.progress?.data) return null;
+  const data = game.progress.data;
+  if (data.weapon && data.weapon !== DEBUG_STARTER_ID) return null;
+  data.crafted = { ...(data.crafted || {}) };
+  data.crafted[DEBUG_STARTER_ID] = true;
+  data.weapon = DEBUG_STARTER_ID;
+  markDebugGranted(data, { weapon: DEBUG_STARTER_ID });
+  game.applyGear?.(false);
+  game.selectSlot?.(0, true);
+  return { id: DEBUG_STARTER_ID, name: 'Hunter Blade' };
+}
+
+export function setDebugAutoAttack(game, on) {
+  if (!game?.debug || debugOnlineBlocked(game)) return false;
+  game.debug.autoAttack = !!on;
+  return game.debug.autoAttack;
+}
+
+export function tickDebugAutoAttack(game) {
+  if (!game?.debug?.autoAttack || debugOnlineBlocked(game)) return false;
+  if (game.uiBlocking || !game.started) return false;
+  const P = game.player;
+  if (!P || P.dead || P.state !== 'idle') return false;
+  const reach = Number(game.carried?.(game.items?.[game.sel])?.reach) || 2.6;
+  const m = game.nearestMonster?.(reach + 0.35, P.pos);
+  if (!m || !monsterIsHostile(m.type)) return false;
+  const d = Math.hypot(m.x - P.pos.x, m.z - P.pos.z) || 1;
+  P.yaw = Math.atan2((m.x - P.pos.x) / d, (m.z - P.pos.z) / d);
+  game.doAttack?.();
+  return true;
 }
 
 /** World 1 replies with this code if a debug frame ever reaches the socket. */
@@ -245,24 +329,13 @@ export function debugOnlineReject() {
 export function spawnDebugMonster(game, search) {
   if (debugOnlineBlocked(game, search)) return debugOnlineReject();
   if (!game?.debug || !game.spawner?.spawn || !game.player?.pos) return null;
-  const p = game.player.pos;
-  const yaw = Number(game.player.yaw) || 0;
+  ensureDebugStarterWeapon(game);
   const type = pickDebugMonsterType(game) || 'slime';
-  let spot = null;
-  for (const dist of [5, 4, 6, 3.5, 7]) {
-    const x = p.x + Math.sin(yaw) * dist;
-    const z = p.z + Math.cos(yaw) * dist;
-    const w = game.world;
-    if (w?.playable && !w.playable(x, z)) continue;
-    if (w?.isWater?.(x, z)) continue;
-    spot = { x, z, dist };
-    break;
-  }
-  if (!spot) {
-    spot = { x: p.x + Math.sin(yaw) * 5, z: p.z + Math.cos(yaw) * 5, dist: 5 };
-  }
-  const mon = game.spawner.spawn(type, spot.x, spot.z, true);
-  game.hud?.toast?.(`DEBUG · ${mon?.name || type}`, 1800);
+  const hostile = monsterIsHostile(type) ? type : 'slime';
+  const spot = debugSpawnSpot(game);
+  const mon = game.spawner.spawn(hostile, spot.x, spot.z, true);
+  if (game.cam) game.cam.pitch = Math.max(Number(game.cam.pitch) || 0, 0.92);
+  game.hud?.toast?.(`DEBUG · ${mon?.name || hostile}`, 1800);
   return mon;
 }
 
@@ -292,6 +365,14 @@ export function teleportDebug(game, raw) {
   }
   const y = game.world?.heightAt?.(spot.x, spot.z) ?? 3.2;
   game.player.pos.set(spot.x, y, spot.z);
+  if (spot.id === 'oasis') {
+    const yaw = Math.atan2(OASIS.x - spot.x, OASIS.z - spot.z);
+    game.player.yaw = yaw;
+    if (game.cam) {
+      game.cam.targetYaw = yaw + Math.PI;
+      game.cam.yaw = yaw + Math.PI;
+    }
+  }
   game.player.syncObj?.();
   game.snapCamera?.();
   game.world?.revealAround?.(spot.x, spot.z, 64);
@@ -305,6 +386,7 @@ function applySession(game, flags) {
     game.rebindFromProgress?.();
   }
   if (flags.tp) teleportDebug(game, flags.tp);
+  ensureDebugStarterWeapon(game);
 }
 
 /**

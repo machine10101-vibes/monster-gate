@@ -18,7 +18,8 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { attachDebug } from './debug/flags.js';
+import { attachDebug, setDebugAutoAttack, tickDebugAutoAttack } from './debug/flags.js';
+import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
@@ -2004,6 +2005,10 @@ class Game {
     }
   }
 
+  setDebugAutoAttack(on) {
+    return setDebugAutoAttack(this, on);
+  }
+
   doAttack() {
     const P = this.player;
     if (P.dead) return;
@@ -2813,6 +2818,7 @@ class Game {
     }
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
     else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
+    else if (!blocked) tickDebugAutoAttack(this);
     if (inp.take('evade') && !blocked) this.doEvade();
     if (inp.take('bolt') && !blocked) this.castSlot(0);
     if (inp.take('skill') && !blocked) this.castSlot(1);
@@ -2926,6 +2932,20 @@ class Game {
       return;
     }
     const land = this.world.landAt(P.x, P.z);
+    const oasisName = oasisAreaName(P.x, P.z);
+    if (oasisName) {
+      if (this.zone !== oasisName) {
+        const first = this.zone === -1;
+        this.zone = oasisName;
+        this.hud.setArea(oasisName);
+        if (!first && this.started) this.hud.banner('The Living Water', oasisName, 2600);
+      }
+      const shade = land?.shade || 0;
+      this.forestAmt += (shade - this.forestAmt) * Math.min(1, dt * 1.5);
+      this.chill += (0 - this.chill) * Math.min(1, dt * 1.2);
+      this.ember += (0 - this.ember) * Math.min(1, dt * 1.2);
+      return;
+    }
     if (land?.banner) {
       if (this.zone !== land.banner[1]) {
         const first = this.zone === -1;

@@ -127,6 +127,28 @@ test('MG-UI-15 expanded quest dropdown has a 220px min-width clamped to the view
   assert.match(theme, /body\.touch #quest\.open \{[\s\S]*min-width:\s*min\(220px/);
 });
 
+test('MG-UI-16 expanded quest wraps inside a viewport-clamped frame', () => {
+  const theme = src('src/ui/theme.css');
+  assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(340px,\s*45vw/);
+  assert.match(theme, /#quest\.open \{[\s\S]*max-height:\s*min\(42vh/);
+  assert.match(theme, /#quest\.open \.q-body \{[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.match(theme, /#quest\.open #q-text \{[\s\S]*text-overflow:\s*unset/);
+  assert.doesNotMatch(theme, /#quest\.open \.q-body \{[\s\S]*white-space:\s*nowrap/);
+});
+
+test('MG-UI-17 action cluster keeps a gap from the menu column', () => {
+  const theme = src('src/ui/theme.css');
+  assert.match(theme, /body\.touch #touch-btns \{[\s\S]*--hud-action-gap/);
+  assert.match(theme, /#hints \{[\s\S]*--hud-clear-bottom/);
+});
+
+test('MG-UI-19 an open window hides the NPC dialogue', () => {
+  const theme = src('src/ui/theme.css');
+  assert.match(theme, /html\.panel-open #dialog/);
+  assert.match(src('src/ui/hud.js'), /panel-open/);
+  assert.match(theme, /#panel \{[\s\S]*z-index:\s*50/);
+});
+
 test('build id is shown in Settings', () => {
   assert.match(src('src/ui/hud.js'), /set-build/);
   assert.match(src('src/ui/buildId.js'), /VITE_BUILD_ID/);

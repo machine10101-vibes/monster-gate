@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
+  ACTION_GAP,
   HUD_CLEAR_PAIRS,
   HUD_VIEWPORTS,
   MENU_COUNT,
   QUEST_KEY,
+  QUEST_MAX_W,
   applyHudLayout,
   dialogClearance,
   fitMenuButtons,
@@ -56,7 +58,8 @@ test('HUD rects do not collide at 844x390, 390x844, 1280x800, 1920x1080', () => 
     assert.ok(rects.menu.y >= 0, vp.name);
     if (vp.touch) {
       assert.ok(rects.bubbles, vp.name);
-      assert.ok(rects.bubbles.x + rects.bubbles.w <= rects.menu.x + 0.5, `${vp.name} bubbles left of column`);
+      const gap = rects.menu.x - (rects.bubbles.x + rects.bubbles.w);
+      assert.ok(gap >= ACTION_GAP - 0.01, `${vp.name} action gap ${gap}`);
     }
     assert.equal(overlap(rects.quest, rects.minimap), false, `${vp.name} quest vs minimap`);
   }
@@ -104,10 +107,19 @@ test('dialogue clearance sits above the hotbar and action bubbles', () => {
   }
 });
 
-test('MG-UI-15 expanded quest is ~220px on a desktop-size touch screen', () => {
-  const rects = hudRects({ name: 'touch-desktop', w: 1280, h: 800, touch: true }, { questOpen: true });
-  assert.ok(rects.quest.w >= 200, rects.quest.w);
-  assert.ok(rects.quest.w <= 220, rects.quest.w);
+test('MG-UI-16 expanded quest stays in frame at 844x390 and 1280x800', () => {
+  for (const vp of [
+    { name: 'phone-landscape', w: 844, h: 390, touch: true },
+    { name: 'laptop', w: 1280, h: 800, touch: false },
+  ]) {
+    const rects = hudRects(vp, { questOpen: true });
+    const cap = Math.min(QUEST_MAX_W, Math.floor(vp.w * 0.45));
+    assert.ok(rects.quest.w <= cap + 0.01, `${vp.name} width ${rects.quest.w}`);
+    assert.ok(rects.quest.w >= 96, `${vp.name} min ${rects.quest.w}`);
+    assert.ok(rects.quest.x + rects.quest.w <= vp.w - rects.menu.w, `${vp.name} inside viewport`);
+    assert.equal(overlap(rects.quest, rects.minimap), false, vp.name);
+  }
   const theme = src('../src/ui/theme.css');
-  assert.match(theme, /#quest\.open \{[\s\S]*min-width:\s*min\(220px/);
+  assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(340px,\s*45vw/);
+  assert.match(theme, /overflow-wrap:\s*anywhere/);
 });

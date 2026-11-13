@@ -20,6 +20,13 @@ export const DESERT_KINDS = ['sunspill', 'glassroad', 'deepwell', 'greenbowl'];
 
 /** World position of the pool, on the corner where the four tiles meet. */
 export const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
+
+/** HUD name while standing at the living water, even on a neighboring dune tile. */
+export function oasisAreaName(x, z) {
+  const d = Math.hypot(Number(x) - OASIS.x, Number(z) - OASIS.z);
+  if (d <= OASIS.r + OASIS.shore + 18) return 'Oasis';
+  return null;
+}
 /**
  * The dig on tile 84. Greyrock Pit is pit 5.5 / rim 10.5.
  * This one is three times that across: pit 16.5, rim 31.5.
