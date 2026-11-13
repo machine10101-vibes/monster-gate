@@ -2,15 +2,18 @@
 
 A 3D pixel (voxel) monster hunting game for desktop and mobile browsers, built with Three.js and Vite.
 
+Play at [https://monstergate.online/](https://monstergate.online/). The previous GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects there after the custom domain is attached.
+
 Start in the village of Oakhollow, step out into the fairy-tale Whispering Wood, and hunt the creatures spilling out of the Monster Gate. Mountains ring the map and open fields and farmland surround the town.
 
 ## Run
 
 ```bash
 npm install
-npm run dev      # development server
-npm run build    # production build in dist/
-npm run preview  # serve the production build
+npm run dev           # development server
+npm run build         # production build in dist/ (Vite base `/` for the custom domain)
+npm run build:gh-path # same build with base `/monster-gate/` if you need the old project path
+npm run preview       # serve the production build
 ```
 
 ## Controls

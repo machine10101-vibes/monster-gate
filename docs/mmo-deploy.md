@@ -55,8 +55,10 @@ Web service, Docker or native Node. Start: `npm run start:server`. Health check:
 Pages stays offline unless the flag is set:
 
 ```
-https://machine10101-vibes.github.io/monster-gate/?mmo=1&server=wss://YOUR_HOST
+https://monstergate.online/?mmo=1&server=wss://YOUR_HOST
 ```
+
+The old GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects to the custom domain after DNS is attached.
 
 Local:
 
