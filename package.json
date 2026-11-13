@@ -4,12 +4,17 @@
   "description": "Monster Gate - a 3D pixel (voxel) monster hunting game for desktop and mobile browsers.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
     "start:server": "node server/index.js",
-    "test": "node --test tests/*.js"
+    "test": "node --test tests/*.js server/tests/*.test.js",
+    "test:server": "node --test server/tests/*.test.js",
+    "test:persistence": "node --test server/persistence/tests/*.test.js"
   },
   "repository": {
     "type": "git",
