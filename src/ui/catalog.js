@@ -436,7 +436,7 @@ export class Catalog {
     }
     root.appendChild(tabs);
     if (this.forge) {
-      root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Iron bars from the smithy outside town become armor, weapons and arrowheads. Fletch a shaft with a feather and an arrowhead here, then wear a quiver. The carving knife is already in your bag.`));
+      root.appendChild(el('div', 'cat-forge', `<b>Bram the Blacksmith</b> Iron bars from the smithy by Greyrock Pit become armor, weapons and arrowheads. Fletch a shaft with a feather and an arrowhead here, then wear a quiver. The carving knife is already in your bag.`));
       root.appendChild(this.forgeBench());
     }
 
@@ -773,7 +773,7 @@ export class Catalog {
         this.render();
       };
       actions.appendChild(b);
-      if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the Forge next to Bram the Blacksmith in Oakhollow.'));
+      if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the forge beside Greyrock Pit, just outside Oakhollow.'));
     } else {
       const worn = pr.worn(g.id);
       const b = el('button', 'cat-btn go', worn ? 'Unequip' : g.type === 'weapon' ? 'Equip' : 'Wear');

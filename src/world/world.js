@@ -605,21 +605,21 @@ export class World {
     this.fenceLine(58.8, 83.5, 58.8, 88);
     this.fenceLine(86.8, 69, 86.8, 72);
 
-    const FX = 61.4;
-    const FZ = 86.1;
+    const FX = 86.3;
+    const FZ = 72.8;
     const fy = this.heightAt(FX, FZ);
-    this.putAt(m.forge, FX, FZ, Math.PI / 2, 1.2);
+    this.putAt(m.forge, FX, FZ, 0.6, 1.2);
     this.box(FX, FZ, 0.85, 1.25);
-    this.putAt(m.anvil, 63.4, 86.1, Math.PI / 2, 1);
-    this.circle(63.4, 86.1, 0.42);
-    this.lightSpots.push({ x: FX + 0.7, y: fy + 0.9, z: FZ, color: 0xff7a22 });
-    this.forge = { x: FX, y: fy, z: FZ, anvil: { x: 63.4, z: 86.1 } };
+    this.putAt(m.anvil, 86.6, 74.7, 0.4, 1);
+    this.circle(86.6, 74.7, 0.42);
+    this.lightSpots.push({ x: FX + 0.4, y: fy + 0.9, z: FZ + 0.3, color: 0xff7a22 });
+    this.forge = { x: FX, y: fy, z: FZ, anvil: { x: 86.6, z: 74.7 } };
     this.buildStorageCrate();
     this.buildSmithy();
 
     this.npcSpots = {
       guild: { x: GUILD.x - 1.4, z: GUILD.z + 3.5 },
-      smith: { x: 64.3, z: 85.2 },
+      smith: { x: 87.5, z: 73.9 },
       alchemist: { x: 73.4, z: 83.6 },
       farmer: { x: 90, z: 82 },
       child: { x: 72, z: 80.5 },
@@ -660,15 +660,15 @@ export class World {
     this.storage = { x, y, z, group: g, lid, flag, open: false };
   }
 
-  /** Beside the west path out of Oakhollow, on the grass between the stream and the trees. The door faces the path. */
+  /** On the south rim of Greyrock Pit, just outside Oakhollow. The door faces south, and Bram works the forge on the town side. */
   buildSmithy() {
-    const x = 42;
-    const z = 70;
+    const x = 92;
+    const z = 73.4;
     const y = this.heightAt(x, z);
     const g = new THREE.Group();
     g.name = 'smithy';
     g.position.set(x, y, z);
-    g.rotation.y = -2.4;
+    g.rotation.y = 0;
     for (const p of makeSmithy(11)) {
       const mat = p.kind === 'solid' ? this.mats.solid : p.kind === 'glow' ? this.mats.glow : this.mats.window;
       const mesh = new THREE.Mesh(p.geo, mat);
@@ -677,9 +677,9 @@ export class World {
       g.add(mesh);
     }
     this.group.add(g);
-    this.box(x, z, 2.3, 1.9);
-    this.occupy(x, z, 2.6);
-    this.lightSpots.push({ x: x + 1.2, y: y + 1.4, z, color: 0xff9a3a });
+    this.box(x, z, 2.6, 1.8);
+    this.occupy(x, z, 3.4);
+    this.lightSpots.push({ x, y: y + 1.6, z: z + 2.2, color: 0xff9a3a });
     this.smithy = { x, y, z, group: g };
   }
 

@@ -164,7 +164,7 @@ function emptyText(tab) {
   if (tab === 'carried') return 'Weapons and supplies on your hotbar show up here.';
   if (tab === 'tools') return 'The tinderbox lights logs you have chopped.';
   if (tab === 'goods') return 'Ore, fish, and logs are kept here. Chop birch, oak, and maple west of town.';
-  if (tab === 'gear') return 'The Forge in Oakhollow turns monster parts into weapons and armor.';
+  if (tab === 'gear') return 'The forge by Greyrock Pit turns monster parts into weapons and armor.';
   return 'Monster parts you harvest are kept here until you forge them.';
 }
 
