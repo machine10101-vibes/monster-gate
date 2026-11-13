@@ -13,10 +13,12 @@ Session-only tools for layout and combat checks. **Inert unless the URL has `?de
 Examples:
 
 ```
-/?debug=1&tp=oakhollow
-/?debug=1&unlock=1&tp=hellspire
-/?debug=1&tp=greyrock
+https://monstergate.online/?debug=1&tp=oakhollow
+https://monstergate.online/?debug=1&unlock=1&tp=hellspire
+https://monstergate.online/?debug=1&tp=greyrock
 ```
+
+The old GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects here after the custom domain is set.
 
 Without `debug=1`, `tp` and `unlock` do nothing.
 

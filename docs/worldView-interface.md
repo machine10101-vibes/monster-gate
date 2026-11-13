@@ -4,7 +4,18 @@ Presentation layer for nearby hunters, name tags, snapshot interpolation, the ch
 
 This module **does not open sockets**. `src/net/mmo.js` (gated by `?mmo=1`) calls into it. Protocol: `PROTOCOL.md`.
 
-Live GitHub Pages is unchanged unless the page is opened with `?mmo=1`.
+Live site: [https://monstergate.online/](https://monstergate.online/). World view stays off unless `?mmo=1` is set.
+
+Mock / wake links:
+
+```
+https://monstergate.online/?mmo=1
+https://monstergate.online/?mmo=1&mock=1
+https://monstergate.online/?mmo=1&mockwake=1
+https://monstergate.online/?mmo=1&mock=1&mockerr=name_taken
+```
+
+The old GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects here after the custom domain is set.
 
 | Flag | What happens |
 | --- | --- |
