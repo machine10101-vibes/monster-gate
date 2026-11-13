@@ -18,8 +18,8 @@
     <link rel="icon" href="./favicon.ico" sizes="any" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <script type="module" crossorigin src="/monster-gate/assets/index-ODiG5EzB.js"></script>
-    <link rel="stylesheet" crossorigin href="/monster-gate/assets/index-EXUyRAiq.css">
+    <script type="module" crossorigin src="/assets/index-C778fjQQ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CFJCRU6d.css">
   </head>
   <body>
     <div id="app">
@@ -41,9 +41,30 @@
           </div>
         </div>
 
-        <div id="top-right">
-          <button id="btn-fs" class="mini" aria-label="Fullscreen" title="Fullscreen"></button>
-          <button id="btn-snd" class="mini" aria-label="Sound" title="Sound"></button>
+        <div id="hud-corner-right">
+          <div id="top-right">
+            <div class="hud-minis">
+              <button id="btn-fs" class="mini" aria-label="Fullscreen" title="Fullscreen"></button>
+              <button id="btn-snd" class="mini" aria-label="Sound" title="Sound"></button>
+            </div>
+          </div>
+          <div id="menu-buttons">
+            <div class="row top">
+              <div id="clock"><span class="sun"></span><b id="clock-text">10:12</b></div>
+              <button class="mbtn" data-panel="map"><i class="ico map"></i><kbd>M</kbd></button>
+              <button class="mbtn" data-action="rotate"><i class="ico rot"></i><kbd>R</kbd></button>
+              <button class="mbtn" data-panel="spellbook" title="Skill and spell book"><i class="ico tome"></i><kbd>G</kbd></button>
+              <button class="mbtn" data-panel="menu" title="Menu"><i class="ico dots"></i></button>
+            </div>
+            <div class="row bottom">
+              <button class="mbtn" data-panel="gear" title="Character — equipped"><i class="ico gear"></i><kbd>E</kbd></button>
+              <button class="mbtn" data-panel="stats" title="Hunter stats"><i class="ico stats"></i><kbd>H</kbd></button>
+              <button class="mbtn" data-panel="bag" title="Inventory"><i class="ico bag"></i><kbd>B</kbd></button>
+              <button class="mbtn" data-panel="catalog"><i class="ico book"></i><kbd>C</kbd></button>
+              <button class="mbtn" data-panel="quest"><i class="ico quest"></i><kbd>Q</kbd></button>
+              <button class="mbtn" data-panel="settings" title="Settings"><i class="ico cog"></i><kbd>T</kbd></button>
+            </div>
+          </div>
         </div>
 
         <div id="center-bottom">
@@ -80,24 +101,6 @@
           <div class="hint"><i class="mouse r"></i><span>Evade</span></div>
         </div>
 
-        <div id="menu-buttons">
-          <div class="row top">
-            <div id="clock"><span class="sun"></span><b id="clock-text">10:12</b></div>
-            <button class="mbtn" data-panel="map"><i class="ico map"></i><kbd>M</kbd></button>
-            <button class="mbtn" data-action="rotate"><i class="ico rot"></i><kbd>R</kbd></button>
-            <button class="mbtn" data-panel="spellbook" title="Skill and spell book"><i class="ico tome"></i><kbd>G</kbd></button>
-            <button class="mbtn" data-panel="menu" title="Menu"><i class="ico dots"></i></button>
-          </div>
-          <div class="row bottom">
-            <button class="mbtn" data-panel="gear" title="Character — equipped"><i class="ico gear"></i><kbd>E</kbd></button>
-            <button class="mbtn" data-panel="stats" title="Hunter stats"><i class="ico stats"></i><kbd>H</kbd></button>
-            <button class="mbtn" data-panel="bag" title="Inventory"><i class="ico bag"></i><kbd>B</kbd></button>
-            <button class="mbtn" data-panel="catalog"><i class="ico book"></i><kbd>C</kbd></button>
-            <button class="mbtn" data-panel="quest"><i class="ico quest"></i><kbd>Q</kbd></button>
-            <button class="mbtn" data-panel="settings" title="Settings"><i class="ico cog"></i><kbd>T</kbd></button>
-          </div>
-        </div>
-
         <div id="touch-controls">
           <div id="stick"><i id="stick-knob"></i></div>
           <div id="touch-btns">
@@ -118,10 +121,10 @@
       <div id="hurt-flash"></div>
       <div id="toast"></div>
       <div id="banner"><span id="banner-sub">Village</span><b id="banner-main">Oakhollow</b></div>
-      <div id="dialog" class="hidden"><b id="dlg-name"></b><p id="dlg-text"></p><div id="dlg-choices" class="hidden"></div><small>Tap or press F to continue</small></div>
+      <div id="dialog" class="mg-frame hidden"><b id="dlg-name"></b><p id="dlg-text"></p><div id="dlg-choices" class="hidden"></div><small>Tap or press F to continue</small></div>
 
       <div id="panel" class="hidden">
-        <div class="panel-card">
+        <div class="panel-card mg-frame">
           <button id="panel-close" aria-label="Close">x</button>
           <h2 id="panel-title"></h2>
           <div id="panel-body"></div>
@@ -150,7 +153,7 @@
             <button id="btn-account-signin" class="start" type="button">Sign in with email</button>
             <button id="btn-wallet" class="start" type="button">Sign in with Klever</button>
           </div>
-          <form id="account-panel" class="account-panel hidden" novalidate>
+          <form id="account-panel" class="account-panel mg-frame hidden" novalidate>
             <label class="wg-label" for="account-email">Email</label>
             <input id="account-email" class="account-input" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" required />
             <label class="wg-label" for="account-password">Password</label>
@@ -193,7 +196,7 @@
           <span id="cs-account" class="cs-account"></span>
         </header>
 
-        <aside id="cs-panel" class="cs-panel">
+        <aside id="cs-panel" class="cs-panel mg-frame">
           <div class="cs-search">
             <input id="cs-search" type="search" placeholder="Search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="24" />
           </div>
@@ -205,7 +208,7 @@
           </div>
         </aside>
 
-        <form id="cs-form" class="cs-panel cs-form hidden" novalidate>
+        <form id="cs-form" class="cs-panel cs-form mg-frame hidden" novalidate>
           <h2 class="cs-form-title">Create Character</h2>
           <label class="cs-label" for="cs-name-input">Name</label>
           <input id="cs-name-input" class="cs-input" type="text" maxlength="14" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Choose a name" />
@@ -232,7 +235,7 @@
         </div>
 
         <div id="cs-confirm" class="cs-confirm hidden" role="alertdialog" aria-modal="true">
-          <div class="cs-confirm-box">
+          <div class="cs-confirm-box mg-frame">
             <p id="cs-confirm-text"></p>
             <div class="cs-confirm-actions">
               <button id="cs-confirm-no" class="cs-btn quiet" type="button">Keep</button>
