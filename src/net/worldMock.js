@@ -118,7 +118,7 @@ export class MockWorld {
     }
     if (this.mockwake) {
       this.wakeElapsed = 0;
-      this.setStatus(STATUS.waking, { secondsLeft: 30, elapsedMs: 0 });
+      this.setStatus(STATUS.waking, { secondsLeft: Math.ceil(this.wakeMs / 1000), elapsedMs: 0 });
       const step = 250;
       this._wake = setInterval(() => this.stepWake(step), step);
       return;
@@ -162,7 +162,7 @@ export class MockWorld {
       this.running = true;
       if (this._wake) clearInterval(this._wake);
       this.wakeElapsed = 0;
-      this.setStatus(STATUS.waking, { secondsLeft: 30, elapsedMs: 0 });
+      this.setStatus(STATUS.waking, { secondsLeft: Math.ceil(this.wakeMs / 1000), elapsedMs: 0 });
       this._wake = setInterval(() => this.stepWake(250), 250);
       return;
     }

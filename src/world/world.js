@@ -504,11 +504,17 @@ export class World {
           return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y);
         }
         void main() {
-          vec2 q = floor(vWorld.xz * 6.0) / 6.0;
-          float n = vn(q * 1.3 + vec2(uTime * 0.35, uTime * 0.2)) * 0.6 + vn(q * 3.1 - vec2(uTime * 0.25, -uTime * 0.3)) * 0.4;
-          vec3 col = mix(uDeep, uShallow, smoothstep(0.25, 0.8, n));
-          float sparkle = step(0.86, vn(q * 5.0 + uTime * 0.8)) * 0.55;
-          float ripple = step(0.74, n) * 0.25;
+          vec2 p = vWorld.xz;
+          float macro = vn(p * 0.055);
+          float mid = vn(p * 0.22 + vec2(uTime * 0.045, -uTime * 0.03));
+          float fine = vn(p * 0.85 + vec2(-uTime * 0.07, uTime * 0.05));
+          float cell = 1.15 + macro * 2.4 + mid * 0.8;
+          vec2 q = floor(p * cell + vec2(mid - 0.5, fine - 0.5) * 1.4) / cell;
+          float n = vn(q * 0.7 + vec2(uTime * 0.1, uTime * 0.07)) * 0.42 + mid * 0.33 + fine * 0.25;
+          vec3 col = mix(uDeep, uShallow, smoothstep(0.18, 0.88, n));
+          col = mix(col, uDeep * 0.72, smoothstep(0.55, 1.0, macro) * 0.4);
+          float sparkle = step(0.9, vn(p * 2.6 + uTime * 0.55)) * 0.4;
+          float ripple = step(0.78, n) * 0.16;
           col += uSky * (sparkle + ripple);
           col *= uLight;
           gl_FragColor = vec4(col, 0.78);

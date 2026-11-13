@@ -58,7 +58,7 @@ export const DESERT_SPECS = {
     dress: { cactus: 8, scrub: 16, rocks: 12, buttes: 3, palms: 0, reeds: 0, flowers: 4, mine: true },
   },
   greenbowl: {
-    banner: ['The Living Water', 'Greenbowl'], desert: true, shade: 0.06, forest: 0.08, amp: 1.5, base: 3.2, seed: 85,
+    banner: ['The Living Water', 'Oasis'], desert: true, shade: 0.06, forest: 0.08, amp: 1.5, base: 3.2, seed: 85,
     rim: {},
     beach: true,
     knolls: [[90, 50, 12, 2], [110, 100, 10, 1.6], [50, 80, 8, 1.2]],
@@ -298,9 +298,12 @@ export function paintDesertCell(out, H, x, z, kind, isPath, n, spec, index) {
   if (kind === K_WATER || h < 0.35) {
     zone[i] = ZONE.WATER;
     top[i] = TILE.SAND;
-    tint[i * 3] = 0.45;
-    tint[i * 3 + 1] = 0.78;
-    tint[i * 3 + 2] = 0.72;
+    const w = hash2(wx, wz, 85);
+    const foam = hash2(wx + 17, wz + 41, 85);
+    const deep = pool < OASIS.r * 0.42;
+    tint[i * 3] = (deep ? 0.18 : 0.34) + w * 0.22 + foam * 0.08;
+    tint[i * 3 + 1] = (deep ? 0.48 : 0.66) + w * 0.18 + (1 - foam) * 0.05;
+    tint[i * 3 + 2] = (deep ? 0.44 : 0.58) + w * 0.16 + foam * 0.1;
     return;
   }
   if (kind === K_PIT) {

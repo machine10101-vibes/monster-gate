@@ -21,6 +21,7 @@ import { Session } from './net/session.js';
 import { attachDebug } from './debug/flags.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
+import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
 import { Journal } from './systems/journal.js';
 import { Bounties } from './systems/bounties.js';
@@ -348,7 +349,7 @@ class Game {
     this.refreshHud(true);
 
     this.snapCamera();
-    this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
+    this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.player.yaw, [], [], 0);
     this.bindUI();
     progress(0.98, 'Ready');
     const account = readAccount();
@@ -1276,6 +1277,7 @@ class Game {
     this.player.setHeld(it.held || null);
     this.syncVitals();
     this.itemsChanged();
+    applyWeaponCursor(this);
     if (!silent) {
       this.audio.select();
       this.hud.toast(it.name, 900);
@@ -1298,6 +1300,7 @@ class Game {
       this.selectSlot(this.sel, true);
       this.refreshHud();
     }
+    applyWeaponCursor(this);
   }
 
   syncVitals() {
@@ -3087,7 +3090,7 @@ class Game {
     this.gather.update(dt);
     const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
-    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, this.cam.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
+    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, P.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
   }
 }
 
@@ -3100,10 +3103,14 @@ function startGame() {
     const q = new URLSearchParams(location.search);
     if (q.get('mmo') === '1') {
       import('./net/worldView.js').then(async (m) => {
-        const mock = q.get('mock') === '1';
-        const mockwake = q.get('mockwake') === '1';
-        const view = await m.init(game.scene, { game, mock: mock || mockwake, search: location.search });
-        if (!mock && !mockwake) {
+        const flags = m.parseMmoFlags(location.search);
+        const view = await m.init(game.scene, {
+          game,
+          mock: flags.mockFeed || flags.mockwake,
+          search: location.search,
+          wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
+        });
+        if (!flags.mock && !flags.mockwake) {
           const { attachMmo } = await import('./net/mmo.js');
           attachMmo(game, view);
         }

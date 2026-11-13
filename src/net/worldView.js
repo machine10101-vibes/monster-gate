@@ -16,11 +16,13 @@
  *
  * Flags: ?mmo=1 mounts this module. ?mmo=1&mock=1 also starts a local crowd.
  * ?mmo=1&mockwake=1 simulates a 30s waking queue, then online.
+ * ?mmo=1&mockwake=90 waits 90 seconds (Almost there…, Retry, Play offline).
  * ?mmo=1&mock=1&mockerr=name_taken shows the hunter-name prompt and stays final.
  */
 
 import { lookOptions, cleanName as rosterCleanName, nameProblem } from '../systems/roster.js';
 import { decorateFrame } from '../ui/theme.js';
+import { applyWeaponCursor } from '../ui/weaponCursor.js';
 
 export const WORLD_VIEW = 1;
 export const REMOTE_PREFIX = 'wv:';
@@ -49,14 +51,26 @@ function paramsOf(search) {
   return new URLSearchParams(q);
 }
 
+/** `?mockwake=1` is 30s. `?mockwake=90` is 90 seconds. */
+export function parseWakeSeconds(search = '') {
+  const q = typeof search === 'string' ? paramsOf(search) : search;
+  const raw = q.get?.('mockwake') ?? q.get('mockwake');
+  if (raw == null || raw === '' || raw === '0' || raw === 'false') return 0;
+  if (raw === '1' || raw === 'true') return WAKE_SECONDS;
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return Math.min(600, Math.max(1, Math.round(n)));
+  return 0;
+}
+
 /** Parse flags. Presentation mounts on mmo=1. Mock feed needs both mmo=1 and mock=1. */
 export function parseMmoFlags(search = '') {
   const q = paramsOf(search);
   const mmo = q.get('mmo') === '1';
   const mock = q.get('mock') === '1';
-  const mockwake = q.get('mockwake') === '1';
+  const wakeSeconds = parseWakeSeconds(q);
+  const mockwake = wakeSeconds > 0;
   const mockerr = q.get('mockerr') || '';
-  return { mmo, mock, mockwake, mockerr, enabled: mmo, mockFeed: mmo && mock };
+  return { mmo, mock, mockwake, mockerr, enabled: mmo, mockFeed: mmo && mock, wakeSeconds };
 }
 
 /**
@@ -157,7 +171,7 @@ export function normalizePlayer(raw, fallbackY = 3) {
     x,
     y,
     z,
-    yaw: clampNum(raw.yaw, -Math.PI * 8, Math.PI * 8, 0),
+    yaw: clampNum(raw.yaw ?? raw.heading, -Math.PI * 8, Math.PI * 8, 0),
     move: clampNum(raw.move, 0, 1, 0),
     anim: animOf(raw.anim ?? raw.state),
     held: typeof raw.held === 'string' && raw.held ? raw.held : 'blade',
@@ -295,6 +309,28 @@ export class WorldView {
     this.wrapped = null;
     this.live = false;
     this.collapsed = false;
+    this.localHeld = null;
+  }
+
+  localPlayerId() {
+    const you = this.game?.mmo?.you;
+    if (you == null) return '';
+    if (typeof you === 'string' || typeof you === 'number') return String(you);
+    return you.id != null ? String(you.id) : '';
+  }
+
+  isLocalId(id) {
+    const mine = this.localPlayerId();
+    return !!mine && String(id) === mine;
+  }
+
+  noteLocalHeld(held) {
+    this.localHeld = typeof held === 'string' && held ? held : null;
+    try {
+      applyWeaponCursor(this.game);
+    } catch {
+      /* node tests have no canvas */
+    }
   }
 
   bindTransport(transport) {
@@ -355,6 +391,11 @@ export class WorldView {
       const p = normalizePlayer(raw, fallbackY);
       if (!p) continue;
       seen.add(p.id);
+      if (this.isLocalId(p.id)) {
+        this.noteLocalHeld(p.held);
+        if (this.actors.has(p.id)) this.drop(p.id);
+        continue;
+      }
       this.upsert(p);
     }
     for (const id of [...this.actors.keys()]) {
@@ -376,9 +417,17 @@ export class WorldView {
     const remove = Array.isArray(delta.remove) ? delta.remove : [];
     for (const raw of upsert) {
       const p = normalizePlayer(raw, 3);
-      if (p) this.upsert(p);
+      if (!p) continue;
+      if (this.isLocalId(p.id)) {
+        this.noteLocalHeld(p.held);
+        if (this.actors.has(p.id)) this.drop(p.id);
+        continue;
+      }
+      this.upsert(p);
     }
-    for (const id of remove) this.drop(String(id));
+    for (const id of remove) {
+      if (!this.isLocalId(id)) this.drop(String(id));
+    }
     this.paintHud();
   }
 
@@ -842,9 +891,11 @@ export class WorldView {
     const status = document.createElement('div');
     status.id = 'world-status';
     status.className = 'pe';
+    const slot = document.getElementById('world-status-slot');
     const top = document.getElementById('top-right');
-    (top || hud).insertBefore(status, top?.firstChild || null);
-    if (!top) hud.appendChild(status);
+    if (slot) slot.appendChild(status);
+    else if (top) top.insertBefore(status, top.firstChild);
+    else hud.appendChild(status);
 
     const chat = document.createElement('div');
     chat.id = 'world-chat';
@@ -1054,7 +1105,7 @@ async function attachMock(view, game, extra = {}) {
     game,
     mockwake: extra.mockwake ?? flags.mockwake,
     mockerr: extra.mockerr ?? flags.mockerr,
-    wakeMs: extra.wakeMs,
+    wakeMs: extra.wakeMs ?? (flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined),
   });
   view.bindTransport(feed);
   if (feed.mockwake) feed.start();

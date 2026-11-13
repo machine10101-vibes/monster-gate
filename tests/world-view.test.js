@@ -12,13 +12,15 @@ import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
 test('MMO flags: presentation on mmo=1, mock feed only with both', () => {
-  assert.deepEqual(parseMmoFlags(''), { mmo: false, mock: false, mockwake: false, mockerr: '', enabled: false, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('?mmo=1'), { mmo: true, mock: false, mockwake: false, mockerr: '', enabled: true, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('mock=1'), { mmo: false, mock: true, mockwake: false, mockerr: '', enabled: false, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { mmo: true, mock: true, mockwake: false, mockerr: '', enabled: true, mockFeed: true });
-  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { mmo: true, mock: false, mockwake: true, mockerr: '', enabled: true, mockFeed: false });
+  const off = { mmo: false, mock: false, mockwake: false, mockerr: '', enabled: false, mockFeed: false, wakeSeconds: 0 };
+  assert.deepEqual(parseMmoFlags(''), off);
+  assert.deepEqual(parseMmoFlags('?mmo=1'), { ...off, mmo: true, enabled: true });
+  assert.deepEqual(parseMmoFlags('mock=1'), { ...off, mock: true });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { ...off, mmo: true, mock: true, enabled: true, mockFeed: true });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { ...off, mmo: true, mockwake: true, enabled: true, wakeSeconds: 30 });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=90'), { ...off, mmo: true, mockwake: true, enabled: true, wakeSeconds: 90 });
   assert.deepEqual(parseMmoFlags('?mmo=1&mock=1&mockerr=name_taken'), {
-    mmo: true, mock: true, mockwake: false, mockerr: 'name_taken', enabled: true, mockFeed: true,
+    mmo: true, mock: true, mockwake: false, mockerr: 'name_taken', enabled: true, mockFeed: true, wakeSeconds: 0,
   });
   assert.equal(parseMmoFlags('?mmo=true&mock=true').enabled, false);
 });

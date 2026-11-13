@@ -19,6 +19,7 @@ import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
 import { mountWalletSettings } from '../wallet/settings.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
+import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -75,6 +76,42 @@ function caveMapLabels(cave) {
     { name: "Dragon's Nest", x: cave.nest.x, z: cave.nest.z - 3 },
     { name: 'Darksycle Den', x: cave.origin.x + cave.w / 2, z: cave.origin.z + cave.d * 0.62, city: true },
   ];
+}
+
+/**
+ * Canvas rotate for a north-up minimap.
+ * World +Z is down on the map, -Z is up (Oakhollow's gate sits at lower Z).
+ * Character yaw 0 faces +Z. The arrow sprite's tip is local -Y (canvas up at 0).
+ * A rotating minimap would subtract camera yaw; this game is north-up only.
+ */
+export function minimapArrowAngle(yaw, opts = {}) {
+  let a = -Number(yaw || 0) + Math.PI;
+  if (opts.rotateMap) a -= Number(opts.cameraYaw || 0);
+  return a;
+}
+
+function paintMinimapArrow(ctx, x, y, yaw, { fill = '#e9fff1', stroke = '#000', scale = 1 } = {}) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(minimapArrowAngle(yaw));
+  ctx.scale(scale, scale);
+  ctx.fillStyle = stroke;
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(6, 6);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(-6, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(4, 4);
+  ctx.lineTo(0, 2);
+  ctx.lineTo(-4, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 export class HUD {
@@ -385,10 +422,9 @@ export class HUD {
     ctx.fillStyle = '#5ad0ff';
     for (const n of npcs) if (inView(n.x, n.z)) ctx.fillRect(toX(n.x) - 2, toZ(n.z) - 2, 4, 4);
     if (remotes) {
-      ctx.fillStyle = '#9ad7ff';
       for (const r of remotes) {
         if (!r.ready || !inView(r.x, r.z)) continue;
-        ctx.fillRect(toX(r.x) - 2, toZ(r.z) - 2, 4, 4);
+        paintMinimapArrow(ctx, toX(r.x), toZ(r.z), r.yaw, { fill: '#9ad7ff', stroke: '#14343a', scale: 0.62 });
       }
     }
     ctx.fillStyle = '#ff4d4d';
@@ -399,26 +435,7 @@ export class HUD {
       ctx.fillRect(toX(m.x) - 1, toZ(m.z) - 1, 2, 2);
       ctx.fillStyle = '#ff4d4d';
     }
-    ctx.save();
-    ctx.translate(toX(px), toZ(pz));
-    ctx.rotate(-yaw + Math.PI);
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.moveTo(0, -8);
-    ctx.lineTo(6, 6);
-    ctx.lineTo(0, 3);
-    ctx.lineTo(-6, 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#e9fff1';
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(4, 4);
-    ctx.lineTo(0, 2);
-    ctx.lineTo(-4, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    paintMinimapArrow(ctx, toX(px), toZ(pz), yaw);
     const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, cv.width * 0.35, cv.width / 2, cv.height / 2, cv.width * 0.72);
     g.addColorStop(0, 'rgba(0,0,0,0)');
     g.addColorStop(1, 'rgba(0,0,0,0.45)');
@@ -672,6 +689,7 @@ export class HUD {
         ['Sound', `<button id="set-snd">${game.audio.enabled ? 'On' : 'Off'}</button>`],
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
+        ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -715,6 +733,11 @@ export class HUD {
       };
       document.getElementById('set-time').onclick = () => game.sky.setHour(game.sky.hour + 3);
       document.getElementById('set-fs').onclick = () => game.toggleFullscreen();
+      document.getElementById('set-wcur').onclick = () => {
+        setWeaponCursorEnabled(!weaponCursorEnabled());
+        applyWeaponCursor(game);
+        document.getElementById('set-wcur').textContent = weaponCursorEnabled() ? 'On' : 'Off';
+      };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
     }
     this.el.panel.classList.remove('hidden');

@@ -26,6 +26,9 @@ test('MG-UI panels share the journal theme tokens and classes', () => {
   assert.match(html, /panel-card mg-frame/);
   assert.match(html, /account-panel mg-frame/);
   assert.match(html, /id="hud-corner-right"/);
+  assert.match(html, /id="menu-col-left"/);
+  assert.match(html, /id="menu-col-right"/);
+  assert.match(theme, /#menu-col-left/);
   assert.match(view, /name_taken/);
   assert.match(view, /wn-in/);
   assert.match(theme, /#mg-import/);
