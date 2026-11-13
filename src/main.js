@@ -2990,8 +2990,10 @@ try {
   const q = new URLSearchParams(location.search);
   if (q.get('mmo') === '1') {
     import('./net/worldView.js').then(async (m) => {
-      const view = await m.init(game.scene, { game, mock: q.get('mock') === '1' });
-      if (q.get('mock') !== '1') {
+      const mock = q.get('mock') === '1';
+      const mockwake = q.get('mockwake') === '1';
+      const view = await m.init(game.scene, { game, mock: mock || mockwake, search: location.search });
+      if (!mock && !mockwake) {
         const { attachMmo } = await import('./net/mmo.js');
         attachMmo(game, view);
       }

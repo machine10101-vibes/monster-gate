@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  ANIM, CHAT_MAX, REMOTE_PREFIX, STATUS, WORLD_VIEW,
+  ANIM, CHAT_MAX, REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
   SnapshotBuffer, WorldView, angLerp, animName, animOf,
-  normalizeChat, normalizePlayer, parseMmoFlags, worldView,
+  normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
 import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
@@ -12,10 +12,11 @@ import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
 test('MMO flags: presentation on mmo=1, mock feed only with both', () => {
-  assert.deepEqual(parseMmoFlags(''), { mmo: false, mock: false, enabled: false, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('?mmo=1'), { mmo: true, mock: false, enabled: true, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('mock=1'), { mmo: false, mock: true, enabled: false, mockFeed: false });
-  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { mmo: true, mock: true, enabled: true, mockFeed: true });
+  assert.deepEqual(parseMmoFlags(''), { mmo: false, mock: false, mockwake: false, enabled: false, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('?mmo=1'), { mmo: true, mock: false, mockwake: false, enabled: true, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('mock=1'), { mmo: false, mock: true, mockwake: false, enabled: false, mockFeed: false });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { mmo: true, mock: true, mockwake: false, enabled: true, mockFeed: true });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { mmo: true, mock: false, mockwake: true, enabled: true, mockFeed: false });
   assert.equal(parseMmoFlags('?mmo=true&mock=true').enabled, false);
 });
 
@@ -254,6 +255,68 @@ test('hunter nameplates offset overlaps, cull extras, and fade with distance', (
   assert.equal(new Set(shown.map((p) => p.y)).size, shown.length);
   assert.ok(shown.every((p) => p.opts?.opacity >= 0.35));
   assert.ok(hidden.some((p) => p.id.includes('far') || p.id.endsWith('far')));
+});
+
+test('waking overlay is inert without ?mmo=1', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '' });
+  view.setStatus('waking', { secondsLeft: 30, elapsedMs: 0 });
+  assert.equal(view.status, STATUS.waking);
+  assert.equal(view.wakeActive(), false);
+  assert.equal(view.wakeUi, null);
+});
+
+test('setStatus waking counts down locally and exposes retry / stuck states', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  let t = 1000;
+  view._now = () => t;
+  view.setStatus('waking', { secondsLeft: 30, elapsedMs: 0 });
+  assert.equal(view.wakeActive(), true);
+  assert.equal(view.pollWake(t).phase, 'queue');
+  assert.equal(view.pollWake(t).secondsLeft, 30);
+  assert.equal(view.pollWake(t + 5000).secondsLeft, 25);
+  assert.equal(view.pollWake(t + 31000).phase, 'late');
+  assert.equal(view.pollWake(t + 61000).phase, 'stuck');
+  const obj = wakeClock({ secondsLeft: WAKE_SECONDS, elapsedMs: 0 }, t, t);
+  assert.equal(obj.secondsLeft, 30);
+
+  view.setStatus({ status: 'waking', detail: { secondsLeft: 12, elapsedMs: 18000 } });
+  assert.equal(view.pollWake(t).secondsLeft, 12);
+
+  let retries = 0;
+  view.onRetry(() => { retries += 1; });
+  view.retryWake();
+  assert.equal(retries, 1);
+
+  view.setStatus('online');
+  assert.equal(view.wakeActive(), false);
+  assert.equal(view.status, STATUS.online);
+
+  view.setStatus('waking', { secondsLeft: 30, elapsedMs: 61000 });
+  assert.equal(view.pollWake(t).phase, 'stuck');
+  view.playOffline();
+  assert.equal(view.wakeActive(), false);
+});
+
+test('mockwake drives waking for 30s then online', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1&mockwake=1' });
+  const feed = new MockWorld(view, { game, mockwake: true, wakeMs: 1000 });
+  view.bindTransport(feed);
+  feed.start();
+  try {
+    assert.equal(view.status, STATUS.waking);
+    assert.equal(view.wakeActive(), true);
+    feed.stepWake(250);
+    assert.equal(view.status, STATUS.waking);
+    assert.ok(view.wakeDetail.elapsedMs >= 250);
+    feed.stepWake(750);
+    assert.equal(view.status, STATUS.online);
+    assert.equal(view.wakeActive(), false);
+  } finally {
+    feed.stop();
+  }
 });
 
 test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () => {

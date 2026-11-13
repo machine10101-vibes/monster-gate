@@ -84,6 +84,9 @@ export class MockWorld {
     this.origin = { x: 72, z: 72.5 };
     this.seq = 1;
     this.online = 24;
+    this.mockwake = !!opts.mockwake;
+    this.wakeMs = Number.isFinite(Number(opts.wakeMs)) ? Number(opts.wakeMs) : 30000;
+    this.wakeElapsed = 0;
   }
 
   on(event, handler, off = false) {
@@ -105,23 +108,55 @@ export class MockWorld {
     if (this.running) return;
     this.running = true;
     this.pinned = false;
+    if (this.mockwake) {
+      this.wakeElapsed = 0;
+      this.setStatus(STATUS.waking, { secondsLeft: 30, elapsedMs: 0 });
+      const step = 250;
+      this._wake = setInterval(() => this.stepWake(step), step);
+      return;
+    }
     this.setStatus(STATUS.connecting, 'Mock world');
-    this._boot = setTimeout(() => {
-      if (!this.running) return;
-      this.setStatus(STATUS.online, 'Mock world');
-      this.fire('online', this.online);
-      this.pushSnapshot();
-      this.say('world', { id: 'herald', name: 'Herald' }, 'Seven hunters are already in Oakhollow.');
-    }, 280);
+    this._boot = setTimeout(() => this.finishBoot(), 280);
+  }
+
+  stepWake(ms) {
+    if (!this.running || !this.mockwake) return;
+    this.wakeElapsed += ms;
+    if (this.wakeElapsed >= this.wakeMs) {
+      if (this._wake) clearInterval(this._wake);
+      this._wake = 0;
+      this.finishBoot();
+      return;
+    }
+    const secondsLeft = Math.max(0, Math.ceil((this.wakeMs - this.wakeElapsed) / 1000));
+    this.setStatus(STATUS.waking, { secondsLeft, elapsedMs: this.wakeElapsed });
+  }
+
+  finishBoot() {
+    if (!this.running) return;
+    this.setStatus(STATUS.online, 'Mock world');
+    this.fire('online', this.online);
+    this.pushSnapshot();
+    this.say('world', { id: 'herald', name: 'Herald' }, 'Seven hunters are already in Oakhollow.');
   }
 
   stop() {
     this.running = false;
     clearTimeout(this._boot);
+    if (this._wake) clearInterval(this._wake);
+    this._wake = 0;
     this.setStatus(STATUS.offline, 'Mock world closed');
   }
 
   reconnect() {
+    if (this.mockwake) {
+      this.running = true;
+      if (this._wake) clearInterval(this._wake);
+      this.wakeElapsed = 0;
+      this.setStatus(STATUS.waking, { secondsLeft: 30, elapsedMs: 0 });
+      this._wake = setInterval(() => this.stepWake(250), 250);
+      return;
+    }
     if (!this.running) this.start();
     this.setStatus(STATUS.reconnecting, 'Mock world');
     clearTimeout(this._retry);
@@ -147,7 +182,7 @@ export class MockWorld {
   }
 
   update(dt) {
-    if (!this.running || this.status === STATUS.offline) return;
+    if (!this.running || this.status === STATUS.offline || this.status === STATUS.waking) return;
     this.time += dt;
     this.snapT -= dt;
     if (this.snapT <= 0) {

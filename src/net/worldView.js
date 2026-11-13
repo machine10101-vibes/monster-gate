@@ -7,13 +7,15 @@
  *   worldView.applyDelta(players);          // or { upsert, remove }
  *   worldView.removePlayer(id);
  *   worldView.pushChat(msg);
- *   worldView.setStatus(state);
+ *   worldView.setStatus(state, detail?);
  *   worldView.onLocalMove(cb);
  *   worldView.onChatSend(cb);
+ *   worldView.onRetry(cb);
  *
  * Full contract: docs/worldView-interface.md
  *
  * Flags: ?mmo=1 mounts this module. ?mmo=1&mock=1 also starts a local crowd.
+ * ?mmo=1&mockwake=1 simulates a 30s waking queue, then online.
  */
 
 import { lookOptions } from '../systems/roster.js';
@@ -28,9 +30,13 @@ export const ANIM = { idle: 0, attack: 1, roll: 2, dead: 3, stagger: 4, use: 5 }
 export const STATUS = {
   offline: 'offline',
   connecting: 'connecting',
+  waking: 'waking',
   online: 'online',
   reconnecting: 'reconnecting',
 };
+
+export const WAKE_SECONDS = 30;
+export const WAKE_STUCK_MS = 60000;
 
 const ANIM_NAME = Object.fromEntries(Object.entries(ANIM).map(([k, v]) => [v, k]));
 
@@ -45,7 +51,29 @@ export function parseMmoFlags(search = '') {
   const q = paramsOf(search);
   const mmo = q.get('mmo') === '1';
   const mock = q.get('mock') === '1';
-  return { mmo, mock, enabled: mmo, mockFeed: mmo && mock };
+  const mockwake = q.get('mockwake') === '1';
+  return { mmo, mock, mockwake, enabled: mmo, mockFeed: mmo && mock };
+}
+
+/**
+ * Local countdown for the waking overlay. `secondsLeft` defaults to 30.
+ * If no further setStatus updates arrive, remaining time counts down from
+ * the last detail using `markedAt` → `now`.
+ */
+export function wakeClock(detail, markedAt = 0, now = Date.now()) {
+  const d = detail && typeof detail === 'object' && !Array.isArray(detail) ? detail : {};
+  const baseElapsed = Number.isFinite(Number(d.elapsedMs)) ? Math.max(0, Number(d.elapsedMs)) : 0;
+  const mark = Number(markedAt);
+  const extra = Number.isFinite(mark) ? Math.max(0, now - mark) : 0;
+  const elapsedMs = baseElapsed + extra;
+  let secondsLeft;
+  if (Number.isFinite(Number(d.secondsLeft))) {
+    secondsLeft = Math.max(0, Math.ceil(Number(d.secondsLeft) - extra / 1000));
+  } else {
+    secondsLeft = Math.max(0, Math.ceil(WAKE_SECONDS - elapsedMs / 1000));
+  }
+  const phase = elapsedMs >= WAKE_STUCK_MS ? 'stuck' : elapsedMs >= WAKE_SECONDS * 1000 ? 'late' : 'queue';
+  return { elapsedMs, secondsLeft, phase };
 }
 
 export function isMockMmo(search) {
@@ -236,16 +264,23 @@ export class WorldView {
     this.spawnRemote = opts.spawnRemote || ((id, name) => {
       throw new Error('WorldView needs spawnRemote from attachWorldView or mmo.js');
     });
+    this.search = opts.search ?? (typeof location !== 'undefined' ? location.search : '');
     this.actors = new Map();
     this.chat = [];
     this.channel = 'world';
     this.status = STATUS.offline;
     this.detail = '';
+    this.wakeDetail = null;
+    this.wakeMarkedAt = 0;
+    this.wakeDismissed = false;
+    this.wakeUi = null;
+    this.wakeTick = 0;
     this.online = 0;
     this.intents = [];
     this.onIntent = null;
     this._onLocalMove = null;
     this._onChatSend = null;
+    this._onRetry = null;
     this.transport = null;
     this.moveAcc = 0;
     this.zone = '';
@@ -285,6 +320,11 @@ export class WorldView {
 
   onChatSend(cb) {
     this._onChatSend = typeof cb === 'function' ? cb : null;
+    return this;
+  }
+
+  onRetry(cb) {
+    this._onRetry = typeof cb === 'function' ? cb : null;
     return this;
   }
 
@@ -407,12 +447,143 @@ export class WorldView {
     let extra = detail;
     if (status && typeof status === 'object') {
       next = status.status || status.state || STATUS.offline;
-      extra = status.detail || '';
+      extra = status.detail != null ? status.detail : '';
       if (status.online != null) this.setOnlineCount(status.online);
+      if (extra && typeof extra !== 'object' && (status.secondsLeft != null || status.elapsedMs != null)) {
+        extra = { secondsLeft: status.secondsLeft, elapsedMs: status.elapsedMs };
+      } else if (extra && typeof extra === 'object') {
+        extra = {
+          ...extra,
+          secondsLeft: extra.secondsLeft ?? status.secondsLeft,
+          elapsedMs: extra.elapsedMs ?? status.elapsedMs,
+        };
+      }
     }
     this.status = STATUS[next] || next || STATUS.offline;
-    this.detail = String(extra || '');
+    if (this.status === STATUS.waking) {
+      this.wakeDetail = extra && typeof extra === 'object' ? extra : {};
+      this.wakeMarkedAt = this.now();
+      this.wakeDismissed = false;
+      this.detail = this.wakeDetail;
+    } else {
+      this.wakeDetail = null;
+      this.wakeMarkedAt = 0;
+      this.detail = extra == null ? '' : extra;
+      if (this.status === STATUS.online) this.wakeDismissed = false;
+    }
     this.paintHud();
+    this.syncWakeOverlay();
+  }
+
+  now() {
+    return this._now ? this._now() : Date.now();
+  }
+
+  mmoEnabled() {
+    return parseMmoFlags(this.search).mmo;
+  }
+
+  /** True when the login-queue overlay should be on screen. */
+  wakeActive() {
+    return this.mmoEnabled() && this.status === STATUS.waking && !this.wakeDismissed;
+  }
+
+  pollWake(now = this.now()) {
+    if (this.status !== STATUS.waking) return null;
+    return wakeClock(this.wakeDetail, this.wakeMarkedAt, now);
+  }
+
+  syncWakeOverlay() {
+    if (!this.wakeActive()) {
+      this.hideWakeOverlay();
+      this.stopWakeTick();
+      return;
+    }
+    this.ensureWakeOverlay();
+    this.startWakeTick();
+    this.paintWakeOverlay();
+  }
+
+  ensureWakeOverlay() {
+    if (this.wakeUi || typeof document === 'undefined') return;
+    const root = document.createElement('div');
+    root.id = 'world-wake';
+    root.innerHTML = `
+      <div class="ww-card">
+        <small>World 1</small>
+        <h1>MONSTER <em>GATE</em></h1>
+        <div class="ww-spin" aria-hidden="true"></div>
+        <p class="ww-msg"></p>
+        <b class="ww-count"></b>
+        <div class="load-bar ww-bar"><i></i></div>
+        <div class="ww-actions">
+          <button type="button" class="start ww-retry">Retry</button>
+          <button type="button" class="start quiet ww-offline">Play offline</button>
+        </div>
+      </div>`;
+    (document.getElementById('app') || document.body).appendChild(root);
+    root.querySelector('.ww-retry').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.retryWake();
+    });
+    root.querySelector('.ww-offline').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.playOffline();
+    });
+    this.wakeUi = {
+      root,
+      msg: root.querySelector('.ww-msg'),
+      count: root.querySelector('.ww-count'),
+      fill: root.querySelector('.ww-bar i'),
+      actions: root.querySelector('.ww-actions'),
+    };
+    this.unsubs.push(() => this.hideWakeOverlay());
+  }
+
+  hideWakeOverlay() {
+    if (this.wakeUi?.root) this.wakeUi.root.remove();
+    this.wakeUi = null;
+  }
+
+  startWakeTick() {
+    if (this.wakeTick || typeof setInterval === 'undefined') return;
+    this.wakeTick = setInterval(() => this.paintWakeOverlay(), 250);
+  }
+
+  stopWakeTick() {
+    if (this.wakeTick) clearInterval(this.wakeTick);
+    this.wakeTick = 0;
+  }
+
+  paintWakeOverlay() {
+    const clock = this.pollWake();
+    if (!clock || !this.wakeActive()) {
+      this.hideWakeOverlay();
+      return;
+    }
+    if (!this.wakeUi) return;
+    const stuck = clock.phase === 'stuck';
+    const late = clock.phase === 'late' || stuck;
+    this.wakeUi.msg.textContent = late
+      ? 'Almost there…'
+      : "Server starting, you're in the login queue";
+    this.wakeUi.count.textContent = late ? '' : `${clock.secondsLeft}s`;
+    const frac = Math.min(1, clock.elapsedMs / (WAKE_SECONDS * 1000));
+    this.wakeUi.fill.style.width = `${Math.round(frac * 100)}%`;
+    this.wakeUi.root.dataset.phase = clock.phase;
+    this.wakeUi.actions.hidden = !stuck;
+  }
+
+  retryWake() {
+    this.wakeDismissed = false;
+    this._onRetry?.();
+    this.requestReconnect();
+  }
+
+  playOffline() {
+    this.wakeDismissed = true;
+    this.hideWakeOverlay();
+    this.stopWakeTick();
   }
 
   setOnlineCount(n) {
@@ -633,12 +804,15 @@ export class WorldView {
       ? `Online · ${count}`
       : st === STATUS.connecting
         ? 'Connecting…'
-        : st === STATUS.reconnecting
-          ? 'Reconnecting…'
-          : 'Offline';
+        : st === STATUS.waking
+          ? 'Starting…'
+          : st === STATUS.reconnecting
+            ? 'Reconnecting…'
+            : 'Offline';
     const canRetry = st === STATUS.offline || st === STATUS.reconnecting;
     this.ui.status.dataset.state = st;
-    this.ui.status.innerHTML = `<b>${label}</b>${this.detail ? `<small>${escapeHtml(this.detail)}</small>` : ''}${
+    const note = typeof this.detail === 'string' ? this.detail : '';
+    this.ui.status.innerHTML = `<b>${label}</b>${note ? `<small>${escapeHtml(note)}</small>` : ''}${
       canRetry ? '<button type="button" class="wc-retry">Reconnect</button>' : ''
     }`;
     const retry = this.ui.status.querySelector('.wc-retry');
@@ -710,6 +884,8 @@ export class WorldView {
     this.ui?.status?.remove();
     this.ui?.chat?.remove();
     this.ui = null;
+    this.hideWakeOverlay();
+    this.stopWakeTick();
     if (typeof document !== 'undefined') document.body?.classList.remove('mmo-view');
     const g = this.game;
     if (this.wrapped && g) {
@@ -739,11 +915,18 @@ function resolveGame(scene, opts) {
   return { scene, remotes: new Map(), ...opts };
 }
 
-async function attachMock(view, game) {
+async function attachMock(view, game, extra = {}) {
   if (view.transport) return view;
   const { MockWorld } = await import('./worldMock.js');
-  const feed = new MockWorld(view, { game });
+  const search = extra.search ?? view.search ?? '';
+  const flags = parseMmoFlags(search);
+  const feed = new MockWorld(view, {
+    game,
+    mockwake: extra.mockwake ?? flags.mockwake,
+    wakeMs: extra.wakeMs,
+  });
   view.bindTransport(feed);
+  if (feed.mockwake) feed.start();
   return view;
 }
 
@@ -753,20 +936,22 @@ async function attachMock(view, game) {
  * `{ mock: true }` (or ?mmo=1&mock=1) starts the local crowd feed.
  */
 export async function init(scene, opts = {}) {
-  const flags = parseMmoFlags(opts.search ?? (typeof location !== 'undefined' ? location.search : ''));
-  const wantMock = opts.mock === true || flags.mockFeed;
+  const search = opts.search ?? (typeof location !== 'undefined' ? location.search : '');
+  const flags = parseMmoFlags(search);
+  const wantMock = opts.mock === true || flags.mockFeed || flags.mockwake;
   const game = resolveGame(scene, opts);
   if (instance) {
-    if (wantMock) await attachMock(instance, game);
+    if (wantMock) await attachMock(instance, game, { search, mockwake: flags.mockwake, wakeMs: opts.wakeMs });
     return instance;
   }
   const { RemoteHunter } = await import('../entities/remote.js');
   const view = new WorldView(game, {
     ...opts,
+    search,
     spawnRemote: opts.spawnRemote || ((id, name) => new RemoteHunter(game, id, name)),
   });
   view.wrapGame();
-  if (wantMock) await attachMock(view, game);
+  if (wantMock) await attachMock(view, game, { search, mockwake: flags.mockwake, wakeMs: opts.wakeMs });
   instance = view;
   game.worldView = view;
   if (typeof window !== 'undefined') window.__worldView = view;
@@ -792,8 +977,8 @@ export function removePlayer(id) {
 export function pushChat(msg) {
   return current()?.pushChat(msg);
 }
-export function setStatus(state) {
-  return current()?.setStatus(state);
+export function setStatus(state, detail) {
+  return current()?.setStatus(state, detail);
 }
 export function onLocalMove(cb) {
   return current()?.onLocalMove(cb);
@@ -801,9 +986,12 @@ export function onLocalMove(cb) {
 export function onChatSend(cb) {
   return current()?.onChatSend(cb);
 }
+export function onRetry(cb) {
+  return current()?.onRetry(cb);
+}
 
 export const worldView = {
-  init, applySnapshot, applyDelta, removePlayer, pushChat, setStatus, onLocalMove, onChatSend,
+  init, applySnapshot, applyDelta, removePlayer, pushChat, setStatus, onLocalMove, onChatSend, onRetry,
 };
 
 /** Tests: drop the module singleton. */

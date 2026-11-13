@@ -11,6 +11,7 @@ Live GitHub Pages is unchanged unless the page is opened with `?mmo=1`.
 | _(none)_ | Nothing. Waygate P2P (`src/net/session.js` / trystero) is untouched. |
 | `?mmo=1` | Mounts worldView and leaves it idle for `mmo.js` (`offline` until `setStatus`). |
 | `?mmo=1&mock=1` | Same, plus a local mock crowd and chat feed for layout / screenshots. |
+| `?mmo=1&mockwake=1` | Mock path with a 30s `waking` queue overlay, then `online`. Does not open a socket. |
 
 ## Mount
 
@@ -34,7 +35,7 @@ worldView.applyDelta(players)                 // array of upserts
 worldView.applyDelta({ upsert, remove })      // patch + despawn
 worldView.removePlayer(id)
 worldView.pushChat(msg)
-worldView.setStatus(state)                    // or { status, detail?, online? }
+worldView.setStatus(state, detail?)           // or { status, detail?, online? }
 ```
 
 ### Player
@@ -64,7 +65,18 @@ worldView.setStatus(state)                    // or { status, detail?, online? }
 
 ### Status
 
-`'offline' | 'connecting' | 'online' | 'reconnecting'`
+`'offline' | 'connecting' | 'waking' | 'online' | 'reconnecting'`
+
+`setStatus('waking', { secondsLeft, elapsedMs })` (or `{ status: 'waking', detail: { secondsLeft, elapsedMs } }`) shows the login-queue overlay:
+
+- Copy: “Server starting, you're in the login queue”
+- Countdown from `secondsLeft` (default **30**). If no further updates arrive, the view counts down locally from the last detail.
+- Progress bar for those 30 seconds.
+- Past 30s elapsed: “Almost there…”
+- Past 60s elapsed: **Retry** and **Play offline**.
+- `online` closes the overlay (including if `mmo.js` connects before wake finishes).
+
+The overlay is inert unless `?mmo=1` is set. It does not block guest or offline play: Play offline dismisses it; title buttons stay clickable around the card.
 
 `meta.online` on a snapshot, or `setStatus({ status, online })`, sets the world-wide count (may exceed nearby).
 
@@ -73,6 +85,7 @@ worldView.setStatus(state)                    // or { status, detail?, online? }
 ```js
 worldView.onLocalMove((pose) => { /* send movement intent */ });
 worldView.onChatSend((msg) => { /* send chat */ });
+worldView.onRetry(() => { /* wake Retry — mmo.js should poll /healthz again */ });
 ```
 
 Move payload (about 10 Hz while hunting):
@@ -88,6 +101,8 @@ Chat payload:
 ```
 
 The reconnect button on the status chip calls `setStatus('reconnecting')` and, if a mock transport is bound, `transport.reconnect()`. `mmo.js` should watch status or pass a transport with `reconnect()`.
+
+The wake overlay **Retry** button fires `onRetry` and the same reconnect path. **Play offline** only dismisses the overlay.
 
 ## Class
 

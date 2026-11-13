@@ -4151,6 +4151,7 @@ body.touch #dialog { z-index: 74; }
 }
 #world-status[data-state="online"] b { color: #7ef6ff; }
 #world-status[data-state="connecting"] b,
+#world-status[data-state="waking"] b,
 #world-status[data-state="reconnecting"] b { color: #ffd23f; }
 #world-status[data-state="offline"] b { color: #ff8a7a; }
 #world-status small {
@@ -4304,6 +4305,81 @@ body.touch #world-chat .wc-log { height: 84px; font-size: 13px; }
     bottom: calc(8px + var(--safe-b) + 142px * var(--ui) + 12px);
     width: min(280px, 52vw);
   }
+}
+
+#world-wake {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: calc(8vh + var(--safe-t));
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 18%, rgba(14, 18, 28, 0.2), transparent 58%);
+}
+#world-wake .ww-card {
+  pointer-events: auto;
+  width: min(420px, 88vw);
+  padding: 22px 24px 18px;
+  text-align: center;
+  background: rgba(10, 12, 18, 0.88);
+  border: 2px solid #3b3d44;
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+#world-wake small {
+  font-family: var(--font-px);
+  font-size: clamp(7px, 1.4vw, 10px);
+  letter-spacing: 2px;
+  color: #ffd23f;
+}
+#world-wake h1 {
+  margin: 10px 0 14px;
+}
+#world-wake .ww-msg {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.45;
+  color: #d5dced;
+}
+#world-wake .ww-count {
+  display: block;
+  margin: 0 0 10px;
+  font-family: var(--font-px);
+  font-size: clamp(16px, 3vw, 28px);
+  letter-spacing: 2px;
+  color: #e8fbff;
+  text-shadow: 0 3px 0 #1b1d26, 0 0 18px rgba(184, 107, 255, 0.35);
+  min-height: 1.2em;
+}
+#world-wake .ww-bar {
+  margin: 0 auto 12px;
+}
+#world-wake .ww-spin {
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 12px;
+  border: 3px solid #3b3d44;
+  border-top-color: #c27bff;
+  border-radius: 50%;
+  animation: ww-spin 0.8s linear infinite;
+}
+#world-wake[data-phase="stuck"] .ww-spin { display: none; }
+#world-wake .ww-actions {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+#world-wake[data-phase="stuck"] .ww-actions { display: flex; }
+#world-wake .ww-actions .start {
+  width: min(280px, 80vw);
+  animation: none;
+}
+@keyframes ww-spin {
+  to { transform: rotate(360deg); }
 }
 
 #debug-badge {
