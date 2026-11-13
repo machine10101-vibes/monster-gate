@@ -39,7 +39,34 @@ import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cl
 
 const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
-import { exitGameFullscreen, isFullscreen, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+
+/** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
+const BOOT_KEY = 'mg-boot';
+
+function bootWasKilled() {
+  try {
+    return sessionStorage.getItem(BOOT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markBoot() {
+  try {
+    sessionStorage.setItem(BOOT_KEY, '1');
+  } catch {
+    /* private mode */
+  }
+}
+
+function clearBoot() {
+  try {
+    sessionStorage.removeItem(BOOT_KEY);
+  } catch {
+    /* private mode */
+  }
+}
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
@@ -72,10 +99,41 @@ function pickQuality() {
   return cores >= 8 ? QUALITIES[2] : QUALITIES[1];
 }
 
+/**
+ * A boot that already died reloads once on the small setting.
+ * The first boot keeps the chosen foliage. Shrinking every iPad boot, then
+ * drawing that scene three times, is what turned one restart into a loop.
+ */
+function survivalBudget(q, heavy) {
+  const w = Math.max(window.screen?.width || 0, window.innerWidth || 1);
+  const h = Math.max(window.screen?.height || 0, window.innerHeight || 1);
+  const dprCap = heavy ? Math.max(0.6, Math.min(1, Math.sqrt(800000 / (w * h)))) : 1;
+  return {
+    ...q,
+    id: heavy ? 'low' : q.id,
+    label: heavy ? 'Low' : q.label,
+    density: heavy ? Math.min(q.density, 0.45) : q.density,
+    motes: heavy ? Math.min(q.motes, 80) : q.motes,
+    gateMotes: heavy ? Math.min(q.gateMotes, 60) : q.gateMotes,
+    dpr: Math.min(q.dpr, Math.round(dprCap * 100) / 100),
+    shadowSize: heavy ? 512 : Math.min(q.shadowSize, 1024),
+    shadows: heavy ? false : q.shadows,
+  };
+}
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('game');
-    this.quality = pickQuality();
+    const killed = bootWasKilled();
+    markBoot();
+    // iPad Chrome and Brave both pretend to be a desktop. The first boot has to
+    // be the small one: a crash-then-retry still dies if every boot draws the whole world.
+    this.safeBoot = isIOS() || isTablet() || killed;
+    this.heavyBoot = this.safeBoot;
+    this.lightBoot = this.safeBoot;
+    const base = this.safeBoot ? QUALITIES[0] : pickQuality();
+    this.quality = this.safeBoot ? survivalBudget(base, true) : base;
+    this.bootFrames = 0;
     this.hud = new HUD();
     this.audio = new Audio8();
     this.input = new Input(this.canvas);
@@ -149,9 +207,19 @@ class Game {
   }
 
   initRenderer() {
-    const r = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    // iPad Safari and Brave reload the tab when the framebuffer peaks at the end of loading.
+    // No multisample buffer, and no preserved backbuffer, on that browser.
+    const lite = this.lightBoot;
+    const r = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: !lite,
+      alpha: false,
+      powerPreference: lite ? 'default' : 'high-performance',
+      preserveDrawingBuffer: false,
+    });
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.NoToneMapping;
+    r.setClearColor(0x0b0d10, 1);
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
     this.renderer = r;
@@ -246,10 +314,21 @@ class Game {
     this.gather = new Gathering(this);
     this.player = new Player(this);
     this.spawner = new Spawner(this);
+    if (this.safeBoot) {
+      this.camera.far = 240;
+      this.camera.updateProjectionMatrix();
+      // The first picture is only the town. The rest streams in a few pieces a frame, out to the fog.
+      this.world.parkBeyond(this.player.pos.x, this.player.pos.z, 96);
+      this.world.streamRadius = 220;
+      this.ambient = { npcs: [], fowl: [], cows: [], butterflies: [] };
+      this.wakeWorld = true;
+    }
     progress(0.95, 'Waking the villagers');
     await new Promise((r) => requestAnimationFrame(r));
-    this.ambient = createAmbient(this);
-    this.spawner.populate();
+    if (!this.safeBoot) {
+      this.ambient = createAmbient(this);
+      this.spawner.populate();
+    }
 
     this.applyGear(true);
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
@@ -259,9 +338,7 @@ class Game {
     this.snapCamera();
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.cam.yaw, [], [], 0);
     this.bindUI();
-    this.applyQuality();
     progress(0.98, 'Ready');
-    this.renderer.compile(this.scene, this.camera);
     const account = readAccount();
     const klever = readSession();
     const session = account && klever
@@ -272,7 +349,8 @@ class Game {
       this.watchAccount();
     }
     this.refreshWalletUi();
-    if (this.charSelect?.active) this.renderer.compile(this.scene, this.camera);
+    this.applyQuality();
+    if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
     document.getElementById('loading').classList.add('hidden');
@@ -290,6 +368,11 @@ class Game {
       this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
     }
     this.started = true;
+    if (this.wakeWorld) {
+      this.wakeWorld = false;
+      this.ambient = createAmbient(this);
+      this.spawner.populate(true);
+    }
     this.audio.unlock();
     this.cam.targetDist = 16;
     document.getElementById('title').classList.add('hidden');
@@ -769,6 +852,7 @@ class Game {
     p.stamina = Math.min(p.maxStamina, h.stamina);
     this.refreshHud(true);
     this.snapCamera();
+    if (this.safeBoot) this.world?.revealAround?.(this.player.pos.x, this.player.pos.z, 48);
     return true;
   }
 
@@ -950,9 +1034,11 @@ class Game {
 
   /* ------------------------------ quality ------------------------------ */
   cycleQuality() {
-    const i = QUALITIES.indexOf(this.quality);
-    this.quality = QUALITIES[(i + 1) % QUALITIES.length];
-    localStorage.setItem('mg-quality', this.quality.id);
+    const i = Math.max(0, QUALITIES.findIndex((q) => q.id === this.quality.id));
+    const next = QUALITIES[(i + 1) % QUALITIES.length];
+    localStorage.setItem('mg-quality', next.id);
+    const base = this.heavyBoot ? QUALITIES[0] : next;
+    this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : next;
     this.applyQuality();
     this.hud.toast(`Graphics: ${this.quality.label} (foliage density applies on reload)`, 2600);
   }
@@ -960,7 +1046,8 @@ class Game {
   applyQuality() {
     const q = this.quality;
     if (this.vfx) this.vfx.density = q.density;
-    this.renderer.shadowMap.enabled = q.shadows;
+    this.renderer.shadowMap.enabled = !!q.shadows;
+    if (this.sky?.sun) this.sky.sun.castShadow = !!q.shadows;
     const sh = this.sky.sun.shadow;
     if (sh.mapSize.x !== q.shadowSize) {
       sh.mapSize.set(q.shadowSize, q.shadowSize);
@@ -2595,6 +2682,14 @@ class Game {
       }
       this.step(dt, raw / 1000);
       this.renderer.render(this.scene, this.camera);
+      if (this.bootFrames >= 0) {
+        this.bootFrames += 1;
+        if (this.bootFrames === 90) {
+          clearBoot();
+          this.bootFrames = -1;
+        }
+      }
+      if (this.safeBoot && this.player) this.world?.revealAround?.(this.player.pos.x, this.player.pos.z, 20);
     } catch (err) {
       this.reportFault(err);
     }

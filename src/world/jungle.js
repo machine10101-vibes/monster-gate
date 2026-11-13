@@ -253,6 +253,7 @@ const pick = (arr, n) => (arr && arr.length ? arr[n % arr.length] : null);
 export function dressJungle(world, land, spec) {
   const J = world.models.jungle;
   if (!J) return;
+  const shareProps = world.instanceProps;
   world.instanceProps = true;
   try {
   const data = land.data;
@@ -423,7 +424,7 @@ export function dressJungle(world, land, spec) {
   for (const p of spec.piers || []) buildPier(world, land, spec, J, p, place, jun);
   if (land.kind === 'pirateshore' || land.kind === 'shellbeach') dressShipyard(world, land, spec, J, place, jun);
   } finally {
-    world.instanceProps = false;
+    world.instanceProps = shareProps;
   }
 }
 

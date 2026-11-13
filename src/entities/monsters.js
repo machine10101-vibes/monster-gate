@@ -1773,7 +1773,7 @@ export class Spawner {
     this.nests = CHICKEN_NESTS.map(([x, z]) => ({ x, z, t: 0 })).concat(penned);
   }
 
-  populate() {
+  populate(nearOnly = false) {
     const w = this.game.world;
     const spots = [
       ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
@@ -1782,6 +1782,8 @@ export class Spawner {
     ];
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
     this.fillChickens(99);
+    // The iPad dies if the dragon, knights and jungle packs are built in the same breath as the first picture.
+    if (nearOnly) return;
     const camp = w.orcCamp;
     if (camp) {
       const pack = [[-2.2, 0.6], [1.8, -1.1], [0.3, 2.5], [8.2, 4.8], [-6.4, 6.6], [2.4, -9.2]];

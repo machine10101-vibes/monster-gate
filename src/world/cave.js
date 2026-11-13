@@ -188,6 +188,11 @@ export function enterCave(game) {
   w.realm = 'cave';
   w.group.visible = false;
   c.group.visible = true;
+  if (game.spawner && !game.monsters.some((m) => m.type === 'darksycledragon' && m.realm === 'cave' && !m.remove)) {
+    const den = game.spawner.spawn('darksycledragon', c.nest.x, c.nest.z, false);
+    den.realm = 'cave';
+    c.respawn = 0;
+  }
   const y = c.heightAt(c.spawn.x, c.spawn.z);
   P.set(c.spawn.x, y, c.spawn.z);
   game.player.yaw = Math.PI;

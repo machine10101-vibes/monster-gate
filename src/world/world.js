@@ -22,6 +22,30 @@ import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+const _sphereC = new THREE.Vector3();
+const _sphereE = new THREE.Vector3();
+
+/** World-space footprint. Instanced props keep their bounds on the mesh, not the shared geometry. */
+function meshSphere(obj) {
+  if (!obj) return null;
+  let sphere = null;
+  if (obj.isInstancedMesh) {
+    if (!obj.boundingSphere) obj.computeBoundingSphere();
+    sphere = obj.boundingSphere;
+  } else if (obj.geometry) {
+    if (!obj.geometry.boundingSphere) obj.geometry.computeBoundingSphere();
+    sphere = obj.geometry.boundingSphere;
+  }
+  if (!sphere) return null;
+  obj.updateWorldMatrix(true, false);
+  _sphereC.copy(sphere.center).applyMatrix4(obj.matrixWorld);
+  _sphereE.setFromMatrixScale(obj.matrixWorld);
+  return {
+    x: _sphereC.x,
+    z: _sphereC.z,
+    r: sphere.radius * Math.max(_sphereE.x, _sphereE.y, _sphereE.z),
+  };
+}
 
 export class World {
   constructor(quality) {
@@ -37,7 +61,9 @@ export class World {
     this.occupied = new Map();
     this.batches = new Map();
     this.instances = new Map();
-    this.instanceProps = false;
+    // Baking every tree and palm into the chunk mesh is what runs an iPad out of
+    // memory as the loading screen finishes. One shared copy, stamped by matrix.
+    this.instanceProps = true;
     this.rng = new RNG(20260711);
     this.realm = 'over';
   }
@@ -1003,6 +1029,76 @@ export class World {
       this.chunkMeshes.push(mesh);
     }
     this.instances.clear();
+  }
+
+  /**
+   * Take distant land out of the scene before the first picture.
+   * iPadOS kills the tab when the first frame uploads every tile at once.
+   */
+  parkBeyond(x, z, radius) {
+    this.parked = this.parked || [];
+    this.streamRadius = radius;
+    const pull = (obj) => {
+      if (!obj) return;
+      if (obj === this.group || obj === this.cave?.group) {
+        for (const child of [...obj.children]) pull(child);
+        return;
+      }
+      const sphere = meshSphere(obj);
+      if (!sphere) {
+        if (obj.children?.length) for (const child of [...obj.children]) pull(child);
+        return;
+      }
+      const flat = Math.hypot(sphere.x - x, sphere.z - z);
+      if (flat - sphere.r > radius) {
+        const parent = obj.parent;
+        obj.removeFromParent();
+        this.parked.push({ obj, parent });
+      } else if (obj.children?.length) {
+        for (const child of [...obj.children]) pull(child);
+      }
+    };
+    pull(this.group);
+  }
+
+  /** Bring back the land around the hunter, a few pieces at a time so the upload stays small. */
+  revealAround(x, z, budget = 24) {
+    if (!this.parked?.length) return 0;
+    const radius = this.streamRadius || 200;
+    const near = [];
+    const far = [];
+    for (const row of this.parked) {
+      const sphere = meshSphere(row.obj);
+      if (!sphere) {
+        near.push(row);
+        continue;
+      }
+      const flat = Math.hypot(sphere.x - x, sphere.z - z);
+      const under = flat <= sphere.r + 6;
+      if (under || flat - sphere.r <= radius) near.push(row);
+      else far.push(row);
+    }
+    near.sort((a, b) => {
+      const as = meshSphere(a.obj);
+      const bs = meshSphere(b.obj);
+      const ad = as ? Math.hypot(as.x - x, as.z - z) : 0;
+      const bd = bs ? Math.hypot(bs.x - x, bs.z - z) : 0;
+      return ad - bd;
+    });
+    let added = 0;
+    const keep = far;
+    for (const row of near) {
+      const sphere = meshSphere(row.obj);
+      const under = sphere && Math.hypot(sphere.x - x, sphere.z - z) <= sphere.r + 6;
+      if (!under && added >= budget) {
+        keep.push(row);
+        continue;
+      }
+      (row.parent || this.group).add(row.obj);
+      if (!under) added++;
+    }
+    this.parked = keep;
+    return added;
   }
 
   /* -------------------------------- finalize ------------------------------- */
