@@ -391,53 +391,6 @@ const SWORDS = {
 
 /* ------------------------------ hafted weapons ------------------------------ */
 
-/**
- * Maul heads carry their spikes out to the sides, with a broad cheek facing
- * down the haft. Turn the head a quarter around the haft so a spike points
- * forward. The pivot is the barrel, not the spike tip, and the haft stays put
- * so the head remains seated on the handle. The iron mallet's caps already
- * face down the haft, so it is left alone.
- */
-function turnStrike(c, zMin) {
-  const cells = [];
-  c.each((x, y, z, col, glow) => {
-    if (z >= zMin) cells.push([x, y, z, col, glow]);
-  });
-  if (!cells.length) return;
-  const bulk = new Map();
-  for (const [x, y, z] of cells) {
-    if (Math.hypot(x + 0.5, y + 0.5) > 12) continue;
-    bulk.set(z, (bulk.get(z) || 0) + 1);
-  }
-  let peak = 0;
-  for (const n of bulk.values()) peak = Math.max(peak, n);
-  let sum = 0;
-  let cnt = 0;
-  for (const [z, n] of bulk) {
-    if (n < peak * 0.5) continue;
-    sum += z * n;
-    cnt += n;
-  }
-  const cz = cnt ? Math.round(sum / cnt) : zMin;
-  const onHaft = (x, y) => Math.hypot(x + 0.5, y + 0.5) <= 2.7;
-  const head = cells.filter(([x, y, z]) => !(onHaft(x, y) && z <= zMin + 10));
-  for (const [x, y, z] of head) c.clear(x, y, z);
-  const moved = [];
-  let back = 1e9;
-  for (const [x, y, z, col, glow] of head) {
-    const nx = -(z - cz);
-    const nz = x + cz;
-    moved.push([nx, y, nz, col, glow]);
-    if (Math.hypot(nx + 0.5, y + 0.5) < 12) back = Math.min(back, nz);
-  }
-  let tip = zMin - 1;
-  c.each((x, y, z) => {
-    if (onHaft(x, y)) tip = Math.max(tip, z);
-  });
-  const dz = Math.round(tip - 6 - back);
-  for (const [x, y, z, col, glow] of moved) c.set(x, y, z + dz, col, glow);
-}
-
 /** Banded block head with rounded corners. */
 function blockHead(c, T, o) {
   const { z0, z1, hx, hy, bands, scale = true, glow = false } = o;
@@ -477,7 +430,6 @@ function maul(T, o) {
   spike(c, 'z', 1, 85, 20, 0, 3.2, 0.7, 0, (k) => (k > 16 ? T.edge : k % 6 === 5 ? T.hornDark : T.horn));
   if (dark) for (const y of [-1, 0]) for (let z = 88; z <= 96; z += 2) c.set(-1, y, z, T.glow, true);
   else for (let z = 90; z <= 100; z += 3) c.set(-1, -1, z, T.glow, true);
-  turnStrike(c, 54);
   return c.done();
 }
 
