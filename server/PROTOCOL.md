@@ -28,22 +28,15 @@ Because the Render free plan sleeps when nobody is connected (about 30 seconds t
 2. While the probe fails or times out, call:
 
 ```js
-worldView.setStatus('waking', { secondsLeft })
+worldView.setStatus('waking', { secondsLeft, elapsedMs })
 ```
 
-`secondsLeft` is an integer. It counts down from **30**, updated about once a second. If it reaches 0 and the server is still asleep, keep probing and keep `secondsLeft` at **0**.
+- `secondsLeft` is an integer, counting down from **30**, updated about once a second. If it reaches 0 and the server is still asleep, keep probing and keep `secondsLeft` at **0**.
+- `elapsedMs` is milliseconds since this wake attempt started (0 at the first failed probe, then increasing). The view counts down locally if updates pause, switches to “Almost there” after 30s elapsed, and shows **Retry** after 60s.
 
-3. Give up after about **60 seconds** with:
-
-```js
-worldView.setStatus('error', {
-  secondsLeft: 0,
-  message: 'World server did not wake in time. Try again in a moment.'
-})
-```
-
-4. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` starts at 30 again).
-5. As soon as `/healthz` returns ok, call `setStatus('connecting')` (or `reconnecting` on a later attempt) and then open the socket. After `welcome`, call `setStatus('online', { online })`. `online` is what closes the wake screen.
+3. Do not switch to an error status at 60s — stay on `waking` with `secondsLeft: 0` and a growing `elapsedMs`, and keep probing so a late wake still connects.
+4. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` back to 30, `elapsedMs` back to 0).
+5. As soon as `/healthz` returns ok, call `setStatus('connecting')` (or `reconnecting` on a later attempt) and then open the socket. After `welcome`, call `setStatus('online', { online })`. `'online'` is what closes the wake screen.
 
 `GET /healthz` sends CORS headers so the GitHub Pages origin (`https://machine10101-vibes.github.io`) can read the response.
 

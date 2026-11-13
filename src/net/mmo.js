@@ -180,13 +180,14 @@ export class MmoClient {
     const now = this.opts.now || Date.now;
     const started = now();
     const alive = () => gen === this.wakeGen && !this.closed && !this.fatal;
-    const secondsLeft = () => Math.max(0, etaSec - Math.floor((now() - started) / 1000));
+    const elapsedMs = () => Math.max(0, now() - started);
+    const secondsLeft = () => Math.max(0, etaSec - Math.floor(elapsedMs() / 1000));
     let announced = false;
 
     const announce = () => {
       if (!alive()) return;
       announced = true;
-      this.setStatus('waking', { secondsLeft: secondsLeft() });
+      this.setStatus('waking', { secondsLeft: secondsLeft(), elapsedMs: elapsedMs() });
     };
 
     while (alive()) {
@@ -202,14 +203,8 @@ export class MmoClient {
         announce();
         this.wakeTick = setInterval(announce, tickMs);
       }
-      if ((now() - started) / 1000 >= giveUpSec) {
-        this.clearWake();
-        this.setStatus('error', {
-          secondsLeft: 0,
-          message: 'World server did not wake in time. Try again in a moment.',
-        });
-        return;
-      }
+      // Past 60s the view shows Retry from elapsedMs; keep probing so a late
+      // wake still moves to connecting/online. onRetry starts a fresh countdown.
       await new Promise((resolve) => {
         this.wakePoll = setTimeout(resolve, pollMs);
       });

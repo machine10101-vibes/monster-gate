@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  MmoClient, attachMmo, isGuestSession, parseMmoClientFlags, resolveServerUrl,
+  MmoClient, attachMmo, healthzUrl, isGuestSession, parseMmoClientFlags, resolveServerUrl,
 } from '../src/net/mmo.js';
 import { PROTOCOL, resolveWorldUrl, encode, parseFrame } from '../src/net/worldProtocol.js';
 
@@ -47,13 +47,20 @@ function stubView() {
     applyDelta(patch) { deltas.push(patch); },
     removePlayer(id) { deltas.push({ remove: [id] }); },
     pushChat(msg) { chats.push(msg); },
-    setStatus(state) { statuses.push(state); },
+    setStatus(state, info) {
+      if (typeof state === 'string') statuses.push({ status: state, ...(info && typeof info === 'object' ? info : {}) });
+      else statuses.push(state);
+    },
     setOnlineCount() {},
     onLocalMove(cb) { this._move = cb; },
     onChatSend(cb) { this._chat = cb; },
     fireMove(pose) { this._move?.(pose); },
     fireChat(msg) { this._chat?.(msg); },
   };
+}
+
+function okFetch() {
+  return async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) });
 }
 
 test('world URL prefers ?world= and VITE_WORLD_URL alias still works', () => {
@@ -84,6 +91,7 @@ test('MmoClient maps server frames onto worldView and sends move/chat', async ()
     WebSocket: FakeSocket,
     token: 'ann-token',
     guest: false,
+    fetch: okFetch(),
   });
   client.connect();
   await new Promise((r) => setTimeout(r, 20));
@@ -138,6 +146,7 @@ test('auth errors stop reconnect and go offline', async () => {
     WebSocket: FakeSocket,
     token: 'bad',
     guest: false,
+    fetch: okFetch(),
   });
   client.connect();
   await new Promise((r) => setTimeout(r, 20));
@@ -145,4 +154,144 @@ test('auth errors stop reconnect and go offline', async () => {
   assert.equal(client.fatal, true);
   assert.equal(client.closed, true);
   assert.ok(toasts.some((t) => /sign in/i.test(t)));
+});
+
+test('healthzUrl uses the https form of a wss world URL', () => {
+  assert.equal(healthzUrl('wss://world.example/'), 'https://world.example/healthz');
+  assert.equal(healthzUrl('ws://localhost:8080/ws'), 'http://localhost:8080/healthz');
+});
+
+test('a live /healthz skips waking and goes connecting then online', async () => {
+  const view = stubView();
+  const client = new MmoClient({ character: { name: 'Ann' }, wallet: { kind: 'account' } }, view, {
+    url: 'wss://world.example',
+    WebSocket: FakeSocket,
+    token: 'ann-token',
+    guest: false,
+    fetch: okFetch(),
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(view.statuses.some((s) => s.status === 'waking'), false);
+  assert.ok(view.statuses.some((s) => s.status === 'connecting'));
+  client.ws.push({ v: 1, type: 'welcome', protocol: 1, tickHz: 15, you: { id: 'u_ann', name: 'Ann' }, online: 1 });
+  assert.ok(view.statuses.some((s) => s.status === 'online'));
+  client.dispose();
+});
+
+test('a sleeping /healthz counts down secondsLeft and then connects', async () => {
+  let calls = 0;
+  const fetch = async () => {
+    calls += 1;
+    if (calls < 3) return { ok: false, status: 502, json: async () => ({ ok: false }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const view = stubView();
+  const client = new MmoClient({ character: { name: 'Ann' } }, view, {
+    url: 'wss://world.example',
+    WebSocket: FakeSocket,
+    token: 'ann',
+    guest: false,
+    fetch,
+    wake: { pollMs: 15, tickMs: 15, probeMs: 15, etaSec: 30, giveUpSec: 60 },
+  });
+  client.connect();
+  await new Promise((r) => {
+    const t = Date.now();
+    const tick = () => {
+      if (view.statuses.some((s) => s.status === 'connecting')) return r();
+      if (Date.now() - t > 2000) return r();
+      setTimeout(tick, 10);
+    };
+    tick();
+  });
+  const waking = view.statuses.filter((s) => s.status === 'waking');
+  assert.ok(waking.length >= 1);
+  assert.equal(typeof waking[0].secondsLeft, 'number');
+  assert.equal(typeof waking[0].elapsedMs, 'number');
+  assert.ok(waking[0].secondsLeft <= 30);
+  assert.ok(waking[0].secondsLeft >= 0);
+  assert.ok(waking[0].elapsedMs >= 0);
+  assert.ok(view.statuses.some((s) => s.status === 'connecting'));
+  client.dispose();
+});
+
+test('secondsLeft stays at 0 after the ETA, and onRetry restarts the wake check', async () => {
+  let retryCb = null;
+  let up = false;
+  const fetch = async () => (up ? { ok: true, json: async () => ({ ok: true }) } : { ok: false, status: 503, json: async () => ({ ok: false }) });
+  const view = stubView();
+  view.onRetry = (cb) => { retryCb = cb; };
+  const client = new MmoClient({ character: { name: 'Ann' } }, view, {
+    url: 'wss://world.example',
+    WebSocket: FakeSocket,
+    token: 'ann',
+    guest: false,
+    fetch,
+    wake: { pollMs: 10, tickMs: 10, probeMs: 10, etaSec: 0, giveUpSec: 60 },
+  });
+  client.connect();
+  await new Promise((r) => {
+    const t = Date.now();
+    const tick = () => {
+      const waking = view.statuses.filter((s) => s.status === 'waking');
+      if (waking.some((s) => s.secondsLeft === 0 && s.elapsedMs > 0) && retryCb) return r();
+      if (Date.now() - t > 2000) return r();
+      setTimeout(tick, 10);
+    };
+    tick();
+  });
+  const waking = view.statuses.filter((s) => s.status === 'waking');
+  assert.ok(waking.some((s) => s.secondsLeft === 0));
+  assert.ok(waking.every((s) => typeof s.elapsedMs === 'number' && s.elapsedMs >= 0));
+  assert.equal(view.statuses.some((s) => s.status === 'error'), false);
+  assert.equal(typeof retryCb, 'function');
+  up = true;
+  retryCb();
+  await new Promise((r) => {
+    const t = Date.now();
+    const tick = () => {
+      if (view.statuses.some((s) => s.status === 'connecting')) return r();
+      if (Date.now() - t > 2000) return r();
+      setTimeout(tick, 10);
+    };
+    tick();
+  });
+  assert.ok(view.statuses.some((s) => s.status === 'connecting'));
+  client.dispose();
+});
+
+test('a view that throws on waking does not crash the client', async () => {
+  const view = stubView();
+  const inner = view.setStatus.bind(view);
+  view.setStatus = (state, info) => {
+    if (state === 'waking') throw new Error('unknown status');
+    return inner(state, info);
+  };
+  let calls = 0;
+  const fetch = async () => {
+    calls += 1;
+    if (calls < 2) return { ok: false, status: 502, json: async () => ({ ok: false }) };
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  const client = new MmoClient({ character: { name: 'Ann' } }, view, {
+    url: 'wss://world.example',
+    WebSocket: FakeSocket,
+    token: 'ann',
+    guest: false,
+    fetch,
+    wake: { pollMs: 15, tickMs: 15, probeMs: 15, etaSec: 30, giveUpSec: 60 },
+  });
+  client.connect();
+  await new Promise((r) => {
+    const t = Date.now();
+    const tick = () => {
+      if (view.statuses.some((s) => s.status === 'connecting') || client.ws) return r();
+      if (Date.now() - t > 2000) return r();
+      setTimeout(tick, 10);
+    };
+    tick();
+  });
+  assert.ok(client.ws || view.statuses.some((s) => s.status === 'connecting'));
+  client.dispose();
 });
