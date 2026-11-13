@@ -23,7 +23,7 @@ import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
-import { applyHudLayout, measureHudSafeRects, nameplateHitsHud, nameplateOutsideViewport, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
+import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -437,14 +437,14 @@ export class HUD {
     for (const [id, el] of this.plates) {
       if (el.style.display === 'none') continue;
       if (el.classList.contains('mon') || el.classList.contains('hunter')) continue;
-      const box = el.getBoundingClientRect?.();
+      const size = measurePlateSize(el);
       rows.push({
         id,
         el,
         x: parseFloat(el.dataset.sx) || parseFloat(el.style.left) || 0,
         y: parseFloat(el.dataset.sy) || parseFloat(el.style.top) || 0,
-        w: box?.width || 0,
-        h: box?.height || 0,
+        w: size.w,
+        h: size.h,
         d: Number(el.dataset.dist) || 999,
       });
     }
@@ -472,11 +472,12 @@ export class HUD {
         continue;
       }
       const box = el.getBoundingClientRect?.();
-      if (!box || box.width < 2 || box.height < 2) {
+      const size = measurePlateSize(el, { w: box?.width || 0, h: box?.height || 0 });
+      if (!box || size.w < 2 || size.h < 2) {
         el.classList.remove('hud-occluded');
         continue;
       }
-      const plate = { x: box.x, y: box.y, w: box.width, h: box.height };
+      const plate = { x: box.x, y: box.y, w: size.w, h: size.h };
       const hit = nameplateHitsHud(plate, safe) || nameplateOutsideViewport(plate, vp);
       el.classList.toggle('hud-occluded', hit);
     }
