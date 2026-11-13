@@ -38,7 +38,10 @@ import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
-import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, readSession, shortAddress, showWalletHelp, signIn } from './wallet/klever.js';
+import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
+import { loginWithKlever } from './wallet/link.js';
+import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
+import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
@@ -348,13 +351,11 @@ class Game {
     this.bindUI();
     progress(0.98, 'Ready');
     const account = readAccount();
-    const klever = readSession();
-    const session = account && klever
-      ? ((account.at || 0) >= (klever.at || 0) ? account : klever)
-      : (account || klever);
-    if (session) {
-      await this.applyWallet(session);
+    if (account?.kind === 'email') {
+      await this.applyWallet(account);
       this.watchAccount();
+    } else {
+      clearSession();
     }
     this.refreshWalletUi();
     this.applyQuality();
@@ -637,19 +638,22 @@ class Game {
     const choices = document.getElementById('account-choices');
     const panel = document.getElementById('account-panel');
     const forming = !!panel && !panel.classList.contains('hidden');
+    const unlinkedOpen = !!document.getElementById('wallet-unlinked') && !document.getElementById('wallet-unlinked').classList.contains('hidden');
     const signed = !!this.wallet?.address;
     const email = this.wallet?.kind === 'email';
     const guest = this.wallet?.kind === 'guest';
-    choices?.classList.toggle('hidden', signed || forming);
-    sign.classList.toggle('hidden', signed || forming);
+    choices?.classList.toggle('hidden', signed || forming || unlinkedOpen);
+    sign.classList.toggle('hidden', signed || forming || unlinkedOpen);
     start.classList.add('hidden');
     start.textContent = 'Begin the hunt';
     swap.classList.toggle('hidden', !signed);
     if (!signed) {
       help?.classList.add('hidden');
       if (!forming) {
-        sign.textContent = 'Sign in with Klever';
-        status.textContent = 'Play as a guest on this device, or sign in to keep the hunt on your account.';
+        sign.textContent = 'Log in with Klever';
+        if (!unlinkedOpen) {
+          status.textContent = 'Play as a guest on this device, or sign in to keep the hunt on your account.';
+        }
       }
       return;
     }
@@ -662,7 +666,7 @@ class Game {
     }
     panel?.classList.add('hidden');
     help?.classList.add('hidden');
-    swap.textContent = email ? 'Sign out' : 'Use a different wallet';
+    swap.textContent = 'Sign out';
     if (this.cloudState === 'error' && !this.cloudSyncing && !this.started) {
       status.replaceChildren();
       const noun = email ? 'account' : 'wallet';
@@ -696,6 +700,7 @@ class Game {
     const password = document.getElementById('account-password');
     const error = document.getElementById('account-error');
     if (!panel) return;
+    this.hideWalletUnlinked();
     panel.dataset.mode = mode;
     panel.classList.remove('hidden');
     confirm?.classList.toggle('hidden', mode !== 'create');
@@ -719,6 +724,7 @@ class Game {
     panel?.classList.add('hidden');
     const error = document.getElementById('account-error');
     if (error) error.textContent = '';
+    this.hideWalletUnlinked();
   }
 
   async onAccountSubmit(event) {
@@ -778,7 +784,6 @@ class Game {
     document.getElementById('title').classList.remove('hidden');
     this.closeAccount();
     this.refreshWalletUi();
-    if (repromptKlever) this.onWallet();
   }
 
   handOffToWallet() {
@@ -832,17 +837,24 @@ class Game {
       ? 'Confirm the signature in the Klever Wallet app…'
       : 'Confirm the signature in the Klever extension…';
     try {
-      const session = await signIn();
+      const session = await loginWithKlever();
+      this.hideWalletUnlinked();
       await this.applyWallet(session);
       this.watchAccount();
     } catch (err) {
       const help = document.getElementById('wallet-help');
       if (help && (err.code === 'mobile-app' || err.code === 'extension')) showWalletHelp(help, err.code);
-      if (status) status.textContent = err.message || 'Klever sign-in failed.';
+      if (err.code === UNLINKED_CODE) {
+        this.showWalletUnlinked();
+      } else if (status) {
+        status.textContent = err.message || 'Klever sign-in failed.';
+      }
     } finally {
       this.walletBusy = false;
       if (sign) sign.disabled = false;
-      if (!this.wallet?.address) document.getElementById('account-choices')?.classList.remove('hidden');
+      if (!this.wallet?.address && document.getElementById('wallet-unlinked')?.classList.contains('hidden')) {
+        document.getElementById('account-choices')?.classList.remove('hidden');
+      }
     }
   }
 
@@ -851,6 +863,7 @@ class Game {
     if (this.accountWatch || !hub || typeof hub.onAccountChanged !== 'function') return;
     this.accountWatch = true;
     hub.onAccountChanged((event) => {
+      if (this.wallet?.kind === 'email') return;
       const next = event?.address;
       if (!next || next === this.wallet?.address) return;
       this.captureHunter();
@@ -864,6 +877,21 @@ class Game {
         this.refreshWalletUi();
       }
     });
+  }
+
+  hideWalletUnlinked() {
+    document.getElementById('wallet-unlinked')?.classList.add('hidden');
+  }
+
+  showWalletUnlinked() {
+    const panel = document.getElementById('wallet-unlinked');
+    const status = document.getElementById('wallet-status');
+    const text = document.getElementById('wallet-unlinked-text');
+    if (text) text.textContent = UNLINKED_MESSAGE;
+    panel?.classList.remove('hidden');
+    document.getElementById('account-choices')?.classList.add('hidden');
+    document.getElementById('wallet-help')?.classList.add('hidden');
+    if (status) status.textContent = '';
   }
 
   captureHunter() {
@@ -935,7 +963,11 @@ class Game {
       this.refreshWalletUi();
     });
     document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
-    swap.addEventListener('click', () => this.signOut(this.wallet?.kind !== 'email'));
+    swap.addEventListener('click', () => this.signOut(false));
+    document.getElementById('wallet-unlinked-email')?.addEventListener('click', () => {
+      this.hideWalletUnlinked();
+      this.openAccount('signin');
+    });
     window.addEventListener('keydown', (e) => {
       if (this.started || this.charSelect.active || (e.code !== 'Enter' && e.code !== 'Space')) return;
       if (e.target?.closest?.('input, textarea, #account-panel')) return;
@@ -2995,6 +3027,7 @@ function startGame() {
   const game = new Game();
   window.__game = game;
   try {
+    installMockWallet();
     attachDebug(game);
     const q = new URLSearchParams(location.search);
     if (q.get('mmo') === '1') {

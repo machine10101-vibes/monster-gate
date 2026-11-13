@@ -17,6 +17,7 @@ import { mountTeleport } from './teleport.js';
 import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
+import { mountWalletSettings } from '../wallet/settings.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 
 export const ITEMS = [
@@ -675,6 +676,7 @@ export class HUD {
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
+      if (game.wallet?.kind === 'email') mountWalletSettings(body, game);
       if (game.wallet?.address) {
         const row = document.createElement('div');
         row.className = 'panel-row account';

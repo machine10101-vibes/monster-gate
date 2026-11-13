@@ -114,6 +114,9 @@ export function saveAccount(session) {
     address: accountAddress(session.userId),
     at: session.at || Date.now(),
   };
+  if (typeof session.kleverAddress === 'string' && session.kleverAddress) {
+    clean.kleverAddress = session.kleverAddress;
+  }
   if (typeof session.accessToken === 'string' && session.accessToken) {
     clean.accessToken = session.accessToken;
     clean.refreshToken = typeof session.refreshToken === 'string' ? session.refreshToken : '';
@@ -150,7 +153,7 @@ export function readAccount() {
     return null;
   }
   if (raw.accessToken) {
-    return saveAccount({ ...raw, email });
+    return saveAccount({ ...raw, email, kleverAddress: raw.kleverAddress || '' });
   }
   const row = readBook()[email];
   if (!row || row.userId !== raw.userId) {

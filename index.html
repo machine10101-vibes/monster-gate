@@ -149,7 +149,7 @@
             <button id="btn-guest" class="start" type="button">Play as guest</button>
             <button id="btn-account-create" class="start" type="button">Create an account</button>
             <button id="btn-account-signin" class="start" type="button">Sign in with email</button>
-            <button id="btn-wallet" class="start" type="button">Sign in with Klever</button>
+            <button id="btn-wallet" class="start" type="button">Log in with Klever</button>
           </div>
           <form id="account-panel" class="account-panel mg-frame hidden" novalidate>
             <label class="wg-label" for="account-email">Email</label>
@@ -164,7 +164,11 @@
             <button id="account-cancel" class="wallet-link" type="button">Back</button>
           </form>
           <button id="btn-start" class="start hidden" type="button">Begin the hunt</button>
-          <button id="btn-wallet-switch" class="wallet-link hidden" type="button">Use a different wallet</button>
+          <button id="btn-wallet-switch" class="wallet-link hidden" type="button">Sign out</button>
+          <div id="wallet-unlinked" class="wallet-unlinked mg-frame hidden" role="alert">
+            <p id="wallet-unlinked-text">No account is linked to this wallet. Sign in with email, then connect your wallet in Account settings.</p>
+            <button id="wallet-unlinked-email" class="start quiet" type="button">Sign in with email</button>
+          </div>
           <div id="wallet-help" class="wallet-help hidden"></div>
           <div class="how">
             <span><kbd>WASD</kbd> Move</span>
