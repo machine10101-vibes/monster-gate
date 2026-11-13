@@ -20,6 +20,8 @@ Examples:
 
 Without `debug=1`, `tp` and `unlock` do nothing.
 
+**World view:** if the URL also has `?mmo=1`, debug is fully inert — no unlocks, teleports, gear grants, or DEBUG badge. The console warns that debug is disabled for world-view sessions. Use debug on a visit without `mmo=1`.
+
 ## `tp` zone keys
 
 | Key | Also accepted | Where |

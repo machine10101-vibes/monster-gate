@@ -22,19 +22,53 @@ after(() => {
 });
 
 test('debug flags are inert without ?debug=1', () => {
-  assert.deepEqual(parseDebugFlags(''), { enabled: false, tp: '', unlock: false });
-  assert.deepEqual(parseDebugFlags('?tp=oakhollow&unlock=1'), { enabled: false, tp: '', unlock: false });
+  assert.deepEqual(parseDebugFlags(''), { enabled: false, tp: '', unlock: false, blocked: false });
+  assert.deepEqual(parseDebugFlags('?tp=oakhollow&unlock=1'), { enabled: false, tp: '', unlock: false, blocked: false });
   assert.equal(parseDebugFlags('?debug=true').enabled, false);
   const on = parseDebugFlags('?debug=1&tp=Hellspire&unlock=1');
   assert.equal(on.enabled, true);
   assert.equal(on.tp, 'Hellspire');
   assert.equal(on.unlock, true);
+  assert.equal(on.blocked, false);
   freezeSaves(false);
   const game = { progress: { sessionOnly: false } };
   assert.equal(attachDebug(game, '?tp=oakhollow&unlock=1'), null);
   assert.equal(savesFrozen(), false);
   assert.equal(game.progress.sessionOnly, false);
   assert.equal(game.debug, undefined);
+});
+
+test('debug combined with mmo=1 changes nothing', () => {
+  freezeSaves(false);
+  const flags = parseDebugFlags('?debug=1&mmo=1&unlock=1&tp=hellspire');
+  assert.deepEqual(flags, { enabled: false, tp: '', unlock: false, blocked: true });
+  assert.deepEqual(parseDebugFlags('?mmo=1&debug=1&tp=oakhollow'), { enabled: false, tp: '', unlock: false, blocked: true });
+
+  const warns = [];
+  const orig = console.warn;
+  console.warn = (...a) => warns.push(a.map(String).join(' '));
+  const game = {
+    progress: { sessionOnly: false, data: { gold: 12, weapon: null, armor: {} } },
+    journal: { state: { quests: {} } },
+    started: true,
+    player: { pos: { set() { this.moved = true; } } },
+    start() { this.started = true; },
+  };
+  try {
+    const r = attachDebug(game, '?mmo=1&debug=1&unlock=1&tp=oakhollow');
+    assert.equal(r, null);
+    assert.equal(savesFrozen(), false);
+    assert.equal(game.progress.sessionOnly, false);
+    assert.equal(game.debug, undefined);
+    assert.equal(game._debugStartWrapped, undefined);
+    assert.equal(game.progress.data.gold, 12);
+    assert.equal(game.progress.data.weapon, null);
+    assert.equal(game.player.pos.moved, undefined);
+    assert.ok(warns.some((w) => /mmo=1/.test(w) && /debug/i.test(w)));
+  } finally {
+    console.warn = orig;
+    freezeSaves(false);
+  }
 });
 
 test('every documented tp key resolves', () => {

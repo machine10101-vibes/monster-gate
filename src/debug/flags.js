@@ -1,6 +1,7 @@
 /**
- * Tester debug tools. Inert unless the page is opened with ?debug=1.
- * Never writes the hunter save. See docs/debug-flags.md.
+ * Tester debug tools. Inert unless the page is opened with ?debug=1,
+ * and always inert when ?mmo=1 is also present. Never writes the hunter save.
+ * See docs/debug-flags.md.
  */
 
 import { GEAR, MONSTERS } from '../data/catalog.js';
@@ -57,10 +58,12 @@ export const DEBUG_ALIASES = {
 
 export function parseDebugFlags(search = '') {
   const q = paramsOf(search);
-  const enabled = q.get('debug') === '1';
+  const mmo = q.get('mmo') === '1';
+  const wanted = q.get('debug') === '1';
+  const enabled = wanted && !mmo;
   const tp = enabled ? String(q.get('tp') || '').trim() : '';
   const unlock = enabled && q.get('unlock') === '1';
-  return { enabled, tp, unlock };
+  return { enabled, tp, unlock, blocked: wanted && mmo };
 }
 
 export function canonicalSpot(raw) {
@@ -193,6 +196,10 @@ function applySession(game, flags) {
 export function attachDebug(game, search) {
   const src = search ?? (typeof location !== 'undefined' ? location.search : '');
   const flags = parseDebugFlags(src);
+  if (flags.blocked) {
+    console.warn('[Monster Gate] Debug flags (?debug=1, &tp=, &unlock=1) are ignored while ?mmo=1 is present, so the world-view session is not teleported, unlocked, or badged.');
+    return null;
+  }
   if (!flags.enabled) return null;
   freezeSaves(true);
   if (game.progress) game.progress.sessionOnly = true;
