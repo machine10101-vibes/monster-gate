@@ -1,0 +1,20 @@
+/** Shared colours for the Green Budge Dragon and everything crafted from it. */
+export const BUDGE = {
+  scaleLo: 0x1b7646,
+  scale: 0x23a65a,
+  scaleHi: 0x5edb86,
+  belly: 0xe6d27a,
+  bellyDark: 0xc9ab4c,
+  horn: 0xf1e6c6,
+  hornDark: 0xbfae84,
+  claw: 0xf4ecd2,
+  eye: 0xffd23a,
+  pupil: 0x240808,
+  mouth: 0x8a2222,
+  tongue: 0xe0546a,
+  tooth: 0xfff8e2,
+  membrane: 0x3a9a5a,
+  membraneHi: 0x62c47e,
+  vein: 0x8cff6a,
+  ember: 0xff9a2a,
+};

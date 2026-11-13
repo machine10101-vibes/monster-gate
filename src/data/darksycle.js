@@ -1,0 +1,21 @@
+/** Shared colours for the Darksycle Dragon and everything crafted from it. */
+export const DARK = {
+  scaleLo: 0x1a1530,
+  scale: 0x2b2450,
+  scaleHi: 0x4b3f8c,
+  belly: 0x7a58b0,
+  bellyDark: 0x5a4290,
+  blade: 0xd8d3ee,
+  bladeDark: 0x9a93c4,
+  edge: 0xf5f2ff,
+  claw: 0xe8e2f8,
+  eye: 0xff4fb8,
+  pupil: 0x14061a,
+  mouth: 0x2e0b3e,
+  mouthGlow: 0xc15cff,
+  membrane: 0x33296a,
+  membraneHi: 0x6a54b8,
+  glow: 0xb25cff,
+  glowHi: 0xf0c8ff,
+  trim: 0x8a7ad0,
+};

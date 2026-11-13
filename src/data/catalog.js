@@ -1,0 +1,562 @@
+/** Everything the Hunter Catalog knows about: monsters, their parts, and what the parts make. */
+import { KNIGHT_LORE, GEAR_DROPS } from './knights.js';
+export { GEAR_DROPS };
+
+export const MATERIALS = {
+  budgescale: { name: 'Budge Scale', desc: 'Overlapping green plate. Tougher than boiled leather.' },
+  budgefang: { name: 'Budge Fang', desc: 'A cream-white fang with a wicked curve.' },
+  budgeclaw: { name: 'Budge Claw', desc: 'Hooked, sharp, and still warm.' },
+  budgehorn: { name: 'Budge Horn', desc: 'Ridged horn. Rings like a bell when struck.' },
+  budgehide: { name: 'Budge Hide', desc: 'Thick scaled hide, supple enough to stitch.' },
+  budgemembrane: { name: 'Budge Wing Membrane', desc: 'Warm green wing skin. Light as silk and nearly as soft.' },
+  duskscale: { name: 'Dusk Scale', desc: 'Indigo plate that drinks the light. Cold to the touch.' },
+  duskclaw: { name: 'Dusk Talon', desc: 'A silver-tipped talon, curved like a new moon.' },
+  scythehorn: { name: 'Scythe Horn', desc: 'A sickle-bladed horn. It is sharp enough to part a shadow.' },
+  gloommembrane: { name: 'Gloom Membrane', desc: 'Wing skin the colour of dusk, laced with violet veins.' },
+  duskhide: { name: 'Dusk Hide', desc: 'Supple indigo hide with a faint violet sheen. It takes a stitch well.' },
+  gloomcore: { name: 'Gloom Core', desc: 'A fist-sized crystal of condensed dusk. It hums when it is near its owner.' },
+  rimefur: { name: 'Rime Fur', desc: 'Shaggy blue-white fur stiff with frost. It crackles when you bend it.' },
+  yetihide: { name: 'Yeti Hide', desc: 'Thick hide matted with ice. Warm on the inside, tough as a drum on the outside.' },
+  glacierclaw: { name: 'Glacier Claw', desc: 'A curved claw the length of a forearm, cold enough to numb the hand that holds it.' },
+  yetifang: { name: 'Yeti Fang', desc: 'A cream-white fang with a rime of frost along the root.' },
+  frostshard: { name: 'Frost Shard', desc: 'A spike of living ice from a yeti\'s back. It never melts.' },
+  frostheart: { name: 'Frostheart', desc: 'A palm-sized crystal that beats once a minute, long after its owner is gone.' },
+  tigerskin: { name: 'Tiger Skin', desc: 'Orange hide banded in black, with a white belly. Heavy, warm and unmistakable.' },
+  tigerclaw: { name: 'Tiger Claw', desc: 'A hooked claw as long as a finger, still sharp enough to scratch steel.' },
+  raptorskin: { name: 'Raptor Skin', desc: 'Olive and tan scaled hide in a mosaic pattern. Tougher than it looks.' },
+  raptorclaw: { name: 'Raptor Claw', desc: 'A curved sickle claw from a raptor\'s foot.' },
+  scimitar: { name: 'Pirate Scimitar', desc: 'A curved cutlass blade with a brass guard. Salt-stained but sharp.' },
+  pirategold: { name: 'Pirate Gold', desc: 'A fistful of doubloons and gold buttons. Spends the same on land.' },
+  piratebone: { name: 'Pirate Bones', desc: 'Yellowed bones from a pirate who never made port.' },
+  sandspine: { name: 'Sand Spine', desc: 'A pale bone spike from a sand worm\'s ridge. It is still warm from the dune.' },
+  wormplate: { name: 'Worm Plate', desc: 'A curved plate of sand-coloured hide, ridged like a dune.' },
+  scorpchitin: { name: 'Scorpion Chitin', desc: 'A plate of gold-brown shell. Light, and harder than it looks.' },
+  scorpsting: { name: 'Scorpion Sting', desc: 'The hooked tip of a desert scorpion\'s tail. The point is still sharp.' },
+};
+
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting'];
+
+/** chance is 0..1 per kill, qty is [min, max]. */
+export const DROPS = {
+  chicken: [
+    { id: 'feather', chance: 1, qty: [5, 12], rate: 'Common' },
+  ],
+  budgedragon: [
+    { id: 'budgescale', chance: 1, qty: [2, 4], rate: 'Common' },
+    { id: 'budgehide', chance: 0.6, qty: [1, 1], rate: 'Common' },
+    { id: 'budgeclaw', chance: 0.5, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'budgefang', chance: 0.55, qty: [1, 1], rate: 'Uncommon' },
+    { id: 'budgemembrane', chance: 0.6, qty: [1, 2], rate: 'Common' },
+    { id: 'budgehorn', chance: 0.35, qty: [1, 1], rate: 'Rare' },
+  ],
+  darksycledragon: [
+    { id: 'duskscale', chance: 1, qty: [3, 5], rate: 'Common' },
+    { id: 'gloommembrane', chance: 0.65, qty: [1, 2], rate: 'Common' },
+    { id: 'duskhide', chance: 0.6, qty: [1, 1], rate: 'Common' },
+    { id: 'duskclaw', chance: 0.6, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'scythehorn', chance: 0.45, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'gloomcore', chance: 0.3, qty: [1, 1], rate: 'Rare' },
+  ],
+  snowyeti: [
+    { id: 'rimefur', chance: 1, qty: [3, 5], rate: 'Common' },
+    { id: 'yetihide', chance: 0.65, qty: [1, 2], rate: 'Common' },
+    { id: 'frostshard', chance: 0.6, qty: [1, 3], rate: 'Common' },
+    { id: 'glacierclaw', chance: 0.55, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'yetifang', chance: 0.5, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'frostheart', chance: 0.25, qty: [1, 1], rate: 'Rare' },
+  ],
+  tiger: [
+    { id: 'tigerskin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'tigerclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
+  ],
+  raptor: [
+    { id: 'raptorskin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'raptorclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
+  ],
+  sandworm: [
+    { id: 'wormplate', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'sandspine', chance: 0.75, qty: [1, 2], rate: 'Common' },
+  ],
+  scorpion: [
+    { id: 'scorpchitin', chance: 1, qty: [1, 3], rate: 'Common' },
+    { id: 'scorpsting', chance: 0.55, qty: [1, 1], rate: 'Uncommon' },
+  ],
+  pirate: [
+    { id: 'scimitar', chance: 0.6, qty: [1, 1], rate: 'Common' },
+    { id: 'pirategold', chance: 0.9, qty: [1, 3], rate: 'Common' },
+    { id: 'piratebone', chance: 0.4, qty: [1, 2], rate: 'Uncommon' },
+  ],
+  cursedpirate: [
+    { id: 'piratebone', chance: 1, qty: [2, 4], rate: 'Common' },
+    { id: 'pirategold', chance: 0.8, qty: [1, 3], rate: 'Common' },
+    { id: 'scimitar', chance: 0.45, qty: [1, 1], rate: 'Uncommon' },
+  ],
+};
+
+export const MONSTERS = [
+  {
+    id: 'chicken', name: 'Chicken', level: 1, temper: 'Skittish', style: 'Passive', habitat: 'Mara\'s Acre on Longacre, and the meadows around Oakhollow',
+    desc: 'A barnyard hen. It pecks the grass and runs when you come close. It will not fight back. Feathers from a chicken fletch arrow shafts, and another hen takes its place soon after. A flock lives in the pen at Mara\'s Acre on Longacre.',
+  },
+  {
+    id: 'slime', name: 'Gate Slime', level: 1, temper: 'Bouncy', style: 'Melee', habitat: 'Around the Monster Gate',
+    desc: 'A wobbling green blob that the gate spits out by the dozen. Harmless until it lands on you.',
+  },
+  {
+    id: 'voidslime', name: 'Void Slime', level: 2, temper: 'Jumpy', style: 'Melee', habitat: 'Beside the Monster Gate',
+    desc: 'Slimes that soaked up too much gate-glow. They hop faster and hit harder.',
+  },
+  {
+    id: 'boar', name: 'Thorn Boar', level: 3, temper: 'Stubborn', style: 'Charger', habitat: 'Fields and forest edge',
+    desc: 'It will paw the dirt, stare you down, and then charge in a straight line. Sidestep it.',
+  },
+  {
+    id: 'wraith', name: 'Gate Wraith', level: 3, temper: 'Spiteful', style: 'Ranged', habitat: 'Near the Monster Gate, after dark',
+    desc: 'A hooded shade that keeps its distance and hurls spirit orbs.',
+  },
+  {
+    id: 'budgedragon', name: 'Green Budge Dragon', level: 4, temper: 'Mean', style: 'Brawler', habitat: 'Open fields and forest edge',
+    desc: 'A stocky, short-fused young dragon with more attitude than altitude. It snaps at anything that moves, spits embers when you back off, and flies into a rage when hurt.',
+  },
+  {
+    id: 'orcscout', name: 'Orc Scout', level: 4, temper: 'Mean', style: 'Melee', habitat: 'The spiked camp in northwest Brookside, west of Oakhollow',
+    desc: 'A tusked scout in hide and fur. They keep to their camp and the ground around it, and they swing a notched blade.',
+  },
+  {
+    id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
+    desc: 'A graphite-scaled dragon with violet wings, a blue crystal crest and a glowing chest core. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Every so often it beats its wings and climbs high for about four seconds, raining crescents, gloom and crystal strikes from the air before diving at your position. Melee cannot reach it up there, so dodge the marked circles and use ranged attacks. Hit its wind-up hard to stagger it.',
+  },
+  {
+    id: 'snowyeti', name: 'Ravenous Snow Yeti', level: 9, temper: 'Ravenous', style: 'Brawler', habitat: 'The flat-topped mountain of Rimecrown, high in the Arctic north',
+    desc: 'A hulking beast of ice-crystal fur with glowing blue eyes and a mouth full of fangs. It rakes in a fast double swipe, exhales a cone of frost that slows you, leaps and slams the ground so ice spikes burst up around you, and hurls boulders of ice from range. Below half health it bellows and goes into a feeding frenzy, chaining attacks with barely a breath between them. Roll out of the marked ground and strike during its recovery.',
+  },
+  {
+    id: 'demonknight', name: 'Demon Knight', level: 11, temper: 'Merciless', style: 'Brawler', habitat: 'The obsidian fortress on tile 14, in the volcanic wasteland',
+    desc: 'A towering knight in jagged black plate, crowned with spikes, red-eyed and wreathed in smoke. It cleaves with a serrated greatsword, charges behind a spiked shield and drives its blade into the ground to send a line of hellfire. It drops no parts, only whole pieces of its own gear, and rarely.',
+    lore: KNIGHT_LORE.demonknight,
+  },
+  {
+    id: 'holyknight', name: 'Holy Knight', level: 11, temper: 'Righteous', style: 'Brawler', habitat: 'The white castle on tile 23, in the volcanic wasteland',
+    desc: 'A giant knight in white and gold plate with glowing blue crosses and a ragged gold-trimmed cape. It smashes the ground with a rune-lit stone war hammer and calls pillars of holy light down on wherever you stand. It drops no parts, only whole pieces of its own gear, and rarely.',
+    lore: KNIGHT_LORE.holyknight,
+  },
+  {
+    id: 'tiger', name: 'Bengal Tiger', level: 6, temper: 'Stalking', style: 'Pouncer', habitat: 'The jungle oasis, west of Brookside',
+    desc: 'An orange and black striped cat with white paws and yellow eyes. It creeps low through the undergrowth, then pounces from a distance and rakes with both paws. If you roll away it lunges again. Hit it during its crouch to knock it off the pounce.',
+  },
+  {
+    id: 'raptor', name: 'Battle Raptor', level: 6, temper: 'Savage', style: 'Pack Hunter', habitat: 'The jungle oasis, west of Brookside',
+    desc: 'A scarred, olive-scaled raptor with a ridge of grey spikes and an orange eye. It hunts in packs, snaps with a mouthful of teeth and leaps with its sickle claws. One alone is a fight and three is a problem.',
+  },
+  {
+    id: 'pirate', name: 'Pirate', level: 5, temper: 'Greedy', style: 'Melee', habitat: 'The shipyard docks and the jungle gate on the western coast',
+    desc: 'A cutthroat in a navy coat, tricorn hat and red bandana. It swings a curved cutlass and lunges when you are out of reach.',
+  },
+  {
+    id: 'sandworm', name: 'Sand Spine Worm', level: 8, temper: 'Patient', style: 'Ambusher', habitat: 'The desert oasis south of Southford, tiles 74, 75, 84 and 85',
+    desc: 'A long sand-coloured worm with a ridge of pale bone spines. It travels under the dune, the spines cutting a wake, then breaches where you stand and bites. The ridge thrashes before it sinks again.',
+  },
+  {
+    id: 'scorpion', name: 'Desert Scorpion', level: 6, temper: 'Wary', style: 'Skirmisher', habitat: 'The dunes around the oasis south of Southford',
+    desc: 'A gold-brown scorpion with eight legs, two heavy claws and a tail curled over its back. It scuttles sideways, snaps with the claws up close, and brings the sting down when you step back.',
+  },
+  {
+    id: 'cursedpirate', name: 'Cursed Pirate', level: 7, temper: 'Vengeful', style: 'Melee', habitat: 'Deep in the jungle oasis, west of Brookside',
+    desc: 'A skeleton in a rotted tricorn, red bandana and navy coat, still gripping a bloody cutlass. It hits harder than a living pirate and does not stay down for long.',
+  },
+];
+
+/** Core slots make up a set; shield and book are extras worn alongside any set. */
+export const CORE_SLOTS = ['helm', 'chest', 'arms', 'legs', 'boots'];
+export const ARMOR_SLOTS = [...CORE_SLOTS, 'shield', 'book', 'quiver'];
+export const SLOT_LABEL = { helm: 'Helm', chest: 'Chest', arms: 'Gloves', legs: 'Legs', boots: 'Boots', shield: 'Shield', book: 'Spell Book', quiver: 'Quiver', ammo: 'Arrows' };
+export const WEAPON_ORDER = ['onesword', 'twosword', 'dual', 'hammer', 'spear', 'staff', 'wand', 'shortbow', 'longbow', 'crossbow', 'scythe'];
+export const WEAPON_LABEL = {
+  onesword: 'One-Hand Sword', twosword: 'Two-Hand Sword', dual: 'Dual Swords', hammer: 'War Hammer', spear: 'Spear', staff: 'War Staff', wand: 'Wand',
+  shortbow: 'Short Bow', longbow: 'Long Bow', crossbow: 'Crossbow', scythe: 'Scythe',
+};
+export const TIER_LABEL = { metal: 'Metal', leather: 'Leather', cloth: 'Cloth' };
+
+export const GEAR = [
+  {
+    id: 'orcblade', type: 'weapon', wtype: 'onesword', name: 'Orc Scout Blade', monster: 'orcscout', held: 'orcblade', found: true,
+    desc: 'A notched iron blade on a hide-wrapped grip. Orc scouts carry them point-down. Rough, heavy, and sharp enough.',
+    recipe: {},
+    item: { id: 'orcblade', icon: 'orcblade', name: 'Orc Scout Blade', kind: 'melee', style: 'swordshield', dmg: 11, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.16, stam: 8, knock: 4, held: 'orcblade', desc: 'Sword and shield. A notched orc blade.' },
+    stats: [['Damage', 11], ['Reach', '2.4'], ['Style', 'Sword & Shield']],
+  },
+  {
+    id: 'budgeblade', type: 'weapon', wtype: 'onesword', name: 'Budgefang Blade', monster: 'budgedragon', held: 'budgeblade',
+    desc: 'A sword grown from a single dragon fang, veined with ember-green light. Quick, balanced, and it never dulls.',
+    recipe: { budgefang: 3, budgescale: 2, budgeclaw: 1 },
+    item: { id: 'budgeblade', icon: 'budgeblade', name: 'Budgefang Blade', kind: 'melee', style: 'swordshield', dmg: 16, reach: 2.5, arc: 2.0, dur: 0.38, hit: 0.16, stam: 9, knock: 5, held: 'budgeblade', desc: 'Sword and shield. Dragon-fang steel.' },
+    stats: [['Damage', 16], ['Reach', '2.5'], ['Style', 'Sword & Shield']],
+  },
+  {
+    id: 'budgemaul', type: 'weapon', wtype: 'hammer', name: 'Horn Maul', monster: 'budgedragon', held: 'budgemaul',
+    desc: 'Scale-banded head, a tusk of budge horn on each side and a spike up front. It hits like a tantrum.',
+    recipe: { budgehorn: 2, budgescale: 4, budgehide: 1 },
+    item: { id: 'budgemaul', icon: 'budgemaul', name: 'Horn Maul', kind: 'melee', style: 'twohand', dmg: 22, reach: 2.5, arc: 2.4, dur: 0.72, hit: 0.34, stam: 16, knock: 9, held: 'budgemaul', desc: 'Two-handed. Slow, brutal, and tusked.' },
+    stats: [['Damage', 22], ['Reach', '2.5'], ['Style', 'Two-Handed']],
+  },
+  {
+    id: 'budgebow', type: 'weapon', wtype: 'longbow', name: 'Wyrmhorn Bow', monster: 'budgedragon', held: 'budgebow',
+    desc: 'Horn limbs, a scale-wrapped grip and claw-tipped ends. Arrows leave it faster and hit harder.',
+    recipe: { budgehorn: 1, budgehide: 2, budgeclaw: 2 },
+    item: { id: 'budgebow', icon: 'budgebow', name: 'Wyrmhorn Bow', kind: 'ranged', style: 'longbow', dmg: 12, dur: 0.46, stam: 7, held: 'budgebow', desc: 'A longbow of horn and hide.' },
+    stats: [['Damage', 12], ['Range', 'Long'], ['Style', 'Longbow']],
+  },
+  {
+    id: 'budgehelm', type: 'armor', slot: 'helm', name: 'Budgescale Helm', monster: 'budgedragon', set: 'budgeset', def: 1,
+    desc: 'A snarling dragon-skull cap with swept horns and a gilded brow plate.',
+    recipe: { budgescale: 3, budgehorn: 1, budgefang: 1 },
+  },
+  {
+    id: 'budgechest', type: 'armor', slot: 'chest', name: 'Budgescale Cuirass', monster: 'budgedragon', set: 'budgeset', def: 3,
+    desc: 'Layered green scales over a gold-banded belly plate.',
+    recipe: { budgescale: 8, budgehide: 3 },
+  },
+  {
+    id: 'budgearms', type: 'armor', slot: 'arms', name: 'Budgescale Gauntlets', monster: 'budgedragon', set: 'budgeset', def: 1,
+    desc: 'Scaled vambraces and a horn-spiked pauldron. The knuckles come with claws.',
+    recipe: { budgescale: 4, budgeclaw: 2, budgehide: 1 },
+  },
+  {
+    id: 'budgelegs', type: 'armor', slot: 'legs', name: 'Budgescale Greaves', monster: 'budgedragon', set: 'budgeset', def: 2,
+    desc: 'Banded thigh plates with a spiked knee guard.',
+    recipe: { budgescale: 5, budgehide: 2 },
+  },
+  {
+    id: 'budgeboots', type: 'armor', slot: 'boots', name: 'Budgescale Boots', monster: 'budgedragon', set: 'budgeset', def: 1,
+    desc: 'Clawed toes grip the dirt. They look better than they smell.',
+    recipe: { budgescale: 3, budgeclaw: 1, budgehide: 1 },
+  },
+  {
+    id: 'darkscythe', type: 'weapon', wtype: 'scythe', name: 'Darksycle Scythe', monster: 'darksycledragon', held: 'darkscythe',
+    desc: 'A horn-blade scythe on a scale-wrapped haft, with a gloom crystal set where the blade meets the shaft. Long reach, wide sweep.',
+    recipe: { scythehorn: 3, duskscale: 2, duskclaw: 1 },
+    item: { id: 'darkscythe', icon: 'darkscythe', name: 'Darksycle Scythe', kind: 'melee', style: 'twohand', dmg: 34, reach: 2.9, arc: 2.7, dur: 0.56, hit: 0.24, stam: 12, knock: 6, held: 'darkscythe', desc: 'Two-handed. Long reach, wide sweep.' },
+    stats: [['Damage', 34], ['Reach', '2.9'], ['Style', 'Two-Handed'], ['Requires', 'Strength 16']],
+    reqLevel: 16,
+  },
+  {
+    id: 'darkbow', type: 'weapon', wtype: 'longbow', name: 'Crescent Wingbow', monster: 'darksycledragon', held: 'darkbow',
+    desc: 'Bowed from two scythe horns and strung with membrane. It does not shoot arrows. It throws spinning crescents that slice through everything in a line.',
+    recipe: { scythehorn: 2, gloommembrane: 2, duskclaw: 1 },
+    item: { id: 'darkbow', icon: 'darkbow', name: 'Crescent Wingbow', kind: 'ranged', style: 'longbow', proj: 'crescent', dmg: 28, dur: 0.5, stam: 8, held: 'darkbow', desc: 'A longbow that throws piercing crescents.' },
+    stats: [['Damage', 28], ['Shot', 'Piercing'], ['Style', 'Longbow'], ['Requires', 'Strength 16']],
+    reqLevel: 16,
+  },
+  {
+    id: 'darkstaff', type: 'weapon', wtype: 'staff', name: 'Gloomcore Staff', monster: 'darksycledragon', held: 'darkstaff',
+    desc: 'A staff crowned with a gloom crystal between two sickle blades. It fires dark orbs that curve toward the nearest monster.',
+    recipe: { gloomcore: 1, scythehorn: 1, duskscale: 3, gloommembrane: 1 },
+    item: { id: 'darkstaff', icon: 'darkstaff', name: 'Gloomcore Staff', kind: 'ranged', style: 'staff', spell: true, proj: 'gloom', dmg: 22, dur: 0.62, stam: 6, held: 'darkstaff', desc: 'A staff. Homing gloom orbs.' },
+    stats: [['Damage', 22], ['Shot', 'Homing'], ['Style', 'Staff'], ['Requires', 'Strength 16']],
+    reqLevel: 16,
+  },
+  {
+    id: 'darkhelm', type: 'armor', slot: 'helm', name: 'Duskscale Helm', monster: 'darksycledragon', set: 'darksyceset', def: 2,
+    desc: 'A sleek dragon-skull helm with two sickle horns sweeping back and a glowing magenta visor.',
+    recipe: { duskscale: 3, scythehorn: 2 },
+  },
+  {
+    id: 'darkchest', type: 'armor', slot: 'chest', name: 'Duskscale Cuirass', monster: 'darksycledragon', set: 'darksyceset', def: 6,
+    desc: 'Indigo scale plate with a gloom core burning at the sternum and blade fins down the spine.',
+    recipe: { duskscale: 8, gloommembrane: 3, gloomcore: 1 },
+  },
+  {
+    id: 'darkarms', type: 'armor', slot: 'arms', name: 'Duskscale Gauntlets', monster: 'darksycledragon', set: 'darksyceset', def: 2,
+    desc: 'Rune-lit vambraces under a pauldron that carries a curved scythe blade.',
+    recipe: { duskscale: 4, duskclaw: 2, scythehorn: 1 },
+  },
+  {
+    id: 'darklegs', type: 'armor', slot: 'legs', name: 'Duskscale Greaves', monster: 'darksycledragon', set: 'darksyceset', def: 4,
+    desc: 'Lean scale greaves with a glowing knee rune and a silver knee blade.',
+    recipe: { duskscale: 5, gloommembrane: 2 },
+  },
+  {
+    id: 'darkboots', type: 'armor', slot: 'boots', name: 'Duskscale Boots', monster: 'darksycledragon', set: 'darksyceset', def: 2,
+    desc: 'Talon-toed boots with a violet glow line along the sole. They make no sound at all.',
+    recipe: { duskscale: 3, duskclaw: 2 },
+  },
+];
+
+const STYLE_LABEL = { swordshield: 'Sword & Shield', twohand: 'Two-Handed', dual: 'Dual Wield', shortbow: 'Short Bow', longbow: 'Longbow', crossbow: 'Crossbow', staff: 'Staff', wand: 'Wand', tome: 'Spell Book' };
+
+/** Builds a forged weapon entry. `shot` names the projectile for ranged weapons. */
+function weapon(id, wtype, name, monster, desc, recipe, it, extra = {}) {
+  const ranged = it.kind === 'ranged';
+  const third = ranged ? ['Shot', it.shotLabel || 'Arrow'] : ['Reach', it.reach.toFixed(1)];
+  const { shotLabel: _shot, ...rest } = it;
+  const stats = [['Damage', it.dmg], third, ['Style', STYLE_LABEL[it.style]]];
+  if (extra.reqLevel) stats.push(['Requires', `Strength ${extra.reqLevel}`]);
+  return {
+    id, type: 'weapon', wtype, name, monster, held: id, desc, recipe,
+    item: { id, icon: id, name, held: id, ...rest, desc: rest.blurb },
+    stats,
+    ...extra,
+  };
+}
+
+const M = (style, dmg, reach, arc, dur, hit, stam, knock, blurb) => ({ kind: 'melee', style, dmg, reach, arc, dur, hit, stam, knock, blurb });
+const R = (style, dmg, dur, stam, blurb, extra = {}) => ({ kind: 'ranged', style, dmg, dur, stam, blurb, ...extra });
+
+GEAR.push(
+  weapon('budgegreatsword', 'twosword', 'Fangreaver Greatsword', 'budgedragon', 'A broadsword of fused dragon fang with a serrated back edge, tusked crossguard and an ember vein down the fuller.', { budgefang: 4, budgehorn: 1, budgescale: 3, budgehide: 1 }, M('twohand', 20, 2.8, 2.5, 0.62, 0.28, 14, 8, 'Two-handed. Heavy fang steel.')),
+  weapon('budgedual', 'dual', 'Twin Fangs', 'budgedragon', 'A matched pair of curved fang blades with scale-wrapped grips. Fast, wicked, and never apart.', { budgefang: 4, budgeclaw: 2, budgescale: 2 }, M('dual', 9, 2.2, 1.8, 0.28, 0.12, 6, 3, 'Dual swords. Rapid fang strikes.')),
+  weapon('budgespear', 'spear', 'Horncollar Spear', 'budgedragon', 'A fang spearhead above a horn collar and a hide-wrapped shaft. Nothing out-reaches it.', { budgefang: 2, budgehorn: 1, budgescale: 2, budgehide: 2 }, M('twohand', 15, 3.3, 1.0, 0.46, 0.2, 10, 4, 'Two-handed. Long, narrow thrust.')),
+  weapon('budgestaff', 'staff', 'Emberhorn War Staff', 'budgedragon', 'Two swept horns cradle a glowing ember orb on a scale-banded staff. It spits fire in a straight line.', { budgehorn: 2, budgehide: 2, budgescale: 2, budgemembrane: 1 }, R('staff', 11, 0.6, 6, 'A war staff. Fires embers.', { spell: true, proj: 'ember', shotLabel: 'Ember' })),
+  weapon('budgewand', 'wand', 'Fangtip Wand', 'budgedragon', 'A slim wand carved from a budge fang with a living ember caught in the tip. Quick to cast.', { budgefang: 1, budgehorn: 1, budgemembrane: 1 }, R('wand', 8, 0.34, 4, 'A wand. Rapid embers.', { spell: true, proj: 'ember', shotLabel: 'Ember' })),
+  weapon('budgeshortbow', 'shortbow', 'Scalebound Shortbow', 'budgedragon', 'A compact hide-and-claw bow made for fast, close shooting.', { budgehide: 2, budgefang: 1, budgeclaw: 1 }, R('shortbow', 9, 0.34, 5, 'A short bow. Quick draws.')),
+  weapon('budgecrossbow', 'crossbow', 'Hornlock Crossbow', 'budgedragon', 'A scale-plated stock, a horn prod and a claw trigger. It lands a bolt like a thrown anvil.', { budgehorn: 1, budgescale: 3, budgehide: 2, budgeclaw: 1 }, R('crossbow', 14, 0.66, 8, 'A crossbow. Slow and heavy.')),
+
+  weapon('darksword', 'onesword', 'Duskblade Saber', 'darksycledragon', 'A swept saber of scythe horn with a violet rune burning along the spine and wing-shaped guards.', { scythehorn: 2, duskscale: 2, duskclaw: 1 }, M('swordshield', 32, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Curved dusk steel.'), { reqLevel: 16 }),
+  weapon('darkgreatsword', 'twosword', 'Gloomreaver Greatsword', 'darksycledragon', 'A sickle-curved greatsword with a glowing notch where the blade begins to bend.', { scythehorn: 4, duskscale: 3, gloommembrane: 1 }, M('twohand', 48, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A curved greatsword of dusk.'), { reqLevel: 18 }),
+  weapon('darkdual', 'dual', 'Twin Crescents', 'darksycledragon', 'Two hooked crescent blades that sing as they cut. Their edges drink the light.', { scythehorn: 3, duskscale: 1, duskclaw: 2 }, M('dual', 22, 2.3, 1.9, 0.27, 0.11, 6, 3, 'Dual swords. Hooked crescent blades.'), { reqLevel: 16 }),
+  weapon('darkhammer', 'hammer', 'Duskbreaker War Hammer', 'darksycledragon', 'A dusk-scale head with a blade spike on both faces and a gloom core humming at its centre.', { scythehorn: 1, duskscale: 5, gloomcore: 1 }, M('twohand', 42, 2.6, 2.4, 0.76, 0.36, 17, 11, 'Two-handed. Shatters armor and bone.'), { reqLevel: 20 }),
+  weapon('darkspear', 'spear', 'Scytheleaf Spear', 'darksycledragon', 'A double-bladed horn head with a trailing membrane pennant. It strikes before the target sees it.', { scythehorn: 2, duskscale: 2, gloommembrane: 1, duskclaw: 1 }, M('twohand', 36, 3.5, 1.0, 0.44, 0.19, 10, 4, 'Two-handed. Longest reach of any blade.'), { reqLevel: 16 }),
+  weapon('darkwand', 'wand', 'Gloomshard Wand', 'darksycledragon', 'A scale-wrapped grip holding a shard of gloom core that spits violet orbs.', { gloomcore: 1, duskclaw: 1, gloommembrane: 1 }, R('wand', 18, 0.32, 4, 'A wand. Rapid gloom orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' }), { reqLevel: 16 }),
+  weapon('darkshortbow', 'shortbow', 'Crescent Shortbow', 'darksycledragon', 'A compact horn bow that throws small piercing crescents in quick succession.', { gloommembrane: 2, duskclaw: 1, duskscale: 1 }, R('shortbow', 20, 0.36, 5, 'A short bow. Piercing crescents.', { proj: 'crescent', shotLabel: 'Piercing' }), { reqLevel: 16 }),
+  weapon('darkcrossbow', 'crossbow', 'Gloomlock Crossbow', 'darksycledragon', 'Blade-tipped prod arms, a dusk-scale stock and a rune that lights the bolt as it leaves.', { scythehorn: 1, duskscale: 3, gloommembrane: 2, duskclaw: 1 }, R('crossbow', 32, 0.64, 8, 'A crossbow. Rune-lit bolts.'), { reqLevel: 16 }),
+
+  weapon('yetisword', 'onesword', 'Frostfang Saber', 'snowyeti', 'A curved saber of yeti fang, rimed white along the spine, with a claw-hooked guard and a fur-wrapped grip.', { yetifang: 3, rimefur: 2, glacierclaw: 1 }, M('swordshield', 19, 2.6, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. Frostbitten fang steel.')),
+  weapon('yetigreatsword', 'twosword', 'Glacierfall Greatsword', 'snowyeti', 'A slab of blue ice-steel with a serrated fang edge and a pair of claw quillons. It leaves a trail of frost.', { yetifang: 4, frostshard: 2, rimefur: 3, yetihide: 1 }, M('twohand', 27, 3.0, 2.6, 0.6, 0.27, 14, 9, 'Two-handed. A glacier of a blade.')),
+  weapon('yetidual', 'dual', 'Twin Icefangs', 'snowyeti', 'Two hooked fang blades crusted with frost. Each swing sheds a spray of ice crystals.', { yetifang: 3, glacierclaw: 2, rimefur: 1 }, M('dual', 12, 2.3, 1.9, 0.27, 0.11, 6, 4, 'Dual swords. Hooked icefang blades.')),
+  weapon('yetihammer', 'hammer', 'Avalanche Maul', 'snowyeti', 'A lump of packed rime fur and ice with frost spikes on every face. It lands like a falling slope.', { frostshard: 3, rimefur: 5, frostheart: 1 }, M('twohand', 30, 2.6, 2.4, 0.76, 0.36, 17, 12, 'Two-handed. Buries what it hits.')),
+  weapon('yetispear', 'spear', 'Icicle Lance', 'snowyeti', 'A long frost-shard head with fang barbs and a tuft of rime fur at the collar.', { frostshard: 2, yetifang: 1, rimefur: 2, yetihide: 1 }, M('twohand', 20, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, cold reach.')),
+  weapon('yetistaff', 'staff', 'Frostheart War Staff', 'snowyeti', 'Claws cradle a frostheart crystal ringed by floating ice shards. It fires chilling bolts that slow what they hit.', { frostheart: 1, frostshard: 2, rimefur: 3, glacierclaw: 1 }, R('staff', 12, 0.6, 6, 'A war staff. Chilling frost bolts.', { spell: true, proj: 'frost', shotLabel: 'Frost' })),
+  weapon('yetiwand', 'wand', 'Rimeshard Wand', 'snowyeti', 'A fur-wrapped grip holding a shard of frost that spits ice bolts.', { frostshard: 2, glacierclaw: 1, rimefur: 1 }, R('wand', 10, 0.32, 4, 'A wand. Rapid frost bolts.', { spell: true, proj: 'frost', shotLabel: 'Frost' })),
+  weapon('yetishortbow', 'shortbow', 'Hoarfrost Shortbow', 'snowyeti', 'A compact claw-and-hide bow strung with frozen sinew. It throws small shards of ice.', { yetihide: 2, glacierclaw: 1, frostshard: 1 }, R('shortbow', 11, 0.36, 5, 'A short bow. Quick ice shards.', { proj: 'icicle', shotLabel: 'Icicle' })),
+  weapon('yetilongbow', 'longbow', 'Glacierhorn Longbow', 'snowyeti', 'Two great claws lashed to a hide-wrapped grip, strung with frozen sinew. Its shafts are frost shards and they hit like hail.', { frostshard: 2, yetihide: 2, glacierclaw: 1 }, R('longbow', 15, 0.5, 8, 'A longbow. Icicles that chill.', { proj: 'icicle', shotLabel: 'Icicle' })),
+  weapon('yeticrossbow', 'crossbow', 'Rimelock Crossbow', 'snowyeti', 'A fur-stocked crossbow with claw prod arms. Each bolt is a frost shard that bursts on impact.', { frostshard: 1, rimefur: 3, yetihide: 2, glacierclaw: 1 }, R('crossbow', 18, 0.64, 8, 'A crossbow. Frost-shard bolts.')),
+  weapon('yetiscythe', 'scythe', 'Whiteout Scythe', 'snowyeti', 'A great ice-claw blade on a fur-bound haft, with a frostheart-blue glow where the blade meets the shaft. It sweeps wide.', { frostshard: 3, rimefur: 2, glacierclaw: 1 }, M('twohand', 21, 2.9, 2.7, 0.56, 0.24, 12, 7, 'Two-handed. Long reach, wide sweep.')),
+);
+
+const BUDGE_ARMOR = 'budgedragon';
+const DARK_ARMOR = 'darksycledragon';
+const YETI_ARMOR = 'snowyeti';
+function armorSet(monster, set, defs) {
+  for (const [slot, id, name, def, desc, recipe, bonus] of defs) {
+    GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe, ...(bonus ? { bonus } : {}) });
+  }
+}
+
+GEAR.push(
+  { id: 'budgeshield', type: 'armor', slot: 'shield', name: 'Budgescale Shield', monster: BUDGE_ARMOR, set: 'budgeset', def: 2, desc: 'A scale-faced kite shield with a horn boss and a gold-banded rim.', recipe: { budgescale: 5, budgehorn: 1, budgehide: 1 } },
+  { id: 'darkshield', type: 'armor', slot: 'shield', name: 'Duskscale Shield', monster: DARK_ARMOR, set: 'darksyceset', def: 4, desc: 'An indigo scale shield with a gloom gem and a silver blade fin on each side.', recipe: { duskscale: 5, scythehorn: 1, gloommembrane: 1 } },
+  { id: 'yetishield', type: 'armor', slot: 'shield', name: 'Glacierplate Shield', monster: YETI_ARMOR, set: 'yetiset', def: 3, desc: 'A slab of frost-shard plate in a rime-fur rim, with a frostheart blue boss and a claw fin on each side.', recipe: { frostshard: 4, rimefur: 3, frostheart: 1 } },
+);
+
+armorSet(BUDGE_ARMOR, 'budgeleather', [
+  ['helm', 'budgeleatherhelm', 'Budgehide Cap', 1, 'A stitched hide cap with two short horn studs and a scale brow.', { budgehide: 3, budgescale: 1 }],
+  ['chest', 'budgeleatherchest', 'Budgehide Jerkin', 2, 'Laced green hide over a scale-trimmed collar. Light enough to run in.', { budgehide: 6, budgescale: 3 }],
+  ['arms', 'budgeleathergloves', 'Budgehide Gloves', 1, 'Supple hide gloves with a claw-bone bracer on each wrist.', { budgehide: 2, budgeclaw: 1 }],
+  ['legs', 'budgeleatherlegs', 'Budgehide Leggings', 1, 'Strapped hide leggings with scale knee patches.', { budgehide: 4, budgescale: 2 }],
+  ['boots', 'budgeleatherboots', 'Budgehide Boots', 1, 'Soft-soled hide boots with a folded cuff and claw-bone toes.', { budgehide: 2, budgeclaw: 1 }],
+]);
+armorSet(BUDGE_ARMOR, 'budgecloth', [
+  ['helm', 'budgeclothhood', 'Emberweave Hood', 1, 'A deep green hood with a gold-edged brim and a horn-tipped point.', { budgemembrane: 2, budgehide: 1 }],
+  ['chest', 'budgeclothrobe', 'Emberweave Robe', 2, 'Flowing wing-silk robes with a gold sash and ember trim.', { budgemembrane: 5, budgehide: 2 }],
+  ['arms', 'budgeclothgloves', 'Emberweave Gloves', 0, 'Silk gloves under wide cuffs edged in gold thread.', { budgemembrane: 2, budgeclaw: 1 }],
+  ['legs', 'budgeclothlegs', 'Emberweave Trousers', 1, 'Light silk trousers tied at the knee with golden cord.', { budgemembrane: 3, budgehide: 1 }],
+  ['boots', 'budgeclothboots', 'Emberweave Slippers', 0, 'Soft silk slippers with curled toes.', { budgemembrane: 2, budgehide: 1 }],
+  ['book', 'budgebook', 'Budgefang Grimoire', 0, 'A scale-bound spellbook with a fang clasp. Its pages smell of smoke.', { budgemembrane: 2, budgehorn: 1, budgefang: 1, budgehide: 1 }, { mana: 12, spell: 0.04 }],
+]);
+armorSet(DARK_ARMOR, 'darkleather', [
+  ['helm', 'darkleatherhelm', 'Duskhide Cowl', 2, 'A close-fitting indigo cowl with a swept violet fin.', { duskhide: 3, duskclaw: 1 }],
+  ['chest', 'darkleatherchest', 'Duskhide Jerkin', 4, 'Indigo hide with violet lacing and a scale collar. Quiet as a shadow.', { duskhide: 6, duskscale: 3 }],
+  ['arms', 'darkleathergloves', 'Duskhide Gloves', 2, 'Dark hide gloves with silver talon-bone bracers.', { duskhide: 2, duskclaw: 1 }],
+  ['legs', 'darkleatherlegs', 'Duskhide Leggings', 2, 'Fitted dark leggings with violet-stitched straps and scale knee patches.', { duskhide: 4, duskscale: 2 }],
+  ['boots', 'darkleatherboots', 'Duskhide Boots', 2, 'Soft-soled boots with a silver talon toe cap.', { duskhide: 2, duskclaw: 1 }],
+]);
+armorSet(DARK_ARMOR, 'darkcloth', [
+  ['helm', 'darkclothhood', 'Gloomweave Hood', 2, 'A deep violet hood with a glowing brow gem and a trailing point.', { gloommembrane: 2, duskhide: 1 }],
+  ['chest', 'darkclothrobe', 'Gloomweave Robe', 4, 'Dusk-silk robes with a gloom core clasp and glowing hem stitching.', { gloommembrane: 5, duskhide: 2, gloomcore: 1 }],
+  ['arms', 'darkclothgloves', 'Gloomweave Gloves', 0, 'Violet silk gloves under flared cuffs with glowing thread.', { gloommembrane: 2, duskclaw: 1 }],
+  ['legs', 'darkclothlegs', 'Gloomweave Trousers', 2, 'Dusk-silk trousers with a violet sash at each knee.', { gloommembrane: 3, duskhide: 1 }],
+  ['boots', 'darkclothboots', 'Gloomweave Slippers', 0, 'Silent silk slippers that glow faintly at the heel.', { gloommembrane: 2, duskhide: 1 }],
+  ['book', 'darkbook', 'Gloomcore Grimoire', 0, 'A membrane-bound tome that hums with a caged gloom core.', { gloomcore: 1, gloommembrane: 2, scythehorn: 1, duskhide: 1 }, { mana: 40, spell: 0.12 }],
+]);
+
+armorSet(YETI_ARMOR, 'yetiset', [
+  ['helm', 'yetihelm', 'Glacierplate Helm', 2, 'A snarling yeti-skull helm of frost-shard plate with a fang-lined maw, swept ice crests and glowing blue eyes.', { frostshard: 3, rimefur: 2, yetifang: 1 }],
+  ['chest', 'yetichest', 'Glacierplate Cuirass', 4, 'Blue ice plate under a collar of rime fur, strapped across with brown leather and a frostheart burning at the sternum.', { frostshard: 6, rimefur: 4, yetihide: 2, frostheart: 1 }],
+  ['arms', 'yetiarms', 'Glacierplate Gauntlets', 2, 'Fur-cuffed ice vambraces under crystal-spiked pauldrons. The knuckles come with glacier claws.', { frostshard: 3, glacierclaw: 2, rimefur: 2 }],
+  ['legs', 'yetilegs', 'Glacierplate Greaves', 3, 'Heavy frost-plate thighs, rime-fur knee guards and a hanging hide faulds with ice shards.', { frostshard: 4, rimefur: 3, yetihide: 1 }],
+  ['boots', 'yetiboots', 'Glacierplate Boots', 2, 'Great furred boots with ice-claw toes that bite into the snow.', { frostshard: 2, rimefur: 2, glacierclaw: 2 }],
+]);
+armorSet(YETI_ARMOR, 'yetileather', [
+  ['helm', 'yetileatherhelm', 'Rimehide Hood', 1, 'A fur-trimmed hide hood with frost-bright tufts and a fang clasp.', { yetihide: 3, rimefur: 1 }],
+  ['chest', 'yetileatherchest', 'Rimehide Jerkin', 3, 'Frost-stiff yeti hide with a shaggy collar and crossed leather straps.', { yetihide: 5, rimefur: 4 }],
+  ['arms', 'yetileathergloves', 'Rimehide Gloves', 1, 'Fur-backed hide gloves with a glacier-claw bracer on each wrist.', { yetihide: 2, glacierclaw: 1 }],
+  ['legs', 'yetileatherlegs', 'Rimehide Leggings', 2, 'Thick fur-banded leggings that shrug off the cold.', { yetihide: 4, rimefur: 2 }],
+  ['boots', 'yetileatherboots', 'Rimehide Boots', 1, 'Deep-furred boots with claw-bone toe caps.', { yetihide: 2, rimefur: 1 }],
+]);
+armorSet(YETI_ARMOR, 'yeticloth', [
+  ['helm', 'yeticlothhood', 'Frostweave Hood', 1, 'A deep frost-white hood edged in rime fur with a floating ice-shard brow.', { rimefur: 3, yetihide: 1 }],
+  ['chest', 'yeticlothrobe', 'Frostweave Robe', 3, 'Layered rime-fur robes with a frostheart clasp and a hem of tiny hanging icicles.', { rimefur: 6, yetihide: 2, frostheart: 1 }],
+  ['arms', 'yeticlothgloves', 'Frostweave Gloves', 0, 'Soft fur mitts under flared cuffs of frosted thread.', { rimefur: 3, glacierclaw: 1 }],
+  ['legs', 'yeticlothlegs', 'Frostweave Trousers', 1, 'Fur-lined trousers tied with a blue frost-silk sash at each knee.', { rimefur: 4, yetihide: 1 }],
+  ['boots', 'yeticlothboots', 'Frostweave Slippers', 0, 'Fur slippers that never leave a footprint in the snow.', { rimefur: 3, yetihide: 1 }],
+  ['book', 'yetibook', 'Frostheart Grimoire', 0, 'A hide-bound tome rimed with frost and clasped with a fang. A caged frostheart pulses on its cover.', { frostheart: 1, rimefur: 3, yetifang: 1, yetihide: 1 }, { mana: 24, spell: 0.07 }],
+]);
+
+const TIGER = 'tiger';
+const RAPTOR = 'raptor';
+const PIRATE = 'pirate';
+const CURSED = 'cursedpirate';
+
+GEAR.push(
+  weapon('tigerclaws', 'dual', 'Twin Tigerclaws', TIGER, 'Two curved claw blades banded in orange and black, each in a hide-wrapped grip. They rake in quick pairs.', { tigerclaw: 4, tigerskin: 2 }, M('dual', 11, 2.2, 1.8, 0.27, 0.11, 6, 3, 'Dual swords. Banded tiger claws.')),
+  weapon('tigershortbow', 'shortbow', 'Stalker Shortbow', TIGER, 'A compact bow wound in striped hide, with a hooked claw at each tip. Built for ambushes at close range.', { tigerskin: 2, tigerclaw: 2 }, R('shortbow', 12, 0.34, 5, 'A short bow. Quick, quiet draws.')),
+  weapon('tigerspear', 'spear', 'Pounce Spear', TIGER, 'A hooked tiger-claw head on a shaft wrapped in striped hide, with a tuft of white fur at the collar.', { tigerclaw: 3, tigerskin: 2 }, M('twohand', 18, 3.4, 1.0, 0.45, 0.2, 10, 4, 'Two-handed. A long, springing thrust.')),
+
+  weapon('raptorsaber', 'onesword', 'Sickleclaw Saber', RAPTOR, 'A single great raptor claw, ground into a curved saber and set in an olive and tan scale-wrapped grip.', { raptorclaw: 3, raptorskin: 2 }, M('swordshield', 16, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. A curved sickle blade.')),
+  weapon('raptorcrossbow', 'crossbow', 'Talonlock Crossbow', RAPTOR, 'A stock of mosaic raptor scales and a pair of sickle-claw prod arms. It throws a bolt like a pouncing talon.', { raptorskin: 3, raptorclaw: 2 }, R('crossbow', 17, 0.64, 8, 'A crossbow. Talon-tipped bolts.')),
+  weapon('raptorscythe', 'scythe', 'Sicklefoot Scythe', RAPTOR, 'A huge sickle claw on a scale-wrapped haft. It sweeps the way a raptor kills: wide, and all at once.', { raptorclaw: 4, raptorskin: 2 }, M('twohand', 18, 2.9, 2.7, 0.56, 0.24, 12, 6, 'Two-handed. Long reach, wide sweep.')),
+
+  weapon('piratecutlass', 'onesword', 'Buccaneer Cutlass', PIRATE, 'A curved steel blade under a gold shell guard, in a grip wrapped with brown leather. Every dock rat has one.', { scimitar: 2, pirategold: 1 }, M('swordshield', 16, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. A quick, curved cutlass.')),
+  weapon('piratedual', 'dual', 'Twin Scimitars', PIRATE, 'Two curved scimitars with gold guards and brown-wrapped grips. A cutthroat never fights with just one.', { scimitar: 3, pirategold: 2 }, M('dual', 11, 2.3, 1.9, 0.27, 0.11, 6, 3, 'Dual swords. Matched scimitars.')),
+  weapon('piratecleaver', 'twosword', 'Captain\'s Greatcutlass', PIRATE, 'A big curved two-handed blade with a gold shell guard and a red-wrapped grip. A captain\'s blade, and it shows.', { scimitar: 3, pirategold: 2, piratebone: 1 }, M('twohand', 23, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A captain\'s heavy blade.')),
+  weapon('buccaneergun', 'crossbow', 'Buccaneer Crossbow', PIRATE, 'A brass-banded stock with gold trim and a scimitar blade lashed on as a bayonet. It shoots, and it stabs.', { scimitar: 1, pirategold: 3, piratebone: 1 }, R('crossbow', 17, 0.64, 8, 'A crossbow. Bayonet-fitted.')),
+
+  weapon('cursedblade', 'onesword', 'Cursed Cutlass', CURSED, 'A rusty, blood-stained blade with a faint green glow in the fuller and a grip of yellowed bone. It has never been cleaned, and it has never needed to be.', { scimitar: 1, piratebone: 3, pirategold: 1 }, M('swordshield', 17, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Cursed, rusted steel.')),
+  weapon('bonestaff', 'staff', 'Deadman\'s Staff', CURSED, 'A skull and crossbones atop a shaft of bone, ringed in gold and trailing a green wisp. It throws spectral orbs.', { piratebone: 4, pirategold: 2 }, R('staff', 12, 0.56, 6, 'A war staff. Spectral orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' })),
+);
+
+GEAR.push(
+  { id: 'pirateshield', type: 'armor', slot: 'shield', name: 'Buccaneer Buckler', monster: PIRATE, set: 'pirateset', def: 2, desc: 'A round buckler of planked wood in an iron rim, with a gold skull riveted to the boss.', recipe: { scimitar: 3, pirategold: 2, piratebone: 1 } },
+);
+
+armorSet(TIGER, 'tigerleather', [
+  ['helm', 'tigerleatherhelm', 'Tigerskin Cowl', 1, 'A close hide cowl with two black-tipped tiger ears and striped brow bands.', { tigerskin: 2, tigerclaw: 1 }],
+  ['chest', 'tigerleatherchest', 'Tigerskin Jerkin', 2, 'A striped orange and black jerkin with a white fur ruff at the chest and a claw-toggle lace.', { tigerskin: 6, tigerclaw: 1 }],
+  ['arms', 'tigerleathergloves', 'Tigerskin Bracers', 1, 'Striped hide gloves with a hooked claw on each bracer.', { tigerskin: 2, tigerclaw: 1 }],
+  ['legs', 'tigerleatherlegs', 'Tigerskin Leggings', 2, 'Banded leggings in orange and black, strapped at the knee.', { tigerskin: 4, tigerclaw: 1 }],
+  ['boots', 'tigerleatherboots', 'Pawfall Boots', 1, 'Soft-soled hide boots with white paw toes. They make no sound at all.', { tigerskin: 2, tigerclaw: 1 }],
+]);
+armorSet(TIGER, 'tigercloth', [
+  ['helm', 'tigerclothhood', 'Stripeweave Hood', 1, 'An orange hood with black stripes, a pale brow and two small ear points.', { tigerskin: 2, tigerclaw: 1 }],
+  ['chest', 'tigerclothrobe', 'Stripeweave Robe', 2, 'Flowing orange robes striped in black, with a white collar and a claw clasp.', { tigerskin: 5, tigerclaw: 2 }],
+  ['arms', 'tigerclothgloves', 'Stripeweave Gloves', 0, 'Soft striped gloves under wide cuffs with a pale fur edge.', { tigerskin: 2, tigerclaw: 1 }],
+  ['legs', 'tigerclothlegs', 'Stripeweave Trousers', 1, 'Striped trousers tied at the knee with black cord.', { tigerskin: 3, tigerclaw: 1 }],
+  ['boots', 'tigerclothboots', 'Stripeweave Slippers', 0, 'Silent slippers with white toes, striped like the rest.', { tigerskin: 2, tigerclaw: 1 }],
+  ['book', 'tigerbook', 'Tigerclaw Grimoire', 0, 'A striped hide cover with a claw clasp and one watchful yellow eye.', { tigerskin: 2, tigerclaw: 2 }, { mana: 14, spell: 0.045 }],
+]);
+
+armorSet(RAPTOR, 'raptorleather', [
+  ['helm', 'raptorleatherhelm', 'Raptorhide Cowl', 1, 'A mosaic-scaled hood with a grey crest of spikes running over the crown.', { raptorskin: 2, raptorclaw: 1 }],
+  ['chest', 'raptorleatherchest', 'Raptorhide Jerkin', 2, 'Olive and tan mosaic hide with grey spike-ridge shoulders and a laced front.', { raptorskin: 6, raptorclaw: 1 }],
+  ['arms', 'raptorleathergloves', 'Raptorhide Gloves', 1, 'Mosaic hide gloves with a sickle claw on each bracer.', { raptorskin: 2, raptorclaw: 1 }],
+  ['legs', 'raptorleatherlegs', 'Raptorhide Leggings', 2, 'Scaled leggings in olive and tan with grey knee spikes.', { raptorskin: 4, raptorclaw: 1 }],
+  ['boots', 'raptorleatherboots', 'Raptorhide Boots', 1, 'Three-toed hide boots with a sickle claw on each heel.', { raptorskin: 2, raptorclaw: 1 }],
+]);
+armorSet(RAPTOR, 'raptorcloth', [
+  ['helm', 'raptorclothhood', 'Mosaicweave Hood', 1, 'A tan and olive hood with a small grey crest and an orange eye-stud at the brow.', { raptorskin: 2, raptorclaw: 1 }],
+  ['chest', 'raptorclothrobe', 'Mosaicweave Robe', 2, 'Robes woven in a scale mosaic of olive and tan, with a grey spiked collar.', { raptorskin: 5, raptorclaw: 2 }],
+  ['arms', 'raptorclothgloves', 'Mosaicweave Gloves', 0, 'Scale-patterned gloves under flared grey-edged cuffs.', { raptorskin: 2, raptorclaw: 1 }],
+  ['legs', 'raptorclothlegs', 'Mosaicweave Trousers', 1, 'Mosaic trousers tied at the knee with olive cord.', { raptorskin: 3, raptorclaw: 1 }],
+  ['boots', 'raptorclothboots', 'Mosaicweave Slippers', 0, 'Soft scale-patterned slippers with a tiny claw toe.', { raptorskin: 2, raptorclaw: 1 }],
+  ['book', 'raptorbook', 'Raptorclaw Grimoire', 0, 'A mosaic-scale cover with a sickle-claw clasp and an orange eye.', { raptorskin: 2, raptorclaw: 2 }, { mana: 14, spell: 0.045 }],
+]);
+
+armorSet(PIRATE, 'pirateset', [
+  ['helm', 'piratehelm', 'Buccaneer Tricorn', 2, 'A navy plate tricorn with a gold-trimmed brim, a red bandana beneath and a gold skull badge.', { scimitar: 2, pirategold: 1 }],
+  ['chest', 'piratechest', 'Buccaneer Coat', 3, 'A navy plate coat with a double row of gold buttons, gold cuffs and a brown belt with a gold buckle.', { scimitar: 5, pirategold: 2 }],
+  ['arms', 'piratearms', 'Buccaneer Gauntlets', 2, 'Navy plate gauntlets with wide gold cuffs and a gold-rimmed pauldron.', { scimitar: 2, pirategold: 1 }],
+  ['legs', 'piratelegs', 'Buccaneer Greaves', 2, 'Navy plate greaves with brown straps and gold knee caps.', { scimitar: 4, pirategold: 1 }],
+  ['boots', 'pirateboots', 'Buccaneer Boots', 1, 'Tall navy boots with folded cuffs and a gold buckle on each.', { scimitar: 2, pirategold: 1 }],
+]);
+armorSet(CURSED, 'piratecloth', [
+  ['helm', 'pirateclothhood', 'Deadman Bandana', 1, 'A red bandana knotted over a black hood, with a small gold skull pin.', { piratebone: 2, pirategold: 1 }],
+  ['chest', 'pirateclothrobe', 'Deadman Coat', 3, 'A black-red coat robe with bone buttons and a bone-and-gold trim along the hem.', { piratebone: 5, pirategold: 2, scimitar: 1 }],
+  ['arms', 'pirateclothgloves', 'Deadman Gloves', 0, 'Black gloves under red cuffs with a bone stud and a gold edge.', { piratebone: 2, pirategold: 1 }],
+  ['legs', 'pirateclothlegs', 'Deadman Trousers', 1, 'Black trousers with a red sash and bone toggles at the knee.', { piratebone: 3, pirategold: 1 }],
+  ['boots', 'pirateclothboots', 'Deadman Slippers', 0, 'Black slippers with a bone toe and a gold buckle.', { piratebone: 2, pirategold: 1 }],
+  ['book', 'piratebook', 'Cursed Logbook', 0, 'A black and red logbook with a skull clasp that glows a faint, sickly green.', { piratebone: 3, pirategold: 2 }, { mana: 22, spell: 0.065 }],
+]);
+
+
+const DEMON_K = 'demonknight';
+const HOLY_K = 'holyknight';
+function foundSet(monster, set, defs) {
+  for (const [slot, id, name, def, desc] of defs) GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe: {}, found: true });
+}
+GEAR.push(
+  {
+    id: 'demonsword', type: 'weapon', wtype: 'onesword', name: 'Hellrend Greatsword', monster: DEMON_K, held: 'demonsword', found: true,
+    desc: 'A tall serrated blade of black iron, its fuller cracked open and glowing red. The Demon Knight carries it point-up.',
+    recipe: {},
+    item: { id: 'demonsword', icon: 'demonsword', name: 'Hellrend Greatsword', kind: 'melee', style: 'swordshield', dmg: 23, reach: 2.9, arc: 2.3, dur: 0.42, hit: 0.18, stam: 11, knock: 7, held: 'demonsword', desc: 'Sword and shield. A serrated blade of hellfire.' },
+    stats: [['Damage', 23], ['Reach', '2.9'], ['Style', 'Sword & Shield']],
+  },
+  {
+    id: 'holyhammer', type: 'weapon', wtype: 'hammer', name: 'Smiterfall War Hammer', monster: HOLY_K, held: 'holyhammer', found: true,
+    desc: 'A block of runed stone in a gold frame on a ribbed haft, lit by glowing blue crosses. It lands like a verdict.',
+    recipe: {},
+    item: { id: 'holyhammer', icon: 'holyhammer', name: 'Smiterfall War Hammer', kind: 'melee', style: 'twohand', dmg: 36, reach: 2.8, arc: 2.5, dur: 0.78, hit: 0.36, stam: 18, knock: 12, held: 'holyhammer', desc: 'Two-handed. A holy stone hammer.' },
+    stats: [['Damage', 36], ['Reach', '2.8'], ['Style', 'Two-Handed']],
+  },
+  { id: 'demonshield', type: 'armor', slot: 'shield', name: 'Hellforged Bulwark', monster: DEMON_K, set: 'demonset', def: 4, desc: 'A tall kite shield of black plate with a spiked rim and a glowing red demon face.', recipe: {}, found: true },
+);
+foundSet(DEMON_K, 'demonset', [
+  ['helm', 'demonhelm', 'Hellforged Crown', 3, 'A black helm crowned with spikes. Two red eyes burn behind the visor.'],
+  ['chest', 'demonchest', 'Hellforged Cuirass', 5, 'Layered shards of black plate, cracked and glowing red, with a row of spikes across the back.'],
+  ['arms', 'demonarms', 'Hellforged Gauntlets', 3, 'Spiked vambraces under huge jagged pauldrons.'],
+  ['legs', 'demonlegs', 'Hellforged Greaves', 4, 'Heavy black thigh plate with spiked knee guards.'],
+  ['boots', 'demonboots', 'Hellforged Sabatons', 3, 'Broad black boots with spiked toes.'],
+]);
+foundSet(HOLY_K, 'holyset', [
+  ['helm', 'holyhelm', 'Radiant Helm', 3, 'A white helm with a dark visor, a forehead cross, a gold crest and curved gold horns.'],
+  ['chest', 'holychest', 'Radiant Cuirass', 5, 'White plate trimmed in gold, with a glowing blue cross over the heart.'],
+  ['arms', 'holyarms', 'Radiant Gauntlets', 3, 'Gold-rimmed pauldrons and vambraces, each with a glowing blue cross.'],
+  ['legs', 'holylegs', 'Radiant Greaves', 4, 'White thigh plate in gold diamond frames with blue crosses.'],
+  ['boots', 'holyboots', 'Radiant Sabatons', 3, 'Large white sabatons with gold bands.'],
+]);
+
+GEAR.push(
+  weapon('ironsword', 'onesword', 'Iron Sword', 'smith', 'A plain steel blade with a straight crossguard. Heavier than the starter sword, and it holds an edge.', { iron_bar: 2 }, M('swordshield', 14, 2.4, 2.0, 0.4, 0.16, 8, 4, 'Sword and shield. Forged iron.')),
+  weapon('irongreatsword', 'twosword', 'Iron Greatsword', 'smith', 'A long steel blade on a two-hand grip. Slow, and it cleaves.', { iron_bar: 4 }, M('twohand', 16, 2.7, 2.4, 0.58, 0.26, 13, 7, 'Two-handed. Heavy iron.')),
+  weapon('ironspear', 'spear', 'Iron Spear', 'smith', 'A leaf-shaped iron head on an ash shaft. It reaches past a sword.', { iron_bar: 3 }, M('twohand', 13, 3.1, 1.0, 0.46, 0.2, 10, 4, 'Two-handed. A long iron thrust.')),
+  weapon('ironhammer', 'hammer', 'Iron Hammer', 'smith', 'A block of iron on a short haft. It is slow and it knocks things down.', { iron_bar: 4 }, M('twohand', 18, 2.5, 2.3, 0.7, 0.32, 15, 9, 'Two-handed. A smith\'s hammer, scaled up.')),
+  { id: 'ironhelm', type: 'armor', slot: 'helm', name: 'Iron Helm', monster: 'smith', set: 'iron', def: 1, desc: 'A plain steel cap with a nasal guard and a brass rivet.', recipe: { iron_bar: 2 } },
+  { id: 'ironchest', type: 'armor', slot: 'chest', name: 'Iron Platebody', monster: 'smith', set: 'iron', def: 2, desc: 'A hammered cuirass. The first real plate a hunter can wear.', recipe: { iron_bar: 5 } },
+  { id: 'ironarms', type: 'armor', slot: 'arms', name: 'Iron Gauntlets', monster: 'smith', set: 'iron', def: 1, desc: 'Steel plates over the hands and a short vambrace.', recipe: { iron_bar: 2 } },
+  { id: 'ironlegs', type: 'armor', slot: 'legs', name: 'Iron Platelegs', monster: 'smith', set: 'iron', def: 1, desc: 'Banded steel over the thighs.', recipe: { iron_bar: 3 } },
+  { id: 'ironboots', type: 'armor', slot: 'boots', name: 'Iron Boots', monster: 'smith', set: 'iron', def: 1, desc: 'Steel sabatons with a brass toe cap.', recipe: { iron_bar: 2 } },
+  { id: 'ironshield', type: 'armor', slot: 'shield', name: 'Iron Shield', monster: 'smith', set: 'iron', def: 2, desc: 'A square steel shield with a raised boss.', recipe: { iron_bar: 3 } },
+  { id: 'quiver', type: 'armor', slot: 'quiver', name: 'Leather Quiver', monster: 'smith', set: 'iron', def: 0, desc: 'A birch-and-iron quiver. Once worn, it fills itself from the arrows in your bag, 99 at a time.', recipe: { iron_bar: 1, birch_logs: 2 } },
+);
+
+const set = (id, name, monster, tier, role, stats, bonus) => ({ id, name, monster, tier, role, hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0, ...stats, bonus });
+export const SETS = [
+  set('iron', 'Iron Plate', 'smith', 'metal', 'Warrior', { hp: 2 }, 'Full set: +2 max health (1 heart).'),
+  set('budgeset', 'Budgescale Plate', BUDGE_ARMOR, 'metal', 'Warrior', { hp: 4 }, 'Full set: +4 max health (2 hearts).'),
+  set('budgeleather', 'Budgehide Leathers', BUDGE_ARMOR, 'leather', 'Ranger', { stamina: 20, ranged: 0.06 }, 'Full set: +20 max stamina and +6% ranged damage.'),
+  set('budgecloth', 'Emberweave Robes', BUDGE_ARMOR, 'cloth', 'Mage', { mana: 20, spell: 0.06 }, 'Full set: +20 max mana and +6% spell damage.'),
+  set('darksyceset', 'Duskscale Plate', DARK_ARMOR, 'metal', 'Warrior', { hp: 4, mana: 40 }, 'Full set: +4 max health (2 hearts) and +40 max mana.'),
+  set('darkleather', 'Duskhide Leathers', DARK_ARMOR, 'leather', 'Ranger', { stamina: 40, crit: 0.08 }, 'Full set: +40 max stamina and +8% critical chance.'),
+  set('darkcloth', 'Gloomweave Robes', DARK_ARMOR, 'cloth', 'Mage', { mana: 60, spell: 0.16 }, 'Full set: +60 max mana and +16% spell damage.'),
+  set('yetiset', 'Glacierplate', YETI_ARMOR, 'metal', 'Warrior', { hp: 4, stamina: 10 }, 'Full set: +4 max health (2 hearts) and +10 max stamina.'),
+  set('yetileather', 'Rimehide Leathers', YETI_ARMOR, 'leather', 'Ranger', { stamina: 30, ranged: 0.08 }, 'Full set: +30 max stamina and +8% ranged damage.'),
+  set('yeticloth', 'Frostweave Robes', YETI_ARMOR, 'cloth', 'Mage', { mana: 36, spell: 0.1 }, 'Full set: +36 max mana and +10% spell damage.'),
+  set('tigerleather', 'Tigerskin Leathers', TIGER, 'leather', 'Ranger', { stamina: 24, ranged: 0.07 }, 'Full set: +24 max stamina and +7% ranged damage.'),
+  set('tigercloth', 'Stripeweave Robes', TIGER, 'cloth', 'Mage', { mana: 28, spell: 0.08 }, 'Full set: +28 max mana and +8% spell damage.'),
+  set('raptorleather', 'Raptorhide Leathers', RAPTOR, 'leather', 'Ranger', { stamina: 22, crit: 0.05 }, 'Full set: +22 max stamina and +5% critical chance.'),
+  set('raptorcloth', 'Mosaicweave Robes', RAPTOR, 'cloth', 'Mage', { mana: 26, spell: 0.07 }, 'Full set: +26 max mana and +7% spell damage.'),
+  set('pirateset', 'Buccaneer Plate', PIRATE, 'metal', 'Warrior', { hp: 4, stamina: 6 }, 'Full set: +4 max health (2 hearts) and +6 max stamina.'),
+  set('piratecloth', 'Deadman Robes', CURSED, 'cloth', 'Mage', { mana: 32, spell: 0.09 }, 'Full set: +32 max mana and +9% spell damage.'),
+  set('demonset', 'Hellforged Plate', DEMON_K, 'metal', 'Warrior', { hp: 6, stamina: 10 }, 'Full set: +6 max health (3 hearts) and +10 max stamina.'),
+  set('holyset', 'Radiant Plate', HOLY_K, 'metal', 'Warrior', { hp: 6, mana: 20 }, 'Full set: +6 max health (3 hearts) and +20 max mana.'),
+];
+
+export const DEF_PER_POINT = 0.04;
+
+export const gearById = (id) => GEAR.find((g) => g.id === id);
+export const monsterById = (id) => MONSTERS.find((m) => m.id === id);
+export const setById = (id) => SETS.find((x) => x.id === id);
+export const armorPieces = (setId) => GEAR.filter((g) => g.type === 'armor' && (!setId || g.set === setId));
+export const corePieces = (setId) => armorPieces(setId).filter((g) => CORE_SLOTS.includes(g.slot));
+export const weapons = (monster) =>
+  GEAR.filter((g) => g.type === 'weapon' && (!monster || g.monster === monster)).sort((a, b) => WEAPON_ORDER.indexOf(a.wtype) - WEAPON_ORDER.indexOf(b.wtype));
