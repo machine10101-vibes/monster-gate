@@ -15,8 +15,13 @@ import { DEBUG_STARTER_ID, markDebugGranted } from './transient.js';
 const MINE = { rampX0: 88, z: 66 };
 const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
 const SAND_MINE = { x: -74, z: 514 };
-/** Dry south-east shore on the Oasis (greenbowl) tile, pool in view to the north-west. */
-const OASIS_DRY = { x: OASIS.x + 14, z: OASIS.z + OASIS.r + OASIS.shore + 8 };
+/**
+ * Dry south-east shore on the Oasis tile, far enough that the pool sits
+ * ahead of the hunter (above --hud-clear-bottom) instead of under the hotbar.
+ */
+const OASIS_DRY = { x: OASIS.x + 16, z: OASIS.z + OASIS.r + 30 };
+export const OASIS_CAM = { pitch: 0.46, dist: 20 };
+export const DEBUG_TANK_HP_MUL = 20;
 
 export function oasisHudName(x, z) {
   const d = Math.hypot(Number(x) - OASIS.x, Number(z) - OASIS.z);
@@ -326,7 +331,21 @@ export function debugOnlineReject() {
   return { ok: false, code: DEBUG_ONLINE_CODE, message: 'Debug tools are offline only.' };
 }
 
-export function spawnDebugMonster(game, search) {
+export function applyDebugTank(mon) {
+  if (!mon) return mon;
+  const base = Math.max(1, Number(mon.maxHp || mon.hp || 18));
+  const hp = Math.round(base * DEBUG_TANK_HP_MUL);
+  mon.maxHp = hp;
+  mon.hp = hp;
+  mon.debugTank = true;
+  mon.debugSpawn = true;
+  mon.cd = Math.max(Number(mon.cd) || 0, 1.8);
+  const label = String(mon.name || 'Monster').replace(/ \(tank\)$/i, '');
+  mon.name = `${label} (tank)`;
+  return mon;
+}
+
+export function spawnDebugMonster(game, search, opts = {}) {
   if (debugOnlineBlocked(game, search)) return debugOnlineReject();
   if (!game?.debug || !game.spawner?.spawn || !game.player?.pos) return null;
   ensureDebugStarterWeapon(game);
@@ -334,6 +353,8 @@ export function spawnDebugMonster(game, search) {
   const hostile = monsterIsHostile(type) ? type : 'slime';
   const spot = debugSpawnSpot(game);
   const mon = game.spawner.spawn(hostile, spot.x, spot.z, true);
+  if (opts.tank) applyDebugTank(mon);
+  if (mon) mon.debugSpawn = true;
   if (game.cam) game.cam.pitch = Math.max(Number(game.cam.pitch) || 0, 0.92);
   game.hud?.toast?.(`DEBUG · ${mon?.name || hostile}`, 1800);
   return mon;
@@ -342,14 +363,15 @@ export function spawnDebugMonster(game, search) {
 function bindDebugSpawn(game) {
   if (game._debugSpawnBound) return;
   game._debugSpawnBound = true;
-  game.debugSpawn = () => spawnDebugMonster(game);
+  game.debugSpawn = (opts) => spawnDebugMonster(game, undefined, opts);
+  game.debugSpawnTank = () => spawnDebugMonster(game, undefined, { tank: true });
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'F9' || e.repeat) return;
     if (!game.debug || debugOnlineBlocked(game)) return;
     const tag = e.target?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     e.preventDefault();
-    spawnDebugMonster(game);
+    spawnDebugMonster(game, undefined, { tank: !!e.shiftKey });
   });
 }
 
@@ -371,6 +393,9 @@ export function teleportDebug(game, raw) {
     if (game.cam) {
       game.cam.targetYaw = yaw + Math.PI;
       game.cam.yaw = yaw + Math.PI;
+      game.cam.pitch = OASIS_CAM.pitch;
+      game.cam.targetDist = OASIS_CAM.dist;
+      game.cam.dist = OASIS_CAM.dist;
     }
   }
   game.player.syncObj?.();

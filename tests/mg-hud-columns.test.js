@@ -20,7 +20,7 @@ test('menu buttons sit in one right-edge column, not left/right rails', () => {
   assert.match(theme, /#menu-col/);
   assert.match(theme, /#menu-col \{[\s\S]*flex-direction:\s*column-reverse/);
   assert.match(theme, /\.mbtn \{[\s\S]*min-width:\s*var\(--menu-btn\)/);
-  assert.match(theme, /body\.touch #touch-btns \{[\s\S]*--menu-col-w/);
+  assert.match(theme, /body\.touch #touch-btns[\s\S]*--hud-action-right/);
   assert.doesNotMatch(theme, /#menu-col-left/);
   assert.doesNotMatch(theme, /flex-flow:\s*row wrap-reverse/);
 });

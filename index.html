@@ -2,22 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <style>html,body{background:#0b0d10}</style>
+    <style>html,body{background:#070308}</style>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content"
     />
-    <meta name="theme-color" content="#0b0d10" />
+    <meta name="theme-color" content="#14060a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Monster Gate" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="manifest" href="./manifest.webmanifest?v=2" />
-    <meta name="description" content="Monster Gate - a 3D pixel monster hunting adventure." />
+    <link rel="manifest" href="./manifest.webmanifest?v=3" />
+    <meta name="description" content="Monster Gate — a 3D pixel monster hunting adventure." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://monstergate.online/" />
+    <meta property="og:title" content="Monster Gate" />
+    <meta property="og:description" content="A 3D pixel monster hunting adventure." />
+    <meta property="og:image" content="https://monstergate.online/brand/og-image.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Monster Gate" />
+    <meta name="twitter:description" content="A 3D pixel monster hunting adventure." />
+    <meta name="twitter:image" content="https://monstergate.online/brand/og-image.jpg" />
     <title>Monster Gate</title>
     <link rel="icon" href="./favicon.ico" sizes="any" />
-    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
   </head>
   <body>
     <div id="app">
@@ -137,12 +147,44 @@
 
       <div id="faint" class="hidden"><b>You fainted</b><span>The guild healers carried you back to town.</span></div>
 
-      <div id="loading">
-        <div class="load-inner">
-          <div class="logo-voxel"><i></i><i></i><i></i><i></i></div>
-          <h1>MONSTER <em>GATE</em></h1>
-          <div class="load-bar"><i id="load-fill"></i></div>
-          <p id="load-text">Preparing...</p>
+      <div id="loading" role="status" aria-live="polite">
+        <div class="load-runes" aria-hidden="true">
+          <span>ᚠ</span><span>ᚱ</span><span>ᛟ</span><span>ᚦ</span>
+        </div>
+        <div id="load-embers" class="load-embers" aria-hidden="true"></div>
+        <div class="load-shell">
+          <div class="load-stage">
+            <div class="load-glow" aria-hidden="true"></div>
+            <img
+              class="load-poster"
+              src="./brand/loading-poster.jpg"
+              width="672"
+              height="448"
+              alt=""
+            />
+            <video
+              id="load-video"
+              muted
+              autoplay
+              playsinline
+              preload="auto"
+              poster="./brand/loading-poster.jpg"
+              width="672"
+              height="448"
+            >
+              <source src="./brand/loading.mp4" type="video/mp4" />
+            </video>
+            <div class="load-vignette" aria-hidden="true"></div>
+          </div>
+          <div class="load-meter">
+            <div class="load-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <b class="load-cap" aria-hidden="true"></b>
+              <i id="load-fill"></i>
+              <b class="load-cap load-cap-end" aria-hidden="true"></b>
+            </div>
+            <p id="load-text">opening the gate</p>
+            <p id="load-tip">A Monster Gate opened in the northern forest.</p>
+          </div>
         </div>
       </div>
 

@@ -105,7 +105,7 @@ test('menu buttons sit in one right-edge column', () => {
   assert.match(theme, /#menu-col/);
   assert.match(theme, /flex-direction:\s*column-reverse/);
   assert.match(theme, /\.mbtn \{[\s\S]*min-width:\s*var\(--menu-btn\)/);
-  assert.match(theme, /body\.touch #touch-btns \{[\s\S]*--menu-col-w/);
+  assert.match(theme, /body\.touch #touch-btns[\s\S]*--hud-action-right/);
 });
 
 test('MG-UI-13 nameplates sit below windows and hide while a window is open', () => {
@@ -138,7 +138,11 @@ test('MG-UI-16 expanded quest wraps inside a viewport-clamped frame', () => {
 
 test('MG-UI-17 action cluster keeps a gap from the menu column', () => {
   const theme = src('src/ui/theme.css');
-  assert.match(theme, /body\.touch #touch-btns \{[\s\S]*--hud-action-gap/);
+  const style = src('src/style.css');
+  assert.match(theme, /--hud-action-right:\s*calc\(var\(--hud-menu-inset\) \+ var\(--menu-col-w\) \+ var\(--hud-action-gap\)/);
+  assert.match(theme, /body\.touch #touch-btns[\s\S]*right:\s*var\(--hud-action-right\)/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#touch-btns \{[\s\S]*right:\s*var\(--hud-action-right\)/);
+  assert.match(style, /#touch-btns \{[\s\S]*--hud-action-right/);
   assert.match(theme, /#hints \{[\s\S]*--hud-clear-bottom/);
 });
 

@@ -12,6 +12,7 @@ import {
   dialogClearance,
   fitMenuButtons,
   hudRects,
+  touchActionRects,
   overlap,
   overlapsOf,
   readQuestOpen,
@@ -32,7 +33,7 @@ test('MG-UI-12: one right-edge menu column and a collapsed quest dropdown', () =
   assert.match(html, /q-arrow/);
   assert.match(theme, /#menu-col/);
   assert.match(theme, /flex-direction:\s*column-reverse/);
-  assert.match(theme, /body\.touch #touch-btns \{[\s\S]*--menu-col-w/);
+  assert.match(theme, /body\.touch #touch-btns[\s\S]*--hud-action-right/);
   assert.match(theme, /#quest:not\(\.open\) \.q-track \{ display: none/);
   assert.match(theme, /#quest \.q-head/);
   const hud = src('../src/ui/hud.js');
@@ -63,6 +64,18 @@ test('HUD rects do not collide at 844x390, 390x844, 1280x800, 1920x1080', () => 
     }
     assert.equal(overlap(rects.quest, rects.minimap), false, `${vp.name} quest vs minimap`);
   }
+});
+
+test('MG-UI-17 844x390 action-button bounding rects leave at least 8px from #menu-col', () => {
+  const vp = { name: 'phone-landscape', w: 844, h: 390, touch: true };
+  const measured = touchActionRects(vp);
+  assert.ok(measured.gap >= ACTION_GAP - 0.01, `attack vs menu gap ${measured.gap}`);
+  assert.ok(measured.menu.x - (measured.attack.x + measured.attack.w) >= 8, 'attack button vs menu');
+  assert.ok(measured.menu.x - (measured.cluster.x + measured.cluster.w) >= 8, 'cluster vs menu');
+  assert.equal(overlap(measured.attack, measured.menu), false);
+  const theme = src('../src/ui/theme.css');
+  assert.match(theme, /--hud-action-right:\s*calc\(var\(--hud-menu-inset\) \+ var\(--menu-col-w\) \+ var\(--hud-action-gap\)/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#touch-btns \{[\s\S]*right:\s*var\(--hud-action-right\)/);
 });
 
 test('expanded quest tracker still misses the minimap', () => {
