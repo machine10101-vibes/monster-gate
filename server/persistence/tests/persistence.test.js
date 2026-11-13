@@ -35,7 +35,7 @@ test('save/load round trip keeps xp, bag, gear, bank and quests', async () => {
     goods: { copper_ore: 3, birch_logs: 2 },
     materials: { budgescale: 4 },
     stock: { potion: 2 },
-    bank: [{ k: 'good', id: 'tin_ore', n: 5 }],
+    bank: [{ k: 'good', id: 'copper_ore', n: 5 }],
     equipment: { weapon: null, armor: {} },
     journal: { quests: { restless: { started: true, step: 1, n: 0 } } },
     position: { zone: 'over', x: 80, y: 4, z: 70, yaw: 1.2 },
@@ -49,7 +49,7 @@ test('save/load round trip keeps xp, bag, gear, bank and quests', async () => {
   assert.equal(row.state.goods.copper_ore, 3);
   assert.equal(row.state.materials.budgescale, 4);
   assert.equal(row.state.stock.potion, 2);
-  assert.equal(row.state.storage[0].id, 'tin_ore');
+  assert.equal(row.state.storage[0].id, 'copper_ore');
   assert.equal(row.state.journal.quests.restless.started, true);
   assert.equal(row.state.hunter.x, 80);
   assert.equal(row.state.hunter.z, 70);

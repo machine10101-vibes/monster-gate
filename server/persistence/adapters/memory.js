@@ -1,4 +1,19 @@
 import { alreadyImported, conflict, invalid, nameTaken, notFound } from '../errors.js';
+import {
+  FRIEND_STATUS,
+  assertCanAccept,
+  assertCanRequest,
+  assertNotSelf,
+  decideRequest,
+  emptyFriendsList,
+  findPair,
+  friendPeer,
+  friendRequestResult,
+  hunterNotFound,
+  listFromRows,
+  pairKey,
+  parseTarget,
+} from '../friends.js';
 import { requireUserId } from '../ids.js';
 import { requireName } from '../names.js';
 import { blankState, characterView, columnsFromState, sanitizeState } from '../schema.js';
@@ -10,6 +25,7 @@ import { blankState, characterView, columnsFromState, sanitizeState } from '../s
 export function createMemoryAdapter() {
   const byUser = new Map();
   const names = new Map();
+  const friendships = new Map();
   let writes = 0;
 
   function rowOf(userId) {
@@ -107,7 +123,105 @@ export function createMemoryAdapter() {
     reset() {
       byUser.clear();
       names.clear();
+      friendships.clear();
       writes = 0;
     },
+
+    async listFriends(userId) {
+      const id = requireUserId(userId);
+      const rows = [...friendships.values()];
+      if (!rows.length) return emptyFriendsList();
+      return listFromRows(id, rows, (uid) => rowOf(uid)?.name || null);
+    },
+
+    async requestFriend(fromUserId, toUserIdOrName) {
+      const from = requireUserId(fromUserId);
+      const to = resolveHunter(toUserIdOrName);
+      assertNotSelf(from, to.userId);
+      const fromRow = rowOf(from);
+      if (!fromRow) throw hunterNotFound(from);
+      const rows = [...friendships.values()];
+      const existing = findPair(rows, from, to.userId);
+      const decision = decideRequest(from, to.userId, existing);
+      if (decision.action === 'idempotent') {
+        return friendRequestResult(FRIEND_STATUS.pending, peerOf(from), to);
+      }
+      if (decision.action === 'auto_accept') {
+        assertCanAccept(from, to.userId, rows);
+        const now = new Date().toISOString();
+        const next = { ...decision.row, status: FRIEND_STATUS.accepted, updatedAt: now };
+        friendships.set(pairKey(from, to.userId), next);
+        writes += 1;
+        return friendRequestResult(FRIEND_STATUS.accepted, to, peerOf(from));
+      }
+      assertCanRequest(from, to.userId, rows);
+      const now = new Date().toISOString();
+      friendships.set(pairKey(from, to.userId), {
+        requesterId: from,
+        targetId: to.userId,
+        status: FRIEND_STATUS.pending,
+        createdAt: now,
+        updatedAt: now,
+      });
+      writes += 1;
+      return friendRequestResult(FRIEND_STATUS.pending, peerOf(from), to);
+    },
+
+    async acceptFriend(userId, otherUserId) {
+      const id = requireUserId(userId);
+      const other = requireUserId(otherUserId);
+      assertNotSelf(id, other);
+      const rows = [...friendships.values()];
+      const existing = findPair(rows, id, other);
+      if (!existing || existing.status !== FRIEND_STATUS.pending || existing.targetId !== id) {
+        throw hunterNotFound(other);
+      }
+      assertCanAccept(id, other, rows);
+      const now = new Date().toISOString();
+      const next = { ...existing, status: FRIEND_STATUS.accepted, updatedAt: now };
+      friendships.set(pairKey(id, other), next);
+      writes += 1;
+      return friendRequestResult(FRIEND_STATUS.accepted, peerOf(existing.requesterId), peerOf(existing.targetId));
+    },
+
+    async declineFriend(userId, otherUserId) {
+      const id = requireUserId(userId);
+      const other = requireUserId(otherUserId);
+      assertNotSelf(id, other);
+      const existing = findPair([...friendships.values()], id, other);
+      if (!existing || existing.status !== FRIEND_STATUS.pending || existing.targetId !== id) {
+        throw hunterNotFound(other);
+      }
+      friendships.delete(pairKey(id, other));
+      writes += 1;
+      return { ok: true, userId: id, otherUserId: other };
+    },
+
+    async removeFriend(userId, otherUserId) {
+      const id = requireUserId(userId);
+      const other = requireUserId(otherUserId);
+      assertNotSelf(id, other);
+      const existing = findPair([...friendships.values()], id, other);
+      if (!existing || existing.status !== FRIEND_STATUS.accepted) throw hunterNotFound(other);
+      friendships.delete(pairKey(id, other));
+      writes += 1;
+      return { ok: true, userId: id, otherUserId: other };
+    },
   };
+
+  function resolveHunter(toUserIdOrName) {
+    const target = parseTarget(toUserIdOrName);
+    if (target.kind === 'id') {
+      const row = rowOf(target.value);
+      if (!row) throw hunterNotFound(target.value);
+      return friendPeer(target.value, row.name);
+    }
+    const owner = names.get(target.value.toLowerCase());
+    if (!owner) throw hunterNotFound(target.value);
+    return friendPeer(owner, rowOf(owner)?.name || null);
+  }
+
+  function peerOf(userId) {
+    return friendPeer(userId, rowOf(userId)?.name || null);
+  }
 }

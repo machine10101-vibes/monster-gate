@@ -1,3 +1,4 @@
+import { emptyFriendsList, hunterNotFound, parseTarget, selfFriend } from '../friends.js';
 import { requireUserId } from '../ids.js';
 import { requireName } from '../names.js';
 import { blankState, characterView, columnsFromState, sanitizeState } from '../schema.js';
@@ -59,6 +60,36 @@ export function createNoopAdapter() {
     },
     async markImported() {
       return null;
+    },
+    async listFriends(userId) {
+      requireUserId(userId);
+      return emptyFriendsList();
+    },
+    async requestFriend(fromUserId, toUserIdOrName) {
+      const from = requireUserId(fromUserId);
+      const target = parseTarget(toUserIdOrName);
+      if (target.kind === 'name') throw hunterNotFound(target.value);
+      const to = requireUserId(target.value);
+      if (from === to) throw selfFriend();
+      throw hunterNotFound(to);
+    },
+    async acceptFriend(userId, otherUserId) {
+      const id = requireUserId(userId);
+      const other = requireUserId(otherUserId);
+      if (id === other) throw selfFriend();
+      throw hunterNotFound(other);
+    },
+    async declineFriend(userId, otherUserId) {
+      const id = requireUserId(userId);
+      const other = requireUserId(otherUserId);
+      if (id === other) throw selfFriend();
+      throw hunterNotFound(other);
+    },
+    async removeFriend(userId, otherUserId) {
+      const id = requireUserId(userId);
+      const other = requireUserId(otherUserId);
+      if (id === other) throw selfFriend();
+      throw hunterNotFound(other);
     },
   };
 }
