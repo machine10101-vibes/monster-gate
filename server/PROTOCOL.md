@@ -40,7 +40,7 @@ worldView.setStatus('waking', { secondsLeft, elapsedMs })
 
 A `name_taken` error (duplicate hunter name) is fatal. The client calls `setStatus('error', { code: 'name_taken', message })` and does not reconnect.
 
-`GET /healthz` sends CORS headers so the GitHub Pages origin (`https://machine10101-vibes.github.io`) can read the response.
+`GET /healthz` sends CORS headers so the live client origins can read the response: `https://monstergate.online`, `http://monstergate.online` (until HTTPS is enforced), `https://www.monstergate.online`, and `https://machine10101-vibes.github.io` (the old Pages URL, which 301s to the custom domain). The WebSocket origin check uses the same list (`ALLOWED_ORIGINS`).
 
 ## Auth
 

@@ -16,4 +16,4 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://machine10101-vibes.github.io
+        value: "https://monstergate.online,http://monstergate.online,https://www.monstergate.online,https://machine10101-vibes.github.io"

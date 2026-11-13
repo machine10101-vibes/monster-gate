@@ -85,7 +85,7 @@ A copy of this Dockerfile also lives at the repo root.
 ```bash
 fly launch --no-deploy
 fly secrets set SUPABASE_URL=... SUPABASE_JWT_SECRET=... SUPABASE_SERVICE_ROLE_KEY=...
-fly secrets set ALLOWED_ORIGINS=https://machine10101-vibes.github.io
+fly secrets set ALLOWED_ORIGINS=https://monstergate.online,http://monstergate.online,https://www.monstergate.online,https://machine10101-vibes.github.io
 fly deploy
 ```
 
@@ -97,7 +97,7 @@ New service from this repo. Start command: `npm run start:server`. Use Railway's
 
 ## Render
 
-`render.yaml` at the repo root is a **free** native Node web service. Build: `npm run ci:server` (`npm ci` at the repo root, then `npm ci --prefix server/persistence`, so `@supabase/supabase-js` is installed). Start: `npm run start:server`. Health check: `/healthz`. Set `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as dashboard secrets (`sync: false`). `ALLOWED_ORIGINS` is `https://machine10101-vibes.github.io` so the GitHub Pages client can read `/healthz` (CORS). Do not set `ALLOW_DEV_TOKENS`.
+`render.yaml` at the repo root is a **free** native Node web service. Build: `npm run ci:server` (`npm ci` at the repo root, then `npm ci --prefix server/persistence`, so `@supabase/supabase-js` is installed). Start: `npm run start:server`. Health check: `/healthz`. Set `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as dashboard secrets (`sync: false`). `ALLOWED_ORIGINS` is `https://monstergate.online`, `http://monstergate.online` (until HTTPS is enforced), `https://www.monstergate.online`, and `https://machine10101-vibes.github.io`, so those clients can open the WebSocket and read `/healthz` (CORS). Do not set `ALLOW_DEV_TOKENS`.
 
 The free plan sleeps when nobody is connected and takes about 30 seconds to wake. `src/net/mmo.js` probes `/healthz` first and calls `worldView.setStatus('waking', { secondsLeft, elapsedMs })` (countdown from 30) until the process answers, then `connecting` and `online`.
 
@@ -106,7 +106,9 @@ The free plan sleeps when nobody is connected and takes about 30 seconds to wake
 Pages stays offline unless the flag is set:
 
 ```
-https://machine10101-vibes.github.io/monster-gate/?mmo=1&world=wss://YOUR_HOST
+https://monstergate.online/?mmo=1&world=wss://YOUR_HOST
 ```
 
-Optional build-time default: `VITE_WORLD_URL=wss://YOUR_HOST`. Leave unset for the public GitHub Pages build. `?mmo=1&mock=1` is the local crowd only (no socket).
+The old GitHub Pages URL `https://machine10101-vibes.github.io/monster-gate/` redirects (301) to the custom domain.
+
+Optional build-time default: `VITE_WORLD_URL=wss://YOUR_HOST`. Leave unset for the public build. `?mmo=1&mock=1` is the local crowd only (no socket).
