@@ -180,8 +180,10 @@ A hunter with no frames for 30 s is disconnected.
 ### welcome
 
 ```json
-{ "v": 1, "type": "welcome", "protocol": 1, "tickHz": 15, "aoi": 96, "aoiNear": 32, "farHz": 4, "zoneCap": 150, "resumeToken": "…", "resumed": false, "you": { "id": "u_…", "name": "Hunter", "guest": false } }
+{ "v": 1, "type": "welcome", "protocol": 1, "tickHz": 15, "aoi": 96, "aoiNear": 32, "farHz": 4, "zoneCap": 150, "resumeToken": "…", "resumed": false, "you": { "id": "u_…", "name": "Hunter", "guest": false, "user_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" }, "features": ["friends", "party", "whisper", "block"] }
 ```
+
+`features` is always that list, in that order, so the client can leave Online-only mode. `you.user_id` is the account id from the login token (`auth.users.id`), never a wallet address. After `welcome` the server also pushes `friend_list` and `party_state` (`party: null` when the hunter is not in a party).
 
 ### snapshot
 
@@ -228,6 +230,116 @@ AOI patch. Nearby hunters (≤ 32 units) are considered at 15 Hz; the outer ring
 { "v": 1, "type": "pong", "t": 1731500000000 }
 ```
 
+### friend_request / friend_accept / friend_decline / friend_remove / friend_list
+
+Friends are keyed by account `user_id`. Lookup by hunter `name` is resolved server-side (case-insensitive, trimmed, 16 characters). Guests cannot use friends (`error` `auth`). A hunter may have at most **100** accepted friends (pending outgoing requests count toward the cap too).
+
+```json
+{ "v": 1, "type": "friend_request", "name": "Bram" }
+{ "v": 1, "type": "friend_request", "user_id": "uuid" }
+{ "v": 1, "type": "friend_accept", "user_id": "uuid" }
+{ "v": 1, "type": "friend_decline", "user_id": "uuid" }
+{ "v": 1, "type": "friend_remove", "user_id": "uuid" }
+{ "v": 1, "type": "friend_list" }
+```
+
+`friend_list` is also pushed on welcome and whenever the list changes.
+
+### block / unblock / ignore / unignore
+
+Block: they cannot friend, invite, or whisper you; you do not see their world or zone chat. Ignore: drop whispers and invites, still see them in the world. These lists are capped at 100 each.
+
+```json
+{ "v": 1, "type": "block", "user_id": "uuid" }
+{ "v": 1, "type": "unblock", "user_id": "uuid" }
+{ "v": 1, "type": "ignore", "user_id": "uuid" }
+{ "v": 1, "type": "unignore", "user_id": "uuid" }
+```
+
+### party_invite / party_accept / party_decline / party_leave / party_kick / party_promote
+
+Parties are in-memory on the world server (not a save file). Max **4** including the leader. Invites expire after **60 seconds**. The target must be online. Only the leader may kick or promote. You cannot kick yourself (leave instead). A hunter may have one pending incoming party invite; a new invite from the same leader replaces the old one, and an invite from another leader returns `busy`. The party disbands when fewer than two members remain. If the leader leaves or disconnects, the oldest remaining member is promoted.
+
+```json
+{ "v": 1, "type": "party_invite", "id": "u_…" }
+{ "v": 1, "type": "party_invite", "name": "Nessa" }
+{ "v": 1, "type": "party_accept", "invite_id": "pinv_…" }
+{ "v": 1, "type": "party_decline", "invite_id": "pinv_…" }
+{ "v": 1, "type": "party_leave" }
+{ "v": 1, "type": "party_kick", "id": "u_…" }
+{ "v": 1, "type": "party_promote", "id": "u_…" }
+```
+
+### whisper
+
+```json
+{ "v": 1, "type": "whisper", "to": "u_…", "text": "Meet at the well." }
+{ "v": 1, "type": "chat", "channel": "whisper", "to": "u_…", "text": "Meet at the well." }
+```
+
+Text is trimmed to 120 characters, same rate as chat. The server echoes a `chat` frame with `channel: "whisper"` to both sides.
+
+## Server → client (social)
+
+### friend_list
+
+```json
+{
+  "v": 1,
+  "type": "friend_list",
+  "friends": [
+    { "user_id": "uuid", "id": "u_…", "name": "Bram", "presence": "online", "zone": "Oakhollow" }
+  ],
+  "pending_in": [{ "user_id": "uuid", "name": "Rowan" }],
+  "pending_out": [{ "user_id": "uuid", "name": "Mira" }],
+  "blocked": [{ "user_id": "uuid", "name": "Pik" }],
+  "ignored": []
+}
+```
+
+### friend_presence
+
+Pushed to accepted friends on join, zone change, and disconnect.
+
+```json
+{ "v": 1, "type": "friend_presence", "user_id": "uuid", "id": "u_…", "name": "Bram", "presence": "online", "zone": "Greyrock Pit" }
+{ "v": 1, "type": "friend_presence", "user_id": "uuid", "presence": "offline", "zone": "" }
+```
+
+### friend_request (incoming)
+
+```json
+{ "v": 1, "type": "friend_request", "from": { "user_id": "uuid", "name": "Rowan" } }
+```
+
+### party_invite (incoming)
+
+```json
+{ "v": 1, "type": "party_invite", "invite_id": "pinv_1", "from": { "id": "u_…", "name": "Nessa" }, "expires_at": 1731500060000 }
+```
+
+### party_state
+
+Pushed on every membership, HP, or zone change. `party: null` means you are not in a party.
+
+```json
+{
+  "v": 1,
+  "type": "party_state",
+  "party": {
+    "id": "pty_…",
+    "leader": "u_nessa",
+    "loot": "round_robin",
+    "loot_turn": 0,
+    "members": [
+      { "id": "u_nessa", "user_id": "uuid", "name": "Nessa", "hp": 18, "max_hp": 20, "zone": "Whispering Wood", "online": true }
+    ]
+  }
+}
+```
+
+Shared XP and loot (`loot_roll` / `loot_result`, 8% bonus per extra member in-zone) are defined in `docs/SOCIAL_SPEC.md`. The world server will apply those integers once combat resolution exists. `loot` on `party_state` is `round_robin` (default) or `need_greed`.
+
 ### error
 
 ```json
@@ -241,11 +353,26 @@ AOI patch. Nearby hunters (≤ 32 units) are considered at 15 Hz; the outer ring
 | `auth` | missing / invalid token; guests are rejected |
 | `persist` | character load / create failed |
 | `name_taken` | the hunter name is already used by another account. Message: "That hunter name is already taken." The socket is closed. |
-| `rate` | move or chat too fast |
+| `rate` | move, chat, or a social action too fast |
 | `teleport` | move jumped further than 40 units |
 | `chat` | empty / invalid channel |
 | `gather` | unknown node, not ready, or too far |
 | `zone_full` | the place already has `ZONE_CAP` hunters (default 150). The socket is closed on hello; a move into a full zone is rejected and the last pose is kept. |
+| `not_found` | name or id is not a hunter |
+| `self` | friend or invite targeting yourself |
+| `already` | already friends, already in this party, already blocked |
+| `pending` | a request or invite is already waiting |
+| `full` | friends cap 100, or party already has 4 |
+| `blocked` | you blocked them, or they blocked you |
+| `ignored` | they ignore you (invites and whispers dropped) |
+| `expired` | party invite older than 60 s |
+| `offline` | party invite to someone who is not online |
+| `not_leader` | kick or promote from a member |
+| `not_in_party` | leave, kick, or promote with no party |
+| `in_party` | target is already in another party |
+| `name` | empty or invalid hunter name |
+| `whisper` | whisper failed (offline, blocked, or feature off) |
+| `busy` | target has a pending invite from another leader |
 
 ## Limits
 
@@ -256,6 +383,9 @@ AOI patch. Nearby hunters (≤ 32 units) are considered at 15 Hz; the outer ring
 | Zone cap | `ZONE_CAP` default 150 per place name; `0` disables the cap |
 | Move | 12 messages / s; 16 u/s clamp; 40 u teleport reject |
 | Chat | 2 / s, 6 / 10 s, 120 characters |
+| Social | 4 / s, 20 / 10 s (friends, party, block, ignore) |
+| Friends | 100 accepted (+ outgoing pending) per account `user_id` |
+| Party | 4 hunters including the leader; invites expire after 60 s |
 | Heartbeat | ping/pong; idle 30 s |
 | Resume | 60 s after disconnect |
 | Save | debounced during play; immediate on disconnect; `flushAll` on SIGTERM |

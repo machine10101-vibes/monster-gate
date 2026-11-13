@@ -75,9 +75,12 @@ const blankRow = {
   updated_at: '2026-11-13T00:00:00.000Z',
 };
 
-test('index re-exports PersistErrorCodes including NAME_TAKEN', () => {
+test('index re-exports PersistErrorCodes including NAME_TAKEN and friends codes', () => {
   assert.equal(PublicCodes.NAME_TAKEN, 'name_taken');
   assert.equal(PublicCodes.CONFLICT, 'conflict');
+  assert.equal(PublicCodes.FRIEND_CAP, 'friend_cap');
+  assert.equal(PublicCodes.ALREADY_FRIENDS, 'already_friends');
+  assert.equal(PublicCodes.SELF, 'self');
   assert.deepEqual(PublicCodes, PersistErrorCodes);
 });
 
@@ -130,6 +133,83 @@ test('supabase adapter rename maps name 23505 to name_taken', async () => {
   await assert.rejects(
     () => adapter.save(USER_B, { ...other.state, name: 'Dara' }, { expectedVersion: 1 }),
     isNameTaken,
+  );
+});
+
+const FRIEND_23505 = {
+  code: '23505',
+  message: 'duplicate key value violates unique constraint "friendships_pair_uniq"',
+  details: 'Key (least(requester_id, target_id), greatest(requester_id, target_id)) already exists.',
+};
+
+const FRIEND_SELF_23514 = {
+  code: '23514',
+  message: 'new row for relation "friendships" violates check constraint "friendships_no_self"',
+};
+
+test('mapSupabaseError: friendships unique is already_friends, not name_taken', () => {
+  const dup = mapSupabaseError(FRIEND_23505, { table: 'friendships' });
+  assert.equal(dup.code, PersistErrorCodes.ALREADY_FRIENDS);
+  assert.notEqual(dup.code, PersistErrorCodes.NAME_TAKEN);
+  assert.notEqual(dup.code, PersistErrorCodes.UNAVAILABLE);
+
+  const named = mapSupabaseError(FRIEND_23505);
+  assert.equal(named.code, PersistErrorCodes.ALREADY_FRIENDS);
+});
+
+test('mapSupabaseError: friendships self-check is self', () => {
+  const err = mapSupabaseError(FRIEND_SELF_23514, { table: 'friendships' });
+  assert.equal(err.code, PersistErrorCodes.SELF);
+  assert.equal(err.message, 'That hunter is you.');
+});
+
+function friendsClient({ insertError }) {
+  const hunters = [
+    { user_id: USER, name: 'Arden' },
+    { user_id: USER_B, name: 'Bram' },
+  ];
+  return {
+    from(table) {
+      const q = {
+        _op: 'select',
+        select() { return q; },
+        insert() { q._op = 'insert'; return q; },
+        update() { q._op = 'update'; return q; },
+        delete() { q._op = 'delete'; return q; },
+        eq() { return q; },
+        or() { return q; },
+        in() { return q; },
+        ilike() { return q; },
+        is() { return q; },
+        single: async () => {
+          if (table === 'friendships' && q._op === 'insert') {
+            return { data: null, error: insertError };
+          }
+          return { data: hunters[0], error: null };
+        },
+        maybeSingle: async () => {
+          if (table === 'characters') return { data: hunters[1], error: null };
+          return { data: null, error: null };
+        },
+        then(resolve, reject) {
+          if (table === 'characters') {
+            return Promise.resolve({ data: hunters, error: null }).then(resolve, reject);
+          }
+          return Promise.resolve({ data: [], error: null, count: 0 }).then(resolve, reject);
+        },
+      };
+      return q;
+    },
+  };
+}
+
+test('supabase adapter requestFriend maps pair 23505 to already_friends', async () => {
+  const adapter = createSupabaseAdapter({
+    client: friendsClient({ insertError: FRIEND_23505 }),
+  });
+  await assert.rejects(
+    () => adapter.requestFriend(USER, USER_B),
+    (err) => err instanceof PersistenceError && err.code === PersistErrorCodes.ALREADY_FRIENDS,
   );
 });
 

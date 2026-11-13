@@ -124,6 +124,27 @@ export function createPersistence(options = {}) {
       signals.length = 0;
       await queue.close();
     },
+
+    async listFriends(userId) {
+      return adapter.listFriends(requireUserId(userId));
+    },
+
+    async requestFriend(fromUserId, toUserIdOrName) {
+      requireUserId(fromUserId);
+      return adapter.requestFriend(fromUserId, toUserIdOrName);
+    },
+
+    async acceptFriend(userId, otherUserId) {
+      return adapter.acceptFriend(requireUserId(userId), requireUserId(otherUserId));
+    },
+
+    async declineFriend(userId, otherUserId) {
+      return adapter.declineFriend(requireUserId(userId), requireUserId(otherUserId));
+    },
+
+    async removeFriend(userId, otherUserId) {
+      return adapter.removeFriend(requireUserId(userId), requireUserId(otherUserId));
+    },
   };
 }
 

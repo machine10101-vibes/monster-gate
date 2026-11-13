@@ -1,4 +1,5 @@
 import { CHAT_PER_10S, CHAT_PER_SEC, MOVE_PER_SEC, SPEED_MAX, TELEPORT_MAX } from './protocol.js';
+import { SOCIAL_PER_10S, SOCIAL_PER_SEC } from './friends.js';
 
 /** Token bucket. `now` is ms. */
 export function createBucket(ratePerSec, burst, now) {
@@ -20,7 +21,9 @@ export function createBucket(ratePerSec, burst, now) {
 export function createLimiter(now = () => Date.now()) {
   const move = createBucket(MOVE_PER_SEC, MOVE_PER_SEC, now);
   const chat = createBucket(CHAT_PER_SEC, CHAT_PER_SEC, now);
+  const social = createBucket(SOCIAL_PER_SEC, SOCIAL_PER_SEC, now);
   const chatWindow = [];
+  const socialWindow = [];
   return {
     allowMove() {
       return move.take();
@@ -31,6 +34,14 @@ export function createLimiter(now = () => Date.now()) {
       while (chatWindow.length && t - chatWindow[0] > 10_000) chatWindow.shift();
       if (chatWindow.length >= CHAT_PER_10S) return false;
       chatWindow.push(t);
+      return true;
+    },
+    allowSocial() {
+      if (!social.take()) return false;
+      const t = now();
+      while (socialWindow.length && t - socialWindow[0] > 10_000) socialWindow.shift();
+      if (socialWindow.length >= SOCIAL_PER_10S) return false;
+      socialWindow.push(t);
       return true;
     },
   };

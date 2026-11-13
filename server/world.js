@@ -11,6 +11,7 @@ import {
   ProtocolError,
 } from './protocol.js';
 import { PersistErrorCodes } from './persistence/index.js';
+import { createSocialRuntime, WELCOME_FEATURES } from './social.js';
 import { openPersistence } from './store.js';
 
 function send(ws, type, extra) {
@@ -48,6 +49,13 @@ export class World {
     this.nodes = opts.nodes || createNodes();
     this.byNode = new Map(this.nodes.map((n) => [n.id, n]));
     this.pendingSaves = [];
+    this._send = send;
+    this.social = opts.social || createSocialRuntime(this, {
+      friends: opts.friends,
+      friendsCap: opts.friendsCap,
+      partyMax: opts.partyMax,
+      inviteTtl: opts.inviteTtl,
+    });
   }
 
   async idle() {
@@ -135,7 +143,10 @@ export class World {
         return;
       }
       if (msg.type === TYPES.move) this.move(session, msg);
+      else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.whisper(session, msg);
       else if (msg.type === TYPES.chat) this.chat(session, msg);
+      else if (msg.type === TYPES.whisper) await this.social.whisper(session, { ...msg, to: msg.to });
+      else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
@@ -244,6 +255,7 @@ export class World {
     this.byUser.set(ident.userId, session);
     const token = this.rememberResume(session);
 
+    session.maxHp = session.maxHp ?? 20;
     send(session.ws, TYPES.welcome, {
       protocol: PROTOCOL,
       tickHz: TICK_HZ,
@@ -253,10 +265,12 @@ export class World {
       zoneCap: this.zoneCap,
       resumeToken: token,
       resumed: !!slot,
-      you: { id: session.id, name: session.name, guest: false },
+      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
+      features: WELCOME_FEATURES,
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
+    await this.social.onJoin(session);
   }
 
   nearbyPlayers(session) {
@@ -295,8 +309,10 @@ export class World {
       return;
     }
     const prevZone = session.zone;
+    const prevHp = session.hp;
     const prevX = session.x, prevY = session.y, prevZ = session.z, prevYaw = session.yaw;
     Object.assign(session, result.pose);
+    if (next.hp != null) session.hp = next.hp;
     if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
     }
@@ -312,6 +328,8 @@ export class World {
     this.dirty.add(session.id);
     const zoneChanged = session.zone !== prevZone;
     if (zoneChanged) this.sendSnapshot(session);
+    this.social.onZone(session, prevZone);
+    this.social.onHp(session, prevHp);
     this.persistPose(session);
   }
 
@@ -331,6 +349,7 @@ export class World {
     };
     for (const other of this.players.values()) {
       if (channel === 'zone' && other.zone !== session.zone) continue;
+      if (this.social.hidesChat(other, session)) continue;
       send(other.ws, TYPES.chat, frame);
     }
   }
@@ -378,6 +397,7 @@ export class World {
       this.players.delete(session.id);
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
       this.dirty.delete(session.id);
+      this.social.onLeave(session);
       this.rememberResume(session);
       const online = this.players.size;
       for (const other of this.players.values()) {
@@ -437,6 +457,8 @@ export class World {
     for (const expired of [...this.resume.values()]) {
       if (t - expired.at > RESUME_MS) this.resume.delete(expired.token);
     }
+
+    this.social.parties.expire();
 
     this.tickCount += 1;
     const farTick = this.tickCount % this.farEvery === 0;
@@ -548,6 +570,10 @@ export async function createWorldServer(options = {}) {
     zoneCap: options.zoneCap,
     monsters: options.monsters,
     nodes: options.nodes,
+    friends: options.friends,
+    friendsCap: options.friendsCap,
+    partyMax: options.partyMax,
+    inviteTtl: options.inviteTtl,
   });
   const allowed = options.allowedOrigins || parseOrigins(world.env);
   const server = http.createServer((req, res) => {

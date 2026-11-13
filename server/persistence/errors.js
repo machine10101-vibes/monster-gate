@@ -7,6 +7,9 @@ export const PersistErrorCodes = {
   NAME_TAKEN: 'name_taken',
   ALREADY_IMPORTED: 'already_imported',
   UNAVAILABLE: 'unavailable',
+  FRIEND_CAP: 'friend_cap',
+  ALREADY_FRIENDS: 'already_friends',
+  SELF: 'self',
 };
 
 export const NAME_TAKEN_MESSAGE = 'That hunter name is already taken.';
@@ -42,4 +45,20 @@ export function alreadyImported(character) {
 
 export function unavailable(message, extra) {
   return new PersistenceError(PersistErrorCodes.UNAVAILABLE, message, extra);
+}
+
+export function friendCap(userId, extra) {
+  return new PersistenceError(PersistErrorCodes.FRIEND_CAP, 'Friends list is full (100).', { userId, ...extra });
+}
+
+export function alreadyFriends(userId, otherUserId) {
+  return new PersistenceError(PersistErrorCodes.ALREADY_FRIENDS, 'Already friends.', { userId, otherUserId });
+}
+
+export function selfFriend() {
+  return new PersistenceError(PersistErrorCodes.SELF, 'That hunter is you.');
+}
+
+export function hunterNotFound(query) {
+  return new PersistenceError(PersistErrorCodes.NOT_FOUND, 'No hunter by that name.', { query });
 }

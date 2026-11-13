@@ -33,6 +33,11 @@ export async function startWorld(extra = {}) {
     nodes: extra.nodes,
     allowedOrigins: extra.allowedOrigins,
     env: extra.env,
+    now: extra.now,
+    friends: extra.friends,
+    friendsCap: extra.friendsCap,
+    partyMax: extra.partyMax,
+    inviteTtl: extra.inviteTtl,
   });
   srv.url = `ws://127.0.0.1:${srv.port}`;
   return srv;

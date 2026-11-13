@@ -29,20 +29,30 @@ node --test server/persistence/tests/*.test.js
 
 Copy `.env.example`. Do not commit secrets.
 
-## Migration to apply
+## Migrations to apply
 
 `supabase/migrations/20261113150000_characters.sql`
+`supabase/migrations/20261113200000_friendships.sql`
 
 ```bash
 supabase db push
 # or, against a remote DB:
 psql "$DATABASE_URL" -f supabase/migrations/20261113150000_characters.sql
+psql "$DATABASE_URL" -f supabase/migrations/20261113200000_friendships.sql
 ```
 
 Table `public.characters`: one row per `auth.users` id, unique hunter name,
 jsonb `state` plus typed `zone/x/y/z/gold/last_seen/version`. RLS lets an
 authenticated player **select their own row**. Inserts, updates, and deletes
 are granted only to `service_role`.
+
+Table `public.friendships`: one row per unordered pair (`requester_id`,
+`target_id`, `status` pending/accepted, plus reserved blocked/ignored). Both
+ids reference `auth.users` on delete cascade. A check forbids self-friends.
+`friendships_pair_uniq` on `least/greatest` keeps a pair from existing twice
+while pending or accepted. RLS: authenticated users may **select rows they
+are on**; writes are `service_role` only. Never keyed by wallet. Parties are
+not stored here.
 
 ## How the world server should call it
 
@@ -59,6 +69,10 @@ if (!character) {
 }
 // Optional, once: fold a browser hunt into this row (clamped).
 // await persist.importLocalSave(userId, localSaveJson);
+
+const social = await persist.listFriends(userId);
+// await persist.requestFriend(userId, 'Bram');
+// await persist.acceptFriend(userId, otherUserId);
 
 // During play, after the authoritative state changes:
 await persist.saveCharacter(userId, state); // debounced / batched
@@ -89,6 +103,11 @@ Validation, unique-name, and version-conflict errors are not retried.
 | `createCharacter(userId, name, { look, state })` | New row, version `1` |
 | `saveCharacter(userId, state, { immediate, expectedVersion })` | Queued `{ ok, queued }` or the saved row when `immediate` |
 | `importLocalSave(userId, localSaveJson)` | Clamped import; rejects if `imported_at` is already set |
+| `listFriends(userId)` | `{ friends, pendingIn, pendingOut }` of `{ userId, name }` |
+| `requestFriend(fromUserId, toUserIdOrName)` | `{ status: 'pending'\|'accepted', from, to }` |
+| `acceptFriend(userId, otherUserId)` | `{ status: 'accepted', from, to }` |
+| `declineFriend(userId, otherUserId)` | `{ ok, userId, otherUserId }` |
+| `removeFriend(userId, otherUserId)` | `{ ok, userId, otherUserId }` |
 | `flush(userId)` / `flushAll()` | Drain the save queue |
 | `installShutdownHandlers()` | SIGTERM + SIGINT → `flushAll()` |
 | `close()` | Flush, drop handlers, stop the interval |
@@ -115,11 +134,25 @@ try {
 | `PersistErrorCodes` | `code` | When |
 | --- | --- | --- |
 | `INVALID` | `invalid` | bad UUID, name, or payload |
-| `NOT_FOUND` | `not_found` | save before create |
+| `NOT_FOUND` | `not_found` | save before create, or hunter name/id is unknown (`No hunter by that name.`) |
 | `CONFLICT` | `conflict` | stale `version` |
 | `NAME_TAKEN` | `name_taken` | unique hunter name (`createCharacter` or rename). Postgres `23505` on `characters_name_lower_idx` maps here, not to `unavailable`. |
 | `ALREADY_IMPORTED` | `already_imported` | local save already folded in |
 | `UNAVAILABLE` | `unavailable` | database / network after retries |
+| `FRIEND_CAP` | `friend_cap` | 100 accepted friends (checked on both sides at accept; requester list size includes outgoing pending) |
+| `ALREADY_FRIENDS` | `already_friends` | pair is already accepted (or friendships unique `23505` after reload) |
+| `SELF` | `self` | friend request / accept / decline / remove targeting yourself |
+
+Friends rules: lookup is case-insensitive by hunter name on `characters`, or by
+`user_id`. Same-direction pending is idempotent (returns the existing pending
+row). A request to someone who already requested you auto-accepts. Cap is 100
+accepted friends per account (`FRIEND_CAP`). Wire-protocol presence/zone is
+not stored; the world server fills those from the socket map.
+
+Wire-spec deviations vs `docs/SOCIAL_SPEC.md`: persist codes use `friend_cap`
+and `already_friends` (not `full` / `already`) so the world server can map
+them; one row per unordered pair instead of two accepted rows, because the
+order-independent unique constraint forbids a duplicate pair.
 
 ## State shape
 

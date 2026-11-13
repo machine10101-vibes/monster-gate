@@ -15,6 +15,12 @@ import { PROTOCOL, TYPES, encode, parseFrame, parseWorldFlags, resolveWorldUrl }
 export { PROTOCOL, TYPES, encode, parseFrame, parseWorldFlags, resolveWorldUrl };
 
 const SESSION_KEY = 'monster-gate-account-session';
+const ACCOUNT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isAccountId(value) {
+  return ACCOUNT_ID_RE.test(String(value || '').trim());
+}
+
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
 const PING_MS = 15_000;
 export const WAKE_ETA_SEC = 30;
@@ -95,6 +101,7 @@ export class MmoClient {
     this.timer = 0;
     this.pingTimer = 0;
     this.you = null;
+    this.features = [];
     this.resumeToken = '';
     this.bound = false;
     this.fatal = false;
@@ -273,6 +280,7 @@ export class MmoClient {
     if (!msg) return;
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
+      this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
       this.setStatus('online', { online: msg.online });
     } else if (msg.type === TYPES.snapshot) {
@@ -336,6 +344,42 @@ export class MmoClient {
       monsters: patch(this.entities.monsters, entities.monsters),
       nodes: patch(this.entities.nodes, entities.nodes),
     };
+  }
+
+  send(type, extra = {}) {
+    if (!this.ws || this.ws.readyState !== 1 || !type) return;
+    this.ws.send(encode(type, extra));
+  }
+
+  friendRequest(target) {
+    const value = String(target || '').trim();
+    const extra = isAccountId(value) ? { user_id: value } : { name: value };
+    return this.send('friend_request', extra);
+  }
+
+  friendAccept(userId) { return this.send('friend_accept', { user_id: userId }); }
+  friendDecline(userId) { return this.send('friend_decline', { user_id: userId }); }
+  friendRemove(userId) { return this.send('friend_remove', { user_id: userId }); }
+  friendList() { return this.send('friend_list'); }
+  blockPlayer(userId) { return this.send('block', { user_id: userId }); }
+  unblockPlayer(userId) { return this.send('unblock', { user_id: userId }); }
+  ignorePlayer(userId) { return this.send('ignore', { user_id: userId }); }
+  unignorePlayer(userId) { return this.send('unignore', { user_id: userId }); }
+
+  partyInvite(target) {
+    const value = String(target || '').trim();
+    const extra = value.length <= 16 && !value.includes('_') ? { name: value } : { id: value };
+    return this.send('party_invite', extra);
+  }
+
+  partyAccept(inviteId) { return this.send('party_accept', { invite_id: inviteId }); }
+  partyDecline(inviteId) { return this.send('party_decline', { invite_id: inviteId }); }
+  partyLeave() { return this.send('party_leave'); }
+  partyKick(id) { return this.send('party_kick', { id }); }
+  partyPromote(id) { return this.send('party_promote', { id }); }
+
+  sendWhisper(to, text) {
+    return this.send('whisper', { to, text });
   }
 
   sendMove(pose) {
