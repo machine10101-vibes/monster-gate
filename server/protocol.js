@@ -1,17 +1,20 @@
-/** Protocol v1 helpers. See PROTOCOL.md. */
+/** Protocol v1 helpers. See server/PROTOCOL.md. */
 
 export const PROTOCOL = 1;
-export const TICK_HZ = 10;
+export const TICK_HZ = 15;
 export const CHAT_MAX = 120;
 export const NAME_MAX = 16;
 export const MAX_PAYLOAD = 8192;
 export const HELLO_MS = 5000;
 export const IDLE_MS = 30_000;
 export const PING_MS = 15_000;
+export const RESUME_MS = 60_000;
+export const AOI_RADIUS = 96;
+export const SAVE_MS = 15_000;
 
 export const SPEED_MAX = 16;
 export const TELEPORT_MAX = 40;
-export const WORLD_MIN = -50;
+export const WORLD_MIN = -800;
 export const WORLD_MAX = 1490;
 
 export const MOVE_PER_SEC = 12;
@@ -31,6 +34,7 @@ export const TYPES = {
   ping: 'ping',
   pong: 'pong',
   error: 'error',
+  gather: 'gather',
 };
 
 export class ProtocolError extends Error {
@@ -125,11 +129,15 @@ export function parseMessage(raw) {
 export function readHello(msg) {
   if (msg.type !== TYPES.hello) throw new ProtocolError('protocol', 'Expected hello.');
   const token = typeof msg.token === 'string' ? msg.token.trim() : '';
+  const resume = typeof msg.resume === 'string' ? msg.resume.trim().slice(0, 128)
+    : typeof msg.resumeToken === 'string' ? msg.resumeToken.trim().slice(0, 128) : '';
   return {
     token: token.slice(0, 4096),
+    resume,
     name: cleanName(msg.name),
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
+    zone: cleanZone(msg.zone),
   };
 }
 
@@ -147,6 +155,7 @@ export function readMove(msg) {
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
     zone: cleanZone(msg.zone),
+    hp: Number.isFinite(Number(msg.hp)) ? clampNum(msg.hp, 0, 200, 20) : undefined,
   };
 }
 
@@ -157,6 +166,13 @@ export function readChat(msg) {
   const text = cleanText(msg.text);
   if (!text) throw new ProtocolError('chat', 'Empty chat.');
   return { channel, text };
+}
+
+export function readGather(msg) {
+  if (msg.type !== TYPES.gather) throw new ProtocolError('protocol', 'Expected gather.');
+  const id = typeof msg.id === 'string' ? msg.id.trim().slice(0, 40) : '';
+  if (!id) throw new ProtocolError('gather', 'Missing node id.');
+  return { id };
 }
 
 export function playerView(p, extra = {}) {
@@ -179,6 +195,48 @@ export function playerView(p, extra = {}) {
   };
 }
 
+export function monsterView(m) {
+  return {
+    id: m.id,
+    type: m.type,
+    name: m.name,
+    x: m.x,
+    y: m.y,
+    z: m.z,
+    yaw: m.yaw || 0,
+    hp: m.hp,
+    maxHp: m.maxHp,
+    level: m.level,
+    dmg: m.dmg,
+    zone: m.zone,
+    alive: m.hp > 0,
+  };
+}
+
+export function nodeView(n) {
+  return {
+    id: n.id,
+    kind: n.kind,
+    type: n.type,
+    x: n.x,
+    y: n.y,
+    z: n.z,
+    zone: n.zone,
+    ready: !!n.ready,
+    respawnAt: n.respawnAt || 0,
+  };
+}
+
 export function errorFrame(code, message) {
   return encode(TYPES.error, { code, message: String(message || code) });
+}
+
+export function inAoi(observer, other, radius = AOI_RADIUS) {
+  if (!observer || !other) return false;
+  const caveA = observer.zone === 'cave';
+  const caveB = other.zone === 'cave';
+  if (caveA !== caveB) return false;
+  const dx = (other.x ?? 0) - (observer.x ?? 0);
+  const dz = (other.z ?? 0) - (observer.z ?? 0);
+  return Math.hypot(dx, dz) <= radius;
 }
