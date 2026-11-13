@@ -31,14 +31,18 @@ Copy `.env.example`. Do not commit secrets.
 
 ## Migrations to apply
 
-`supabase/migrations/20261113150000_characters.sql`
-`supabase/migrations/20261113200000_friendships.sql`
+Apply **all three** before World 1 deploys:
+
+1. `supabase/migrations/20261113150000_characters.sql`
+2. `supabase/migrations/20261113200000_friendships.sql`
+3. `supabase/migrations/20261113210000_friendships_accept_fn.sql`
 
 ```bash
 supabase db push
 # or, against a remote DB:
 psql "$DATABASE_URL" -f supabase/migrations/20261113150000_characters.sql
 psql "$DATABASE_URL" -f supabase/migrations/20261113200000_friendships.sql
+psql "$DATABASE_URL" -f supabase/migrations/20261113210000_friendships_accept_fn.sql
 ```
 
 Table `public.characters`: one row per `auth.users` id, unique hunter name,
@@ -53,6 +57,14 @@ ids reference `auth.users` on delete cascade. A check forbids self-friends.
 while pending or accepted. RLS: authenticated users may **select rows they
 are on**; writes are `service_role` only. Never keyed by wallet. Parties are
 not stored here.
+
+Accept and request go through `public.friend_accept(p_user uuid, p_other uuid)`
+and `public.friend_request(p_from uuid, p_to uuid)` (`SECURITY DEFINER`,
+`service_role` execute only). Each call takes transaction-scoped advisory
+locks on both accounts (uuid order) then counts accepted rows before writing
+`accepted`, so two concurrent accepts cannot pass 100. A crossed reverse
+request uses the same cap check: on `friend_cap` the existing pending row is
+left pending. A BEFORE INSERT/UPDATE trigger is a second cap guard.
 
 ## How the world server should call it
 
@@ -139,7 +151,7 @@ try {
 | `NAME_TAKEN` | `name_taken` | unique hunter name (`createCharacter` or rename). Postgres `23505` on `characters_name_lower_idx` maps here, not to `unavailable`. |
 | `ALREADY_IMPORTED` | `already_imported` | local save already folded in |
 | `UNAVAILABLE` | `unavailable` | database / network after retries |
-| `FRIEND_CAP` | `friend_cap` | 100 accepted friends (checked on both sides at accept; requester list size includes outgoing pending) |
+| `FRIEND_CAP` | `friend_cap` | 100 accepted friends (checked on both sides at accept, including crossed auto-accept; requester list size includes outgoing pending). Postgres `P0001` / message `friend_cap` maps here. |
 | `ALREADY_FRIENDS` | `already_friends` | pair is already accepted (or friendships unique `23505` after reload) |
 | `SELF` | `self` | friend request / accept / decline / remove targeting yourself |
 

@@ -12,10 +12,8 @@ import {
   unavailable,
 } from '../errors.js';
 import {
-  FRIEND_CAP,
   FRIEND_STATUS,
   assertNotSelf,
-  decideRequest,
   emptyFriendsList,
   friendPeer,
   friendRequestResult,
@@ -136,39 +134,23 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
       assertNotSelf(from, to.userId);
       const fromPeer = await loadPeer(db, from);
       if (!fromPeer.name) throw hunterNotFound(from);
-      const existing = await findPairRow(db, from, to.userId);
-      const decision = decideRequest(from, to.userId, existing);
-      if (decision.action === 'idempotent') {
-        return friendRequestResult(FRIEND_STATUS.pending, fromPeer, to);
-      }
-      if (decision.action === 'auto_accept') {
-        await assertAcceptCaps(db, from, to.userId);
-        await setStatus(db, decision.row, FRIEND_STATUS.accepted);
+      const row = await rpcFriendship(db, 'friend_request', { p_from: from, p_to: to.userId });
+      if (row.status === FRIEND_STATUS.accepted && row.requesterId !== from) {
         return friendRequestResult(FRIEND_STATUS.accepted, to, fromPeer);
       }
-      await assertRequestCaps(db, from, to.userId);
-      const inserted = await insertPending(db, from, to.userId);
-      if (inserted.status === FRIEND_STATUS.accepted) {
-        return friendRequestResult(FRIEND_STATUS.accepted, friendPeer(inserted.requesterId, to.name), fromPeer);
-      }
-      return friendRequestResult(FRIEND_STATUS.pending, fromPeer, to);
+      return friendRequestResult(row.status, fromPeer, to);
     },
 
     async acceptFriend(userId, otherUserId) {
       const id = requireUserId(userId);
       const other = requireUserId(otherUserId);
       assertNotSelf(id, other);
-      const existing = await findPairRow(db, id, other);
-      if (!existing || existing.status !== FRIEND_STATUS.pending || existing.targetId !== id) {
-        throw hunterNotFound(other);
-      }
-      await assertAcceptCaps(db, id, other);
-      await setStatus(db, existing, FRIEND_STATUS.accepted);
-      const names = await loadNames(db, [existing.requesterId, existing.targetId]);
+      const row = await rpcFriendship(db, 'friend_accept', { p_user: id, p_other: other });
+      const names = await loadNames(db, [row.requesterId, row.targetId]);
       return friendRequestResult(
         FRIEND_STATUS.accepted,
-        friendPeer(existing.requesterId, names.get(existing.requesterId)),
-        friendPeer(existing.targetId, names.get(existing.targetId)),
+        friendPeer(row.requesterId, names.get(row.requesterId)),
+        friendPeer(row.targetId, names.get(row.targetId)),
       );
     },
 
@@ -277,79 +259,18 @@ async function resolveHunter(db, toUserIdOrName) {
   return friendPeer(data.user_id, data.name);
 }
 
-async function countAccepted(db, userId) {
-  const { count, error } = await db
-    .from('friendships')
-    .select('requester_id', { count: 'exact', head: true })
-    .eq('status', FRIEND_STATUS.accepted)
-    .or(`requester_id.eq.${userId},target_id.eq.${userId}`);
-  if (error) throw wrap(error, { table: 'friendships' });
-  return count || 0;
-}
-
-async function countOutgoingPending(db, userId) {
-  const { count, error } = await db
-    .from('friendships')
-    .select('requester_id', { count: 'exact', head: true })
-    .eq('status', FRIEND_STATUS.pending)
-    .eq('requester_id', userId);
-  if (error) throw wrap(error, { table: 'friendships' });
-  return count || 0;
-}
-
-async function assertRequestCaps(db, fromUserId, toUserId) {
-  const [fromAccepted, fromPending, toAccepted] = await Promise.all([
-    countAccepted(db, fromUserId),
-    countOutgoingPending(db, fromUserId),
-    countAccepted(db, toUserId),
-  ]);
-  if (fromAccepted + fromPending >= FRIEND_CAP) throw friendCap(fromUserId);
-  if (toAccepted >= FRIEND_CAP) throw friendCap(toUserId);
-}
-
-async function assertAcceptCaps(db, userId, otherUserId) {
-  const [mine, theirs] = await Promise.all([
-    countAccepted(db, userId),
-    countAccepted(db, otherUserId),
-  ]);
-  if (mine >= FRIEND_CAP) throw friendCap(userId);
-  if (theirs >= FRIEND_CAP) throw friendCap(otherUserId);
-}
-
-async function insertPending(db, from, to) {
-  const { data, error } = await db
-    .from('friendships')
-    .insert({ requester_id: from, target_id: to, status: FRIEND_STATUS.pending })
-    .select('requester_id, target_id, status, created_at, updated_at')
-    .single();
+async function rpcFriendship(db, fn, args) {
+  const { data, error } = await db.rpc(fn, args);
   if (error) {
-    if (String(error.code) === '23505') {
-      const existing = await findPairRow(db, from, to);
-      if (existing?.status === FRIEND_STATUS.accepted) throw alreadyFriends(from, to);
-      if (existing?.status === FRIEND_STATUS.pending) {
-        if (existing.requesterId === to && existing.targetId === from) {
-          return setStatus(db, existing, FRIEND_STATUS.accepted);
-        }
-        return existing;
-      }
-      throw alreadyFriends(from, to);
-    }
-    throw wrap(error, { table: 'friendships', userId: from, otherUserId: to });
+    throw wrap(error, {
+      table: 'friendships',
+      userId: args.p_from || args.p_user,
+      otherUserId: args.p_to || args.p_other,
+    });
   }
-  return fromDb(data);
-}
-
-async function setStatus(db, row, status) {
-  const { data, error } = await db
-    .from('friendships')
-    .update({ status })
-    .eq('requester_id', row.requesterId)
-    .eq('target_id', row.targetId)
-    .select('requester_id, target_id, status, created_at, updated_at')
-    .maybeSingle();
-  if (error) throw wrap(error, { table: 'friendships' });
-  if (!data) throw hunterNotFound(row.targetId);
-  return fromDb(data);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw hunterNotFound(args.p_to || args.p_other);
+  return fromDb(row);
 }
 
 async function deletePair(db, row) {
@@ -382,6 +303,21 @@ export function mapSupabaseError(error, extra = {}) {
   const code = String(error?.code || '');
   const message = error?.message || 'Supabase request failed.';
   const blob = [message, error?.details, error?.hint, error?.constraint].filter(Boolean).join(' ');
+  const token = String(message).trim();
+
+  if (code === 'P0001' || extra.table === 'friendships' || /friend_cap|already_friends|\bself\b|not_found/i.test(blob)) {
+    if (token === 'friend_cap' || /\bfriend_cap\b/i.test(blob)) return friendCap(extra.userId);
+    if (token === 'already_friends' || /\balready_friends\b/i.test(blob)) {
+      return alreadyFriends(extra.userId, extra.otherUserId);
+    }
+    if (token === 'self' || (code === 'P0001' && /\bself\b/i.test(blob))) return selfFriend();
+    if (token === 'not_found' || (code === 'P0001' && /\bnot_found\b/i.test(blob))) {
+      return hunterNotFound(extra.query || extra.otherUserId);
+    }
+    if (token === 'invalid' || (code === 'P0001' && /\binvalid\b/i.test(blob))) {
+      return invalid('Need a hunter name or user id.', extra);
+    }
+  }
 
   if (code === '23514' && /friendships_no_self/i.test(blob)) {
     return selfFriend();

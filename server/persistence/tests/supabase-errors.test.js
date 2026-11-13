@@ -163,34 +163,32 @@ test('mapSupabaseError: friendships self-check is self', () => {
   assert.equal(err.message, 'That hunter is you.');
 });
 
-function friendsClient({ insertError }) {
+function friendsRpcClient(rpcError) {
   const hunters = [
     { user_id: USER, name: 'Arden' },
     { user_id: USER_B, name: 'Bram' },
   ];
   return {
+    async rpc() {
+      return { data: null, error: rpcError };
+    },
     from(table) {
       const q = {
-        _op: 'select',
         select() { return q; },
-        insert() { q._op = 'insert'; return q; },
-        update() { q._op = 'update'; return q; },
-        delete() { q._op = 'delete'; return q; },
+        insert() { return q; },
+        update() { return q; },
+        delete() { return q; },
         eq() { return q; },
         or() { return q; },
         in() { return q; },
         ilike() { return q; },
         is() { return q; },
-        single: async () => {
-          if (table === 'friendships' && q._op === 'insert') {
-            return { data: null, error: insertError };
-          }
-          return { data: hunters[0], error: null };
-        },
-        maybeSingle: async () => {
-          if (table === 'characters') return { data: hunters[1], error: null };
-          return { data: null, error: null };
-        },
+        single: async () => ({ data: hunters[0], error: null }),
+        maybeSingle: async () => (
+          table === 'characters'
+            ? { data: hunters[1], error: null }
+            : { data: null, error: null }
+        ),
         then(resolve, reject) {
           if (table === 'characters') {
             return Promise.resolve({ data: hunters, error: null }).then(resolve, reject);
@@ -203,9 +201,38 @@ function friendsClient({ insertError }) {
   };
 }
 
-test('supabase adapter requestFriend maps pair 23505 to already_friends', async () => {
+test('mapSupabaseError: rpc friend_cap / already_friends / not_found / self', () => {
+  assert.equal(mapSupabaseError({ code: 'P0001', message: 'friend_cap' }).code, PersistErrorCodes.FRIEND_CAP);
+  assert.equal(mapSupabaseError({ code: 'P0001', message: 'already_friends' }).code, PersistErrorCodes.ALREADY_FRIENDS);
+  assert.equal(mapSupabaseError({ code: 'P0001', message: 'not_found' }).code, PersistErrorCodes.NOT_FOUND);
+  assert.equal(mapSupabaseError({ code: 'P0001', message: 'self' }).code, PersistErrorCodes.SELF);
+});
+
+test('supabase adapter requestFriend maps rpc friend_cap', async () => {
   const adapter = createSupabaseAdapter({
-    client: friendsClient({ insertError: FRIEND_23505 }),
+    client: friendsRpcClient({ code: 'P0001', message: 'friend_cap' }),
+  });
+  await assert.rejects(
+    () => adapter.requestFriend(USER, USER_B),
+    (err) => err instanceof PersistenceError && err.code === PersistErrorCodes.FRIEND_CAP,
+  );
+});
+
+test('supabase adapter acceptFriend maps rpc friend_cap', async () => {
+  const adapter = createSupabaseAdapter({
+    client: {
+      rpc: async () => ({ data: null, error: { code: 'P0001', message: 'friend_cap' } }),
+    },
+  });
+  await assert.rejects(
+    () => adapter.acceptFriend(USER, USER_B),
+    (err) => err instanceof PersistenceError && err.code === PersistErrorCodes.FRIEND_CAP,
+  );
+});
+
+test('supabase adapter requestFriend maps rpc already_friends', async () => {
+  const adapter = createSupabaseAdapter({
+    client: friendsRpcClient({ code: 'P0001', message: 'already_friends' }),
   });
   await assert.rejects(
     () => adapter.requestFriend(USER, USER_B),

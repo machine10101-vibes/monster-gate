@@ -118,29 +118,53 @@ test('self, unknown name, and missing pending/accepted', async () => {
   await db.close();
 });
 
+async function fillAccepted(db, userId, start, prefix) {
+  for (let i = 1; i <= FRIEND_CAP; i += 1) {
+    const other = uid(start + i);
+    await db.createCharacter(other, hunterName(prefix, i));
+    await db.requestFriend(other, userId);
+    await db.acceptFriend(userId, other);
+  }
+}
+
 test('friends cap 100 is enforced on request and on both sides of accept', async () => {
   const db = persist();
   await db.createCharacter(USER, 'Arden');
   await db.createCharacter(USER_B, 'Bram');
   await db.createCharacter(USER_C, 'Cora');
 
-  for (let i = 1; i <= FRIEND_CAP; i += 1) {
-    const other = uid(i);
-    await db.createCharacter(other, hunterName('H', i));
-    await db.requestFriend(USER, other);
-    await db.acceptFriend(other, USER);
-  }
+  await fillAccepted(db, USER, 0, 'H');
   assert.equal((await db.listFriends(USER)).friends.length, FRIEND_CAP);
   await assert.rejects(() => db.requestFriend(USER, USER_B), isCode(PersistErrorCodes.FRIEND_CAP));
 
   await db.requestFriend(USER_B, USER_C);
-  for (let i = 1; i <= FRIEND_CAP; i += 1) {
-    const other = uid(200 + i);
-    await db.createCharacter(other, hunterName('Z', i));
-    await db.requestFriend(USER_C, other);
-    await db.acceptFriend(other, USER_C);
-  }
+  await fillAccepted(db, USER_C, 200, 'Z');
   await assert.rejects(() => db.acceptFriend(USER_C, USER_B), isCode(PersistErrorCodes.FRIEND_CAP));
+  await db.close();
+});
+
+test('crossed request at cap returns friend_cap and leaves the pending row', async () => {
+  const db = persist();
+  await db.createCharacter(USER, 'Arden');
+  await db.createCharacter(USER_B, 'Bram');
+  await db.createCharacter(USER_C, 'Cora');
+
+  // Acceptor (Arden) is at cap: Bram's pending stays pending.
+  await db.requestFriend(USER_B, USER);
+  await fillAccepted(db, USER, 0, 'H');
+  await assert.rejects(() => db.requestFriend(USER, USER_B), isCode(PersistErrorCodes.FRIEND_CAP));
+  assert.equal((await db.listFriends(USER_B)).pendingOut.length, 1);
+  assert.equal((await db.listFriends(USER_B)).friends.length, 0);
+  assert.equal((await db.listFriends(USER)).pendingIn.length, 1);
+  assert.equal((await db.listFriends(USER)).friends.length, FRIEND_CAP);
+
+  // Original requester (Bram) is at cap: Cora's reverse request does not auto-accept.
+  await db.requestFriend(USER_B, USER_C);
+  await fillAccepted(db, USER_B, 400, 'Q');
+  await assert.rejects(() => db.requestFriend(USER_C, USER_B), isCode(PersistErrorCodes.FRIEND_CAP));
+  assert.equal((await db.listFriends(USER_B)).pendingOut.some((p) => p.userId === USER_C), true);
+  assert.equal((await db.listFriends(USER_C)).pendingIn.length, 1);
+  assert.equal((await db.listFriends(USER_C)).friends.length, 0);
   await db.close();
 });
 
