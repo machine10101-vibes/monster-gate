@@ -278,21 +278,40 @@ test('a mock chat send from you is marked local and opens a player bubble', () =
   assert.equal(view.localSay, 'zephyr20');
   assert.ok(view.localSayT > 0);
   assert.equal(view.localPin.text, 'zephyr20');
-  assert.equal(view.localPinT, LOCAL_PIN_S);
   view.pushChat({ channel: 'world', from: { id: 'herald', name: 'Herald' }, text: 'Seven hunters are already in Oakhollow.' });
   assert.equal(view.localPin.text, 'zephyr20', 'crowd lines do not replace the pinned own line');
   view.update(LOCAL_BUBBLE_S + 0.5);
   assert.equal(view.localSay, '');
-  assert.ok(view.localPinT > 0);
   assert.equal(view.localPin.text, 'zephyr20');
   view.update(LOCAL_PIN_S);
-  assert.equal(view.localPin, null);
+  assert.equal(view.localPin.text, 'zephyr20', 'game dt does not expire the wall-clock pin');
+  view.pushChat({ channel: 'world', from: { id: 'you', name: 'Test' }, text: 'next' });
+  assert.equal(view.localPin.text, 'next');
+  view.dispose();
   const wv = src('../src/net/worldView.js');
   assert.match(wv, /wc-you/);
   assert.match(wv, /wc-pin/);
+  assert.match(wv, /setTimeout/);
   assert.match(wv, /local-chat/);
   assert.match(wv, /layoutInteractPlates/);
   assert.equal(LOCAL_PIN_S, 15);
+});
+
+test('MG-UI-37 own pin clears after 15s of wall clock with no frames', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote });
+  view.pushChat({ channel: 'world', from: { id: 'you', name: 'Test' }, text: 'zephyr20' });
+  assert.equal(view.localPin.text, 'zephyr20');
+  t.mock.timers.tick(14_999);
+  assert.equal(view.localPin.text, 'zephyr20', 'still pinned before 15s');
+  t.mock.timers.tick(1);
+  assert.equal(view.localPin, null, 'clears at 15s of real time with no update()');
+  view.pushChat({ channel: 'world', from: { id: 'you', name: 'Test' }, text: 'again' });
+  assert.equal(view.localPin.text, 'again');
+  t.mock.timers.tick(15_000);
+  assert.equal(view.localPin, null);
+  view.dispose();
 });
 
 test('waking overlay is inert without ?mmo=1', () => {

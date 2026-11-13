@@ -316,7 +316,8 @@ export class WorldView {
     this.localSay = '';
     this.localSayT = 0;
     this.localPin = null;
-    this.localPinT = 0;
+    this.localPinUntil = 0;
+    this._pinTimer = 0;
   }
 
   localPlayerId() {
@@ -505,7 +506,7 @@ export class WorldView {
       this.localSay = msg.text;
       this.localSayT = LOCAL_BUBBLE_S;
       this.localPin = { id: msg.from.id, name: msg.from.name || 'You', text: msg.text };
-      this.localPinT = LOCAL_PIN_S;
+      this.armPinTimer();
     }
     this.paintChat();
   }
@@ -569,6 +570,40 @@ export class WorldView {
 
   now() {
     return this._now ? this._now() : Date.now();
+  }
+
+  clearPinTimer() {
+    if (this._pinTimer) {
+      clearTimeout(this._pinTimer);
+      this._pinTimer = 0;
+    }
+  }
+
+  armPinTimer() {
+    this.clearPinTimer();
+    const delay = LOCAL_PIN_S * 1000;
+    this.localPinUntil = this.now() + delay;
+    this._pinTimer = setTimeout(() => {
+      this._pinTimer = 0;
+      this.clearOwnPin();
+    }, delay);
+  }
+
+  /** Hide the pinned own line. Does not rebuild the chat log. */
+  clearOwnPin() {
+    this.clearPinTimer();
+    this.localPin = null;
+    this.localPinUntil = 0;
+    this.paintPin();
+  }
+
+  expireOwnPin() {
+    if (!this.localPin || !this.localPinUntil) return false;
+    if (this.now() < this.localPinUntil) return false;
+    this.clearPinTimer();
+    this.localPin = null;
+    this.localPinUntil = 0;
+    return true;
   }
 
   mmoEnabled() {
@@ -813,13 +848,7 @@ export class WorldView {
       this.localSayT -= dt;
       if (this.localSayT <= 0) this.localSay = '';
     }
-    if (this.localPinT > 0) {
-      this.localPinT -= dt;
-      if (this.localPinT <= 0) {
-        this.localPin = null;
-        this.paintChat();
-      }
-    }
+    if (this.expireOwnPin()) this.paintPin();
     const tags = [];
     for (const row of this.actors.values()) {
       if (row.sayT > 0) {
@@ -952,6 +981,9 @@ export class WorldView {
       pin: chat.querySelector('.wc-pin'),
       input: chat.querySelector('.wc-in'),
     };
+    const onVis = () => { if (this.expireOwnPin()) this.paintPin(); };
+    document.addEventListener('visibilitychange', onVis);
+    this.unsubs.push(() => document.removeEventListener('visibilitychange', onVis));
 
     chat.querySelector('.wc-toggle').addEventListener('click', (e) => {
       e.preventDefault();
@@ -1057,20 +1089,25 @@ export class WorldView {
       return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
     }).join('');
     this.ui.log.scrollTop = this.ui.log.scrollHeight;
-    if (this.ui.pin) {
-      const pin = this.localPin && this.localPinT > 0 ? this.localPin : null;
-      if (pin) {
-        const who = escapeHtml(pin.name);
-        const text = escapeHtml(pin.text);
-        const pid = escapeHtml(pin.id);
-        this.ui.pin.hidden = false;
-        this.ui.pin.innerHTML = `<p class="wc-you"><b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
-      } else {
-        this.ui.pin.hidden = true;
-        this.ui.pin.innerHTML = '';
-      }
-    }
+    this.paintPin();
     this.paintHud();
+  }
+
+  paintPin() {
+    this.expireOwnPin();
+    const el = this.ui?.pin;
+    if (!el) return;
+    const pin = this.localPin;
+    if (!pin) {
+      el.hidden = true;
+      el.innerHTML = '';
+      return;
+    }
+    const who = escapeHtml(pin.name);
+    const text = escapeHtml(pin.text);
+    const pid = escapeHtml(pin.id);
+    el.hidden = false;
+    el.innerHTML = `<p class="wc-you"><b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
   }
 
   wrapGame() {
@@ -1108,6 +1145,7 @@ export class WorldView {
 
   dispose() {
     this.live = false;
+    this.clearPinTimer();
     this.transport?.stop?.();
     for (const id of [...this.actors.keys()]) this.drop(id);
     for (const off of this.unsubs) {
