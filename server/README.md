@@ -44,11 +44,18 @@ Or run `npm run smoke` from this folder (uses mocked auth, two scripted clients)
 | `ALLOW_DEV_TOKENS` | no | `1` accepts `dev:<uuid>` tokens. Do not set in production. |
 | `ZONE_CAP` | no (150) | Max hunters in one place name (Oakhollow, Hellspire, …). Further joins get `error` `zone_full`. `0` disables the cap. |
 
-Apply the characters migration once Brandon merges PR #60:
+Apply PR #60 persistence migrations in this order (characters, then friendships, then the accept/request RPCs):
+
+1. `supabase/migrations/20261113150000_characters.sql`
+2. `supabase/migrations/20261113200000_friendships.sql`
+3. `supabase/migrations/20261113210000_friendships_accept_fn.sql`
 
 ```bash
 supabase db push
-# or: psql "$DATABASE_URL" -f supabase/migrations/20261113150000_characters.sql
+# or:
+# psql "$DATABASE_URL" -f supabase/migrations/20261113150000_characters.sql
+# psql "$DATABASE_URL" -f supabase/migrations/20261113200000_friendships.sql
+# psql "$DATABASE_URL" -f supabase/migrations/20261113210000_friendships_accept_fn.sql
 ```
 
 The world server should use the service role key only on the host. Never put it in the browser build.
