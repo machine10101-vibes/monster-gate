@@ -176,7 +176,19 @@ export function nameplateOutsideViewport(plate, vp, inset = VIEWPORT_PLATE_INSET
  * farther ones lift until they clear, then hide if they still collide.
  */
 /** Extra air between stacked world labels (covers subtitle + text-shadow). */
-export const PLATE_STACK_GAP = 10;
+export const PLATE_STACK_GAP = 16;
+
+/**
+ * True when two plate boxes are closer than `gap` on all four sides.
+ * Inflates each rect by half-gap (same as inflating one by the full gap)
+ * so side-by-side labels collide, not only vertically stacked ones.
+ */
+export function platesCollide(a, b, gap = PLATE_STACK_GAP) {
+  const raw = Number(gap);
+  const pad = Number.isFinite(raw) ? raw : PLATE_STACK_GAP;
+  const half = pad / 2;
+  return overlap(inflateRect(a, half), inflateRect(b, half), 0.5);
+}
 
 export function stackNameplates(rows, opts = {}) {
   const gap = opts.gap ?? PLATE_STACK_GAP;
@@ -193,7 +205,7 @@ export function stackNameplates(rows, opts = {}) {
     const { w, h } = sizeOf(t);
     return plateAnchorRect(t.x, y, w, h);
   };
-  const collides = (r) => used.some((u) => overlap(r, u, -gap));
+  const collides = (r) => used.some((u) => platesCollide(r, u, gap));
   const out = [];
   for (const t of sorted) {
     const { w, h } = sizeOf(t);
