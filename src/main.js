@@ -19,6 +19,7 @@ import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
 import { attachDebug } from './debug/flags.js';
+import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
@@ -3090,7 +3091,7 @@ class Game {
     this.gather.update(dt);
     const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
-    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, P.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values());
+    this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, P.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values(), this.social);
   }
 }
 
@@ -3100,6 +3101,7 @@ function startGame() {
   try {
     installMockWallet();
     attachDebug(game);
+    attachSocial(game);
     const q = new URLSearchParams(location.search);
     if (q.get('mmo') === '1') {
       import('./net/worldView.js').then(async (m) => {

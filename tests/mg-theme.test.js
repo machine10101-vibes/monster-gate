@@ -38,4 +38,11 @@ test('MG-UI panels share the journal theme tokens and classes', () => {
   assert.match(style, /min\(320px, 86vw\)/);
   assert.match(html, /account-pass-hint/);
   assert.match(html, /id="btn-guest"[^>]*>Play as guest/);
+  assert.match(html, /data-panel="friends"/);
+  assert.match(theme, /#party-frame/);
+  assert.match(theme, /#social-invite/);
+  assert.match(theme, /#social-menu/);
+  assert.match(hud, /mountFriends/);
+  assert.match(main, /attachSocial/);
+  assert.match(style, /\.nameplate\.hunter\.party/);
 });

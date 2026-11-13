@@ -164,6 +164,11 @@ test('rift HP and damage scale from solo to four, waves stay short', () => {
   assert.equal(riftChestGold(4), 80);
   assert.equal(partySize({ wallet: { kind: 'guest' }, net: { peers: { size: 3 } } }), 1);
   assert.equal(partySize({ wallet: { kind: 'email' }, net: { peers: { size: 3 } } }), 4);
+  assert.equal(partySize({
+    wallet: { kind: 'email' },
+    net: { peers: { size: 3 } },
+    social: { party: { members: [{ id: 'a' }, { id: 'b' }] } },
+  }), 2);
 });
 
 test('slice wiring: rift button, guest-session block, journal gear reward', () => {

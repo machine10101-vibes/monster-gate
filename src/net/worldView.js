@@ -188,7 +188,7 @@ export function normalizeChat(raw) {
   if (!raw) return null;
   const text = cleanText(raw.text);
   if (!text) return null;
-  const channel = raw.channel === 'zone' ? 'zone' : 'world';
+  const channel = raw.channel === 'zone' ? 'zone' : raw.channel === 'whisper' ? 'whisper' : 'world';
   const from = raw.from && typeof raw.from === 'object' ? raw.from : {};
   return {
     id: String(raw.id || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).slice(0, 48),
@@ -197,6 +197,7 @@ export function normalizeChat(raw) {
     text,
     at: Number(raw.at) || Date.now(),
     zone: raw.zone != null ? String(raw.zone).slice(0, 32) : '',
+    to: raw.to && typeof raw.to === 'object' ? { id: String(raw.to.id || ''), name: cleanName(raw.to.name) } : null,
   };
 }
 
@@ -815,7 +816,9 @@ export class WorldView {
     const [sx, sy, vis] = g.screenOf(r.x, r.y + 2.2, r.z, true);
     const d = Math.hypot(r.x - g.player.pos.x, r.z - g.player.pos.z);
     const bubble = row.say && row.sayT > 0 ? `<i class="say">${escapeHtml(row.say)}</i>` : '';
-    g.hud.plate(r.id, `${escapeHtml(row.name)}${bubble}`, 'hunter');
+    const mate = g.social?.isPartyMember?.(r.id, row.name);
+    const plate = g.hud.plate(r.id, `${escapeHtml(row.name)}${bubble}`, mate ? 'hunter party' : 'hunter');
+    if (plate) plate.dataset.pname = row.name;
     return { id: r.id, sx, sy, vis, d };
   }
 
@@ -872,6 +875,11 @@ export class WorldView {
   sendChat(text, channel = this.channel) {
     const msg = cleanText(text);
     if (!msg) return false;
+    const whisper = msg.match(/^\/w(?:hisper)?\s+(\S+)\s+(.+)$/i);
+    if (whisper && this.game?.social?.caps?.whisper) {
+      this.game.social.whisper(whisper[1], whisper[2]);
+      return true;
+    }
     const payload = { channel: channel === 'zone' ? 'zone' : 'world', text: msg };
     this._onChatSend?.(payload);
     this.emit({ type: 'chat', ...payload });
@@ -1008,13 +1016,16 @@ export class WorldView {
     if (!this.ui?.log) return;
     const zone = this.zone;
     const rows = this.chat.filter((m) => {
+      if (m.channel === 'whisper') return true;
       if (this.channel === 'world') return m.channel === 'world';
       return m.channel === 'zone' && (!m.zone || !zone || m.zone === zone);
     });
     this.ui.log.innerHTML = rows.slice(-40).map((m) => {
       const who = escapeHtml(m.from.name);
       const text = escapeHtml(m.text);
-      return `<p><b>${who}</b> ${text}</p>`;
+      const pid = escapeHtml(m.from.id);
+      const tag = m.channel === 'whisper' ? '<i class="wc-wh">whisper</i> ' : '';
+      return `<p>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
     }).join('');
     this.ui.log.scrollTop = this.ui.log.scrollHeight;
     this.paintHud();

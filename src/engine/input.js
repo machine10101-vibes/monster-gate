@@ -107,6 +107,9 @@ export class Input {
         case 'KeyT':
           this.press('panel:settings');
           break;
+        case 'KeyP':
+          this.press('panel:friends');
+          break;
         case 'Escape':
           this.press('escape');
           break;
@@ -171,7 +174,7 @@ export class Input {
       this.touch = true;
       document.body.classList.add('touch');
       const t = e.target;
-      if (t.closest && (t.closest('.tbtn') || t.closest('.slot') || t.closest('.mbtn') || t.closest('#panel') || t.closest('#dialog') || t.closest('.mini') || t.closest('#title') || t.closest('#loading') || t.closest('#rotate-overlay'))) return;
+      if (t.closest && (t.closest('.tbtn') || t.closest('.slot') || t.closest('.mbtn') || t.closest('#panel') || t.closest('#dialog') || t.closest('.mini') || t.closest('#title') || t.closest('#loading') || t.closest('#rotate-overlay') || t.closest('#party-frame') || t.closest('#social-invite') || t.closest('#social-menu') || t.closest('#world-chat'))) return;
       const w = window.innerWidth;
       if (e.clientX < w * 0.42 && this.stick.id === null) {
         this.stick.id = e.pointerId;

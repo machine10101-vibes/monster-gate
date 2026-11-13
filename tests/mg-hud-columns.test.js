@@ -13,6 +13,7 @@ test('menu buttons split into left character and right world columns', () => {
   assert.doesNotMatch(html, /id="menu-buttons"/);
   assert.match(html, /menu-col-left[\s\S]*data-panel="bag"[\s\S]*data-panel="catalog"/);
   assert.match(html, /menu-col-right[\s\S]*data-panel="quest"[\s\S]*data-panel="settings"/);
+  assert.match(html, /menu-col-right[\s\S]*data-panel="friends"/);
   assert.match(html, /hud-corner-right[\s\S]*id="clock"[\s\S]*btn-fs[\s\S]*btn-snd/);
   const corner = html.match(/id="hud-corner-right"[\s\S]*?<nav id="menu-col-left"/);
   assert.ok(corner, 'columns follow the status cluster');

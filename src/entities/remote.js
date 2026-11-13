@@ -222,7 +222,9 @@ export class RemoteHunter {
     if (this.driven) return;
     const [sx, sy, vis] = this.game.screenOf(this.x, this.y + 2.15, this.z, true);
     const d = Math.hypot(this.x - this.game.player.pos.x, this.z - this.game.player.pos.z);
-    this.game.hud.plate(this.id, `${this.name}<small>hunter</small>`);
+    const mate = this.game.social?.isPartyMember?.(this.id, this.name);
+    const plate = this.game.hud.plate(this.id, `${this.name}<small>hunter</small>`, mate ? 'hunter party' : 'hunter');
+    if (plate) plate.dataset.pname = this.name;
     this.game.hud.placePlate(this.id, sx, sy, vis && d < 24);
   }
 

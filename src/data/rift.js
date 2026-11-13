@@ -15,6 +15,8 @@ export function clampParty(n) {
 
 export function partySize(game) {
   if (game?.wallet?.kind === 'guest') return 1;
+  const n = game?.social?.party?.members?.length | 0;
+  if (n >= 2) return clampParty(n);
   return clampParty(1 + (game?.net?.peers?.size || 0));
 }
 
