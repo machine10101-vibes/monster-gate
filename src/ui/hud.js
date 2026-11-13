@@ -23,7 +23,7 @@ import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
-import { applyHudLayout, readQuestOpen, writeQuestOpen } from './hudLayout.js';
+import { applyHudLayout, measureHudSafeRects, nameplateHitsHud, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -437,21 +437,44 @@ export class HUD {
     for (const [id, el] of this.plates) {
       if (el.style.display === 'none') continue;
       if (el.classList.contains('mon') || el.classList.contains('hunter')) continue;
+      const box = el.getBoundingClientRect?.();
       rows.push({
         id,
         el,
-        x: parseFloat(el.style.left) || 0,
-        y: parseFloat(el.style.top) || 0,
+        x: parseFloat(el.dataset.sx) || parseFloat(el.style.left) || 0,
+        y: parseFloat(el.dataset.sy) || parseFloat(el.style.top) || 0,
+        w: box?.width || 0,
+        h: box?.height || 0,
         d: Number(el.dataset.dist) || 999,
       });
     }
     for (const t of stackNameplates(rows)) {
       if (!t.visible) {
         t.el.style.display = 'none';
+        t.el.classList.remove('hud-occluded');
         continue;
       }
       t.el.style.top = t.y.toFixed(0) + 'px';
       t.el.style.zIndex = String(Math.max(1, 90 - Math.floor(t.d)));
+    }
+    this.cullPlatesOverHud();
+  }
+
+  cullPlatesOverHud() {
+    const safe = measureHudSafeRects();
+    if (!safe.length) return;
+    for (const el of this.plates.values()) {
+      if (el.style.display === 'none') {
+        el.classList.remove('hud-occluded');
+        continue;
+      }
+      const box = el.getBoundingClientRect?.();
+      if (!box || box.width < 2 || box.height < 2) {
+        el.classList.remove('hud-occluded');
+        continue;
+      }
+      const hit = nameplateHitsHud({ x: box.x, y: box.y, w: box.width, h: box.height }, safe);
+      el.classList.toggle('hud-occluded', hit);
     }
   }
 
@@ -952,33 +975,7 @@ export class HUD {
   }
 }
 
-export { TOWN };
-
-/** Offset overlapping world labels in screen space; hide extras that still collide. */
-export function stackNameplates(rows, opts = {}) {
-  const dx = opts.dx ?? 170;
-  const dy = opts.dy ?? 28;
-  const maxLift = opts.maxLift ?? 5;
-  const sorted = rows.slice().sort((a, b) => (a.d ?? 999) - (b.d ?? 999));
-  const used = [];
-  const hit = (x, y) => used.some((u) => Math.abs(u.x - x) < dx && Math.abs(u.y - y) < dy);
-  const out = [];
-  for (const t of sorted) {
-    let y = t.y;
-    let n = 0;
-    while (n < maxLift && hit(t.x, y)) {
-      y -= dy;
-      n += 1;
-    }
-    if (hit(t.x, y)) {
-      out.push({ ...t, y: t.y, visible: false });
-      continue;
-    }
-    used.push({ x: t.x, y });
-    out.push({ ...t, y, visible: true });
-  }
-  return out;
-}
+export { TOWN, stackNameplates };
 
 /** Close inventory, bank, shop, and every other #panel overlay. */
 export function bindPanelClose(btn, onClose) {

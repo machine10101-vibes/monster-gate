@@ -52,6 +52,89 @@ export function overlap(a, b, pad = 0.5) {
   return a.x < b.x + b.w - pad && a.x + a.w > b.x + pad && a.y < b.y + b.h - pad && a.y + a.h > b.y + pad;
 }
 
+/**
+ * CSS px box for a nameplate whose `left/top` is the world anchor and whose
+ * style is `transform: translate(-50%, -100%)`.
+ */
+export function plateAnchorRect(x, y, w, h) {
+  const width = Math.max(1, Number(w) || 0);
+  const height = Math.max(1, Number(h) || 0);
+  return { x: x - width / 2, y: y - height, w: width, h: height };
+}
+
+/** HUD chrome that world labels must not cover. Measured in CSS px. */
+export const HUD_SAFE_IDS = [
+  'minimap-wrap',
+  'center-bottom',
+  'quest',
+  'menu-col',
+  'touch-btns',
+  'stick',
+  'hud-corner-right',
+  'cast-buttons',
+];
+
+export function measureHudSafeRects(doc = typeof document !== 'undefined' ? document : null) {
+  if (!doc?.getElementById) return [];
+  const out = [];
+  for (const id of HUD_SAFE_IDS) {
+    const el = doc.getElementById(id);
+    if (!el) continue;
+    if (el.hidden || el.classList.contains('hidden')) continue;
+    const r = el.getBoundingClientRect?.();
+    if (!r || r.width < 4 || r.height < 4) continue;
+    out.push({ id, x: r.x, y: r.y, w: r.width, h: r.height });
+  }
+  return out;
+}
+
+export function nameplateHitsHud(plate, safe, pad = -2) {
+  if (!plate || !safe?.length) return false;
+  return safe.some((s) => overlap(plate, s, pad));
+}
+
+/**
+ * Offset overlapping world labels using real CSS-px boxes. Near labels stay;
+ * farther ones lift until they clear, then hide if they still collide.
+ */
+export function stackNameplates(rows, opts = {}) {
+  const gap = opts.gap ?? 6;
+  const maxLift = opts.maxLift ?? 8;
+  const fallbackW = opts.defaultW ?? 200;
+  const fallbackH = opts.defaultH ?? 40;
+  const sorted = rows.slice().sort((a, b) => (a.d ?? 999) - (b.d ?? 999));
+  const used = [];
+  const sizeOf = (t) => ({
+    w: Number.isFinite(Number(t.w)) && Number(t.w) > 0 ? Number(t.w) : fallbackW,
+    h: Number.isFinite(Number(t.h)) && Number(t.h) > 0 ? Number(t.h) : fallbackH,
+  });
+  const rectAt = (t, y) => {
+    const { w, h } = sizeOf(t);
+    return plateAnchorRect(t.x, y, w, h);
+  };
+  const collides = (r) => used.some((u) => overlap(r, u, -gap));
+  const out = [];
+  for (const t of sorted) {
+    const { w, h } = sizeOf(t);
+    const step = opts.dy ?? h + gap;
+    let y = t.y;
+    let n = 0;
+    let r = rectAt(t, y);
+    while (n < maxLift && collides(r)) {
+      y -= step;
+      r = rectAt(t, y);
+      n += 1;
+    }
+    if (collides(r) || r.y < -h) {
+      out.push({ ...t, w, h, y: t.y, visible: false, rect: rectAt(t, t.y) });
+      continue;
+    }
+    used.push(r);
+    out.push({ ...t, w, h, y, visible: true, rect: r });
+  }
+  return out;
+}
+
 export function overlapsOf(items, pairs) {
   const hits = [];
   for (const [a, b] of pairs) {

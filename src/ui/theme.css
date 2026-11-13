@@ -739,7 +739,7 @@ body.touch #dialog {
 }
 
 #nameplates {
-  z-index: 8;
+  z-index: 4;
 }
 html.windows-open #nameplates,
 #app:has(#panel:not(.hidden)) #nameplates,
