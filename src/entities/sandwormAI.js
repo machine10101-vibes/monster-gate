@@ -16,7 +16,8 @@ export const FX = {
   burst: [0xd2ae62, 0xf3e6c4, 0x8c6238],
   death: [0xd2ae62, 0xf3e6c4, 0x6a3030, 0xffffff],
   tele: 0xe6b04a,
-  accel: 7,
+  accel: 8,
+  accelFn: (m) => (m.state === 'breach' ? 26 : m.state === 'buried' ? 10 : 8),
   knock: 4.2,
   stun: 0.12,
   plateY: 2.4,
@@ -170,10 +171,15 @@ export function animate(m, dt, ctx) {
   let sink = buried ? (st === 'windup' ? -0.35 : -0.72) : 0;
   if (st === 'windup') sink = -0.72 + ease3(clamp(m.t / 0.7, 0, 1)) * 0.45;
   if (st === 'breach') {
-    const u = clamp(m.t / 0.2, 0, 1);
-    sink = -0.25 + Math.sin(u * Math.PI) * 0.85;
-    p.head.rotation.x = -0.7 * (1 - u) + 0.35 * u;
-    p.jaw.rotation.x = 0.8 * Math.sin(clamp(m.t / 0.3, 0, 1) * Math.PI);
+    const u = clamp(m.t / 0.22, 0, 1);
+    const arc = Math.sin(u * Math.PI);
+    sink = -0.15 + arc * 1.15;
+    const arch = [0.15, 0.42, 0.12, -0.08, -0.2, -0.3];
+    p.segs.forEach((seg, i) => {
+      seg.rotation.x = arch[i] * arc;
+    });
+    p.head.rotation.x = -0.2 + 0.75 * u;
+    p.jaw.rotation.x = 0.95 * Math.sin(clamp(m.t / 0.28, 0, 1) * Math.PI);
   } else if (st === 'thrash') {
     sink = 0.05;
     p.head.rotation.x = Math.sin(m.t * 16) * 0.35;
@@ -190,7 +196,7 @@ export function animate(m, dt, ctx) {
 }
 
 export function dead(m, dt, c) {
-  const { u, ease, side, bs } = c;
+  const { u, ease, side, bs, dissolve } = c;
   const o = m.obj;
   const p = m.model.parts;
   const k = ease(clamp(u / 0.55, 0, 1));
@@ -201,6 +207,7 @@ export function dead(m, dt, c) {
     seg.rotation.x = 0.2 * k;
   });
   p.jaw.rotation.x = 0.6 * k;
-  o.scale.setScalar(bs * (1 - Math.max(0, u - 1.1) * 0.35));
+  const k2 = dissolve(1.05, 0.6, [0xd2ae62, 0xf3e6c4, 0x6a3030, 0xffffff], 4);
+  o.scale.setScalar(bs * (1 - k2 * k2));
   void dt;
 }

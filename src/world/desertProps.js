@@ -4,9 +4,6 @@ import { bundle, buildTent } from './models.js';
 const SAND = [0xd8b56a, 0xc9a45c, 0xe6c67a, 0xb48c48];
 const GREEN = [0x3f7a3a, 0x4e8c42, 0x2f6630, 0x6aa356];
 const WOOD = [0x8a5a32, 0x6e4424, 0xa06a3c, 0x5c381c];
-const IRON = [0x6a6e74, 0x8a9098, 0x4e545c];
-const ORE = [0xc47a3a, 0x8a8e96, 0xd4924a, 0x5c646c];
-const CLOTH = [0xc4a06a, 0xd8b888, 0xa88858];
 
 const pick = (arr, x, y, z) => arr[Math.abs(hash3(x, y, z, 3)) % arr.length];
 
@@ -30,8 +27,8 @@ function cactus(seed, arms) {
   const M = new VoxelModel(28, 36, 28);
   const c = 14;
   const skin = (x, y, z) => pick(GREEN, x, y + seed, z);
-  cyl(M, c, c, 0, 22, 3.2, skin);
-  cyl(M, c, c, 22, 26, 2.2, skin);
+  cyl(M, c, c, 0, 22, 4.4, skin);
+  cyl(M, c, c, 22, 27, 2.8, skin);
   if (arms) {
     for (const s of [-1, 1]) {
       const y0 = 8 + (seed % 3);
@@ -40,8 +37,9 @@ function cactus(seed, arms) {
     }
   }
   for (let y = 2; y < 24; y += 2) {
-    M.set(c + 3, y, c, 0xe6d49a);
-    M.set(c - 3, y + 1, c, 0xe6d49a);
+    M.set(c + 4, y, c, 0x6aa356);
+    M.set(c - 4, y + 1, c, 0x8fbf62);
+    M.set(c, y, c + 4, 0x2f6630);
   }
   return bundle([[M, 0.16, c, 0, c]]);
 }
@@ -72,52 +70,11 @@ function butte(seed) {
   return bundle([[M, 0.22, c, 0, c]]);
 }
 
-function headframe() {
-  const M = new VoxelModel(28, 40, 16);
-  const wood = (x, y, z) => pick(WOOD, x, y, z);
-  const iron = (x, y, z) => pick(IRON, x, y, z);
-  // Two A legs and a crossbeam, three times the presence of the Greyrock frame.
-  M.line(4, 0, 4, 14, 32, 8, wood, 2);
-  M.line(24, 0, 4, 14, 32, 8, wood, 2);
-  M.line(4, 0, 12, 14, 32, 8, wood, 2);
-  M.line(24, 0, 12, 14, 32, 8, wood, 2);
-  M.box(8, 30, 5, 20, 33, 11, wood);
-  M.line(14, 32, 8, 14, 8, 8, iron, 1);
-  M.box(12, 6, 6, 16, 8, 10, iron);
-  M.set(14, 31, 8, 0xffb347, true);
-  return bundle([[M, 0.22, 14, 0, 8]]);
-}
-
-function cart() {
-  const M = new VoxelModel(16, 12, 22);
-  const iron = (x, y, z) => pick(IRON, x, y, z);
-  const wood = (x, y, z) => pick(WOOD, x, y, z);
-  M.box(2, 3, 2, 14, 8, 16, wood);
-  M.box(3, 8, 3, 13, 10, 15, (x, y, z) => pick(ORE, x, y, z));
-  cyl(M, 4, 3, 1, 3, 1.6, iron);
-  cyl(M, 12, 3, 1, 3, 1.6, iron);
-  cyl(M, 4, 17, 1, 3, 1.6, iron);
-  cyl(M, 12, 17, 1, 3, 1.6, iron);
-  return bundle([[M, 0.16, 8, 0, 11]]);
-}
-
-function orePile(seed) {
-  const M = new VoxelModel(16, 12, 16);
-  const c = 8;
-  for (let y = 0; y < 7; y++) {
-    cyl(M, c, c, y, y + 1, 6 - y * 0.6, (x, yy, z) => pick(ORE, x, yy + seed, z));
-  }
-  return bundle([[M, 0.18, c, 0, c]]);
-}
-
 export function buildDesertModels() {
   return {
     cactus: [cactus(1, true), cactus(2, true), cactus(3, false)],
     scrub: [scrub(1), scrub(2), scrub(4)],
     buttes: [butte(1), butte(3)],
     tent: buildTent(84, 0xc4a06a, 0x6e4424),
-    headframe: headframe(),
-    cart: cart(),
-    ore: [orePile(1), orePile(2), orePile(3)],
   };
 }

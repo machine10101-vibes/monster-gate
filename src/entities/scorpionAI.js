@@ -158,18 +158,27 @@ export function animate(m, dt, ctx) {
   m.step = (m.step || 0) + dt * (moving ? 14 : 3);
   const lift = moving ? 0.55 : 0.08;
   p.legs.forEach((leg, i) => {
-    const phase = m.step + i * 0.9 + (i >= 4 ? Math.PI : 0);
-    leg.rotation.x = Math.sin(phase) * lift;
-    leg.rotation.z = (i < 4 ? 1 : -1) * (0.25 + Math.max(0, Math.sin(phase)) * 0.35);
+    const side = i < 4 ? 1 : -1;
+    // Alternating tripods: one set of four legs plants while the other reaches.
+    const lead = (i % 2 === 0) !== (i >= 4);
+    const phase = m.step + (lead ? 0 : Math.PI);
+    const stride = Math.sin(phase);
+    leg.rotation.y = side * stride * lift;
+    leg.rotation.z = side * (0.1 + Math.max(0, Math.cos(phase)) * lift * 0.7);
   });
   const k = Math.min(1, dt * 10);
-  let claw = 0.5;
-  if (st === 'windup') claw = 0.5 + clamp(m.t / 0.38, 0, 1) * 0.7;
-  if (st === 'snap') claw = 0.15;
-  p.claws[0].rotation.z += ((-claw) - p.claws[0].rotation.z) * k;
-  p.claws[1].rotation.z += (claw - p.claws[1].rotation.z) * k;
-  p.claws[0].rotation.y = st === 'snap' ? -0.4 : -0.1;
-  p.claws[1].rotation.y = st === 'snap' ? 0.4 : 0.1;
+  let gap = 0.2;
+  if (st === 'windup') gap = 0.2 + clamp(m.t / 0.38, 0, 1) * 0.55;
+  if (st === 'snap') gap = -0.35;
+  p.uppers.forEach((finger) => {
+    finger.rotation.x += (gap - finger.rotation.x) * k;
+  });
+  p.lowers.forEach((finger) => {
+    finger.rotation.x += (-gap - finger.rotation.x) * k;
+  });
+  const reach = st === 'snap' ? 0.45 : st === 'windup' ? 0.2 : 0;
+  p.claws[0].rotation.y = -reach;
+  p.claws[1].rotation.y = reach;
 
   const curl = st === 'stingwind' ? -0.9 * clamp(m.t / 0.62, 0, 1) : st === 'sting' ? 0.85 * (1 - clamp(m.t / 0.2, 0, 1)) : -0.35;
   p.tail.forEach((seg, i) => {
@@ -178,25 +187,33 @@ export function animate(m, dt, ctx) {
   p.sting.rotation.x += ((st === 'sting' ? 0.8 : curl * 0.4) - p.sting.rotation.x) * k;
   p.head.rotation.y = (ctx.lookSm || 0) * 0.4;
   const bob = moving ? Math.abs(Math.sin(m.step)) * 0.04 : 0;
-  if (st === 'windup' || st === 'stingwind') m.model.mat.emissive.setRGB(0.28, 0.16, 0.02);
+  if (st === 'windup' || st === 'stingwind') {
+    const pulse = 0.2 + Math.sin(m.t * 28) * 0.1;
+    m.model.mat.emissive.setRGB(pulse, pulse * 0.55, 0.02);
+  }
   return { rootY: bob + (st === 'sting' ? 0.06 : 0), rootX: st === 'snap' ? 0.12 : moving ? 0.04 : 0 };
 }
 
 export function dead(m, dt, c) {
-  const { u, ease, side } = c;
+  const { u, ease, side, bs, dissolve } = c;
   const o = m.obj;
   const p = m.model.parts;
   const k = ease(clamp(u / 0.45, 0, 1));
   o.rotation.set(side * 1.4 * k, m.yaw, 0);
   o.position.set(m.x, m.y, m.z);
   p.legs.forEach((leg, i) => {
-    leg.rotation.x = 0.8 * k * (i % 2 ? 1 : -1);
+    leg.rotation.z = (i < 4 ? 1 : -1) * 0.9 * k;
   });
-  p.claws.forEach((claw, i) => {
-    claw.rotation.z = (i ? 1 : -1) * 0.2 * k;
+  p.uppers.forEach((finger) => {
+    finger.rotation.x = 0.5 * k;
+  });
+  p.lowers.forEach((finger) => {
+    finger.rotation.x = -0.5 * k;
   });
   p.tail.forEach((seg) => {
-    seg.rotation.x = 0.4 * k;
+    seg.rotation.x = 0.35 * k;
   });
+  const k2 = dissolve(0.85, 0.55, [0xc4a15a, 0x8d6a38, 0xe8d080, 0xffffff], 4);
+  o.scale.setScalar(bs * (1 - k2 * k2));
   void dt;
 }

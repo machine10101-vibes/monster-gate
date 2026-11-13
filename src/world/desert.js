@@ -1,6 +1,7 @@
 import { fbm, hash2, lerp, clamp, smoothstep } from '../engine/voxel.js';
 import { TILE } from '../engine/materials.js';
 import { W, ZONE } from './terrain.js';
+import { buildMineCart, buildMineFrame, buildOrePile } from './gatherModels.js';
 
 /**
  * Tiles 74, 75, 84 and 85, south of Longacre and Southford.
@@ -238,12 +239,46 @@ export function carveDesert(lands) {
     }
     reslopeBand(H, slope, 0, W - 1, 0, W - 1);
   }
+  // The pool, the beach and the dry-wash lift are carved after the edges were
+  // copied, so the shared desert borders are written back from the tile that
+  // was built first.
+  const by = Object.fromEntries(lands.map((l) => [l.kind, l.data]));
+  const copyEdge = (dst, src, axis, dstAt, srcAt) => {
+    for (let i = 0; i < W; i++) {
+      const di = axis === 'x' ? i * W + dstAt : dstAt * W + i;
+      const si = axis === 'x' ? i * W + srcAt : srcAt * W + i;
+      dst.H[di] = src.H[si];
+      dst.zone[di] = src.zone[si];
+      dst.top[di] = src.top[si];
+      dst.pathMask[di] = src.pathMask[si];
+      dst.forest[di] = src.forest[si];
+      dst.slope[di] = src.slope[si];
+      dst.tint[di * 3] = src.tint[si * 3];
+      dst.tint[di * 3 + 1] = src.tint[si * 3 + 1];
+      dst.tint[di * 3 + 2] = src.tint[si * 3 + 2];
+    }
+  };
+  copyEdge(by.glassroad, by.sunspill, 'x', 0, W - 1);
+  copyEdge(by.deepwell, by.sunspill, 'z', 0, W - 1);
+  copyEdge(by.greenbowl, by.glassroad, 'z', 0, W - 1);
+  copyEdge(by.greenbowl, by.deepwell, 'x', 0, W - 1);
+  reslopeBand(by.glassroad.H, by.glassroad.slope, 0, 2, 0, W - 1);
+  reslopeBand(by.deepwell.H, by.deepwell.slope, 0, W - 1, 0, 2);
+  reslopeBand(by.greenbowl.H, by.greenbowl.slope, 0, W - 1, 0, 2);
+  reslopeBand(by.greenbowl.H, by.greenbowl.slope, 0, 2, 0, W - 1);
+}
+
+function duneAt(x, z, h, spec) {
+  const edge = Math.min(x, z, W - 1 - x, W - 1 - z);
+  const fade = smoothstep(10, 28, edge);
+  const wave = Math.sin((z + spec.seed * 3) * 0.085) * 1.15 + Math.sin((x + z * 0.35) * 0.06) * 0.55;
+  return { h: Math.min(h + wave * fade, Math.max(h, 6)), kind: 0 };
 }
 
 export function desertFeature(h, x, z, spec) {
   const wx = spec.ox + x;
   const wz = spec.oz + z;
-  return oasisAt(wx, wz, h) || mineAt(wx, wz, h) || beachAt(spec, z, h);
+  return oasisAt(wx, wz, h) || mineAt(wx, wz, h) || beachAt(spec, z, h) || duneAt(x, z, h, spec);
 }
 
 function sandTint(n, crest) {
@@ -372,9 +407,7 @@ export function dressDesert(world, land, spec) {
   scatter(count.flowers, 0.3, (lx, lz, k) => {
     const i = lz * W + lx;
     if (data.zone[i] !== ZONE.FIELD) return false;
-    if (Math.hypot(X(lx) - OASIS.x, Z(lz) - OASIS.z) > OASIS.r + OASIS.shore + 20) {
-      return drop(D.scrub[k % D.scrub.length], lx, lz, k, 0.55, 0.3);
-    }
+    if (Math.hypot(X(lx) - OASIS.x, Z(lz) - OASIS.z) > OASIS.r + OASIS.shore + 14) return false;
     return drop(m.flowers[k % m.flowers.length], lx, lz, k, 0.9, 0.25);
   });
 
@@ -417,35 +450,45 @@ export function dressDesert(world, land, spec) {
 
 function dressMine(world, land, D, m) {
   const { x: cx, z: cz, pitR, rimR, rampHW } = SAND_MINE;
-  const place = (parts, x, z, rot, scale, rad) => {
-    if (!world.free(x, z, rad * 0.6)) return;
+  const place = (parts, x, z, rot, scale, rad, must) => {
+    const tries = must ? [[0, 0], [5, 0], [-5, 0], [0, 5], [0, -5], [7, 3], [-7, 3]] : [[0, 0]];
+    for (const [dx, dz] of tries) {
+      const px = x + dx;
+      const pz = z + dz;
+      if (!world.free(px, pz, rad * 0.55)) continue;
+      world.putAt(parts, px, pz, rot, scale);
+      world.circle(px, pz, rad * 0.5);
+      world.occupy(px, pz, rad);
+      return [px, pz];
+    }
+    if (!must) return null;
     world.putAt(parts, x, z, rot, scale);
-    world.circle(x, z, rad * 0.5);
     world.occupy(x, z, rad);
+    return [x, z];
   };
-  // Three headframes where Greyrock has one, spaced around the rim.
+  // Greyrock has one gantry, one cart and one ore pile. Deepwell has three of each,
+  // and each one is three times that gantry's size.
   const frames = [
-    [cx, cz - rimR - 2, 0],
-    [cx + rimR * 0.75, cz + rimR * 0.35, 1.2],
-    [cx - rimR * 0.72, cz + rimR * 0.2, -0.8],
+    [cx, cz - rimR - 8, 0.15],
+    [cx + rimR + 6, cz + 2, 1.15],
+    [cx - rimR - 6, cz + 4, -0.85],
   ];
   frames.forEach(([x, z, rot], i) => {
-    place(D.headframe, x, z, rot, 1.15 + i * 0.08, 2.4);
-    world.lightSpots.push({ x, y: world.heightAt(x, z) + 6.5, z, color: 0xffb347 });
+    const at = place(buildMineFrame(8 + i), x, z, rot, 4.35, 3.4, true);
+    world.lightSpots.push({ x: at[0], y: world.heightAt(at[0], at[1]) + 8, z: at[1], color: 0xffb347 });
   });
-  // Carts and ore along the north ramp and the rim road. Greyrock has one of each.
   const carts = [
-    [cx, cz - pitR - 6, 0],
-    [cx + 8, cz - rimR + 2, 0.4],
-    [cx - 10, cz - rimR + 4, -0.3],
+    [cx, cz - pitR - 8, 0.1],
+    [cx + 14, cz - rimR + 1, 0.5],
+    [cx - 12, cz - rimR + 3, -0.4],
   ];
-  for (const [x, z, rot] of carts) place(D.cart, x, z, rot, 1.15, 1.1);
+  carts.forEach(([x, z, rot], i) => place(buildMineCart(5 + i), x, z, rot, 3.3, 1.8, true));
   const piles = [
-    [cx + rimR * 0.45, cz - rimR * 0.15],
-    [cx - rimR * 0.4, cz + rimR * 0.35],
-    [cx + 4, cz + rimR * 0.55],
+    [cx + rimR * 0.55, cz - rimR * 0.2],
+    [cx - rimR * 0.45, cz + rimR * 0.4],
+    [cx + 6, cz + rimR + 4],
   ];
-  piles.forEach(([x, z], i) => place(D.ore[i % D.ore.length], x, z, i, 1.3, 1.2));
+  piles.forEach(([x, z], i) => place(buildOrePile(3 + i), x, z, i * 0.6, 3.6, 2.2, true));
   for (let a = 0; a < 16; a++) {
     const ang = (a / 16) * Math.PI * 2;
     const x = cx + Math.cos(ang) * (rimR - 1.5);

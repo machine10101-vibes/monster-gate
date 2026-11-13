@@ -1506,7 +1506,7 @@ export class Monster {
     m.root.position.y = rootY;
     m.root.scale.set(rootSXY, rootSXY, rootSZ);
     if (this.flash > 0) this.model.mat.emissive.setRGB(0.8, 0.8, 0.8);
-    else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'darksycledragon' && this.airCharge) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
+    else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'scorpion' && this.state === 'stingwind') && !(this.type === 'darksycledragon' && this.airCharge) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if (dist < 14 && this.hp < this.maxHp) {
       const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' ? 6.0 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);

@@ -142,15 +142,19 @@ function sculptScorpion() {
       R.cap([knee, 7.2, z + 0.6], [foot, 0.45, z + 2.2], 0.85, 0.45, shell);
     }
   }
-  // Open pincers: a thick upper finger and a lower finger with a gap between them.
+  // Each pincer is three parts: a palm, an upper finger and a lower finger.
   R.own('clawL');
-  R.cap([3.5, 4.4, 13], [8, 5.2, 17], 1.7, 2.2, () => SCORP.claw);
-  R.cap([8, 6.4, 17], [14, 7.2, 22], 1.5, 0.7, () => SCORP.shellHi);
-  R.cap([8, 3.2, 17], [13.5, 2.4, 21.5], 1.2, 0.65, () => SCORP.claw);
+  R.cap([3.5, 4.2, 13], [8, 5.4, 17], 1.7, 2.0, () => SCORP.claw);
+  R.own('upL');
+  R.cap([8, 6.3, 17], [15, 7.5, 23], 1.25, 0.5, () => SCORP.shellHi);
+  R.own('loL');
+  R.cap([8, 3.3, 17], [14.5, 2.1, 22.5], 1.1, 0.48, () => SCORP.claw);
   R.own('clawR');
-  R.cap([-3.5, 4.4, 13], [-8, 5.2, 17], 1.7, 2.2, () => SCORP.claw);
-  R.cap([-8, 6.4, 17], [-14, 7.2, 22], 1.5, 0.7, () => SCORP.shellHi);
-  R.cap([-8, 3.2, 17], [-13.5, 2.4, 21.5], 1.2, 0.65, () => SCORP.claw);
+  R.cap([-3.5, 4.2, 13], [-8, 5.4, 17], 1.7, 2.0, () => SCORP.claw);
+  R.own('upR');
+  R.cap([-8, 6.3, 17], [-15, 7.5, 23], 1.25, 0.5, () => SCORP.shellHi);
+  R.own('loR');
+  R.cap([-8, 3.3, 17], [-14.5, 2.1, 22.5], 1.1, 0.48, () => SCORP.claw);
   // The tail arches over the back and the sting leads.
   R.own('t1');
   R.cap([0, 5.2, -6], [0, 8, -8], 2.2, 1.8, shell);
@@ -170,15 +174,19 @@ const SCORP_SPEC = [
   { id: 'body', parent: null, pivot: [0, 4.2, 2] },
   { id: 'head', parent: 'body', pivot: [0, 4.0, 9] },
   { id: 'clawL', parent: 'head', pivot: [4, 4.2, 14] },
+  { id: 'upL', parent: 'clawL', pivot: [8, 6.3, 17] },
+  { id: 'loL', parent: 'clawL', pivot: [8, 3.3, 17] },
   { id: 'clawR', parent: 'head', pivot: [-4, 4.2, 14] },
-  { id: 'L0', parent: 'body', pivot: [6.2, 3.6, 8] },
-  { id: 'L1', parent: 'body', pivot: [6.2, 3.6, 3.8] },
-  { id: 'L2', parent: 'body', pivot: [6.2, 3.6, -0.4] },
-  { id: 'L3', parent: 'body', pivot: [6.2, 3.6, -4.6] },
-  { id: 'R0', parent: 'body', pivot: [-6.2, 3.6, 8] },
-  { id: 'R1', parent: 'body', pivot: [-6.2, 3.6, 3.8] },
-  { id: 'R2', parent: 'body', pivot: [-6.2, 3.6, -0.4] },
-  { id: 'R3', parent: 'body', pivot: [-6.2, 3.6, -4.6] },
+  { id: 'upR', parent: 'clawR', pivot: [-8, 6.3, 17] },
+  { id: 'loR', parent: 'clawR', pivot: [-8, 3.3, 17] },
+  { id: 'L0', parent: 'body', pivot: [6.4, 3.4, 7.5] },
+  { id: 'L1', parent: 'body', pivot: [6.4, 3.4, 3.1] },
+  { id: 'L2', parent: 'body', pivot: [6.4, 3.4, -1.3] },
+  { id: 'L3', parent: 'body', pivot: [6.4, 3.4, -5.7] },
+  { id: 'R0', parent: 'body', pivot: [-6.4, 3.4, 7.5] },
+  { id: 'R1', parent: 'body', pivot: [-6.4, 3.4, 3.1] },
+  { id: 'R2', parent: 'body', pivot: [-6.4, 3.4, -1.3] },
+  { id: 'R3', parent: 'body', pivot: [-6.4, 3.4, -5.7] },
   { id: 't1', parent: 'body', pivot: [0, 5.2, -6] },
   { id: 't2', parent: 't1', pivot: [0, 8, -8] },
   { id: 't3', parent: 't2', pivot: [0, 12, -4] },
@@ -196,6 +204,8 @@ export function buildDesertScorpion() {
     body: g.body,
     head: g.head,
     claws: [g.clawL, g.clawR],
+    uppers: [g.upL, g.upR],
+    lowers: [g.loL, g.loR],
     legs: [leg('L0'), leg('L1'), leg('L2'), leg('L3'), leg('R0'), leg('R1'), leg('R2'), leg('R3')],
     tail: [g.t1, g.t2, g.t3, g.t4],
     sting: g.sting,
