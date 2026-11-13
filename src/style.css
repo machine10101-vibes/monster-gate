@@ -112,6 +112,7 @@ kbd {
 #hud {
   position: absolute;
   inset: 0;
+  z-index: 10;
   pointer-events: none;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85);
 }
@@ -854,6 +855,16 @@ body.touch #top-right {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
+}
+#nameplates {
+  z-index: 4;
+}
+#damage-layer {
+  z-index: 5;
+}
+.nameplate.hud-occluded {
+  opacity: 0 !important;
+  visibility: hidden;
 }
 .dmg {
   position: absolute;

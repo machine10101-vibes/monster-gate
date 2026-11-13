@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
 import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
+import { nameplateHitsHud, overlap, plateAnchorRect } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -189,7 +190,10 @@ test('menu buttons sit in one right-edge column', () => {
 
 test('MG-UI-13 nameplates sit below windows and hide while a window is open', () => {
   const theme = src('src/ui/theme.css');
-  assert.match(theme, /#nameplates \{[\s\S]*z-index:\s*8/);
+  const style = src('src/style.css');
+  assert.match(theme, /#nameplates \{[\s\S]*z-index:\s*4/);
+  assert.match(style, /#hud \{[\s\S]*z-index:\s*10/);
+  assert.match(style, /#nameplates \{[\s\S]*z-index:\s*4/);
   assert.match(theme, /html\.windows-open #nameplates/);
   assert.match(src('src/ui/hud.js'), /syncWindows/);
 });
@@ -364,18 +368,62 @@ test('MG-UI-28 dialogue is a bottom sheet with scrollable text and sticky choice
   assert.match(style, /@media \(max-height: 520px\) \{[\s\S]*body\.touch #dialog \{[\s\S]*max-height:\s*min\(62vh/);
 });
 
-test('MG-UI-29 overlapping nameplates stack or hide the farther label', () => {
-  const mira = { id: 'npc-guild', x: 420, y: 180, d: 2.1 };
-  const crate = { id: 'storage', x: 428, y: 182, d: 4.8 };
+test('MG-UI-29 overlapping nameplates stack using measured CSS-px rects', () => {
+  const mira = { id: 'npc-guild', x: 420, y: 180, d: 2.1, w: 236, h: 42 };
+  const crate = { id: 'storage', x: 428, y: 182, d: 4.8, w: 188, h: 38 };
   const out = stackNameplates([mira, crate]);
   const keep = out.filter((r) => r.visible);
   assert.equal(keep.length, 2);
   assert.notEqual(keep[0].y, keep[1].y);
+  const ra = plateAnchorRect(keep[0].x, keep[0].y, keep[0].w, keep[0].h);
+  const rb = plateAnchorRect(keep[1].x, keep[1].y, keep[1].w, keep[1].h);
+  assert.equal(overlap(ra, rb, -4), false, 'stacked labels must not share a line');
+  const phone = stackNameplates([
+    { ...mira, x: 210, y: 168 },
+    { ...crate, x: 218, y: 170 },
+  ]);
+  const phoneKeep = phone.filter((r) => r.visible);
+  assert.equal(phoneKeep.length, 2);
+  assert.equal(
+    overlap(
+      plateAnchorRect(phoneKeep[0].x, phoneKeep[0].y, phoneKeep[0].w, phoneKeep[0].h),
+      plateAnchorRect(phoneKeep[1].x, phoneKeep[1].y, phoneKeep[1].w, phoneKeep[1].h),
+      -4,
+    ),
+    false,
+    '844-wide labels still stack',
+  );
   const hidden = stackNameplates(
-    [mira, crate, { id: 'market', x: 422, y: 181, d: 9 }],
-    { maxLift: 1, dy: 8, dx: 200 },
+    [mira, crate, { id: 'market', x: 422, y: 181, d: 9, w: 200, h: 36 }],
+    { maxLift: 1, dy: 8 },
   );
   assert.ok(hidden.some((r) => !r.visible), 'far labels drop when they still overlap');
   const hud = src('src/ui/hud.js');
   assert.match(hud, /layoutInteractPlates/);
+  assert.match(hud, /getBoundingClientRect/);
+  assert.match(hud, /cullPlatesOverHud/);
+  assert.doesNotMatch(hud, /dx \?\? 170/);
+});
+
+test('MG-UI-30 nameplates that hit HUD safe rects are culled and sit below the HUD', () => {
+  const minimap = { id: 'minimap-wrap', x: 8, y: 6, w: 110, h: 110 };
+  const hearts = { id: 'center-bottom', x: 220, y: 300, w: 400, h: 86 };
+  const menu = { id: 'menu-col', x: 808, y: 20, w: 32, h: 360 };
+  const tobin = plateAnchorRect(70, 90, 160, 36);
+  const lira = plateAnchorRect(420, 330, 180, 40);
+  const pip = plateAnchorRect(400, 318, 150, 36);
+  const mira = plateAnchorRect(420, 180, 220, 42);
+  assert.equal(nameplateHitsHud(tobin, [minimap, hearts, menu]), true, 'Tobin on minimap');
+  assert.equal(nameplateHitsHud(lira, [minimap, hearts, menu]), true, 'Lira on hearts/hotbar');
+  assert.equal(nameplateHitsHud(pip, [minimap, hearts, menu]), true, 'Pip on hearts');
+  assert.equal(nameplateHitsHud(mira, [minimap, hearts, menu]), false, 'Mira in the open stays');
+  const style = src('src/style.css');
+  const theme = src('src/ui/theme.css');
+  const hud = src('src/ui/hud.js');
+  assert.match(style, /#hud \{[\s\S]*z-index:\s*10/);
+  assert.match(style, /#nameplates \{[\s\S]*z-index:\s*4/);
+  assert.match(theme, /#nameplates \{[\s\S]*z-index:\s*4/);
+  assert.match(style, /\.nameplate\.hud-occluded/);
+  assert.match(hud, /measureHudSafeRects/);
+  assert.match(hud, /nameplateHitsHud/);
 });
