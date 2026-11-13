@@ -126,11 +126,13 @@ class Game {
     this.canvas = document.getElementById('game');
     const killed = bootWasKilled();
     markBoot();
-    const ios = isIOS();
-    this.heavyBoot = killed;
-    this.lightBoot = ios || isTablet() || killed;
-    const base = this.heavyBoot ? QUALITIES[0] : pickQuality();
-    this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : base;
+    // iPad Chrome and Brave both pretend to be a desktop. The first boot has to
+    // be the small one: a crash-then-retry still dies if every boot draws the whole world.
+    this.safeBoot = isIOS() || isTablet() || killed;
+    this.heavyBoot = this.safeBoot;
+    this.lightBoot = this.safeBoot;
+    const base = this.safeBoot ? QUALITIES[0] : pickQuality();
+    this.quality = this.safeBoot ? survivalBudget(base, true) : base;
     this.bootFrames = 0;
     this.hud = new HUD();
     this.audio = new Audio8();
@@ -312,10 +314,21 @@ class Game {
     this.gather = new Gathering(this);
     this.player = new Player(this);
     this.spawner = new Spawner(this);
+    if (this.safeBoot) {
+      this.camera.far = 240;
+      this.camera.updateProjectionMatrix();
+      // The first picture is only the town. The rest streams in a few pieces a frame, out to the fog.
+      this.world.parkBeyond(this.player.pos.x, this.player.pos.z, 96);
+      this.world.streamRadius = 220;
+      this.ambient = { npcs: [], fowl: [], cows: [], butterflies: [] };
+      this.wakeWorld = true;
+    }
     progress(0.95, 'Waking the villagers');
     await new Promise((r) => requestAnimationFrame(r));
-    this.ambient = createAmbient(this);
-    this.spawner.populate();
+    if (!this.safeBoot) {
+      this.ambient = createAmbient(this);
+      this.spawner.populate();
+    }
 
     this.applyGear(true);
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
@@ -355,6 +368,11 @@ class Game {
       this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
     }
     this.started = true;
+    if (this.wakeWorld) {
+      this.wakeWorld = false;
+      this.ambient = createAmbient(this);
+      this.spawner.populate(true);
+    }
     this.audio.unlock();
     this.cam.targetDist = 16;
     document.getElementById('title').classList.add('hidden');
@@ -834,6 +852,7 @@ class Game {
     p.stamina = Math.min(p.maxStamina, h.stamina);
     this.refreshHud(true);
     this.snapCamera();
+    if (this.safeBoot) this.world?.revealAround?.(this.player.pos.x, this.player.pos.z, 48);
     return true;
   }
 
@@ -2670,6 +2689,7 @@ class Game {
           this.bootFrames = -1;
         }
       }
+      if (this.safeBoot && this.player) this.world?.revealAround?.(this.player.pos.x, this.player.pos.z, 20);
     } catch (err) {
       this.reportFault(err);
     }
