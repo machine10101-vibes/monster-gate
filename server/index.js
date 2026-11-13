@@ -1,8 +1,12 @@
+import { openPersistence } from './store.js';
 import { createWorldServer } from './world.js';
 
 const PORT = Number(process.env.PORT || 8080);
 
-const { close, server, world } = await createWorldServer({ port: PORT });
+const persist = await openPersistence();
+persist.installShutdownHandlers?.();
+
+const { close, server, world } = await createWorldServer({ port: PORT, persist });
 const addr = server.address();
 console.log(`monster-gate world v1 on :${addr.port} (${world.size} hunters)`);
 
