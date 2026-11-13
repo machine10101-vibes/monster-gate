@@ -49,6 +49,10 @@ export function mountWorldMap(body, game) {
       cv.height = 36;
       cv.getContext('2d').drawImage(thumb(tile, game), 0, 0);
       b.appendChild(cv);
+      const num = document.createElement('span');
+      num.className = 'wm-num';
+      num.textContent = String(tile.n);
+      b.appendChild(num);
       const name = document.createElement('b');
       name.className = 'wm-name';
       name.textContent = tile.name;

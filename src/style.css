@@ -2834,6 +2834,24 @@ body.touch .stash-slot.holding {
 .wm-detail { min-width: 0; }
 .wm-cell { position: relative; container-type: inline-size; padding: 0; border: 2px solid #10140c; border-radius: 2px; overflow: hidden; aspect-ratio: 1; touch-action: auto; background: #111; }
 .wm-cell canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.wm-num {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  z-index: 2;
+  padding: 1px 3px 0;
+  border-radius: 2px;
+  background: rgba(6, 8, 10, 0.86);
+  color: #fff8e8;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: clamp(9px, 26cqw, 14px);
+  line-height: 1.15;
+  letter-spacing: 0;
+  text-shadow: 0 1px 0 #000;
+  pointer-events: none;
+}
+.wm-cell.built .wm-num { color: #ffe7a0; }
 .wm-name {
   position: absolute;
   left: 0;
