@@ -2336,6 +2336,11 @@ body.touch .how {
   text-transform: uppercase;
   color: #ffd23f;
 }
+.bag-hint {
+  margin: -4px 0 8px;
+  color: #b7c0b4;
+  font-size: 12px;
+}
 .bag-cell {
   display: flex;
   flex-direction: column;
@@ -2347,6 +2352,14 @@ body.touch .how {
   border: 2px solid #343842;
   border-radius: 8px;
   position: relative;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.bag-cell.holding {
+  border-color: #ffd23f;
+  box-shadow: 0 0 0 1px #ffd23f;
 }
 .bag-cell canvas {
   width: 52px;
@@ -2629,6 +2642,11 @@ body.touch .how {
   border: 2px solid #fff1b8;
   border-radius: 4px;
 }
+.stash-ask-row button.bag-ask-drop {
+  color: #f4e8d4;
+  background: linear-gradient(#5a3a28, #3a2418);
+  border-color: #c48a4a;
+}
 .bag-gold { margin: 0 0 8px; color: #ffe27a; font-family: var(--font-px); font-size: 11px; }
 .stash-help { margin: 0 0 10px; color: #c9c3b4; font-size: 13px; }
 .stash-cols {
@@ -2688,6 +2706,9 @@ body.touch .stash-slot.holding {
   position: fixed;
   inset: 0;
   z-index: 40;
+}
+.stash-ask-back.bag-ask-back {
+  z-index: 80;
 }
 .stash-ask {
   position: fixed;

@@ -28,6 +28,7 @@ import { BUILD_ID } from './ui/buildId.js';
 import { mountLoading } from './ui/boot.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
+import { BAG_TOSS_SIT, tossFrom } from './systems/bagDrop.js';
 import { Journal } from './systems/journal.js';
 import { Bounties } from './systems/bounties.js';
 import { Roster, lookOptions } from './systems/roster.js';
@@ -1820,11 +1821,11 @@ class Game {
     this.pickups.push({ holder, mesh: model, kind: 'orcblade', value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.2, age: 0, grounded: false });
   }
 
-  dropStack(k, id, n, x, y, z) {
+  dropStack(k, id, n, x, y, z, sit = null) {
     n = n | 0;
     if (n < 1) return;
     const geo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
-    const mat = new THREE.MeshBasicMaterial({ color: k === 'part' ? 0x6fd45a : 0xc6a15a });
+    const mat = new THREE.MeshBasicMaterial({ color: k === 'part' ? 0x6fd45a : k === 'held' ? 0x8ec4ff : 0xc6a15a });
     const mesh = new THREE.Mesh(geo, mat);
     const holder = new THREE.Group();
     holder.add(mesh);
@@ -1832,13 +1833,15 @@ class Game {
     this.scene.add(holder);
     const a = Math.random() * Math.PI * 2;
     const s = 1.2 + Math.random();
+    const wait = sit != null ? Math.max(0.4, Number(sit) || 0.4) : null;
     this.pickups.push({
       holder, mesh, kind: 'stack', k, id, n,
       value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4 + Math.random() * 2, age: 0, grounded: false,
+      pickupAfter: wait, magnetAfter: wait,
     });
   }
 
-  dropGear(id, x, y, z) {
+  dropGear(id, x, y, z, tossed = false) {
     const gear = gearById(id);
     if (!gear) return;
     const holy = gear.monster === 'holyknight';
@@ -1859,11 +1862,58 @@ class Game {
     this.scene.add(holder);
     const a = Math.random() * Math.PI * 2;
     const s = 1.2 + Math.random();
-    this.pickups.push({ holder, mesh, kind: 'gear', gearId: id, value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 5, age: 0, grounded: false });
+    const wait = tossed ? BAG_TOSS_SIT : null;
+    this.pickups.push({
+      holder, mesh, kind: 'gear', gearId: id, value: 0,
+      vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 5, age: 0, grounded: false,
+      pickupAfter: wait, magnetAfter: wait,
+    });
     this.fx.ring(x, y, z, holy ? 0xffd27a : 0xff3a1a, 16, 3.2, 0.1, 0.6);
     this.fx.burst(x, y, z, holy ? [0xfff0b0, 0x9fd0ff, 0xffffff] : [0xff3a1a, 0xff8a2a, 0xffffff], 18, 4, 0.1, 0.9, 6, 2);
-    this.hud.floatText(...this.screenOf(x, y + 1.2, z), 'Rare drop!', 'crit');
-    this.audio.quest();
+    if (!tossed) {
+      this.hud.floatText(...this.screenOf(x, y + 1.2, z), 'Rare drop!', 'crit');
+      this.audio.quest();
+    }
+  }
+
+  /** Toss a bag stack in front of the hunter. Returns false if it could not leave the bag. */
+  dropBagItem(spec) {
+    if (!spec || !this.player || !this.started) return false;
+    const n = Math.max(1, spec.n | 0);
+    const P = this.player.pos;
+    const toss = tossFrom(P, this.player.yaw);
+    const x = toss.x;
+    const z = toss.z;
+    const y = (this.world?.heightAt?.(x, z) || P.y) + 0.9;
+    let label = spec.name || 'Item';
+    if (spec.k === 'good') {
+      if (!this.progress.takeGood(spec.id, n)) return false;
+      label = GOODS[spec.id]?.name || spec.id;
+      this.dropStack('good', spec.id, n, x, y, z, BAG_TOSS_SIT);
+    } else if (spec.k === 'part') {
+      if (!this.progress.takePart(spec.id, n)) return false;
+      label = MATERIALS[spec.id]?.name || spec.id;
+      this.dropStack('part', spec.id, n, x, y, z, BAG_TOSS_SIT);
+    } else if (spec.k === 'gear') {
+      const g = gearById(spec.id);
+      if (!g || !this.progress.releaseCrafted(spec.id)) return false;
+      this.applyGear();
+      if (g.type === 'weapon') this.selectSlot(0, true);
+      label = g.name;
+      this.dropGear(spec.id, x, y, z, true);
+    } else if (spec.k === 'held') {
+      const it = this.items.find((i) => i.id === spec.id);
+      if (!it || it.count == null || it.count < n) return false;
+      it.count -= n;
+      if (it.kind === 'use') this.progress.setStock(spec.id, it.count);
+      this.itemsChanged();
+      label = it.name;
+      this.dropStack('held', spec.id, n, x, y, z, BAG_TOSS_SIT);
+    } else return false;
+    this.audio.select();
+    this.hud.toast(`Dropped ${label}`, 1400);
+    this.fx.burst(x, y, z, [0xc6a15a, 0xffd23f, 0xffffff], 8, 1.8, 0.07, 0.4);
+    return true;
   }
 
   updatePickups(dt) {
@@ -1915,12 +1965,31 @@ class Game {
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), itemName, 'gold');
           this.fx.burst(h.x, h.y, h.z, [0xd4a84a, 0xffd23f, 0xffffff], 8, 2.2, 0.08, 0.45);
         } else if (k.kind === 'stack') {
-          const added = k.k === 'good' ? this.progress.addGood(k.id, k.n) : this.progress.addPart(k.id, k.n);
-          if (added < 1) {
+          let added = 0;
+          let label = MATERIALS[k.id]?.name || GOODS[k.id]?.name || k.id;
+          if (k.k === 'good') added = this.progress.addGood(k.id, k.n);
+          else if (k.k === 'part') added = this.progress.addPart(k.id, k.n);
+          else if (k.k === 'held') {
+            const it = this.items.find((i) => i.id === k.id);
+            if (!it || it.count == null) k.done = true;
+            else {
+              const cap = POTION_SHOP[k.id]?.max;
+              const room = cap != null ? Math.max(0, cap - (it.count | 0)) : k.n;
+              added = Math.min(k.n, room);
+              if (added > 0) {
+                it.count += added;
+                if (it.kind === 'use') this.progress.setStock(k.id, it.count);
+                this.itemsChanged();
+              }
+              label = it.name;
+            }
+          }
+          if (k.done) {
+            /* unknown held stack */
+          } else if (added < 1) {
             this.hud.toast(INVENTORY_FULL, 1400);
           } else {
             k.n -= added;
-            const label = MATERIALS[k.id]?.name || GOODS[k.id]?.name || k.id;
             this.audio.coin();
             this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), `+${added} ${label}`, 'gold');
             this.fx.burst(h.x, h.y, h.z, [0xc6a15a, 0xffffff], 5, 2, 0.07, 0.3);

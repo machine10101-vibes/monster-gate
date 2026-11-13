@@ -326,6 +326,20 @@ export class Progress {
     }
   }
 
+  /**
+   * Unequip a crafted piece and take it out of the bag so it can be tossed.
+   * The carving knife is a starting tool and cannot leave the hunt.
+   */
+  releaseCrafted(id) {
+    if (!id || id === 'knife' || !this.crafted(id) || this.storedGear(id)) return false;
+    const g = gearById(id);
+    if (!g) return false;
+    if (this.worn(id)) this.toggleWear(id);
+    delete this.data.crafted[id];
+    this.save();
+    return true;
+  }
+
   /** {helm:'budgeset',...} describing which pieces are on the hero and which set styles them. */
   armorLook() {
     const look = {};
