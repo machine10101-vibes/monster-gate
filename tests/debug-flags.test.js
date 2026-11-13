@@ -4,7 +4,8 @@ import { after, test } from 'node:test';
 import {
   DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
-import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
+import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload, isUnsellableGood, stripDebugGrantedInPlace } from '../src/debug/transient.js';
+import { GOODS } from '../src/data/gathering.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
 import { Progress, saveKey } from '../src/systems/progress.js';
 
@@ -537,4 +538,77 @@ test('debug freeze does not write the hunter save', () => {
   } finally {
     freezeSaves(false);
   }
+});
+
+test('MG-SYS-7 huntSavePayload and loadRaw drop debug loot from crate storage', () => {
+  const payload = huntSavePayload({
+    storage: [
+      { k: 'good', id: DEBUG_LOOT_ID, n: 2 },
+      { k: 'good', id: 'copper_ore', n: 3 },
+    ],
+    goods: { [DEBUG_LOOT_ID]: 1, copper_ore: 2 },
+  });
+  assert.ok(!payload.storage.some((s) => s && s.id === DEBUG_LOOT_ID));
+  assert.ok(payload.storage.some((s) => s && s.id === 'copper_ore' && s.n === 3));
+  assert.equal(payload.goods[DEBUG_LOOT_ID], undefined);
+  assert.equal(payload.goods.copper_ore, 2);
+
+  const granted = huntSavePayload({
+    storage: [{ k: 'good', id: 'copper_ore', n: 1 }, { k: 'good', id: 'feather', n: 4 }],
+    debugGranted: { items: ['copper_ore'] },
+  });
+  assert.ok(!granted.storage.some((s) => s && s.id === 'copper_ore'));
+  assert.ok(granted.storage.some((s) => s && s.id === 'feather'));
+
+  const live = {
+    storage: [{ k: 'good', id: DEBUG_LOOT_ID, n: 2 }, { k: 'good', id: 'copper_ore', n: 1 }],
+    goods: { [DEBUG_LOOT_ID]: 1 },
+    debugGranted: { items: [DEBUG_LOOT_ID] },
+  };
+  stripDebugGrantedInPlace(live);
+  assert.ok(!live.storage.some((s) => s && s.id === DEBUG_LOOT_ID));
+  assert.ok(live.storage.some((s) => s && s.id === 'copper_ore'));
+
+  installStorage();
+  mem.clear();
+  freezeSaves(false);
+  const p = new Progress();
+  p.loadRaw({ storage: [{ k: 'good', id: '__debug_pouch', n: 2 }] });
+  assert.ok(!p.data.storage.some((s) => s && s.id === '__debug_pouch'), 'crate must not keep the pouch when debug is off');
+  assert.equal(p.data.goods[DEBUG_LOOT_ID], undefined);
+});
+
+test("Dalla skips session debug pouch in sellGood and the market listing", () => {
+  assert.equal(GOODS[DEBUG_LOOT_ID].session, true);
+  assert.equal(isUnsellableGood(GOODS[DEBUG_LOOT_ID]), true);
+  assert.equal(isUnsellableGood(GOODS.copper_ore), false);
+  const sold = [];
+  const game = {
+    progress: {
+      takeGood(id, n) {
+        sold.push([id, n]);
+        return true;
+      },
+    },
+    addGold() {},
+    audio: { coin() {} },
+    world: { market: null },
+    fx: { burst() {} },
+    hud: { toast() {} },
+    sellGood(id, n = 1) {
+      const g = GOODS[id];
+      if (!g || isUnsellableGood(g)) return false;
+      if (!this.progress.takeGood(id, n)) return false;
+      return true;
+    },
+  };
+  assert.equal(game.sellGood(DEBUG_LOOT_ID, 1), false);
+  assert.equal(sold.length, 0);
+  assert.equal(game.sellGood('copper_ore', 1), true);
+  assert.deepEqual(sold, [['copper_ore', 1]]);
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(main, /sellGood\(id, n = 1\) \{[\s\S]{0,180}isUnsellableGood\(g\)/);
+  assert.match(main, /sellAllGoods\(\) \{[\s\S]{0,220}if \(g\.session\) continue/);
+  const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
+  assert.match(hud, /function mountMarket[\s\S]*isUnsellableGood\(g\)\) continue/);
 });

@@ -1,5 +1,6 @@
 import { iconCanvas, iconURL, heartCanvas } from './icons.js';
 import { GOODS } from '../data/gathering.js';
+import { isUnsellableGood } from '../debug/transient.js';
 import { mountStats } from './stats.js';
 import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
@@ -1010,6 +1011,7 @@ function mountMarket(body, game) {
     let total = 0;
     let any = false;
     for (const g of Object.values(GOODS)) {
+      if (isUnsellableGood(g)) continue;
       const n = pr.good(g.id);
       total += n * g.price;
       if (!n) continue;

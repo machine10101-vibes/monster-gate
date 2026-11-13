@@ -7,6 +7,11 @@ export const DEBUG_STARTER_ID = '__debug_blade';
 export const DEBUG_LOOT_ID = '__debug_pouch';
 export const DEBUG_GRANTED_KEY = 'debugGranted';
 
+/** Session trophies and debug loot never go through Dalla's stall. */
+export function isUnsellableGood(g) {
+  return !g || !!g.session || g.id === DEBUG_LOOT_ID;
+}
+
 export function markDebugGranted(data, { weapon, items: extra } = {}) {
   if (!data || typeof data !== 'object') return data;
   const g = { ...(data[DEBUG_GRANTED_KEY] || {}) };
@@ -38,6 +43,21 @@ function dropGranted(crafted, ids) {
   return hit ? next : crafted;
 }
 
+function dropStorageSlots(slots, ids) {
+  if (!Array.isArray(slots) || !ids?.length) return slots;
+  const drop = new Set(ids.filter(Boolean));
+  if (!drop.size) return slots;
+  let hit = false;
+  const next = slots.map((s) => {
+    if (s && drop.has(s.id)) {
+      hit = true;
+      return null;
+    }
+    return s;
+  });
+  return hit ? next : slots;
+}
+
 /** Payload the client may write. Never includes debug-granted items. */
 export function huntSavePayload(data) {
   if (!data || typeof data !== 'object') return data;
@@ -62,6 +82,7 @@ export function huntSavePayload(data) {
     }
     if (hit) next.goods = goods;
   }
+  if (Array.isArray(next.storage)) next.storage = dropStorageSlots(next.storage, drop);
   return next;
 }
 
@@ -73,5 +94,6 @@ export function stripDebugGrantedInPlace(data) {
   data.weapon = clean.weapon;
   if (clean.crafted) data.crafted = clean.crafted;
   if (clean.goods) data.goods = clean.goods;
+  if (Array.isArray(clean.storage)) data.storage = clean.storage;
   return data;
 }

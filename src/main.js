@@ -19,7 +19,7 @@ import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
 import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
-import { DEBUG_LOOT_ID, markDebugGranted } from './debug/transient.js';
+import { DEBUG_LOOT_ID, isUnsellableGood, markDebugGranted } from './debug/transient.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
@@ -2545,7 +2545,8 @@ class Game {
 
   sellGood(id, n = 1) {
     const g = GOODS[id];
-    if (!g || !this.progress.takeGood(id, n)) return false;
+    if (!g || isUnsellableGood(g)) return false;
+    if (!this.progress.takeGood(id, n)) return false;
     this.addGold(g.price * n);
     this.audio.coin();
     const m = this.world.market;
