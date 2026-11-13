@@ -156,9 +156,9 @@ test('MG-UI-20 loading stage fills the largest 3:2 box above the bar', () => {
   assert.match(theme, /#loading #load-text \{[\s\S]*font-size:\s*14px/);
   assert.match(theme, /#load-tip \{[\s\S]*font-size:\s*15px/);
   assert.doesNotMatch(theme, /mix-blend-mode:\s*screen/);
-  assert.match(theme, /mask-image:\s*radial-gradient\(ellipse 70% 66%/);
-  assert.match(theme, /linear-gradient\(to right, transparent 0%, #000 14%/);
-  assert.match(theme, /linear-gradient\(to bottom, transparent 0%, #000 12%/);
+  assert.match(theme, /mask-image:\s*radial-gradient\(ellipse 74% 84%/);
+  assert.match(theme, /linear-gradient\(to right, transparent 0%, #000 10%/);
+  assert.match(theme, /linear-gradient\(to bottom, transparent 0%, #000 8%/);
   assert.match(theme, /-webkit-mask-image:/);
   assert.match(theme, /mask-composite:\s*intersect/);
   assert.match(theme, /\.load-poster,\s*\n#load-video,\s*\n\.load-key \{[\s\S]*background:\s*transparent/);

@@ -76,7 +76,7 @@ test('MG-UI-21 title panel fits short landscape and DEBUG stays off the tagline'
   assert.match(theme, /#debug-badge \{[\s\S]*left:\s*auto/);
   assert.match(style, /#debug-badge \{[\s\S]*right:\s*calc\(10px/);
   assert.match(theme, /#title \.title-inner \{[\s\S]*max-height:\s*calc\(100dvh - 16px\)/);
-  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*6px 16px 16px/);
+  assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.title-inner \{[\s\S]*padding:\s*16px 18px 16px/);
   assert.match(theme, /#title \.touch-only \{[\s\S]*padding:\s*0 8px 8px/);
   assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#title \.touch-only \{[\s\S]*padding:\s*8px 8px 12px/);
 });

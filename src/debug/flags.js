@@ -27,6 +27,8 @@ export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;
 export const DEBUG_STARTER_DMG = 9;
 export const DEBUG_AUTO_CADENCE = 1.15;
+/** Per-tick cap so a hitch cannot skip a whole swing, but real time still drives the clock. */
+export const DEBUG_AUTO_DT_CLAMP = 0.1;
 export const DEBUG_TANK_AGGRO = 12;
 export const DEBUG_TANK_REACH = 2.8;
 export const DEBUG_TANK_CADENCE = 1.7;
@@ -310,33 +312,77 @@ export function ensureDebugStarterWeapon(game) {
 export function setDebugAutoAttack(game, on) {
   if (!game?.debug || debugOnlineBlocked(game)) return false;
   game.debug.autoAttack = !!on;
+  if (!on && game.debug) game.debug.autoLock = null;
   return game.debug.autoAttack;
 }
 
-export function tickDebugAutoAttack(game, dt = 0) {
+function autoAttackStep(game, dt, now) {
+  let step = Math.min(DEBUG_AUTO_DT_CLAMP, Math.max(0, Number(dt) || 0));
+  const t = Number(now);
+  if (Number.isFinite(t)) {
+    const prev = Number(game.debug.autoAtkNow);
+    game.debug.autoAtkNow = t;
+    if (Number.isFinite(prev)) {
+      const elapsed = (t - prev) / 1000;
+      if (elapsed > step && elapsed >= 0) step = Math.min(DEBUG_AUTO_DT_CLAMP, elapsed);
+    }
+  }
+  return step;
+}
+
+/** Nearest living hostile in reach. Holds the current lock so crates and pickups cannot steal it. */
+export function acquireAutoAttackTarget(game) {
+  if (!game?.debug?.autoAttack || debugOnlineBlocked(game)) return null;
+  const P = game.player;
+  if (!P || P.dead) return null;
+  const from = P.pos || P;
+  const it = game.carried?.(game.items?.[game.sel]) || game.items?.[game.sel] || {};
+  const reach = (Number(it.reach) || 2.6) + 2.4;
+  const hold = reach + 4;
+  const locked = game.debug.autoLock;
+  if (locked && !locked.dead) {
+    const d = Math.hypot((Number(locked.x) || 0) - from.x, (Number(locked.z) || 0) - from.z);
+    if (d <= hold) return locked;
+  }
+  let best = null;
+  let bd = reach;
+  for (const row of game.monsters || []) {
+    if (!row || row.dead) continue;
+    if (!row.debugTank && !monsterIsHostile(row.type)) continue;
+    const d = Math.hypot(row.x - from.x, row.z - from.z);
+    if (d < bd) {
+      bd = d;
+      best = row;
+    }
+  }
+  game.debug.autoLock = best || null;
+  return game.debug.autoLock;
+}
+
+export function tickDebugAutoAttack(game, dt = 0, now = undefined) {
   if (!game?.debug?.autoAttack || debugOnlineBlocked(game)) return false;
   if (game.uiBlocking || !game.started) return false;
   const P = game.player;
   if (!P || P.dead) return false;
-  if (P.state === 'attack' || P.state === 'roll' || P.state === 'stagger' || P.state === 'use') return false;
-  const step = Number(dt) || 0;
+  const step = autoAttackStep(game, dt, now);
   if (step > 0) {
     game.debug.autoAtkCd = Math.max(0, Number(game.debug.autoAtkCd) || 0) - step;
-    if (game.debug.autoAtkCd > 0) return false;
   }
-  const from = P.pos || P;
-  const it = game.carried?.(game.items?.[game.sel]) || game.items?.[game.sel] || {};
-  const reach = Number(it.reach) || 2.6;
-  let m = game.nearestMonster?.(reach + 2.4, from);
-  if (!m || m.dead) {
-    m = (game.monsters || []).find((row) => row?.debugTank && !row.dead) || null;
-  }
+  const busy = P.state === 'attack' || P.state === 'roll' || P.state === 'stagger' || P.state === 'use';
+  if (busy) return false;
+  if (step > 0 && game.debug.autoAtkCd > 0) return false;
+  const m = acquireAutoAttackTarget(game);
   if (!m || m.dead) return false;
-  if (!m.debugTank && !monsterIsHostile(m.type)) return false;
+  const from = P.pos || P;
   const d = Math.hypot(m.x - from.x, m.z - from.z) || 1;
   P.yaw = Math.atan2((m.x - from.x) / d, (m.z - from.z) / d);
   const stam = P.stamina;
-  game.doAttack?.();
+  game.debug.facingLock = true;
+  try {
+    game.doAttack?.();
+  } finally {
+    game.debug.facingLock = false;
+  }
   if (P.stamina != null && stam != null) P.stamina = stam;
   if (step > 0) game.debug.autoAtkCd = DEBUG_AUTO_CADENCE;
   return true;
@@ -360,13 +406,14 @@ export function debugTankHpLabel(mon) {
   return `${hp}/${max}`;
 }
 
-/** Always drop a coin on a debug tank so testers see the normal kill/loot path. */
+/** Coin plus a visible session-only loot bag. Never written into hunter saves. */
 export function grantDebugTankLoot(game, mon) {
   if (!mon?.debugTank || !game) return false;
   const x = Number(mon.x) || 0;
   const y = (Number(mon.y) || 0) + 0.6;
   const z = Number(mon.z) || 0;
   game.dropCoin?.(x, y, z, 4);
+  game.dropLootBag?.(x, y + 0.15, z, { session: true, gold: 6, label: 'Loot bag' });
   return true;
 }
 

@@ -378,11 +378,11 @@ h1 em,
 @media (max-height: 500px) {
   #title {
     align-items: center;
-    padding: 8px 8px 12px;
+    padding: 14px 12px 16px;
   }
   #title .title-inner {
     max-height: calc(100dvh - 16px);
-    padding: 6px 16px 16px;
+    padding: 16px 18px 16px;
     overflow: hidden;
   }
   #title h1 {
@@ -390,6 +390,9 @@ h1 em,
     font-size: clamp(18px, 6.4vh, 28px);
   }
   #title .title-inner small {
+    display: block;
+    margin: 2px 0 4px;
+    padding: 0 2px;
     font-size: 8px;
     letter-spacing: 1px;
   }
@@ -417,7 +420,7 @@ h1 em,
     flex: none;
   }
   body.touch #title .title-inner {
-    padding: 6px 14px 16px;
+    padding: 16px 16px 16px;
   }
   body.touch #title h1 {
     margin: 2px 0 6px;
@@ -515,16 +518,16 @@ h1 em,
   pointer-events: none;
   background: transparent;
   border: 0;
-  /* Soften the 3:2 box into the red surround. The canvas luma-keys the clip's
-     near-black; video/poster keep this mask as a no-JS fallback. */
+  /* Soften the 3:2 box into the red surround. Opaque core is tall enough that
+     MONSTERGATE and .online stay solid; luma-key already punched the black. */
   -webkit-mask-image:
-    radial-gradient(ellipse 70% 66% at 50% 48%, #000 22%, transparent 72%),
-    linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+    radial-gradient(ellipse 74% 84% at 50% 52%, #000 46%, transparent 82%),
+    linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 8%, #000 94%, transparent 100%);
   mask-image:
-    radial-gradient(ellipse 70% 66% at 50% 48%, #000 22%, transparent 72%),
-    linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+    radial-gradient(ellipse 74% 84% at 50% 52%, #000 46%, transparent 82%),
+    linear-gradient(to right, transparent 0%, #000 10%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 8%, #000 94%, transparent 100%);
   -webkit-mask-composite: source-in, source-in;
   mask-composite: intersect;
   -webkit-mask-size: 100% 100%;

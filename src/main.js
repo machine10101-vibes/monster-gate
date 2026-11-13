@@ -18,7 +18,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { attachDebug, grantDebugTankLoot, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
+import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
@@ -1752,6 +1752,28 @@ class Game {
     this.fx.burst(p.pos.x, p.pos.y + 1, p.pos.z, [0xffd23f, 0xffffff, 0xffa030], 24, 5, 0.12, 0.9);
   }
 
+  dropLootBag(x, y, z, { session = true, gold = 6, label = 'Loot bag' } = {}) {
+    const bag = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.38), new THREE.MeshBasicMaterial({ color: 0x8a4a1c }));
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.42), new THREE.MeshBasicMaterial({ color: 0xd4a84a }));
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.08), new THREE.MeshBasicMaterial({ color: 0x5a3010 }));
+    flap.position.y = 0.2;
+    strap.position.set(0, 0.28, 0);
+    bag.add(body, flap, strap);
+    const holder = new THREE.Group();
+    holder.add(bag);
+    holder.position.set(x, y, z);
+    this.scene.add(holder);
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.1 + Math.random() * 0.8;
+    this.pickups.push({
+      holder, mesh: bag, kind: 'lootbag', session: !!session, value: gold | 0, label,
+      vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.4, age: 0, grounded: false,
+    });
+    this.fx?.burst?.(x, y, z, [0xd4a84a, 0xffd23f, 0xffffff], 10, 2.4, 0.08, 0.55);
+    return true;
+  }
+
   dropCoin(x, y, z, value, kind = 'coin') {
     const geo = kind === 'heart' ? new THREE.BoxGeometry(0.3, 0.3, 0.12) : new THREE.CylinderGeometry(0.2, 0.2, 0.07, 8);
     const mat = new THREE.MeshBasicMaterial({ color: kind === 'heart' ? 0xff4a5c : 0xffd23f });
@@ -1858,7 +1880,14 @@ class Game {
         h.y += (P.y + 0.9 - h.y) * Math.min(1, dt * 6);
       }
       if (k.age > 0.5 && d < 0.8) {
-        if (k.kind === 'stack') {
+        if (k.kind === 'lootbag') {
+          k.done = true;
+          if (k.value) this.addGold(k.value);
+          this.audio.coin();
+          this.hud.toast(k.label || 'Loot bag', 1800);
+          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), k.label || 'Loot bag', 'gold');
+          this.fx.burst(h.x, h.y, h.z, [0xd4a84a, 0xffd23f, 0xffffff], 8, 2.2, 0.08, 0.45);
+        } else if (k.kind === 'stack') {
           const added = k.k === 'good' ? this.progress.addGood(k.id, k.n) : this.progress.addPart(k.id, k.n);
           if (added < 1) {
             this.hud.toast(INVENTORY_FULL, 1400);
@@ -1920,10 +1949,10 @@ class Game {
           this.audio.coin();
           this.fx.burst(h.x, h.y, h.z, [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
         }
-      } else if (k.age > (k.kind === 'gear' || k.kind === 'stack' ? 180 : 40)) k.done = true;
+      } else if (k.age > (k.kind === 'gear' || k.kind === 'stack' || k.kind === 'lootbag' ? 180 : 40)) k.done = true;
       if (k.done) {
         this.scene.remove(k.holder);
-        if (k.kind === 'orcblade' || k.kind === 'gear') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+        if (k.kind === 'orcblade' || k.kind === 'gear' || k.kind === 'lootbag') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
         else {
           k.mesh.geometry.dispose();
           k.mesh.material.dispose();
@@ -2000,6 +2029,7 @@ class Game {
 
   faceForAction() {
     const P = this.player;
+    if (this.debug?.facingLock || (this.debug?.autoAttack && this.debug.autoLock && !this.debug.autoLock.dead)) return;
     const f = P.facing;
     if (this.input.touch) {
       const m = this.nearestMonster(5.5, P.pos, f);
@@ -2820,12 +2850,15 @@ class Game {
     if (inp.take('talk')) {
       if (!blocked) this.tryTalk();
     }
+    const autoLocked = !blocked && this.debug?.autoAttack && acquireAutoAttackTarget(this);
     if (inp.take('attack') && !blocked) {
-      if (!this.clickStorage() && !this.clickPortal() && !this.clickSmithy()) this.doAttack();
+      if (autoLocked) {
+        /* Hostile lock holds: crates, portals, and the smithy cannot steal the swing. */
+      } else if (!this.clickStorage() && !this.clickPortal() && !this.clickSmithy()) this.doAttack();
+    } else if (!autoLocked && inp.attackHeld && !blocked && this.player.state === 'idle') {
+      this.doAttack();
     }
-    else if (inp.attackHeld && !blocked && this.player.state === 'idle' && !inp.touch) this.doAttack();
-    else if (inp.attackHeld && !blocked && this.player.state === 'idle' && inp.touch) this.doAttack();
-    else if (!blocked) tickDebugAutoAttack(this, this.rawDt);
+    if (!blocked) tickDebugAutoAttack(this, this.rawDt, typeof performance !== 'undefined' ? performance.now() : 0);
     if (inp.take('evade') && !blocked) this.doEvade();
     if (inp.take('bolt') && !blocked) this.castSlot(0);
     if (inp.take('skill') && !blocked) this.castSlot(1);
