@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
 import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
-import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, overlap, padHudSafeRects, plateAnchorRect } from '../src/ui/hudLayout.js';
+import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, overlap, padHudSafeRects, plateAnchorRect } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -469,4 +469,47 @@ test('MG-UI-31 hides world labels that cross the viewport edges', () => {
   assert.match(layout, /nameplateOutsideViewport/);
   assert.match(hud, /nameplateOutsideViewport/);
   assert.match(hud, /cullPlatesOverHud/);
+});
+
+test('MG-UI-33 stacks the full name+subtitle box and culls labels that hug the clock', () => {
+  const pipName = { id: 'npc-child', x: 400, y: 140, d: 3.2, w: 124, h: 16 };
+  const alcName = { id: 'alchemy', x: 410, y: 138, d: 5.5, w: 220, h: 16 };
+  const short = stackNameplates([pipName, alcName], { gap: 10 });
+  const shortVis = short.filter((r) => r.visible);
+  assert.equal(shortVis.length, 2);
+  const shortFull = shortVis.map((t) => plateAnchorRect(t.x, t.y, t.w, 32));
+  assert.equal(overlap(shortFull[0], shortFull[1], -4), true, 'name-only height leaves subtitles overlapping');
+
+  const pip = { ...pipName, h: 32 };
+  const alc = { ...alcName, h: 32 };
+  const full = stackNameplates([pip, alc], { gap: PLATE_STACK_GAP });
+  const vis = full.filter((r) => r.visible);
+  assert.equal(vis.length, 2);
+  assert.equal(
+    overlap(
+      plateAnchorRect(vis[0].x, vis[0].y, vis[0].w, vis[0].h),
+      plateAnchorRect(vis[1].x, vis[1].y, vis[1].w, vis[1].h),
+      -8,
+    ),
+    false,
+    'full two-line boxes stay a few px apart',
+  );
+  const dropped = stackNameplates([pip, alc], { gap: 10, maxLift: 0 });
+  assert.ok(dropped.some((r) => !r.visible), 'farther label hides when it still collides');
+
+  const clock = { id: 'clock', x: 700, y: 8, w: 78, h: 34 };
+  const hug = { x: 566, y: 10, w: 124, h: 32 };
+  assert.equal(hug.x + hug.w, 690);
+  assert.ok(clock.x - (hug.x + hug.w) <= 10, 'about 10px left of the clock');
+  assert.equal(nameplateHitsHud(hug, [clock]), false, 'unpadded clock misses a hugging label');
+  assert.equal(nameplateHitsHud(hug, padHudSafeRects([clock], 16)), true, 'padded clock culls it');
+  const hud = src('src/ui/hud.js');
+  const layout = src('src/ui/hudLayout.js');
+  assert.match(layout, /PLATE_STACK_GAP = 10/);
+  assert.match(layout, /measurePlateSize/);
+  assert.match(layout, /debug-badge/);
+  assert.match(layout, /btn-fs/);
+  assert.match(layout, /btn-snd/);
+  assert.match(layout, /'clock'/);
+  assert.match(hud, /measurePlateSize/);
 });

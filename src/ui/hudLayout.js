@@ -62,6 +62,28 @@ export function plateAnchorRect(x, y, w, h) {
   return { x: x - width / 2, y: y - height, w: width, h: height };
 }
 
+/**
+ * Visual CSS-px size of a nameplate, including a subtitle that can sit
+ * outside the parent's border box.
+ */
+export function measurePlateSize(el, fallback = { w: 200, h: 40 }) {
+  const fw = Number.isFinite(Number(fallback.w)) && Number(fallback.w) > 0 ? Number(fallback.w) : 200;
+  const fh = Number.isFinite(Number(fallback.h)) && Number(fallback.h) > 0 ? Number(fallback.h) : 40;
+  if (!el?.getBoundingClientRect) return { w: fw, h: fh };
+  const box = el.getBoundingClientRect();
+  let w = Number(box.width) || 0;
+  let h = Number(box.height) || 0;
+  const left = Number(box.left) || 0;
+  const top = Number(box.top) || 0;
+  for (const node of el.children || []) {
+    const c = node.getBoundingClientRect?.();
+    if (!c || c.width < 1 || c.height < 1) continue;
+    w = Math.max(w, c.right - left, c.width);
+    h = Math.max(h, c.bottom - top);
+  }
+  return { w: w > 0 ? w : fw, h: h > 0 ? h : fh };
+}
+
 /** HUD chrome that world labels must not cover. Measured in CSS px. */
 export const HUD_SAFE_IDS = [
   'minimap-wrap',
@@ -75,6 +97,11 @@ export const HUD_SAFE_IDS = [
   'tb-talk',
   'stick',
   'hud-corner-right',
+  'top-right',
+  'clock',
+  'btn-fs',
+  'btn-snd',
+  'debug-badge',
   'cast-buttons',
 ];
 
@@ -148,8 +175,11 @@ export function nameplateOutsideViewport(plate, vp, inset = VIEWPORT_PLATE_INSET
  * Offset overlapping world labels using real CSS-px boxes. Near labels stay;
  * farther ones lift until they clear, then hide if they still collide.
  */
+/** Extra air between stacked world labels (covers subtitle + text-shadow). */
+export const PLATE_STACK_GAP = 10;
+
 export function stackNameplates(rows, opts = {}) {
-  const gap = opts.gap ?? 6;
+  const gap = opts.gap ?? PLATE_STACK_GAP;
   const maxLift = opts.maxLift ?? 8;
   const fallbackW = opts.defaultW ?? 200;
   const fallbackH = opts.defaultH ?? 40;
