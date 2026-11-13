@@ -1135,3 +1135,20 @@ body.touch #social-menu button { min-height: 40px; }
     width: min(148px, 52vw);
   }
 }
+
+@media (max-height: 500px) {
+  #party-frame,
+  body.touch #party-frame {
+    width: min(128px, 34vw);
+    padding: 6px 8px 4px;
+  }
+  .mg-party-h { margin-bottom: 2px; }
+  .mg-party-list { gap: 2px; }
+  .mg-party-list small { display: none; }
+  .mg-hp { margin: 1px 0; height: 4px; }
+  .mg-party-actions { margin-top: 4px; }
+  #top-left {
+    max-height: calc(100dvh - 168px - var(--safe-b) - var(--safe-t));
+    overflow: hidden;
+  }
+}
