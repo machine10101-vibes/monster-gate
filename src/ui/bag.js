@@ -3,8 +3,23 @@ import { STYLE_LABEL } from '../data/skills.js';
 import { iconCanvas } from './icons.js';
 import { FISH, GOODS, GOODS_ORDER, SHAFT_FROM_LOG, SHAFTS_PER_LOG, TOOLS, burnChance } from '../data/gathering.js';
 import { BAG_SLOTS } from '../systems/progress.js';
+import { BAG_HOLD_MS, bagHoldChoices } from '../systems/bagDrop.js';
 import { splitStacks } from '../systems/stacks.js';
 import { flushThumbs, renderThumb } from './catalog.js';
+
+let askEl = null;
+const pending = [];
+
+function clearPending() {
+  for (const id of pending) clearTimeout(id);
+  pending.length = 0;
+}
+
+function closeBagAsk() {
+  askEl?.remove();
+  askEl = null;
+  clearPending();
+}
 
 const TABS = [
   ['carried', 'Hotbar'],
@@ -20,6 +35,7 @@ export function mountBag(body, game) {
   let sel = null;
 
   const paint = () => {
+    closeBagAsk();
     const groups = collect(game);
     if (!groups[tab].some((it) => it.key === sel)) sel = groups[tab][0]?.key || null;
     body.innerHTML = '';
@@ -30,6 +46,10 @@ export function mountBag(body, game) {
     gold.className = 'bag-gold';
     gold.textContent = `Gold ${game.gold} · ${game.progress.bagSlotsUsed()} / ${BAG_SLOTS} slots`;
     root.appendChild(gold);
+    const hint = document.createElement('p');
+    hint.className = 'bag-hint';
+    hint.textContent = 'Hold an item to Use or Drop it.';
+    root.appendChild(hint);
 
     const tabs = document.createElement('div');
     tabs.className = 'bag-tabs';
@@ -70,10 +90,16 @@ export function mountBag(body, game) {
         i.textContent = it.badge;
         b.appendChild(i);
       }
-      b.onclick = () => {
-        sel = it.key;
-        paint();
-      };
+      bindBagHold(b, {
+        onSelect: () => {
+          sel = it.key;
+          paint();
+        },
+        onMenu: () => {
+          sel = it.key;
+          openBagMenu(b, it, game, paint);
+        },
+      });
       grid.appendChild(b);
     }
     stage.appendChild(grid);
@@ -112,7 +138,18 @@ export function mountBag(body, game) {
         note.textContent = current.setNote;
         detail.appendChild(note);
       }
-      const actions = current.actions || (current.action ? [{ label: current.action, run: current.run }] : []);
+      const held = bagHoldChoices(current);
+      const actions = current.actions
+        ? current.actions.slice()
+        : (held.use ? [held.use] : []);
+      if (held.drop) {
+        actions.push({
+          label: 'Drop',
+          run: (done) => {
+            if (game.dropBagItem(held.drop)) done();
+          },
+        });
+      }
       if (actions.length) {
         const row = document.createElement('div');
         row.className = 'bag-acts';
@@ -134,7 +171,126 @@ export function mountBag(body, game) {
   };
 
   paint();
-  return () => {};
+  return () => closeBagAsk();
+}
+
+function bindBagHold(button, { onSelect, onMenu }) {
+  let timer = 0;
+  let suppress = false;
+  let sx = 0;
+  let sy = 0;
+  const stop = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+    }
+    button.classList.remove('holding');
+  };
+  button.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    suppress = false;
+    sx = e.clientX;
+    sy = e.clientY;
+    button.classList.add('holding');
+    timer = setTimeout(() => {
+      timer = 0;
+      suppress = true;
+      button.classList.remove('holding');
+      onMenu();
+    }, BAG_HOLD_MS);
+    pending.push(timer);
+  });
+  button.addEventListener('pointermove', (e) => {
+    if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 14) stop();
+  });
+  button.addEventListener('pointerup', stop);
+  button.addEventListener('pointercancel', stop);
+  button.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    stop();
+    suppress = true;
+    onMenu();
+  });
+  button.addEventListener('click', (e) => {
+    if (suppress) {
+      suppress = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onSelect();
+  });
+}
+
+function openBagMenu(anchor, item, game, paint) {
+  const { use, drop } = bagHoldChoices(item);
+  if (!use && !drop) return;
+  closeBagAsk();
+  const back = document.createElement('div');
+  back.className = 'stash-ask-back bag-ask-back';
+  const card = document.createElement('div');
+  card.className = 'stash-ask bag-ask';
+
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'stash-ask-x';
+  x.textContent = '×';
+  x.onclick = () => closeBagAsk();
+
+  const title = document.createElement('b');
+  title.textContent = item.name;
+  const hint = document.createElement('p');
+  hint.textContent = drop && use ? 'Use it, or drop it on the ground.' : drop ? 'Drop it on the ground?' : `${use.label} this?`;
+
+  const row = document.createElement('div');
+  row.className = 'stash-ask-row bag-ask-row';
+  if (use) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = use.label;
+    b.onclick = () => {
+      closeBagAsk();
+      use.run(paint);
+    };
+    row.appendChild(b);
+  }
+  if (drop) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bag-ask-drop';
+    b.textContent = 'Drop';
+    b.onclick = () => {
+      closeBagAsk();
+      if (game.dropBagItem(drop)) paint();
+    };
+    row.appendChild(b);
+  }
+  card.append(x, title, hint, row);
+  back.appendChild(card);
+  document.body.appendChild(back);
+  askEl = back;
+  card.style.pointerEvents = 'none';
+  const arm = () => {
+    if (askEl !== back) return;
+    card.style.pointerEvents = '';
+    window.removeEventListener('pointerup', arm, true);
+    window.removeEventListener('pointercancel', arm, true);
+  };
+  window.addEventListener('pointerup', arm, true);
+  window.addEventListener('pointercancel', arm, true);
+
+  const r = anchor.getBoundingClientRect();
+  const c = card.getBoundingClientRect();
+  let left = r.left + r.width / 2 - c.width / 2;
+  let top = r.bottom + 8;
+  left = Math.max(8, Math.min(left, window.innerWidth - c.width - 8));
+  if (top + c.height > window.innerHeight - 8) top = Math.max(8, r.top - c.height - 8);
+  card.style.left = left + 'px';
+  card.style.top = top + 'px';
+
+  back.addEventListener('pointerdown', (e) => {
+    if (e.target === back) closeBagAsk();
+  });
 }
 
 function pieceStats(g, progress) {
@@ -185,6 +341,7 @@ function collect(game) {
       badge: it.count !== undefined ? String(it.count) : null,
       canvas: () => renderThumb({ kind: 'held', id: it.held }, 96),
       action: it.kind === 'use' ? 'Use' : 'Hold',
+      drop: it.count != null && it.count > 0 ? { k: 'held', id: it.id, n: it.count, name: it.name } : null,
       run: (paint) => {
         if (it.kind === 'use') game.player?.tryAttack(it);
         else game.selectSlot(i);
@@ -287,6 +444,7 @@ function collect(game) {
         canvas: () => renderThumb({ kind: 'good', id }, 96),
         action,
         actions,
+        drop: { k: 'good', id, n, name: g.name },
         run,
       });
     });
@@ -305,6 +463,7 @@ function collect(game) {
       setNote: sheet.note,
       canvas: () => renderThumb({ kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id }, 96),
       action: worn ? 'Unequip' : 'Equip',
+      drop: { k: 'gear', id: g.id, n: 1, name: g.name },
       run: (paint) => {
         game.wearPiece(g.id);
         paint();
@@ -324,6 +483,7 @@ function collect(game) {
         badge: String(n),
         n,
         canvas: () => renderThumb({ kind: 'material', id }, 96),
+        drop: { k: 'part', id, n, name: MATERIALS[id].name },
       });
     });
   }
