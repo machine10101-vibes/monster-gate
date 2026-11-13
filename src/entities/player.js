@@ -71,6 +71,8 @@ export class Player {
     this.aimYaw = 0;
     this.heldKind = null;
     this.sheathKind = null;
+    this.sipping = false;
+    this.sipFrom = null;
     this.idleArm = 0;
     this.torchLight = new THREE.PointLight(0xffa850, 0, 10, 1.6);
     this.torchLight.position.set(0, 1.6, 0.4);
@@ -163,9 +165,9 @@ export class Player {
       this.idleArm = 0;
       return;
     }
-    if (this.state === 'attack') {
+    if (this.state === 'attack' || this.state === 'use') {
       this.idleArm = 0;
-      if (this.heldKind !== weapon) this.showHeld(weapon);
+      if (this.state === 'attack' && this.heldKind !== weapon) this.showHeld(weapon);
       return;
     }
     if (this.shielding) return;
@@ -182,7 +184,7 @@ export class Player {
 
   showHeld(kind) {
     if (this.heldKind === kind) {
-      this.syncSheath();
+      if (!this.sipping) this.syncSheath();
       return;
     }
     this.heldKind = kind;
@@ -203,7 +205,7 @@ export class Player {
         off.add(twin);
       }
     }
-    this.syncSheath();
+    if (!this.sipping) this.syncSheath();
   }
 
   get facing() {
@@ -301,9 +303,54 @@ export class Player {
   }
 
   setState(s, dur = 0) {
+    const leavingDrink = this.sipping && !(s === 'use' && this.state !== 'use');
+    if (leavingDrink) this.endSip();
+    if (leavingDrink || (this.state === 'use' && s !== 'use')) this.potionDone = false;
     this.state = s;
     this.stateT = 0;
     this.stateDur = dur;
+  }
+
+  /** Show the bottle for a drink without forgetting the weapon in hand. */
+  beginSip(kind) {
+    this.sipping = true;
+    this.sipFrom = this.heldKind || null;
+    this.showHeld(kind === 'manapotion' ? 'manapotion' : 'potion');
+  }
+
+  /** The gulp lands. Safe to call twice. */
+  grantDrink() {
+    if (this.potionDone) return;
+    this.potionDone = true;
+    const g = this.game;
+    const fx = this.useFx || { heal: 0, mana: 0 };
+    if (fx.eat) g.audio.tone(320, 0.06, 'square', 0.1, 120);
+    else g.audio.potion();
+    if (fx.heal) {
+      this.heal(fx.heal);
+      g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff6a8a, 0xffc0cc, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
+      g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2, this.pos.z), '+' + fx.heal, 'heal');
+    }
+    if (fx.mana) {
+      const before = this.mana;
+      this.mana = Math.min(this.maxMana, this.mana + fx.mana);
+      const got = Math.round(this.mana - before);
+      g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0x4ec8ff, 0xb8f0ff, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
+      g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.3, this.pos.z), '+' + got, 'mana');
+    }
+  }
+
+  /** Put back whatever the hand held before the drink. */
+  endSip() {
+    if (!this.sipping) return;
+    this.grantDrink();
+    this.sipping = false;
+    const back = this.sipFrom;
+    this.sipFrom = null;
+    const bottle = this.heldKind === 'potion' || this.heldKind === 'manapotion';
+    if (bottle) {
+      if (this.heldKind !== back) this.showHeld(back);
+    } else this.syncSheath();
   }
 
   spend(n) {
@@ -344,7 +391,9 @@ export class Player {
   tryAttack(item) {
     if (this.state === 'gather') this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger') return false;
-    if (this.state === 'attack' || this.state === 'use') {
+    if (this.state === 'attack') return false;
+    // A drink plays in the free hand. Swinging still uses the weapon already selected.
+    if (this.state === 'use' && !(this.sipping && item.kind !== 'use' && item.kind !== 'light' && item.kind !== 'none')) {
       return false;
     }
     if (item.kind === 'use') {
@@ -365,6 +414,7 @@ export class Player {
       item.count--;
       this.useFx = { heal, mana };
       this.game.progress.setStock(item.id, item.count);
+      this.beginSip(item.held);
       this.setState('use', 0.6);
       this.game.itemsChanged();
       return true;
@@ -483,28 +533,8 @@ export class Player {
       case 'use': {
         speed = inputMag * 1.4;
         moveDir.copy(want);
-        if (!this.potionDone && this.stateT > 0.3) {
-          this.potionDone = true;
-          const fx = this.useFx || { heal: 8, mana: 0 };
-          if (fx.eat) g.audio.tone(320, 0.06, 'square', 0.1, 120);
-          else g.audio.potion();
-          if (fx.heal) {
-            this.heal(fx.heal);
-            g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff6a8a, 0xffc0cc, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
-            g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2, this.pos.z), '+' + fx.heal, 'heal');
-          }
-          if (fx.mana) {
-            const before = this.mana;
-            this.mana = Math.min(this.maxMana, this.mana + fx.mana);
-            const got = Math.round(this.mana - before);
-            g.fx.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0x4ec8ff, 0xb8f0ff, 0xffffff], 14, 1.8, 0.08, 0.9, -1.5, 0.6);
-            g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.3, this.pos.z), '+' + got, 'mana');
-          }
-        }
-        if (this.stateT >= this.stateDur) {
-          this.potionDone = false;
-          this.setState('idle');
-        }
+        if (!this.potionDone && this.stateT > 0.3) this.grantDrink();
+        if (this.stateT >= this.stateDur) this.setState('idle');
         break;
       }
       case 'gather': {
@@ -936,10 +966,17 @@ export class Player {
       case 'use': {
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
         const sw = Math.sin(tt * Math.PI);
-        armR = this.heldKind === 'potion' || this.heldKind === 'manapotion' ? lerp(-0.3, -2.4, sw) : -1.6 + sw * -0.6;
-        if (this.heldKind !== 'potion') armL = -1.2;
-        headPitch = -0.14 * sw;
-        lean = -0.06 * sw;
+        if (this.sipping) {
+          armR = lerp(-0.45, -2.55, sw);
+          armRz = -0.15 * sw;
+          headPitch = -0.7 * sw;
+          lean = -0.16 * sw;
+        } else {
+          armR = -1.6 + sw * -0.6;
+          armL = -1.2;
+          headPitch = -0.14 * sw;
+          lean = -0.06 * sw;
+        }
         break;
       }
       case 'roll': {
