@@ -10,7 +10,8 @@
     "build:gh-path": "VITE_BASE=/monster-gate/ vite build",
     "preview": "vite preview --host",
     "start:server": "node server/index.js",
-    "test": "node --test tests/*.js"
+    "test": "node --test tests/*.js",
+    "test:persistence": "node --test server/persistence/tests/*.test.js"
   },
   "repository": {
     "type": "git",
