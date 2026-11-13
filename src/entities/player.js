@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, TALL_KINDS, gripRoll, placeSheath } from './weaponModels.js';
+import { DUAL_KINDS, TALL_KINDS, gripRoll, placeSheath, swingRoll } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -1306,7 +1306,7 @@ export class Player {
     const aimed = AIMED_KINDS.has(this.heldKind);
     m.heldSlot.rotation.x = aimed ? -(m.armR.rotation.x + m.elbowR.rotation.x) : 0;
     let roll = gripRoll(this.heldKind);
-    if (roll && !aimed && this.state === 'attack' && this.attackItem?.kind === 'melee' && this.combo !== 2) {
+    if (swingRoll(this.heldKind) && !aimed && this.state === 'attack' && this.attackItem?.kind === 'melee' && this.combo !== 2) {
       const tt = clamp(this.stateT / Math.max(0.0001, this.stateDur), 0, 1);
       const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
       const cut = tt < hitT ? ease(tt / hitT) : 1 - ease(clamp((tt - hitT) / (1 - hitT), 0, 1));

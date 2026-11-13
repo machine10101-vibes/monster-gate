@@ -33,19 +33,32 @@ const EDGE_HOLD = new Set([
 ]);
 
 /**
+ * Maul heads are widest across the grip, so the striking bar lies flat.
+ * The same quarter roll that stands a sword on its edge stands that bar
+ * up and down. The iron mallet's face is already taller than it is wide.
+ */
+const HAMMER_HOLD = new Set(['budgemaul', 'darkhammer', 'yetihammer', 'holyhammer']);
+
+/**
  * Resting roll of a weapon in the hand, around the grip.
- * Swords stand on their edge. Hammers are turned in the sculpt so the blunt
- * face already leads; rolling them would swing that flat cheek toward the viewer.
+ * Swords stand on their edge. Mauls stand with the striking bar upright.
  */
 export function gripRoll(kind) {
-  return EDGE_HOLD.has(kind) ? -Math.PI / 2 : 0;
+  return EDGE_HOLD.has(kind) || HAMMER_HOLD.has(kind) ? -Math.PI / 2 : 0;
+}
+
+/** Side cuts roll a sword so the edge leads. A hammer keeps its bar upright through the swing. */
+export function swingRoll(kind) {
+  return EDGE_HOLD.has(kind);
 }
 
 const sheathTip = new THREE.Vector3();
 const sheathBack = new THREE.Vector3(0, 0, -1);
+const sheathZ = new THREE.Vector3(0, 0, 1);
 const sheathX = new THREE.Vector3();
 const sheathY = new THREE.Vector3();
 const sheathBasis = new THREE.Matrix4();
+const sheathRoll = new THREE.Quaternion();
 
 /**
  * Hang a carried weapon on the back slot.
@@ -65,6 +78,10 @@ export function placeSheath(group, kind) {
   sheathY.crossVectors(sheathTip, sheathX).normalize();
   sheathBasis.makeBasis(sheathX, sheathY, sheathTip);
   group.quaternion.setFromRotationMatrix(sheathBasis);
+  if (HAMMER_HOLD.has(kind)) {
+    sheathRoll.setFromAxisAngle(sheathZ, gripRoll(kind));
+    group.quaternion.multiply(sheathRoll);
+  }
 }
 
 const THEMES = {
