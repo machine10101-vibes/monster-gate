@@ -1107,7 +1107,7 @@ export class WorldView {
     const text = escapeHtml(pin.text);
     const pid = escapeHtml(pin.id);
     el.hidden = false;
-    el.innerHTML = `<p class="wc-you"><b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
+    el.innerHTML = `<p class="wc-you"><span class="wc-pin-mark" aria-label="Pinned">📌</span><b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
   }
 
   wrapGame() {

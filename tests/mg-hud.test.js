@@ -609,3 +609,17 @@ test('MG-UI-36 own bubble nudges off the open chat panel', () => {
   assert.equal(nameplateHitsHud(after, padded), false, 'nudged bubble misses the chat panel');
   assert.equal(nameplateOutsideViewport(after, vp), false, 'nudged bubble stays on screen');
 });
+
+test('MG-UI-37 pin slot is labeled and distinct from the in-log own row', () => {
+  const style = src('src/style.css');
+  const theme = src('src/ui/theme.css');
+  const wv = src('src/net/worldView.js');
+  assert.match(wv, /wc-pin-mark/);
+  assert.match(wv, /📌/);
+  assert.match(style, /#world-chat \.wc-pin \{[\s\S]*?border-left:\s*3px solid/);
+  assert.match(style, /#world-chat \.wc-pin-mark/);
+  assert.match(style, /#world-chat \.wc-log p\.wc-you \{/);
+  assert.doesNotMatch(style, /#world-chat \.wc-log p\.wc-you,\s*#world-chat \.wc-pin p\.wc-you/);
+  assert.doesNotMatch(theme, /#world-chat \.wc-log p\.wc-you,\s*#world-chat \.wc-pin p\.wc-you/);
+  assert.match(theme, /#world-chat \.wc-pin \{[\s\S]*?border-left-color:\s*var\(--mg-gold\)/);
+});

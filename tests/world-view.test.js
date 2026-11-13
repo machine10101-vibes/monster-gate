@@ -291,6 +291,7 @@ test('a mock chat send from you is marked local and opens a player bubble', () =
   const wv = src('../src/net/worldView.js');
   assert.match(wv, /wc-you/);
   assert.match(wv, /wc-pin/);
+  assert.match(wv, /wc-pin-mark/);
   assert.match(wv, /setTimeout/);
   assert.match(wv, /local-chat/);
   assert.match(wv, /layoutInteractPlates/);
