@@ -133,6 +133,10 @@ kbd {
   top: calc(8px + var(--safe-t));
   transform-origin: top left;
   transform: scale(var(--ui));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 #minimap-wrap {
@@ -4271,7 +4275,13 @@ body.touch #dialog { z-index: 74; }
   border-radius: 4px;
   touch-action: auto;
 }
-.nameplate.hunter { color: #e8fbff; font-size: var(--plate); }
+.nameplate.hunter {
+  color: #e8fbff;
+  font-size: var(--plate);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.nameplate.hunter.party { color: #ffe27a; }
 .nameplate .say {
   display: block;
   margin: 4px auto 0;

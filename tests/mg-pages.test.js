@@ -14,4 +14,6 @@ test('Pages CNAME is the custom domain and the Vite base defaults to /', () => {
   assert.match(src('../package.json'), /build:gh-path/);
   assert.match(src('../docs/debug-flags.md'), /https:\/\/monstergate\.online\/\?debug=1/);
   assert.match(src('../docs/worldView-interface.md'), /https:\/\/monstergate\.online\/\?mmo=1&mockwake=1/);
+  assert.match(src('../docs/worldView-interface.md'), /mocksocial=1/);
+  assert.match(src('../docs/SOCIAL_SPEC.md'), /monstergate\.online\/\?mmo=1&mocksocial=1/);
 });

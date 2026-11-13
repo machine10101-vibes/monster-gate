@@ -20,6 +20,7 @@ import { shortAddress } from '../wallet/klever.js';
 import { mountWalletSettings } from '../wallet/settings.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
+import { mountFriends } from '../social/ui.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -44,6 +45,14 @@ export const POTION_SHOP = {
 };
 
 const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire']);
+
+function isPartyRemote(r, partyOf) {
+  if (!r || !partyOf) return false;
+  if (typeof partyOf.isPartyMember === 'function') return !!partyOf.isPartyMember(r.id, r.name);
+  if (typeof partyOf === 'function') return !!partyOf(r);
+  if (partyOf.has) return partyOf.has(r.id) || partyOf.has(r.name);
+  return false;
+}
 
 /** Area and city names for the map the player opens. */
 function landMapLabels(world) {
@@ -330,14 +339,18 @@ export class HUD {
     let p = this.plates.get(id);
     if (!p) {
       p = document.createElement('div');
-      p.className = 'nameplate ' + cls;
       this.el.nameplates.appendChild(p);
       p.dataset.h = '';
       this.plates.set(id, p);
     }
+    const nextCls = ('nameplate ' + cls).trim();
+    if (p.className !== nextCls) p.className = nextCls;
+    p.dataset.pid = String(id);
     if (p.dataset.h !== html) {
       p.innerHTML = html;
       p.dataset.h = html;
+      const name = p.childNodes[0]?.textContent || '';
+      if (name) p.dataset.pname = name.trim();
     }
     return p;
   }
@@ -367,7 +380,7 @@ export class HUD {
     else p.style.zIndex = '';
   }
 
-  drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null) {
+  drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null, partyOf = null) {
     const ctx = this.mctx;
     const cv = this.el.minimap;
     const N = 44;
@@ -424,7 +437,12 @@ export class HUD {
     if (remotes) {
       for (const r of remotes) {
         if (!r.ready || !inView(r.x, r.z)) continue;
-        paintMinimapArrow(ctx, toX(r.x), toZ(r.z), r.yaw, { fill: '#9ad7ff', stroke: '#14343a', scale: 0.62 });
+        const mate = isPartyRemote(r, partyOf);
+        paintMinimapArrow(ctx, toX(r.x), toZ(r.z), r.yaw, {
+          fill: mate ? '#ffe27a' : '#9ad7ff',
+          stroke: mate ? '#6a4a10' : '#14343a',
+          scale: mate ? 0.78 : 0.62,
+        });
       }
     }
     ctx.fillStyle = '#ff4d4d';
@@ -550,6 +568,9 @@ export class HUD {
     } else if (name === 'world') {
       title.textContent = 'World Map';
       this.cleanup = mountWorldMap(body, game);
+    } else if (name === 'friends') {
+      title.textContent = 'Friends';
+      this.cleanup = mountFriends(body, game);
     } else if (name === 'stats') {
       title.textContent = 'Hunter Stats';
       this.cleanup = mountStats(body, game, game.statsFocus);
@@ -663,6 +684,7 @@ export class HUD {
       jumps.className = 'set-jumps';
       for (const [id, label, sub] of [
         ['tome', 'Teleportation Tome', 'Travel to a remembered place'],
+        ['friends', 'Friends', 'Friends list and party'],
         ['gear', 'Character', 'Equipped and unequipped'],
         ['bag', 'Inventory', 'Bag, tools and goods'],
         ['world', 'World Creator', '100-tile map'],
@@ -710,7 +732,7 @@ export class HUD {
         row.append(label, out);
         body.appendChild(row);
       }
-      add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
+      add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · P friends · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
       const statsBtn = document.getElementById('set-stats');
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');

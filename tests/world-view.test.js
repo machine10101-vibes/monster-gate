@@ -65,6 +65,7 @@ test('chat events keep world/zone and length limits', () => {
   assert.equal(msg.from.name, 'Lira');
   assert.equal(msg.text.length, CHAT_MAX);
   assert.equal(normalizeChat({ channel: 'world', text: 'hi' }).channel, 'world');
+  assert.equal(normalizeChat({ channel: 'whisper', text: 'psst', from: { id: 'a', name: 'Ann' } }).channel, 'whisper');
 });
 
 test('snapshot buffer interpolates position and wraps yaw', () => {
