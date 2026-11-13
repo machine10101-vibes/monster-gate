@@ -145,7 +145,7 @@ export class NPC {
     this.near = d < 2.6;
     const [sx, sy, vis] = this.game.screenOf(this.x, this.y + this.height + 0.4, this.z, true);
     this.game.hud.plate(this.id, `${this.def.name}<small>${this.def.title}</small>`);
-    this.game.hud.placePlate(this.id, sx, sy, vis && d < 16);
+    this.game.hud.placePlate(this.id, sx, sy, vis && d < 16, { dist: d });
   }
 
   stepRoam(dt) {

@@ -813,6 +813,7 @@ body.touch #top-right {
   text-align: center;
   line-height: 1.5;
   max-width: 80vw;
+  z-index: 80;
 }
 #toast.show {
   opacity: 1;
@@ -942,12 +943,12 @@ body.touch #top-right {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(220, 30, 30, 0.6));
+  background: radial-gradient(ellipse at 50% 50%, transparent 68%, rgba(180, 24, 24, 0.18));
   opacity: 0;
   transition: opacity 0.3s;
 }
 #hurt-flash.show {
-  opacity: 1;
+  opacity: 0.85;
   transition: none;
 }
 
@@ -957,12 +958,17 @@ body.touch #top-right {
   bottom: max(16px, calc(var(--hud-clear-bottom, 120px) + var(--safe-b)));
   transform: translateX(-50%);
   width: min(560px, 86vw);
+  max-height: calc(100dvh - var(--safe-t) - var(--hud-clear-bottom, 120px) - 24px);
   padding: 12px 16px 10px;
   background: rgba(10, 11, 14, 0.88);
   border: 2px solid var(--panel-hi);
   border-radius: 6px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 #dialog b {
   display: block;
@@ -975,6 +981,9 @@ body.touch #top-right {
   margin: 0 0 6px;
   font-size: 15px;
   line-height: 1.35;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 #dialog small {
   font-size: 10px;
@@ -3609,8 +3618,9 @@ body.touch .book-list, body.touch .book-passives { gap: 6px; }
 body.touch .stash-cols { gap: 8px; }
 body.touch .stash-help { margin-bottom: 6px; }
 body.touch #dialog {
-  width: min(440px, calc(100vw - 20px - var(--safe-l) - var(--safe-r)));
-  bottom: max(16px, calc(var(--hud-clear-bottom, 200px) + var(--safe-b)));
+  width: min(520px, calc(100vw - 20px - var(--safe-l) - var(--safe-r)));
+  bottom: max(12px, var(--safe-b));
+  max-height: min(58vh, calc(100dvh - var(--safe-t) - 12px));
   padding: 8px 10px 6px;
 }
 body.touch #dialog b { margin-bottom: 4px; }
@@ -3704,9 +3714,10 @@ body.touch .stash-ask input { min-height: 40px; }
   body.touch .book-slot canvas { width: 32px; height: 32px; }
   body.touch #dialog {
     left: 50%;
-    width: min(300px, 36vw);
-    bottom: max(12px, calc(var(--hud-clear-bottom, 120px) + var(--safe-b)));
-    padding: 6px 8px 4px;
+    width: min(640px, calc(100vw - 16px - var(--safe-l) - var(--safe-r)));
+    bottom: max(8px, var(--safe-b));
+    max-height: min(62vh, calc(100dvh - var(--safe-t) - 8px));
+    padding: 8px 10px 8px;
   }
   body.touch #dialog p { font-size: 13px; line-height: 1.3; }
   body.touch #faint b { font-size: 16px; }
@@ -4136,6 +4147,7 @@ body.touch #dialog { z-index: 74; }
   flex-direction: column;
   gap: 6px;
   margin: 8px 0 4px;
+  flex: 0 0 auto;
 }
 .dlg-choice {
   text-align: left;

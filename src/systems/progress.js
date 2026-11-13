@@ -582,7 +582,7 @@ export class Progress {
   addGood(id, n = 1, echo = true) {
     n = n | 0;
     if (!GOODS[id] || n < 1) return 0;
-    const add = Math.min(n, this.roomFor('good', id));
+    const add = GOODS[id].session ? n : Math.min(n, this.roomFor('good', id));
     if (add < 1) return 0;
     this.data.goods[id] = this.good(id) + add;
     if (echo) this.save();

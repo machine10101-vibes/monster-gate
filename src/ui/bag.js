@@ -227,7 +227,11 @@ function collect(game) {
   })));
 
   const goods = [];
-  for (const id of GOODS_ORDER) {
+  const seenGoods = new Set();
+  const sessionIds = Object.keys(game.progress.data?.goods || {}).filter((id) => GOODS[id]?.session);
+  for (const id of [...sessionIds, ...GOODS_ORDER]) {
+    if (seenGoods.has(id)) continue;
+    seenGoods.add(id);
     const total = game.progress.good(id);
     if (!total) continue;
     const g = GOODS[id];

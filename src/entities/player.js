@@ -264,17 +264,18 @@ export class Player {
     this.hp = Math.max(0, this.hp - dmg);
     this.invuln = 0.9;
     this.hurtT = 0.4;
-    this.knock.set((dx / d) * knock, 0, (dz / d) * knock);
-    g.fx.impact(this.pos.x, this.pos.y + 1.1, this.pos.z, dx / d, dz / d, [0xff4d5a, 0xffa0a8, 0xffffff], 1.1);
-    g.fx.burst(this.pos.x, this.pos.y + 1.1, this.pos.z, [0xff4d5a, 0xffa0a8, 0xffffff], 8, 3.5, 0.09, 0.5);
-    g.punch(0.28);
+    const auto = !!g.debug?.autoAttack;
+    this.knock.set((dx / d) * (auto ? 0 : knock), 0, (dz / d) * (auto ? 0 : knock));
+    g.fx.impact(this.pos.x, this.pos.y + 1.1, this.pos.z, dx / d, dz / d, [0xff4d5a, 0xffa0a8, 0xffffff], 0.22);
+    g.fx.burst(this.pos.x, this.pos.y + 1.15, this.pos.z, [0xff4d5a, 0xffa0a8], 3, 1.05, 0.045, 0.22);
+    g.punch(auto ? 0.1 : 0.28);
     g.audio.hurt();
     g.hud.hurtFlash();
     g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), '-' + dmg, 'hurt');
-    g.shake(0.25);
+    g.shake(auto ? 0.08 : 0.25);
     g.hitstop(0.07);
     if (this.state === 'gather') g.gather.cancel();
-    if (this.state === 'attack' || this.state === 'use') this.setState('idle');
+    if (!auto && (this.state === 'attack' || this.state === 'use')) this.setState('idle');
     if (this.hp <= 0) this.die();
     return true;
   }
@@ -639,7 +640,10 @@ export class Player {
     this.syncObj();
     this.updateTrail(dt);
 
-    this.model.mat.emissive.setRGB(this.hurtT > 0.2 ? 0.6 : 0, 0, 0);
+    if (this.hurtT > 0) {
+      const k = Math.min(1, this.hurtT / 0.4);
+      this.model.mat.emissive.setRGB(0.26 * k, 0.04 * k, 0.03 * k);
+    } else this.model.mat.emissive.setRGB(0, 0, 0);
     if (this.invuln > 0 && this.hurtT <= 0 && this.state !== 'roll') {
       this.obj.visible = Math.floor(this.invuln * 18) % 2 === 0 || this.invuln > 1.4;
     } else this.obj.visible = true;

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
-import { bindPanelClose, minimapArrowAngle } from '../src/ui/hud.js';
+import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -49,9 +49,9 @@ test('MG-UI-10 dialogue stays absolutely positioned and clamped on screen', () =
   const theme = src('src/ui/theme.css');
   assert.match(theme, /#dialog \{[\s\S]*position:\s*absolute/);
   assert.match(theme, /#dialog \{[\s\S]*max-height:\s*calc\(100dvh/);
-  assert.match(theme, /body\.touch #dialog \{[\s\S]*max-height:\s*calc\(100dvh/);
+  assert.match(theme, /body\.touch #dialog \{[\s\S]*max-height:\s*min\(58vh/);
   assert.match(theme, /#dialog \{[\s\S]*--hud-clear-bottom/);
-  assert.match(theme, /body\.touch #dialog \{[\s\S]*--hud-clear-bottom/);
+  assert.match(theme, /#dialog \{[\s\S]*flex-direction:\s*column/);
 });
 
 test('MG-UI-9 landscape chat stays off the quest HUD and the page cannot scroll', () => {
@@ -331,7 +331,8 @@ test('offline cursor uses local gear; mmo uses snapshot held for the local id', 
 test('MG-UI-27 hit glow is small and on the monster, player swing stays subtle', () => {
   const vfx = src('src/engine/vfx.js');
   const hit = vfx.slice(vfx.indexOf('hit(x, y, z'), vfx.indexOf('/* ----------------------------- update'));
-  assert.match(hit, /0xffffff,\s*0\.28 \+ power \* 0\.1/);
+  assert.match(hit, /Math\.min\(0\.48/);
+  assert.match(hit, /0xffffff,\s*0\.14 \+ p \* 0\.05/);
   assert.doesNotMatch(hit, /0\.9 \+ power \* 0\.5/);
   const swing = src('src/systems/skillfx.js');
   const melee = swing.slice(swing.indexOf('export function meleeSwing'), swing.indexOf('/* ------------------------------------------------------------------ */\n/* skills'));
@@ -339,4 +340,42 @@ test('MG-UI-27 hit glow is small and on the monster, player swing stays subtle',
   assert.doesNotMatch(melee, /1\.3,\s*0\.14/);
   const monsters = src('src/entities/monsters.js');
   assert.match(monsters, /emissive\.setRGB\(0\.38, 0\.32, 0\.22\)/);
+  const player = src('src/entities/player.js');
+  assert.match(player, /fx\.burst\([\s\S]{0,180}3,\s*1\.05,\s*0\.045/);
+  assert.match(player, /emissive\.setRGB\(0\.26 \* k, 0\.04 \* k, 0\.03 \* k\)/);
+  assert.match(player, /fx\.impact\([\s\S]{0,160}0\.22\)/);
+  const style = src('src/style.css');
+  assert.match(style, /#hurt-flash \{[\s\S]*transparent 68%/);
+  assert.match(style, /#hurt-flash\.show \{[\s\S]*opacity:\s*0\.85/);
+  assert.match(style, /#toast \{[\s\S]*z-index:\s*80/);
+});
+
+test('MG-UI-28 dialogue is a bottom sheet with scrollable text and sticky choices', () => {
+  const theme = src('src/ui/theme.css');
+  const style = src('src/style.css');
+  const hud = src('src/ui/hud.js');
+  assert.match(theme, /#dialog \{[\s\S]*flex-direction:\s*column/);
+  assert.match(theme, /#dialog p \{[\s\S]*overflow-y:\s*auto/);
+  assert.match(theme, /#dlg-choices \{[\s\S]*flex:\s*0 0 auto/);
+  assert.match(theme, /html\.dialog-open #quest/);
+  assert.match(theme, /#app:has\(#dialog:not\(\.hidden\)\) #quest/);
+  assert.match(hud, /classList\.toggle\('dialog-open'/);
+  assert.match(style, /#dialog \{[\s\S]*flex-direction:\s*column/);
+  assert.match(style, /@media \(max-height: 520px\) \{[\s\S]*body\.touch #dialog \{[\s\S]*max-height:\s*min\(62vh/);
+});
+
+test('MG-UI-29 overlapping nameplates stack or hide the farther label', () => {
+  const mira = { id: 'npc-guild', x: 420, y: 180, d: 2.1 };
+  const crate = { id: 'storage', x: 428, y: 182, d: 4.8 };
+  const out = stackNameplates([mira, crate]);
+  const keep = out.filter((r) => r.visible);
+  assert.equal(keep.length, 2);
+  assert.notEqual(keep[0].y, keep[1].y);
+  const hidden = stackNameplates(
+    [mira, crate, { id: 'market', x: 422, y: 181, d: 9 }],
+    { maxLift: 1, dy: 8, dx: 200 },
+  );
+  assert.ok(hidden.some((r) => !r.visible), 'far labels drop when they still overlap');
+  const hud = src('src/ui/hud.js');
+  assert.match(hud, /layoutInteractPlates/);
 });

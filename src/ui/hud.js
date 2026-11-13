@@ -199,9 +199,11 @@ export class HUD {
 
   syncWindows() {
     const panel = this.panelOpen;
-    const open = panel || this.dialogOpen;
+    const dialog = this.dialogOpen;
+    const open = panel || dialog;
     document.documentElement.classList.toggle('windows-open', !!open);
     document.documentElement.classList.toggle('panel-open', !!panel);
+    document.documentElement.classList.toggle('dialog-open', !!dialog);
   }
 
   buildHotbar(items, onSelect) {
@@ -420,10 +422,36 @@ export class HUD {
     p.style.display = '';
     p.style.left = x.toFixed(0) + 'px';
     p.style.top = y.toFixed(0) + 'px';
+    p.dataset.sx = String(x);
+    p.dataset.sy = String(y);
+    if (opts.dist != null) p.dataset.dist = String(opts.dist);
     if (opts.opacity != null) p.style.opacity = String(opts.opacity);
     else p.style.opacity = '';
     if (opts.zIndex != null) p.style.zIndex = String(opts.zIndex);
     else p.style.zIndex = '';
+  }
+
+  layoutInteractPlates() {
+    const rows = [];
+    for (const [id, el] of this.plates) {
+      if (el.style.display === 'none') continue;
+      if (el.classList.contains('mon') || el.classList.contains('hunter')) continue;
+      rows.push({
+        id,
+        el,
+        x: parseFloat(el.style.left) || 0,
+        y: parseFloat(el.style.top) || 0,
+        d: Number(el.dataset.dist) || 999,
+      });
+    }
+    for (const t of stackNameplates(rows)) {
+      if (!t.visible) {
+        t.el.style.display = 'none';
+        continue;
+      }
+      t.el.style.top = t.y.toFixed(0) + 'px';
+      t.el.style.zIndex = String(Math.max(1, 90 - Math.floor(t.d)));
+    }
   }
 
   drawMinimap(world, px, pz, yaw, monsters, npcs, time, remotes = null, partyOf = null) {
@@ -924,6 +952,32 @@ export class HUD {
 }
 
 export { TOWN };
+
+/** Offset overlapping world labels in screen space; hide extras that still collide. */
+export function stackNameplates(rows, opts = {}) {
+  const dx = opts.dx ?? 170;
+  const dy = opts.dy ?? 28;
+  const maxLift = opts.maxLift ?? 5;
+  const sorted = rows.slice().sort((a, b) => (a.d ?? 999) - (b.d ?? 999));
+  const used = [];
+  const hit = (x, y) => used.some((u) => Math.abs(u.x - x) < dx && Math.abs(u.y - y) < dy);
+  const out = [];
+  for (const t of sorted) {
+    let y = t.y;
+    let n = 0;
+    while (n < maxLift && hit(t.x, y)) {
+      y -= dy;
+      n += 1;
+    }
+    if (hit(t.x, y)) {
+      out.push({ ...t, y: t.y, visible: false });
+      continue;
+    }
+    used.push({ x: t.x, y });
+    out.push({ ...t, y, visible: true });
+  }
+  return out;
+}
 
 /** Close inventory, bank, shop, and every other #panel overlay. */
 export function bindPanelClose(btn, onClose) {

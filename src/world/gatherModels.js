@@ -818,7 +818,16 @@ const GOODS_MODELS = {
   arrow_shaft: () => arrowShaft('birch'),
   iron_arrow: ironArrow,
   quiver: quiverModel,
+  __debug_pouch: trophyPouch,
 };
+
+function trophyPouch() {
+  const M = new VoxelModel(16, 16, 14);
+  M.box(3, 1, 3, 13, 10, 11, (x, y, z) => J(y > 8 ? 0xd4a84a : 0x8a4a1c, x, y, z, 9, 0.05));
+  M.box(5, 10, 5, 11, 13, 9, 0x5a3010);
+  M.box(7, 12, 6, 9, 15, 8, 0xffd23f);
+  return [M, 0.055, 8, 0, 7];
+}
 
 function tintBar(hi, lo) {
   const M = new VoxelModel(22, 8, 8);
@@ -884,5 +893,6 @@ export function hasGoodsModel(id) {
 
 /** [model, size, ox, oy, oz] for a carried good, so callers pick the mesh builder. */
 export function goodsVoxels(id) {
-  return GOODS_MODELS[id]();
+  const fn = GOODS_MODELS[id] || GOODS_MODELS.__debug_pouch;
+  return fn();
 }

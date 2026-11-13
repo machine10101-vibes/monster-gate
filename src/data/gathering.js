@@ -384,6 +384,14 @@ Object.assign(GOODS, {
   oak_shaft: { id: 'oak_shaft', name: 'Oak arrow shaft', desc: 'Shaved from an oak log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 2, kind: 'part', wood: 'oak' },
   maple_shaft: { id: 'maple_shaft', name: 'Maple arrow shaft', desc: 'Shaved from a maple log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 3, kind: 'part', wood: 'maple' },
   iron_arrow: { id: 'iron_arrow', name: 'Iron arrow', desc: 'An iron head on a wooden shaft. A quiver holds 99.', price: 3, kind: 'arrow' },
+  __debug_pouch: {
+    id: '__debug_pouch',
+    name: 'Trophy Pouch',
+    desc: 'A session trophy from a debug tank. Never written into the hunter save.',
+    price: 0,
+    kind: 'loot',
+    session: true,
+  },
 });
 const FISH_GOODS = Object.keys(FISH).flatMap((id) => [id, `cooked_${id}`, `burnt_${id}`]);
 const ORE_IDS = METALS.filter((m) => m.ore).map((m) => m.oreId);

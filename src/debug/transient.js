@@ -4,15 +4,21 @@
  */
 
 export const DEBUG_STARTER_ID = '__debug_blade';
+export const DEBUG_LOOT_ID = '__debug_pouch';
 export const DEBUG_GRANTED_KEY = 'debugGranted';
 
-export function markDebugGranted(data, { weapon } = {}) {
+export function markDebugGranted(data, { weapon, items: extra } = {}) {
   if (!data || typeof data !== 'object') return data;
   const g = { ...(data[DEBUG_GRANTED_KEY] || {}) };
   const items = Array.isArray(g.items) ? [...g.items] : [];
   if (weapon) {
     g.weapon = weapon;
     if (!items.includes(weapon)) items.push(weapon);
+  }
+  if (Array.isArray(extra)) {
+    for (const id of extra) {
+      if (id && !items.includes(id)) items.push(id);
+    }
   }
   g.items = items;
   data[DEBUG_GRANTED_KEY] = g;
@@ -44,6 +50,18 @@ export function huntSavePayload(data) {
   drop.push(DEBUG_STARTER_ID);
   if (drop.includes(next.weapon) || next.weapon === DEBUG_STARTER_ID) next.weapon = null;
   next.crafted = dropGranted(next.crafted, drop);
+  drop.push(DEBUG_LOOT_ID);
+  if (next.goods && typeof next.goods === 'object') {
+    const goods = { ...next.goods };
+    let hit = false;
+    for (const id of drop) {
+      if (id && Object.prototype.hasOwnProperty.call(goods, id)) {
+        delete goods[id];
+        hit = true;
+      }
+    }
+    if (hit) next.goods = goods;
+  }
   return next;
 }
 
@@ -54,5 +72,6 @@ export function stripDebugGrantedInPlace(data) {
   delete data[DEBUG_GRANTED_KEY];
   data.weapon = clean.weapon;
   if (clean.crafted) data.crafted = clean.crafted;
+  if (clean.goods) data.goods = clean.goods;
   return data;
 }

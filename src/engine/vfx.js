@@ -782,22 +782,23 @@ export class VFX {
     });
   }
 
-  /** Hit flare on the struck target. White is small so it does not wash out the hunter. */
+  /** Hit flare on the struck target. Caps size so it never swallows the hunter. */
   hit(x, y, z, dx, dz, color = 0xffe27a, power = 1) {
     const col = Array.isArray(color) ? color[0] : color;
-    this.glow(x, y, z, 0xffffff, 0.28 + power * 0.1, 0.07, { grow: 0.2, pow: 1.1, gain: 0.4 });
-    this.glow(x, y, z, col, 0.7 + power * 0.22, 0.16, { grow: 0.35, gain: 0.65 });
-    this.ring(x, y, z, { axis: 'cam', color: col, r0: 0.1, r1: 0.38 + power * 0.18, life: 0.16, thick: 0.16, fill: 0.18 });
+    const p = Math.min(0.48, Math.max(0.15, Number(power) || 0.3));
+    this.glow(x, y, z, 0xffffff, 0.14 + p * 0.05, 0.05, { grow: 0.1, pow: 1.2, gain: 0.28 });
+    this.glow(x, y, z, col, 0.24 + p * 0.08, 0.1, { grow: 0.14, gain: 0.38 });
+    this.ring(x, y, z, { axis: 'cam', color: col, r0: 0.08, r1: 0.2 + p * 0.08, life: 0.12, thick: 0.1, fill: 0.1 });
     const l = Math.hypot(dx, dz) || 1;
     const ux = dx / l;
     const uz = dz / l;
-    const n = this.n(5 + power * 4);
+    const n = this.n(3 + p * 3);
     for (let i = 0; i < n; i++) {
       const a = R(-0.8, 0.8);
       const ca = Math.cos(a);
       const sa = Math.sin(a);
-      const sp = R(5, 11) * (0.7 + power * 0.3);
-      this.spark(x, y, z, (ux * ca - uz * sa) * sp, R(0, 3), (ux * sa + uz * ca) * sp, i % 3 === 0 ? 0xffffff : col, R(0.04, 0.08), R(0.16, 0.32), 9, 1.2);
+      const sp = R(3, 7) * (0.6 + p * 0.25);
+      this.spark(x, y, z, (ux * ca - uz * sa) * sp, R(0, 2), (ux * sa + uz * ca) * sp, i % 3 === 0 ? 0xffffff : col, R(0.03, 0.055), R(0.12, 0.22), 9, 1.2);
     }
   }
 

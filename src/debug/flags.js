@@ -10,7 +10,7 @@ import { PORTAL_IDS } from '../data/portals.js';
 import { SKILL_ORDER, xpForLevel } from '../data/gathering.js';
 import { freezeSaves } from '../systems/saveio.js';
 import { originOf, TILES } from '../world/tiles.js';
-import { DEBUG_STARTER_ID, markDebugGranted } from './transient.js';
+import { DEBUG_LOOT_ID, DEBUG_STARTER_ID, markDebugGranted } from './transient.js';
 
 const MINE = { rampX0: 88, z: 66 };
 const OASIS = { x: 0, z: 432, r: 32, shore: 16 };
@@ -28,11 +28,14 @@ export const DEBUG_TANK_HP_CAP = 160;
 export const DEBUG_STARTER_DMG = 9;
 export const DEBUG_AUTO_CADENCE = 1.15;
 /** Per-tick cap so a hitch cannot skip a whole swing, but real time still drives the clock. */
-export const DEBUG_AUTO_DT_CLAMP = 0.1;
+export const DEBUG_AUTO_DT_CLAMP = 0.35;
 export const DEBUG_TANK_AGGRO = 12;
 export const DEBUG_TANK_REACH = 2.8;
 export const DEBUG_TANK_CADENCE = 1.7;
 export const DEBUG_TANK_DMG = 2;
+/** Seconds the loot bag must sit on the ground before magnet or pickup. */
+export const DEBUG_LOOT_SIT = 1.5;
+export { DEBUG_LOOT_ID };
 
 export function oasisHudName(x, z) {
   const d = Math.hypot(Number(x) - OASIS.x, Number(z) - OASIS.z);
@@ -410,10 +413,32 @@ export function debugTankHpLabel(mon) {
 export function grantDebugTankLoot(game, mon) {
   if (!mon?.debugTank || !game) return false;
   const x = Number(mon.x) || 0;
-  const y = (Number(mon.y) || 0) + 0.6;
   const z = Number(mon.z) || 0;
-  game.dropCoin?.(x, y, z, 4);
-  game.dropLootBag?.(x, y + 0.15, z, { session: true, gold: 6, label: 'Loot bag' });
+  const px = Number(game.player?.pos?.x ?? game.player?.x ?? x);
+  const pz = Number(game.player?.pos?.z ?? game.player?.z ?? z);
+  let ox = x - px;
+  let oz = z - pz;
+  const len = Math.hypot(ox, oz);
+  if (len < 0.2) {
+    ox = 1.6;
+    oz = 0.4;
+  } else {
+    ox = (ox / len) * 1.7;
+    oz = (oz / len) * 1.7;
+  }
+  const bx = x + ox;
+  const bz = z + oz;
+  const ground = game.world?.heightAt?.(bx, bz);
+  const by = (Number.isFinite(ground) ? ground : (Number(mon.y) || 0)) + 0.62;
+  game.dropCoin?.(x, (Number(mon.y) || 0) + 0.6, z, 4);
+  game.dropLootBag?.(bx, by, bz, {
+    session: true,
+    gold: 6,
+    label: 'Loot bag',
+    pickupAfter: DEBUG_LOOT_SIT,
+    magnetAfter: DEBUG_LOOT_SIT,
+    item: DEBUG_LOOT_ID,
+  });
   return true;
 }
 
@@ -474,7 +499,7 @@ export function tickDebugTank(game, dt = 1 / 60) {
     if (m.tankCd > 0) continue;
     m.tankCd = DEBUG_TANK_CADENCE;
     const dmg = Math.max(1, Number(m.def?.dmg) || DEBUG_TANK_DMG);
-    if (typeof P.hurt === 'function') P.hurt(dmg, m.x, m.z, 4);
+    if (typeof P.hurt === 'function') P.hurt(dmg, m.x, m.z, game.debug?.autoAttack ? 0 : 4);
     else if (P.hp != null) P.hp = Math.max(0, Number(P.hp) - dmg);
     hits += 1;
   }

@@ -257,7 +257,7 @@ export class Gathering {
       const t = this.near;
       const [sx, sy, vis] = g.screenOf(t.x, t.y, t.z, true);
       g.hud.plate('gather', this.label(t));
-      g.hud.placePlate('gather', sx, sy, vis);
+      g.hud.placePlate('gather', sx, sy, vis, { dist: Math.hypot(g.player.pos.x - t.x, g.player.pos.z - t.z) });
     } else if (this.session) {
       const s = this.session;
       const [sx, sy, vis] = g.screenOf(s.node.x, (s.node.y || WATER_Y) + 1.6, s.node.z, true);
@@ -272,7 +272,7 @@ export class Gathering {
         else note = 'Walking to the fire…';
       } else what = s.node.catches.length > 1 ? 'Ice fishing' : s.kind === 'net' ? `Netting ${s.fish.name.toLowerCase()}` : `Fishing for ${s.fish.name.toLowerCase()}`;
       g.hud.plate('gather', `${what}<small>${note}</small>`);
-      g.hud.placePlate('gather', sx, sy, vis);
+      g.hud.placePlate('gather', sx, sy, vis, { dist: Math.hypot(g.player.pos.x - s.node.x, g.player.pos.z - s.node.z) });
     } else g.hud.removePlate('gather');
   }
 

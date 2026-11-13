@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_AUTO_CADENCE, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
-import { DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
+import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
 import { Progress, saveKey } from '../src/systems/progress.js';
 
@@ -342,11 +342,25 @@ test('debug tank dies in ~20s of low-level auto-attack, shows HP, and drops loot
   assert.equal(bags.length, 1);
   assert.equal(bags[0].session, true);
   assert.equal(bags[0].label, 'Loot bag');
+  assert.equal(bags[0].pickupAfter, DEBUG_LOOT_SIT);
+  assert.ok(bags[0].pickupAfter >= 1.5);
+  assert.equal(bags[0].item, DEBUG_LOOT_ID);
+  assert.equal(DEBUG_LOOT_ID, TRANSIENT_LOOT_ID);
+  const stripped = huntSavePayload({ gold: 9, goods: { [DEBUG_LOOT_ID]: 1, copper_ore: 2 }, debugGranted: { items: [DEBUG_LOOT_ID] } });
+  assert.equal(stripped.goods[DEBUG_LOOT_ID], undefined);
+  assert.equal(stripped.goods.copper_ore, 2);
   assert.ok(!JSON.stringify(payload).includes('debugTank'));
   assert.ok(!JSON.stringify(payload).includes('lootbag'));
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(main, /grantDebugTankLoot/);
   assert.match(main, /m\.debugTank/);
+  assert.match(main, /0xd4892a/);
+  assert.match(main, /bag\.scale\.setScalar\(1\.45\)/);
+  assert.match(main, /label \|\| 'Loot bag', 3600/);
+  assert.match(main, /if \(!m\.debugTank\) this\.hud\.toast\(line/);
+  const playerSrc = readFileSync(new URL('../src/entities/player.js', import.meta.url), 'utf8');
+  assert.match(playerSrc, /auto \? 0 : knock/);
+  assert.match(playerSrc, /if \(!auto && \(this\.state === 'attack'/);
   live.dead = false;
   live.hp = 90;
   game.player.state = 'idle';

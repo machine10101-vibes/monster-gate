@@ -279,8 +279,8 @@ export class Monster {
     const hy = this.y + 0.7 + this.hover;
     const hz = this.z;
     const sparkCol = ffx ? ffx.spark : this.type === 'chicken' ? [0xfffaf0, 0xf59a2a] : this.type === 'slime' ? [0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xdcb4ff, 0xffffff] : dusk ? [0xd8b0ff, 0xffffff] : yeti ? [0xe6f9ff, 0x9fdcff, 0xffffff] : this.type === 'demonknight' ? [0xff8a4a, 0xff3a1a, 0xffffff] : this.type === 'holyknight' ? [0xfff0b0, 0x9fd0ff, 0xffffff] : [0xfff2c0, 0xffb347, 0xffffff];
-    g.fx.impact(hx - dx * this.radius * 0.6, hy + 0.2, hz - dz * this.radius * 0.6, dx, dz, sparkCol, (crit ? 1.7 : 1) * Math.min(1.8, 0.6 + dmg / 18));
-    g.fx.burst(hx, hy, hz, ffx ? ffx.burst : this.type === 'chicken' ? [0xfffaf0, 0xf59a2a, 0xe03a3a, 0xffffff] : this.type === 'slime' ? [0x57d46c, 0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xc27bff, 0x8c52da, 0xffffff] : dusk ? [0xb25cff, 0x4b3f8c, 0xffffff] : yeti ? [0xb4d0e6, 0xdcecf8, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0x6a6a74, 0xff3a1a] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0xffffff] : [0xc9967a, 0xff5a46, 0xffffff], crit ? 12 : 6, 3.8, 0.1, 0.5);
+    g.fx.impact(hx - dx * this.radius * 0.6, hy + 0.2, hz - dz * this.radius * 0.6, dx, dz, sparkCol, (crit ? 0.85 : 0.5) * Math.min(1, 0.4 + dmg / 28));
+    g.fx.burst(hx, hy, hz, ffx ? ffx.burst : this.type === 'chicken' ? [0xfffaf0, 0xf59a2a, 0xe03a3a, 0xffffff] : this.type === 'slime' ? [0x57d46c, 0xa4f58f, 0xffffff] : this.type === 'voidslime' || this.type === 'wraith' ? [0xc27bff, 0x8c52da, 0xffffff] : dusk ? [0xb25cff, 0x4b3f8c, 0xffffff] : yeti ? [0xb4d0e6, 0xdcecf8, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0x6a6a74, 0xff3a1a] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0xffffff] : [0xc9967a, 0xff5a46, 0xffffff], crit ? 6 : 4, 1.15, 0.05, 0.28);
     g.hud.floatText(...g.screenOf(hx, hy + 0.9, hz), String(dmg) + (crit ? '!' : ''), crit ? 'crit' : '');
     if ((this.state === 'idle' || this.state === 'wander' || this.state === 'peck') && this.type !== 'chicken') this.state = 'chase';
     if (this.hp <= 0) this.die();

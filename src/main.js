@@ -19,6 +19,7 @@ import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
 import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
+import { DEBUG_LOOT_ID, markDebugGranted } from './debug/transient.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
@@ -1243,6 +1244,7 @@ class Game {
   }
 
   hitstop(t) {
+    if (this.debug?.autoAttack) return;
     this.hitstopT = Math.max(this.hitstopT, t);
   }
 
@@ -1690,7 +1692,6 @@ class Game {
 
   onMonsterKilled(m) {
     this.kills++;
-    if (m.debugTank) grantDebugTankLoot(this, m);
     if (m.type === 'orcscout') {
       if (Math.random() < 0.72) {
         const n = m.def.gold[0] + Math.floor(Math.random() * (m.def.gold[1] - m.def.gold[0] + 1));
@@ -1716,7 +1717,7 @@ class Game {
     }
     if (parts.got.length) {
       const line = parts.got.map((d) => `+${d.n} ${MATERIALS[d.id]?.name || GOODS[d.id]?.name || d.id}`).join('   ');
-      this.hud.toast(line, 2600);
+      if (!m.debugTank) this.hud.toast(line, 2600);
       this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.got.map((d) => `+${d.n}`).join(' '), 'gold');
       this.fx.burst(m.x, m.y + 1, m.z, [0x6fd45a, 0xf1e6c6, 0xffd23f], 12, 3.5, 0.1, 0.8);
     }
@@ -1725,6 +1726,7 @@ class Game {
       this.hud.toast(INVENTORY_FULL, 1800);
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
+    if (m.debugTank) grantDebugTankLoot(this, m);
     this.applyJournal(this.journal.onKill(m.type));
     if (this.bounties?.onKill(m.type) && this.hud.panelId === 'quest' && this.hud.journalRefresh) this.hud.journalRefresh();
     if (m.type === 'chicken') return;
@@ -1752,25 +1754,43 @@ class Game {
     this.fx.burst(p.pos.x, p.pos.y + 1, p.pos.z, [0xffd23f, 0xffffff, 0xffa030], 24, 5, 0.12, 0.9);
   }
 
-  dropLootBag(x, y, z, { session = true, gold = 6, label = 'Loot bag' } = {}) {
+  dropLootBag(x, y, z, {
+    session = true,
+    gold = 6,
+    label = 'Loot bag',
+    pickupAfter = 1.5,
+    magnetAfter = 1.5,
+    item = DEBUG_LOOT_ID,
+  } = {}) {
     const bag = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.38), new THREE.MeshBasicMaterial({ color: 0x8a4a1c }));
-    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.42), new THREE.MeshBasicMaterial({ color: 0xd4a84a }));
-    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.08), new THREE.MeshBasicMaterial({ color: 0x5a3010 }));
-    flap.position.y = 0.2;
-    strap.position.set(0, 0.28, 0);
-    bag.add(body, flap, strap);
+    const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.08, 10), new THREE.MeshBasicMaterial({ color: 0xffe27a }));
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.78, 0.84), new THREE.MeshBasicMaterial({ color: 0xd4892a }));
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.28, 0.92), new THREE.MeshBasicMaterial({ color: 0xffe27a }));
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.46, 0.16), new THREE.MeshBasicMaterial({ color: 0x7a4010 }));
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.25, 6), new THREE.MeshBasicMaterial({ color: 0xfff3c4 }));
+    const bead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff8d8 }));
+    halo.position.y = -0.42;
+    flap.position.y = 0.44;
+    strap.position.set(0, 0.58, 0);
+    pin.position.set(0, 1.05, 0);
+    bead.position.set(0, 1.68, 0);
+    bag.add(halo, body, flap, strap, pin, bead);
+    bag.scale.setScalar(1.45);
     const holder = new THREE.Group();
     holder.add(bag);
     holder.position.set(x, y, z);
     this.scene.add(holder);
-    const a = Math.random() * Math.PI * 2;
-    const s = 1.1 + Math.random() * 0.8;
     this.pickups.push({
       holder, mesh: bag, kind: 'lootbag', session: !!session, value: gold | 0, label,
-      vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.4, age: 0, grounded: false,
+      pickupAfter: Math.max(1.5, Number(pickupAfter) || 1.5),
+      magnetAfter: Math.max(1.5, Number(magnetAfter) || 1.5),
+      item: item || DEBUG_LOOT_ID,
+      vx: 0, vz: 0, vy: 1.4, age: 0, grounded: false,
     });
-    this.fx?.burst?.(x, y, z, [0xd4a84a, 0xffd23f, 0xffffff], 10, 2.4, 0.08, 0.55);
+    this.fx?.burst?.(x, y + 0.4, z, [0xd4a84a, 0xffd23f, 0xffffff], 6, 1.4, 0.07, 0.4);
+    this.fx?.ring?.(x, y, z, 0xffd23f, 16, 2.4, 0.1, 0.7);
+    this.hud?.toast?.(label || 'Loot bag', 3600);
+    this.hud?.floatText?.(...this.screenOf(x, y + 1.2, z), label || 'Loot bag', 'gold');
     return true;
   }
 
@@ -1865,27 +1885,34 @@ class Game {
           if (Math.abs(k.vy) < 1) k.grounded = true;
         }
       } else {
-        const gh = Math.max(this.world.heightAt(h.x, h.z), 0.4) + 0.4 + Math.sin(this.time * 4 + k.age) * 0.06;
+        const lift = k.kind === 'lootbag' ? 0.58 : 0.4;
+        const gh = Math.max(this.world.heightAt(h.x, h.z), 0.4) + lift + Math.sin(this.time * 4 + k.age) * 0.06;
         h.y = gh;
       }
-      k.mesh.rotation.y += dt * 4;
+      k.mesh.rotation.y += dt * (k.kind === 'lootbag' ? 1.15 : 4);
       if (k.kind === 'heart') k.mesh.rotation.z = 0;
       const dx = P.x - h.x;
       const dz = P.z - h.z;
       const d = Math.hypot(dx, dz);
-      if (k.age > 0.6 && d < 3.2) {
+      const magnetAfter = k.magnetAfter != null ? k.magnetAfter : 0.6;
+      const pickupAfter = k.pickupAfter != null ? k.pickupAfter : 0.5;
+      if (k.age > magnetAfter && d < 3.2) {
         const pull = (1 - d / 3.2) * 12 + 3;
         h.x += (dx / (d || 1)) * pull * dt;
         h.z += (dz / (d || 1)) * pull * dt;
         h.y += (P.y + 0.9 - h.y) * Math.min(1, dt * 6);
       }
-      if (k.age > 0.5 && d < 0.8) {
+      if (k.age > pickupAfter && d < 0.8) {
         if (k.kind === 'lootbag') {
           k.done = true;
           if (k.value) this.addGold(k.value);
+          const itemId = k.item || DEBUG_LOOT_ID;
+          const added = this.progress?.addGood?.(itemId, 1, false) || 0;
+          if (added > 0 && this.progress?.data) markDebugGranted(this.progress.data, { items: [itemId] });
           this.audio.coin();
-          this.hud.toast(k.label || 'Loot bag', 1800);
-          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), k.label || 'Loot bag', 'gold');
+          const itemName = GOODS[itemId]?.name || 'Trophy Pouch';
+          this.hud.toast(itemName, 2200);
+          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), itemName, 'gold');
           this.fx.burst(h.x, h.y, h.z, [0xd4a84a, 0xffd23f, 0xffffff], 8, 2.2, 0.08, 0.45);
         } else if (k.kind === 'stack') {
           const added = k.k === 'good' ? this.progress.addGood(k.id, k.n) : this.progress.addPart(k.id, k.n);
@@ -2282,7 +2309,7 @@ class Game {
         ? `${site.name}<small>F · open tome</small>`
         : `${site.name}<small>F · attune</small>`;
       this.hud.plate('portal', label);
-      this.hud.placePlate('portal', sx, sy, vis);
+      this.hud.placePlate('portal', sx, sy, vis, { dist: Math.hypot(this.player.pos.x - site.x, this.player.pos.z - site.z) });
     } else this.hud.removePlate('portal');
   }
 
@@ -2512,7 +2539,7 @@ class Game {
     if (this.alchemyNear) {
       const [sx, sy, vis] = this.screenOf(a.x, a.y + 1.5, a.z, true);
       this.hud.plate('alchemy', "Lira's Alchemy<small>F · buy potions</small>");
-      this.hud.placePlate('alchemy', sx, sy, vis);
+      this.hud.placePlate('alchemy', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('alchemy');
   }
 
@@ -2530,6 +2557,7 @@ class Game {
   sellAllGoods() {
     let gold = 0;
     for (const g of Object.values(GOODS)) {
+      if (g.session) continue;
       const n = this.progress.good(g.id);
       if (n > 0 && this.progress.takeGood(g.id, n)) gold += n * g.price;
     }
@@ -2575,7 +2603,7 @@ class Game {
     if (this.marketNear) {
       const [sx, sy, vis] = this.screenOf(m.x, m.y + 2.4, m.z, true);
       this.hud.plate('market', "Dalla's Market<small>F · sell ore &amp; fish</small>");
-      this.hud.placePlate('market', sx, sy, vis);
+      this.hud.placePlate('market', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('market');
   }
 
@@ -2603,7 +2631,7 @@ class Game {
     if (this.storageNear) {
       const [sx, sy, vis] = this.screenOf(c.x, c.y + 2.2, c.z, true);
       this.hud.plate('storage', 'Storage Crate<small>F · store items</small>');
-      this.hud.placePlate('storage', sx, sy, vis);
+      this.hud.placePlate('storage', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('storage');
     const showing = this.hud.panelId === 'storage' && this.hud.panelOpen;
     c.open = showing && d < 4.8;
@@ -2747,7 +2775,7 @@ class Game {
     if (this.smithyNear) {
       const [sx, sy, vis] = this.screenOf(s.x, s.y + 3.2, s.z, true);
       this.hud.plate('smithy', 'The Smithy<small>F · smelt bars</small>');
-      this.hud.placePlate('smithy', sx, sy, vis);
+      this.hud.placePlate('smithy', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('smithy');
     if (this.hud.panelId === 'smithy' && d > 5.2) this.hud.closePanel();
   }
@@ -2797,7 +2825,7 @@ class Game {
     if (this.forgeNear) {
       const [sx, sy, vis] = this.screenOf(f.x, f.y + 2.9, f.z, true);
       this.hud.plate('forge', 'The Forge<small>F · forge gear</small>');
-      this.hud.placePlate('forge', sx, sy, vis);
+      this.hud.placePlate('forge', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('forge');
   }
 
@@ -3031,9 +3059,10 @@ class Game {
     try {
       const raw = now - this.last;
       this.last = now;
-      if (!(raw >= 0) || raw > 250) return;
-      this.adaptResolution(raw);
-      let dt = Math.min(raw / 1000, 0.05);
+      if (!(raw >= 0)) return;
+      const rawMs = Math.min(raw, 250);
+      this.adaptResolution(rawMs);
+      let dt = Math.min(rawMs / 1000, 0.05);
       if (this.hitstopT > 0) {
         this.hitstopT -= dt;
         dt *= 0.08;
@@ -3041,7 +3070,7 @@ class Game {
         this.slowT -= dt;
         dt *= this.slowK + (1 - this.slowK) * Math.max(0, 1 - this.slowT / 0.25) * (this.slowT < 0.25 ? 1 : 0);
       }
-      this.step(dt, raw / 1000);
+      this.step(dt, rawMs / 1000);
       this.renderer.render(this.scene, this.camera);
       if (this.bootFrames >= 0) {
         this.bootFrames += 1;
@@ -3150,13 +3179,13 @@ class Game {
       const [sx, sy, vis] = this.screenOf(wgate.x, wgate.y + 3.5, wgate.z, true);
       const label = this.net.role ? `Waygate<small>${this.net.code} · ${this.net.count}/6</small>` : 'Waygate<small>F · rift or friends</small>';
       this.hud.plate('waygate', label);
-      this.hud.placePlate('waygate', sx, sy, vis);
+      this.hud.placePlate('waygate', sx, sy, vis, { dist: Math.hypot(P.pos.x - wgate.x, P.pos.z - wgate.z) });
     } else this.hud.removePlate('waygate');
     const chest = this.world.rift?.chest;
     if (this.world.realm === 'rift' && chest?.ready && !chest.looted) {
       const [sx, sy, vis] = this.screenOf(chest.x, chest.y + 1.2, chest.z, true);
       this.hud.plate('riftchest', 'Rift chest<small>F · take the spoils</small>');
-      this.hud.placePlate('riftchest', sx, sy, vis);
+      this.hud.placePlate('riftchest', sx, sy, vis, { dist: Math.hypot(P.pos.x - chest.x, P.pos.z - chest.z) });
     } else this.hud.removePlate('riftchest');
     this.updateForge(dt);
     this.updateSmithy(dt);
@@ -3168,6 +3197,7 @@ class Game {
     this.gather.update(dt);
     const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
+    this.hud.layoutInteractPlates();
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, P.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values(), this.social);
   }
 }
