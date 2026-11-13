@@ -1,12 +1,12 @@
 services:
   - type: web
     name: monster-gate-world-1
-    runtime: docker
-    dockerfilePath: ./server/Dockerfile
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run start:server
     healthCheckPath: /healthz
     envVars:
-      - key: PORT
-        value: "8080"
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_JWT_SECRET
@@ -16,4 +16,4 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://machine10101-vibes.github.io

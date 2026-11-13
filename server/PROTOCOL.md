@@ -18,6 +18,35 @@ Mismatching `v` is an `error` with code `protocol`. Unknown `type` is ignored.
 
 The live GitHub Pages client only opens a socket when the page is loaded with `?mmo=1` (and not `?mock=1`). The world URL comes from `?world=wss://…` or the `VITE_WORLD_URL` build env (`?server=` / `VITE_MMO_URL` still work as aliases). Waygate / trystero is a separate path.
 
+## Client status (mmo.js)
+
+`src/net/mmo.js` talks to the view through `setStatus(status, info)`. Reconnects use the same path. If the view does not handle a status yet (including `waking`), the client must not throw.
+
+Because the Render free plan sleeps when nobody is connected (about 30 seconds to wake), the client checks `/healthz` on the **https** (or http) form of the world URL before opening the WebSocket:
+
+1. Probe `GET {https-world}/healthz` every **2–3 seconds** (3 second abort per try).
+2. While the probe fails or times out, call:
+
+```js
+worldView.setStatus('waking', { secondsLeft })
+```
+
+`secondsLeft` is an integer. It counts down from **30**, updated about once a second. If it reaches 0 and the server is still asleep, keep probing and keep `secondsLeft` at **0**.
+
+3. Give up after about **60 seconds** with:
+
+```js
+worldView.setStatus('error', {
+  secondsLeft: 0,
+  message: 'World server did not wake in time. Try again in a moment.'
+})
+```
+
+4. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` starts at 30 again).
+5. As soon as `/healthz` returns ok, call `setStatus('connecting')` (or `reconnecting` on a later attempt) and then open the socket. After `welcome`, call `setStatus('online', { online })`. `online` is what closes the wake screen.
+
+`GET /healthz` sends CORS headers so the GitHub Pages origin (`https://machine10101-vibes.github.io`) can read the response.
+
 ## Auth
 
 The first client message must be `hello` within 5 seconds, with `token` set to the hunter's Supabase access token.

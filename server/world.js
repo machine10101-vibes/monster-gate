@@ -514,6 +514,17 @@ function healthBody(world) {
   });
 }
 
+function corsHeaders(origin, allowed) {
+  const headers = {
+    'access-control-allow-methods': 'GET, OPTIONS',
+    'access-control-allow-headers': 'Content-Type',
+    vary: 'Origin',
+  };
+  if (origin && originAllowed(origin, allowed)) headers['access-control-allow-origin'] = origin;
+  else if (!allowed.length) headers['access-control-allow-origin'] = '*';
+  return headers;
+}
+
 export async function createWorldServer(options = {}) {
   const persist = options.persist || await openPersistence({
     memory: options.memory,
@@ -541,10 +552,14 @@ export async function createWorldServer(options = {}) {
       res.end('origin not allowed');
       return;
     }
-    const headers = { 'content-type': 'application/json' };
-    if (origin && originAllowed(origin, allowed)) headers['access-control-allow-origin'] = origin;
-    else if (!allowed.length) headers['access-control-allow-origin'] = '*';
+    const headers = corsHeaders(origin, allowed);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, headers);
+      res.end();
+      return;
+    }
     if (path === '/healthz' || path === '/health' || path === '/') {
+      headers['content-type'] = 'application/json';
       res.writeHead(200, headers);
       res.end(healthBody(world));
       return;

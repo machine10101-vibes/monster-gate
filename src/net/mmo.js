@@ -17,6 +17,27 @@ export { PROTOCOL, TYPES, encode, parseFrame, parseWorldFlags, resolveWorldUrl }
 const SESSION_KEY = 'monster-gate-account-session';
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
 const PING_MS = 15_000;
+export const WAKE_ETA_SEC = 30;
+export const WAKE_GIVE_UP_SEC = 60;
+export const WAKE_POLL_MS = 2500;
+export const WAKE_TICK_MS = 1000;
+export const WAKE_PROBE_MS = 3000;
+
+/** https:// (or http://) /healthz for a wss:// or ws:// world URL. */
+export function healthzUrl(worldUrl) {
+  if (!worldUrl) return '';
+  try {
+    const u = new URL(worldUrl);
+    if (u.protocol === 'wss:') u.protocol = 'https:';
+    else if (u.protocol === 'ws:') u.protocol = 'http:';
+    u.pathname = '/healthz';
+    u.search = '';
+    u.hash = '';
+    return u.toString();
+  } catch {
+    return '';
+  }
+}
 
 export function parseMmoClientFlags(search = '') {
   return parseWorldFlags(search);
@@ -79,6 +100,10 @@ export class MmoClient {
     this.fatal = false;
     this.entities = { monsters: [], nodes: [] };
     this.nearby = new Map();
+    this.wakeGen = 0;
+    this.wakePoll = 0;
+    this.wakeTick = 0;
+    this.retryBound = false;
   }
 
   bind() {
@@ -86,18 +111,113 @@ export class MmoClient {
     this.bound = true;
     this.view.onLocalMove((pose) => this.sendMove(pose));
     this.view.onChatSend((msg) => this.sendChat(msg));
+    if (!this.retryBound && typeof this.view.onRetry === 'function') {
+      this.retryBound = true;
+      this.view.onRetry(() => this.retry());
+    }
     this.view.transport = {
       reconnect: () => this.retry(),
     };
   }
 
-  setStatus(state, detail) {
-    this.view?.setStatus?.(typeof state === 'string' ? { status: state, detail } : state);
+  setStatus(state, info) {
+    if (!this.view?.setStatus) return;
+    try {
+      if (typeof state === 'string') this.view.setStatus(state, info);
+      else this.view.setStatus(state.status, state);
+    } catch {
+      /* view may not handle this status (e.g. waking) yet */
+    }
   }
 
   connect() {
     if (this.closed || this.fatal || !this.url || !this.Socket) return;
     this.bind();
+    void this.wakeThenOpen();
+  }
+
+  clearWake() {
+    if (this.wakePoll) clearTimeout(this.wakePoll);
+    if (this.wakeTick) clearInterval(this.wakeTick);
+    this.wakePoll = 0;
+    this.wakeTick = 0;
+  }
+
+  async probeHealthz(timeoutMs) {
+    const url = healthzUrl(this.url);
+    const fetchFn = this.opts.fetch || (typeof fetch === 'function' ? fetch : null);
+    if (!url || typeof fetchFn !== 'function') return false;
+    const ac = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => { try { ac?.abort(); } catch { /* ignore */ } }, timeoutMs);
+    try {
+      const res = await fetchFn(url, { method: 'GET', mode: 'cors', signal: ac?.signal });
+      if (!res || !res.ok) return false;
+      if (typeof res.json === 'function') {
+        try {
+          const body = await res.json();
+          if (body && body.ok === false) return false;
+        } catch {
+          /* a 200 with no JSON still means the process is up */
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async wakeThenOpen() {
+    this.clearWake();
+    const gen = ++this.wakeGen;
+    const wake = this.opts.wake || {};
+    const etaSec = wake.etaSec ?? WAKE_ETA_SEC;
+    const giveUpSec = wake.giveUpSec ?? WAKE_GIVE_UP_SEC;
+    const pollMs = wake.pollMs ?? WAKE_POLL_MS;
+    const tickMs = wake.tickMs ?? WAKE_TICK_MS;
+    const probeMs = wake.probeMs ?? WAKE_PROBE_MS;
+    const now = this.opts.now || Date.now;
+    const started = now();
+    const alive = () => gen === this.wakeGen && !this.closed && !this.fatal;
+    const secondsLeft = () => Math.max(0, etaSec - Math.floor((now() - started) / 1000));
+    let announced = false;
+
+    const announce = () => {
+      if (!alive()) return;
+      announced = true;
+      this.setStatus('waking', { secondsLeft: secondsLeft() });
+    };
+
+    while (alive()) {
+      const ok = await this.probeHealthz(probeMs);
+      if (!alive()) return;
+      if (ok) {
+        this.clearWake();
+        this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
+        this.openSocket();
+        return;
+      }
+      if (!announced) {
+        announce();
+        this.wakeTick = setInterval(announce, tickMs);
+      }
+      if ((now() - started) / 1000 >= giveUpSec) {
+        this.clearWake();
+        this.setStatus('error', {
+          secondsLeft: 0,
+          message: 'World server did not wake in time. Try again in a moment.',
+        });
+        return;
+      }
+      await new Promise((resolve) => {
+        this.wakePoll = setTimeout(resolve, pollMs);
+      });
+    }
+  }
+
+  openSocket() {
+    if (this.closed || this.fatal || !this.url || !this.Socket) return;
     this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
     let ws;
     try {
@@ -159,7 +279,7 @@ export class MmoClient {
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
-      this.setStatus({ status: 'online', online: msg.online });
+      this.setStatus('online', { online: msg.online });
     } else if (msg.type === TYPES.snapshot) {
       this.nearby = new Map();
       for (const p of msg.players || []) if (p?.id) this.nearby.set(p.id, { ...p });
@@ -234,7 +354,7 @@ export class MmoClient {
   }
 
   fail() {
-    this.setStatus('reconnecting', 'World server unreachable');
+    this.setStatus('reconnecting', { message: 'World server unreachable' });
     this.schedule();
   }
 
@@ -249,7 +369,10 @@ export class MmoClient {
 
   retry() {
     if (this.fatal) return;
+    this.closed = false;
     this.attempt = 0;
+    this.clearWake();
+    this.wakeGen += 1;
     clearTimeout(this.timer);
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
@@ -260,13 +383,15 @@ export class MmoClient {
 
   dispose(status = 'offline', detail) {
     this.closed = true;
+    this.wakeGen += 1;
+    this.clearWake();
     this.stopPing();
     clearTimeout(this.timer);
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
       this.ws = null;
     }
-    this.setStatus(status, detail);
+    this.setStatus(status, typeof detail === 'string' ? { message: detail } : detail);
   }
 }
 
