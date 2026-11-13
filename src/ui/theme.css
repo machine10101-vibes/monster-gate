@@ -1146,6 +1146,10 @@ body.mmo-view #top-left {
   body.touch #world-chat .wc-stack {
     height: 64px;
   }
+  body.touch #world-chat .wc-log {
+    padding: 2px 8px;
+    line-height: 1.25;
+  }
   body.touch #world-chat:not(.collapsed) .wc-toggle {
     min-height: 32px;
     padding: 4px 10px;

@@ -209,11 +209,64 @@ export function fullyVisibleRows(viewTop, viewBottom, rows, eps = ROW_FIT_EPS) {
   return (rows || []).filter((r) => r.top >= viewTop - eps && r.bottom <= viewBottom + eps);
 }
 
+/** Index of the log row that must stay while the pin is up (skip the pinned echo). */
+export function newestKeepIndex(rows, keepNewest = false) {
+  const list = rows || [];
+  if (!keepNewest || !list.length) return -1;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (!list[i].pinned) return i;
+  }
+  return list.length - 1;
+}
+
+/**
+ * Decide which log rows to hide vs clamp. While the pin shows, the newest
+ * non-pin row stays; if it cannot fully fit it is clamped, not hidden.
+ * Older rows that only half-fit are hidden whole.
+ */
+export function planLogCull(rows, viewTop, viewBottom, { keepNewest = false, eps = ROW_FIT_EPS } = {}) {
+  const list = rows || [];
+  const keepIndex = newestKeepIndex(list, keepNewest);
+  const hide = [];
+  for (let i = 0; i < list.length; i++) {
+    if (i === keepIndex) continue;
+    const r = list[i];
+    if (keepNewest && r.pinned) {
+      hide.push(i);
+      continue;
+    }
+    const fits = r.top >= viewTop - eps && r.bottom <= viewBottom + eps;
+    if (!fits) hide.push(i);
+  }
+  return { hide, keepIndex, clampNewest: keepIndex >= 0 };
+}
+
+function rowMatchesPin(row, pin) {
+  if (!pin || !row) return false;
+  if (!row.classList?.contains?.('wc-you')) return false;
+  const t = String(row.textContent || '').replace(/\s+/g, ' ').trim();
+  const name = String(pin.name || '');
+  const text = String(pin.text || '');
+  return !!text && t.includes(text) && (!name || t.includes(name));
+}
+
 /** Hide any log row that would render only partially. Scrolls to the bottom first. */
-export function cullChatLogRows(log) {
+export function cullChatLogRows(log, { keepNewest = false, pin = null } = {}) {
   if (!log || typeof log.getBoundingClientRect !== 'function') return 0;
   const rows = [...(log.querySelectorAll?.(':scope > p') || log.children || [])];
-  for (const row of rows) row.hidden = false;
+  for (const row of rows) {
+    row.hidden = false;
+    row.classList?.remove?.('wc-clamp');
+  }
+  const flags = rows.map((row) => ({ pinned: rowMatchesPin(row, pin) }));
+  const keepIndex = newestKeepIndex(flags, keepNewest);
+  const keepRow = keepIndex >= 0 ? rows[keepIndex] : null;
+  if (keepNewest) {
+    for (let i = 0; i < rows.length; i++) {
+      if (flags[i].pinned && i !== keepIndex) rows[i].hidden = true;
+    }
+  }
+  if (keepRow) keepRow.classList?.add?.('wc-clamp');
   log.scrollTop = Math.max(0, (log.scrollHeight || 0) - (log.clientHeight || 0));
   const box = log.getBoundingClientRect();
   if (!box.height) return 0;
@@ -226,17 +279,21 @@ export function cullChatLogRows(log) {
   }
   const viewTop = box.top + padTop;
   const viewBottom = box.bottom - padBot;
-  const rects = rows.map((row) => {
+  const rects = rows.map((row, i) => {
     const r = row.getBoundingClientRect?.() || { top: 0, bottom: 0 };
-    return { row, top: r.top, bottom: r.bottom };
+    return { row, top: r.top, bottom: r.bottom, pinned: flags[i].pinned };
   });
-  const keep = new Set(fullyVisibleRows(viewTop, viewBottom, rects).map((r) => r.row));
+  const plan = planLogCull(rects, viewTop, viewBottom, { keepNewest });
   let hidden = 0;
-  for (const row of rows) {
-    if (keep.has(row)) continue;
+  for (const i of plan.hide) {
+    const row = rows[i];
+    if (!row) continue;
     row.hidden = true;
+    row.classList?.remove?.('wc-clamp');
     hidden += 1;
   }
+  if (keepRow && plan.clampNewest) keepRow.classList?.add?.('wc-clamp');
+  else if (keepRow) keepRow.classList?.remove?.('wc-clamp');
   log.scrollTop = Math.max(0, (log.scrollHeight || 0) - (log.clientHeight || 0));
   return hidden;
 }
@@ -1156,7 +1213,8 @@ export class WorldView {
   }
 
   cullLog() {
-    cullChatLogRows(this.ui?.log);
+    const pinOn = !!(this.ui?.pin && !this.ui.pin.hidden && this.localPin);
+    cullChatLogRows(this.ui?.log, { keepNewest: pinOn, pin: pinOn ? this.localPin : null });
   }
 
   wrapGame() {
