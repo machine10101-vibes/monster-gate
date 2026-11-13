@@ -23,7 +23,7 @@ import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
-import { applyHudLayout, measureHudSafeRects, nameplateHitsHud, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
+import { applyHudLayout, measureHudSafeRects, nameplateHitsHud, nameplateOutsideViewport, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -462,7 +462,10 @@ export class HUD {
 
   cullPlatesOverHud() {
     const safe = measureHudSafeRects();
-    if (!safe.length) return;
+    const vp = {
+      w: window.innerWidth || document.documentElement?.clientWidth || 0,
+      h: window.innerHeight || document.documentElement?.clientHeight || 0,
+    };
     for (const el of this.plates.values()) {
       if (el.style.display === 'none') {
         el.classList.remove('hud-occluded');
@@ -473,7 +476,8 @@ export class HUD {
         el.classList.remove('hud-occluded');
         continue;
       }
-      const hit = nameplateHitsHud({ x: box.x, y: box.y, w: box.width, h: box.height }, safe);
+      const plate = { x: box.x, y: box.y, w: box.width, h: box.height };
+      const hit = nameplateHitsHud(plate, safe) || nameplateOutsideViewport(plate, vp);
       el.classList.toggle('hud-occluded', hit);
     }
   }

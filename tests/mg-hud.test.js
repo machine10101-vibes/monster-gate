@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
 import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
-import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, hudSafeMargin, nameplateHitsHud, overlap, padHudSafeRects, plateAnchorRect } from '../src/ui/hudLayout.js';
+import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, overlap, padHudSafeRects, plateAnchorRect } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
   WTYPE_TO_KIND,
@@ -449,4 +449,24 @@ test('MG-UI-30 pads HUD rects so a label in the hotbar fade band is culled', () 
   assert.match(layout, /tb-talk/);
   assert.match(layout, /padHudSafeRects/);
   assert.match(hud, /measureHudSafeRects/);
+});
+
+test('MG-UI-31 hides world labels that cross the viewport edges', () => {
+  const vp = { w: 844, h: 390 };
+  const inset = VIEWPORT_PLATE_INSET;
+  const open = { x: 320, y: 140, w: 160, h: 32 };
+  assert.equal(nameplateOutsideViewport(open, vp, inset), false, 'label in the open stays');
+  const tobin = { x: 280, y: -2, w: 168, h: 32 };
+  assert.equal(nameplateOutsideViewport(tobin, vp, inset), true, 'Old Tobin clipped by the top edge');
+  assert.equal(nameplateOutsideViewport({ x: 300, y: 1, w: 140, h: 30 }, vp, inset), true, 'inside the 4px top inset');
+  assert.equal(nameplateOutsideViewport({ x: 300, y: 4, w: 140, h: 30 }, vp, inset), false, 'flush with the inset stays');
+  assert.equal(nameplateOutsideViewport({ x: -6, y: 160, w: 120, h: 30 }, vp, inset), true, 'left edge');
+  assert.equal(nameplateOutsideViewport({ x: 800, y: 160, w: 50, h: 30 }, vp, inset), true, 'right edge');
+  assert.equal(nameplateOutsideViewport({ x: 300, y: 360, w: 140, h: 36 }, vp, inset), true, 'bottom edge');
+  const hud = src('src/ui/hud.js');
+  const layout = src('src/ui/hudLayout.js');
+  assert.match(layout, /VIEWPORT_PLATE_INSET = 4/);
+  assert.match(layout, /nameplateOutsideViewport/);
+  assert.match(hud, /nameplateOutsideViewport/);
+  assert.match(hud, /cullPlatesOverHud/);
 });
