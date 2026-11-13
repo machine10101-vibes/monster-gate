@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_AUTO_CADENCE, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_STARTER_ID, huntSavePayload } from '../src/debug/transient.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
@@ -270,7 +270,7 @@ test('debug tank spawn is capped HP, hits back, and stays out of saves', () => {
   assert.equal(fat.maxHp, DEBUG_TANK_HP_CAP);
 });
 
-test('debug tank dies in ~20-30s of low-level hits, auto-attacks until dead, and drops loot', () => {
+test('debug tank dies in ~20s of low-level auto-attack, shows HP, and drops loot', () => {
   const mon = applyDebugTank({
     type: 'slime',
     x: 73,
@@ -282,8 +282,14 @@ test('debug tank dies in ~20-30s of low-level hits, auto-attacks until dead, and
     def: { gold: [2, 4], dmg: 2 },
   });
   assert.ok(mon.maxHp <= DEBUG_TANK_HP_CAP);
-  const budget = debugTankKillBudget(mon.maxHp, { dmg: DEBUG_STARTER_DMG, swingSec: 1.5 });
-  assert.ok(budget.sec >= 15 && budget.sec <= 30, `kill time ${budget.sec}s`);
+  const budget = debugTankKillBudget(mon.maxHp);
+  assert.equal(DEBUG_AUTO_CADENCE, 1.15);
+  assert.ok(budget.sec >= 18 && budget.sec <= 24, `kill time ${budget.sec}s`);
+  assert.equal(debugTankHpLabel({ hp: 87, maxHp: 160 }), '87/160');
+  assert.equal(debugTankHpLabel(mon), `${mon.maxHp}/${mon.maxHp}`);
+  const monstersSrc = readFileSync(new URL('../src/entities/monsters.js', import.meta.url), 'utf8');
+  assert.match(monstersSrc, /debugTankHpLabel/);
+  assert.match(monstersSrc, /this\.debugTank && !this\.dead/);
   const coins = [];
   const payload = huntSavePayload({ gold: 4, debugGranted: { items: [] } });
   assert.equal(payload.debugGranted, undefined);
@@ -334,6 +340,15 @@ test('debug tank dies in ~20-30s of low-level hits, auto-attacks until dead, and
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(main, /grantDebugTankLoot/);
   assert.match(main, /m\.debugTank/);
+  live.dead = false;
+  live.hp = 90;
+  game.player.state = 'idle';
+  game.player.stamina = 40;
+  game.debug.autoAtkCd = 0;
+  assert.equal(tickDebugAutoAttack(game, 0.05), true);
+  assert.equal(game.player.stamina, 40);
+  assert.ok(game.debug.autoAtkCd >= 1);
+  assert.equal(tickDebugAutoAttack(game, 0.2), false, 'cadence holds the next swing');
 });
 
 test('MG-UI-22 oasis landing frames the pool above the hotbar clearance', () => {
