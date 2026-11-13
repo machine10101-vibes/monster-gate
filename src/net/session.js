@@ -19,7 +19,8 @@ const r2 = (n) => Math.round(n * 100) / 100;
 const STATE = { idle: 0, attack: 1, roll: 2, dead: 3, stagger: 4, use: 5 };
 
 export function poseOf(player) {
-  const parked = player.game?.world?.realm === 'cave' ? player.game.world.cave?.outside : null;
+  const realm = player.game?.world?.realm;
+  const parked = realm === 'cave' ? player.game.world.cave?.outside : realm === 'rift' ? player.game.world.rift?.outside : null;
   const x = parked ? parked.x : player.pos.x;
   const y = parked ? parked.y : player.pos.y;
   const z = parked ? parked.z : player.pos.z;
@@ -218,7 +219,12 @@ export class Session {
       m.push([mon.id, mon.type, r2(mon.x), r2(mon.y), r2(mon.z), r2(mon.yaw), Math.round(mon.hp), mon.state]);
     }
     const opts = target ? { target } : undefined;
-    this.worldAct.send({ m }, opts).catch(() => {});
+    const r = this.game.world?.rift;
+    const run = this.game.riftRun;
+    const rift = this.game.world?.realm === 'rift' && run && !run.follow
+      ? { on: true, party: run.party, chest: r?.chest ? { x: r.chest.x, y: r.chest.y, z: r.chest.z } : null }
+      : { on: false };
+    this.worldAct.send({ m, rift }, opts).catch(() => {});
   }
 
   update(dt) {

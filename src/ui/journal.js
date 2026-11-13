@@ -200,7 +200,7 @@ export function mountJournal(body, game) {
     const list = el('div', 'qj-list');
     if (state.tab === 'quests') fillQuests(list);
     else if (state.tab === 'beasts') fillBeasts(list);
-    else if (state.tab === 'challenges') fillSimple(list, [{ id: 'board', name: 'Guild Board', sub: 'Repeating hunt' }]);
+    else if (state.tab === 'challenges') fillSimple(list, challengeRows());
     else fillSimple(list, game.journal.state.activity.map((a, i) => ({ id: 'a' + i, name: a.title, sub: a.text.slice(0, 42) })));
     box.appendChild(list);
 
@@ -211,7 +211,8 @@ export function mountJournal(body, game) {
       const known = MONSTERS.filter((m) => game.progress.seen(m.id)).length;
       box.appendChild(el('div', 'qj-points', `Beasts met: ${known} / ${MONSTERS.length}`));
     } else if (state.tab === 'challenges') {
-      box.appendChild(el('div', 'qj-points', `Rank ${RANKS[game.rank] || 'F'}`));
+      const left = game.bounties?.remainingClaims?.() ?? 6;
+      box.appendChild(el('div', 'qj-points', `Rank ${RANKS[game.rank] || 'F'} · ${left} claims left this hour`));
     } else {
       box.appendChild(el('div', 'qj-points', `${game.journal.state.activity.length} entries`));
     }
@@ -418,14 +419,73 @@ export function mountJournal(body, game) {
     });
   };
 
+  const challengeRows = () => {
+    const rows = [{ id: 'board', name: 'Guild Hunt', sub: 'Repeating rank hunt' }];
+    const slots = game.bounties?.slots?.() || [];
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i];
+      const got = game.bounties.progressOf(s);
+      rows.push({
+        id: 'b' + i,
+        name: s.claimed ? `${s.label} (paid)` : s.label,
+        sub: s.claimed ? 'Turned in' : `${s.kind === 'kill' ? 'Slay' : 'Gather'} ${got}/${s.need}`,
+      });
+    }
+    return rows;
+  };
+
+  const fmtWait = (ms) => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m ? `${m}m ${r}s` : `${r}s`;
+  };
+
   const challengeDetail = (pane) => {
+    const sel = String(state.selected || 'board');
+    if (sel.startsWith('b')) {
+      const i = Number(sel.slice(1));
+      const slot = game.bounties?.slot(i);
+      pane.appendChild(el('h3', 'qj-title', slot ? slot.label.toUpperCase() : 'BOUNTY'));
+      const log = el('div', 'qj-log story');
+      if (!slot) {
+        log.appendChild(el('p', '', 'That posting fell off the board.'));
+      } else {
+        const got = game.bounties.progressOf(slot);
+        const kind = slot.kind === 'kill' ? 'Hunt' : 'Gather';
+        log.appendChild(el('p', '', `${kind}. ${slot.claimed ? 'Paid.' : `${got} / ${slot.need}`}.`));
+        log.appendChild(el('p', '', `<b>Pay.</b> ${slot.gold} gold and ${slot.xp} ${slot.skill} XP.`));
+        log.appendChild(el('p', '', 'Counts start when the posting is pinned. Old stacks in the bag do not count. Six turn-ins an hour.'));
+        if (!slot.claimed) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'qj-action qj-bounty-go';
+          const ready = game.bounties.ready(slot);
+          const cap = (game.bounties.remainingClaims() | 0) <= 0;
+          b.textContent = cap ? 'Hourly cap' : ready ? 'Turn in' : 'Not yet';
+          b.disabled = !ready || cap;
+          b.addEventListener('click', () => {
+            if (game.claimBounty(i)) paint();
+          });
+          log.appendChild(b);
+        }
+      }
+      pane.appendChild(log);
+      footer(pane, () => {}, () => {}, 'BOARD', () => {
+        state.selected = 'board';
+        paint();
+      });
+      return;
+    }
     pane.appendChild(el('h3', 'qj-title', 'GUILD BOARD'));
     const log = el('div', 'qj-log story');
     const q = game.quest;
-    log.appendChild(el('p', '', 'The board in the guild hall does not close. Mira adds a fresh count every time the last one is paid. Chickens are still not on it.'));
-    log.appendChild(el('p', '', `<b>Rank.</b> ${RANKS[game.rank] || 'F'}.`));
+    const wait = game.bounties?.msUntilRotate?.() || 0;
+    const left = game.bounties?.remainingClaims?.() ?? 6;
+    log.appendChild(el('p', '', 'The board in the guild hall does not close. Mira pins three bounties that rotate, plus the old rank hunt. Chickens are still not on it.'));
+    log.appendChild(el('p', '', `<b>Rank.</b> ${RANKS[game.rank] || 'F'}. <b>Claims left this hour.</b> ${left}. <b>New postings in</b> ${fmtWait(wait)}.`));
     log.appendChild(el('p', 'qj-now', `${q.text} (${q.n}/${q.total})`));
-    log.appendChild(el('p', '', 'Gold waits at the end of the count, and your rank moves one step. The story quests in the other tab are separate. This one keeps going.'));
+    log.appendChild(el('p', '', 'Gold waits at the end of the rank count. Bounties pay coins and skill XP. Story quests in the other tab are separate.'));
     pane.appendChild(log);
     footer(pane, () => {}, () => {}, 'QUESTS', () => {
       state.tab = 'quests';

@@ -63,6 +63,7 @@ const DEFS = {
   snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
   demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 5, gold: [90, 140], aggro: 14, build: buildDemonKnight },
   holyknight: { name: 'Holy Knight', hp: 300, radius: 1.05, speed: 3.0, dmg: 5, gold: [90, 140], aggro: 14, build: buildHolyKnight },
+  keepwarden: { name: 'Keep Warden', hp: 420, radius: 1.12, speed: 3.05, dmg: 7, gold: [110, 160], aggro: 16, build: buildDemonKnight },
   orcscout: { name: 'Orc Scout', hp: 36, radius: 0.6, speed: 2.7, dmg: 4, gold: [2, 8], aggro: 12, build: buildOrcScout },
 };
 
@@ -129,7 +130,7 @@ export class Monster {
     this.obj.add(built.root);
     game.scene.add(this.obj);
     this.obj.position.set(x, this.y, z);
-    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : 1;
+    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'keepwarden' ? 1.12 : 1;
     this.air = false;
     this.attacking = false;
     this.chargeDir = new THREE.Vector3();
@@ -929,7 +930,8 @@ export class Monster {
           break;
         }
         case 'demonknight':
-        case 'holyknight': {
+        case 'holyknight':
+        case 'keepwarden': {
           [mvx, mvz] = knightThink(this, dt, { g, P, dx, dz, dist, sees, toP });
           break;
         }
@@ -1797,6 +1799,7 @@ export class Spawner {
       const keep = w[key];
       if (keep) for (const [ox, oz] of keep.posts) this.spawn(type, keep.x + ox, keep.z + oz, false);
     }
+    if (w.warfield) this.spawn('keepwarden', w.warfield.x, w.warfield.z, false);
     const jungle = w.jungle;
     if (jungle) {
       for (const [type, n] of Object.entries(JUNGLE_QUOTA)) {
@@ -1866,7 +1869,7 @@ export class Spawner {
   update(dt) {
     if (this.game.net?.role === 'guest') return;
     this.fillChickens(dt);
-    if (this.game.world?.realm === 'cave') return;
+    if (this.game.world?.realm === 'cave' || this.game.world?.realm === 'rift') return;
     const g = this.game;
     this.timer -= dt;
     if (this.timer > 0) return;
@@ -1874,6 +1877,7 @@ export class Spawner {
     this.fillOrcs();
     this.fillYetis();
     this.fillKnights();
+    this.fillWarden();
     this.fillJungle();
     this.fillDesert();
     const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
@@ -1961,6 +1965,18 @@ export class Spawner {
       this.knightT = 0;
       this.spawn(type, x, z);
     }
+  }
+
+  fillWarden() {
+    const g = this.game;
+    const field = g.world?.warfield;
+    if (!field || g.world?.realm !== 'over') return;
+    this.wardenT = (this.wardenT || 0) + 1;
+    if (this.wardenT < 80) return;
+    if (g.monsters.some((m) => !m.dead && m.type === 'keepwarden')) return;
+    if (Math.hypot(field.x - g.player.pos.x, field.z - g.player.pos.z) < 22) return;
+    this.wardenT = 0;
+    this.spawn('keepwarden', field.x, field.z);
   }
 
   /** A spot for a jungle or shipyard mob: tigers, raptors and skeleton pirates in the trees, pirates around the docks and the jungle gate. */

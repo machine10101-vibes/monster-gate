@@ -1120,6 +1120,18 @@ body.touch #top-right {
 .wg-row .wg-btn {
   margin-top: 0;
 }
+#wg-rift {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(126, 246, 255, 0.18);
+}
+#wg-rift-enter:disabled {
+  opacity: 0.55;
+}
+.qj-bounty-go {
+  display: inline-flex;
+  margin: 8px auto 12px;
+}
 .wg-code {
   display: block;
   font-family: var(--font-px);

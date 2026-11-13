@@ -446,6 +446,101 @@ export const QUESTS = [
       },
     ],
   },
+  {
+    id: 'keepassault',
+    name: 'The Eternal War',
+    series: 'Embergate',
+    kind: 'quest',
+    points: 3,
+    giver: 'Mira',
+    requires: ['mark'],
+    reward: { gold: 70, gear: 'ashenbrand' },
+    blurb: 'Hellspire and Dawnspire have spilled their war onto the Endless Field. Mira wants a hunter who can walk both courtyards and put the Warden down.',
+    opening:
+      'The board in the guild hall has a new name on it that is not a slime. Mira has been reading reports from the north pass: black iron at one keep, white gold at the other, and something between them that answers to both.',
+    steps: [
+      {
+        id: 'war-ask',
+        kind: 'talk',
+        npc: 'guild',
+        objective: 'Speak with Mira about the keeps',
+        lines: [
+          'The north pass is not a pasture. Ashen Road climbs into a wasteland the guild maps as Embergate.',
+          'Hellspire is the Demon Knight\'s fortress. Dawnspire is the Holy Knight\'s castle. They have been at this longer than Oakhollow has had a name.',
+          'Walk both courtyards. Put down the knights that will let you. Then stand in the field between them. The Warden waits there. If you come back with the brand it carries, the board will believe you.',
+        ],
+        journal:
+          'Mira sent me north through Ashen Road. Hellspire first, then Dawnspire, then the Endless Field between them. The Keep Warden carries a brand she wants on the board.',
+      },
+      {
+        id: 'see-hell',
+        kind: 'visit',
+        spot: 'hellspire',
+        radius: 28,
+        objective: 'Enter the courtyard of Hellspire',
+        journal:
+          'Hellspire is a mouth of black iron. The courtyard smells like old heat. The knights on the posts did not look surprised to see a hunter from the south.',
+      },
+      {
+        id: 'kill-demon',
+        kind: 'kill',
+        types: ['demonknight'],
+        count: 2,
+        objective: 'Slay 2 Demon Knights at Hellspire',
+        journal:
+          'Two of the black knights went down. The keep did not. I still had the white castle west of the field to walk, and Mira does not take half a report.',
+      },
+      {
+        id: 'see-dawn',
+        kind: 'visit',
+        spot: 'dawnspire',
+        radius: 28,
+        objective: 'Enter the courtyard of Dawnspire',
+        journal:
+          'Dawnspire is white stone and blue fire. The courtyard is quieter than Hellspire and somehow worse for it. The Holy Knights watch the same war from the other side.',
+      },
+      {
+        id: 'kill-holy',
+        kind: 'kill',
+        types: ['holyknight'],
+        count: 2,
+        objective: 'Slay 2 Holy Knights at Dawnspire',
+        journal:
+          'Two of the white knights fell. The field between the keeps is a grave of banners. That is where Mira said the Warden would be.',
+      },
+      {
+        id: 'see-field',
+        kind: 'visit',
+        spot: 'warfield',
+        radius: 22,
+        objective: 'Stand on the Endless Field',
+        journal:
+          'The Endless Field is swords in the ash, two colours of banner, and a knight in mixed plate that does not belong to either keep. It was waiting.',
+      },
+      {
+        id: 'kill-warden',
+        kind: 'kill',
+        types: ['keepwarden'],
+        count: 1,
+        objective: 'Defeat the Keep Warden',
+        journal:
+          'The Warden used both keeps\' tricks: a hammer of light and a line of hellfire. It went down harder than a posted knight and cleaner than a dragon. The brand it carried is ugly, honest steel.',
+      },
+      {
+        id: 'war-back',
+        kind: 'talk',
+        npc: 'guild',
+        objective: 'Return to Mira with the report',
+        lines: [
+          'You walked both keeps and the dirt between them. That is more than most names on this board will ever do.',
+          'Keep the brand. It is not dusk steel and it is not a starter hammer. It is what a hunter carries after the war has looked at them.',
+          'The knights will still be there tomorrow. The Warden too. The board does not need you to end eternity. It needed you to stand in it.',
+        ],
+        journal:
+          'Mira took the report and left me the brand. Hellspire and Dawnspire are still at war. The guild board has a name that has been to both courtyards.',
+      },
+    ],
+  },
 ];
 
 export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));

@@ -356,6 +356,7 @@ export class Gathering {
     const g = this.game;
     const P = g.player.pos;
     g.progress.addGood(rock.ore, 1);
+    if (g.bounties?.onGather(rock.ore, 1) && g.hud.panelId === 'quest' && g.hud.journalRefresh) g.hud.journalRefresh();
     this.train('mining', rock.xp, true);
     g.hud.toast(`You manage to mine some ${n.type}.`, 1800);
     g.audio.coin();
@@ -418,6 +419,7 @@ export class Gathering {
     const g = this.game;
     const P = g.player.pos;
     g.progress.addGood(tree.log, 1);
+    if (g.bounties?.onGather(tree.log, 1) && g.hud.panelId === 'quest' && g.hud.journalRefresh) g.hud.journalRefresh();
     this.train('woodcutting', tree.xp, true);
     g.hud.toast(`You get some ${GOODS[tree.log].name.toLowerCase()}.`, 1800);
     g.audio.tone(140, 0.14, 'triangle', 0.18, -40);
@@ -888,6 +890,7 @@ export class Gathering {
     const P = g.player.pos;
     const fish = s.fish;
     g.progress.addGood(fish.id, 1);
+    if (g.bounties?.onGather(fish.id, 1) && g.hud.panelId === 'quest' && g.hud.journalRefresh) g.hud.journalRefresh();
     this.train('fishing', fish.xp, true);
     g.hud.toast(fish.catchText, 1800);
     g.audio.coin();
