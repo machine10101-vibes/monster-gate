@@ -48,6 +48,7 @@ const CLOUD_AUTOSAVE_MS = 30000;
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
+import { INVENTORY_FULL } from './systems/stacks.js';
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
@@ -1506,9 +1507,12 @@ class Game {
       if (!e) continue;
       if (e.gold) this.addGold(e.gold);
       if (e.gear) {
-        const got = this.progress.grantFound(e.gear);
         const gg = gearById(e.gear);
-        if (got && gg) {
+        if (this.progress.crafted(e.gear)) {
+          /* already owned */
+        } else if (!this.progress.grantFound(e.gear)) {
+          this.hud.toast(INVENTORY_FULL, 1800);
+        } else if (gg) {
           this.applyGear();
           this.hud.toast(`Earned: ${gg.name}`, 2800);
         }
@@ -1686,11 +1690,15 @@ class Game {
     if (this.progress.classId && this.progress.skillPoints().earned > hadPoints) {
       this.hud.toast('Skill point earned. Press K.', 2200);
     }
-    if (parts.length) {
-      const line = parts.map((d) => `+${d.n} ${MATERIALS[d.id]?.name || GOODS[d.id]?.name || d.id}`).join('   ');
+    if (parts.got.length) {
+      const line = parts.got.map((d) => `+${d.n} ${MATERIALS[d.id]?.name || GOODS[d.id]?.name || d.id}`).join('   ');
       this.hud.toast(line, 2600);
-      this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.map((d) => `+${d.n}`).join(' '), 'gold');
+      this.hud.floatText(...this.screenOf(m.x, m.y + 2.2, m.z), parts.got.map((d) => `+${d.n}`).join(' '), 'gold');
       this.fx.burst(m.x, m.y + 1, m.z, [0x6fd45a, 0xf1e6c6, 0xffd23f], 12, 3.5, 0.1, 0.8);
+    }
+    if (parts.leftover.length) {
+      for (const d of parts.leftover) this.dropStack(d.k, d.id, d.n, m.x, m.y + 0.9, m.z);
+      this.hud.toast(INVENTORY_FULL, 1800);
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
     this.applyJournal(this.journal.onKill(m.type));
@@ -1744,6 +1752,24 @@ class Game {
     const a = Math.random() * Math.PI * 2;
     const s = 1.2 + Math.random();
     this.pickups.push({ holder, mesh: model, kind: 'orcblade', value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4.2, age: 0, grounded: false });
+  }
+
+  dropStack(k, id, n, x, y, z) {
+    n = n | 0;
+    if (n < 1) return;
+    const geo = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+    const mat = new THREE.MeshBasicMaterial({ color: k === 'part' ? 0x6fd45a : 0xc6a15a });
+    const mesh = new THREE.Mesh(geo, mat);
+    const holder = new THREE.Group();
+    holder.add(mesh);
+    holder.position.set(x, y, z);
+    this.scene.add(holder);
+    const a = Math.random() * Math.PI * 2;
+    const s = 1.2 + Math.random();
+    this.pickups.push({
+      holder, mesh, kind: 'stack', k, id, n,
+      value: 0, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: 4 + Math.random() * 2, age: 0, grounded: false,
+    });
   }
 
   dropGear(id, x, y, z) {
@@ -1808,36 +1834,69 @@ class Game {
         h.y += (P.y + 0.9 - h.y) * Math.min(1, dt * 6);
       }
       if (k.age > 0.5 && d < 0.8) {
-        k.done = true;
-        if (k.kind === 'heart') {
+        if (k.kind === 'stack') {
+          const added = k.k === 'good' ? this.progress.addGood(k.id, k.n) : this.progress.addPart(k.id, k.n);
+          if (added < 1) {
+            this.hud.toast(INVENTORY_FULL, 1400);
+          } else {
+            k.n -= added;
+            const label = MATERIALS[k.id]?.name || GOODS[k.id]?.name || k.id;
+            this.audio.coin();
+            this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), `+${added} ${label}`, 'gold');
+            this.fx.burst(h.x, h.y, h.z, [0xc6a15a, 0xffffff], 5, 2, 0.07, 0.3);
+            if (k.n < 1) k.done = true;
+            else this.hud.toast(INVENTORY_FULL, 1400);
+          }
+        } else if (k.kind === 'heart') {
+          k.done = true;
           this.player.heal(4);
           this.audio.potion();
           this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), '+2', 'heal');
+          this.fx.burst(h.x, h.y, h.z, [0xff4a5c, 0xffffff], 5, 2, 0.07, 0.3);
         } else if (k.kind === 'gear') {
           const gg = gearById(k.gearId);
-          const got = this.progress.grantFound(k.gearId);
-          this.audio.quest();
-          this.hud.toast(got ? `Found: ${gg.name}` : `You already carry ${gg.name}`, 2800);
-          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), gg.name, 'gold');
-          if (got) {
+          if (this.progress.crafted(k.gearId)) {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast(`You already carry ${gg.name}`, 2800);
+            this.fx.burst(h.x, h.y, h.z, [0xffd27a, 0xff6a3a, 0xffffff], 5, 2, 0.07, 0.3);
+          } else if (!this.progress.grantFound(k.gearId)) {
+            this.hud.toast(INVENTORY_FULL, 1800);
+          } else {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast(`Found: ${gg.name}`, 2800);
+            this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), gg.name, 'gold');
             this.applyGear();
             if (gg.type === 'weapon' && this.progress.data.weapon === gg.id) this.selectSlot(0, true);
+            this.fx.burst(h.x, h.y, h.z, [0xffd27a, 0xff6a3a, 0xffffff], 5, 2, 0.07, 0.3);
           }
         } else if (k.kind === 'orcblade') {
-          const got = this.progress.grantFound('orcblade');
-          this.audio.quest();
-          this.hud.toast(got ? 'Orc Scout Blade' : 'You already carry that blade', 1800);
-          this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), 'Orc Blade', 'gold');
-          if (got && this.progress.data.weapon === 'orcblade') {
-            this.applyGear();
-            this.selectSlot(0, true);
+          if (this.progress.crafted('orcblade')) {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast('You already carry that blade', 1800);
+            this.fx.burst(h.x, h.y, h.z, [0xb0b4bc, 0xe6dcc4, 0xffffff], 5, 2, 0.07, 0.3);
+          } else if (!this.progress.grantFound('orcblade')) {
+            this.hud.toast(INVENTORY_FULL, 1800);
+          } else {
+            k.done = true;
+            this.audio.quest();
+            this.hud.toast('Orc Scout Blade', 1800);
+            this.hud.floatText(...this.screenOf(P.x, P.y + 2, P.z), 'Orc Blade', 'gold');
+            if (this.progress.data.weapon === 'orcblade') {
+              this.applyGear();
+              this.selectSlot(0, true);
+            }
+            this.fx.burst(h.x, h.y, h.z, [0xb0b4bc, 0xe6dcc4, 0xffffff], 5, 2, 0.07, 0.3);
           }
         } else {
+          k.done = true;
           this.addGold(k.value);
           this.audio.coin();
+          this.fx.burst(h.x, h.y, h.z, [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
         }
-        this.fx.burst(h.x, h.y, h.z, k.kind === 'heart' ? [0xff4a5c, 0xffffff] : k.kind === 'gear' ? [0xffd27a, 0xff6a3a, 0xffffff] : k.kind === 'orcblade' ? [0xb0b4bc, 0xe6dcc4, 0xffffff] : [0xffd23f, 0xffffff], 5, 2, 0.07, 0.3);
-      } else if (k.age > (k.kind === 'gear' ? 180 : 40)) k.done = true;
+      } else if (k.age > (k.kind === 'gear' || k.kind === 'stack' ? 180 : 40)) k.done = true;
       if (k.done) {
         this.scene.remove(k.holder);
         if (k.kind === 'orcblade' || k.kind === 'gear') k.holder.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
@@ -2513,16 +2572,14 @@ class Game {
       this.hud.toast('That is already in the crate', 1400);
       return false;
     }
-    if (!pr.canFitStorage(k, id)) {
+    if (!pr.canFitStorage(k, id, n)) {
       this.hud.toast('The crate is full', 1400);
       return false;
     }
     const refund = () => {
       if (k === 'good') pr.addGood(id, n);
-      else if (k === 'part') {
-        pr.data.materials[id] = pr.count(id) + n;
-        pr.save();
-      } else if (k === 'potion') {
+      else if (k === 'part') pr.addPart(id, n);
+      else if (k === 'potion') {
         const it = this.items.find((i) => i.id === id);
         if (it) {
           it.count += n;
@@ -2534,9 +2591,7 @@ class Game {
     if (k === 'good') {
       if (!pr.takeGood(id, n)) return false;
     } else if (k === 'part') {
-      if (pr.count(id) < n) return false;
-      pr.data.materials[id] = pr.count(id) - n;
-      pr.save();
+      if (!pr.takePart(id, n)) return false;
     } else if (k === 'gear') {
       if (!pr.crafted(id)) return false;
       const g = gearById(id);
@@ -2575,14 +2630,27 @@ class Game {
         return false;
       }
       want = Math.min(want, room);
+    } else if (s.k === 'good') {
+      want = Math.min(want, pr.roomFor('good', s.id));
+      if (want < 1) {
+        this.hud.toast(INVENTORY_FULL, 1400);
+        return false;
+      }
+    } else if (s.k === 'part') {
+      want = Math.min(want, pr.roomFor('part', s.id));
+      if (want < 1) {
+        this.hud.toast(INVENTORY_FULL, 1400);
+        return false;
+      }
+    } else if (s.k === 'gear' && !pr.fitsBag(pr.bagSlotsUsed() + 1)) {
+      this.hud.toast(INVENTORY_FULL, 1400);
+      return false;
     }
     const out = pr.pullStorage(index, want);
     if (!out) return false;
     if (out.k === 'good') pr.addGood(out.id, out.n);
-    else if (out.k === 'part') {
-      pr.data.materials[out.id] = pr.count(out.id) + out.n;
-      pr.save();
-    } else if (out.k === 'potion') {
+    else if (out.k === 'part') pr.addPart(out.id, out.n);
+    else if (out.k === 'potion') {
       const it = this.items.find((i) => i.id === out.id);
       if (it) {
         it.count += out.n;

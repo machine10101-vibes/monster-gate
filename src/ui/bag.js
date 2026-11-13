@@ -2,6 +2,8 @@ import { GEAR, MATERIAL_ORDER, MATERIALS, SLOT_LABEL, setById } from '../data/ca
 import { STYLE_LABEL } from '../data/skills.js';
 import { iconCanvas } from './icons.js';
 import { FISH, GOODS, GOODS_ORDER, SHAFT_FROM_LOG, SHAFTS_PER_LOG, TOOLS, burnChance } from '../data/gathering.js';
+import { BAG_SLOTS } from '../systems/progress.js';
+import { splitStacks } from '../systems/stacks.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 const TABS = [
@@ -26,7 +28,7 @@ export function mountBag(body, game) {
 
     const gold = document.createElement('p');
     gold.className = 'bag-gold';
-    gold.textContent = `Gold ${game.gold}`;
+    gold.textContent = `Gold ${game.gold} · ${game.progress.bagSlotsUsed()} / ${BAG_SLOTS} slots`;
     root.appendChild(gold);
 
     const tabs = document.createElement('div');
@@ -226,8 +228,8 @@ function collect(game) {
 
   const goods = [];
   for (const id of GOODS_ORDER) {
-    const n = game.progress.good(id);
-    if (!n) continue;
+    const total = game.progress.good(id);
+    if (!total) continue;
     const g = GOODS[id];
     const fish = FISH[id];
     let sub;
@@ -237,24 +239,24 @@ function collect(game) {
     if (fish) {
       const cooked = GOODS[fish.cooked];
       const burn = Math.round(burnChance(fish, game.progress.level('cooking')) * 100);
-      sub = `Eat for ${g.heal} health. Cook on a fire for ${cooked.heal} health, with a ${burn}% chance to burn. You have ${n}.`;
+      sub = `Eat for ${g.heal} health. Cook on a fire for ${cooked.heal} health, with a ${burn}% chance to burn. You have ${total}.`;
       actions = [
         { label: 'Eat', run: (paint) => { if (game.eatGood(id)) paint(); } },
         { label: 'Cook', run: (paint) => { if (game.cookFish(id)) game.hud.closePanel(); else paint(); } },
       ];
     } else if (g.heal) {
-      sub = `Eat to restore ${g.heal} health. You have ${n}.`;
+      sub = `Eat to restore ${g.heal} health. You have ${total}.`;
       action = 'Eat';
       run = (paint) => { if (game.eatGood(id)) paint(); };
     } else if (g.burnt) {
-      sub = `${g.desc} You have ${n}.`;
+      sub = `${g.desc} You have ${total}.`;
     } else if (g.kind === 'bar' || g.kind === 'part' || g.kind === 'arrow') {
-      sub = `${g.desc} You have ${n}.`;
+      sub = `${g.desc} You have ${total}.`;
     } else if (g.kind === 'log') {
       const shaft = GOODS[SHAFT_FROM_LOG[id]];
       sub = shaft
-        ? `Light it, or carve ${SHAFTS_PER_LOG} ${shaft.name.toLowerCase()}s. You have ${n}.`
-        : `Light with the tinderbox. You have ${n}.`;
+        ? `Light it, or carve ${SHAFTS_PER_LOG} ${shaft.name.toLowerCase()}s. You have ${total}.`
+        : `Light with the tinderbox. You have ${total}.`;
       actions = [
         { label: 'Light', run: (paint) => { if (game.lightLog(id)) game.hud.closePanel(); else paint(); } },
       ];
@@ -270,16 +272,19 @@ function collect(game) {
           },
         });
       }
-    } else sub = `Sells for ${g.price} gold each. You have ${n}.`;
-    goods.push({
-      key: 'g' + id,
-      name: g.name,
-      sub,
-      badge: String(n),
-      canvas: () => renderThumb({ kind: 'good', id }, 96),
-      action,
-      actions,
-      run,
+    } else sub = `Sells for ${g.price} gold each. You have ${total}.`;
+    splitStacks(total).forEach((n, i) => {
+      goods.push({
+        key: 'g' + id + ':' + i,
+        name: g.name,
+        sub,
+        badge: String(n),
+        n,
+        canvas: () => renderThumb({ kind: 'good', id }, 96),
+        action,
+        actions,
+        run,
+      });
     });
   }
 
@@ -305,14 +310,17 @@ function collect(game) {
 
   const parts = [];
   for (const id of MATERIAL_ORDER) {
-    const n = game.progress.count(id);
-    if (!n) continue;
-    parts.push({
-      key: 'p' + id,
-      name: MATERIALS[id].name,
-      sub: `${MATERIALS[id].desc} You have ${n}.`,
-      badge: String(n),
-      canvas: () => renderThumb({ kind: 'material', id }, 96),
+    const total = game.progress.count(id);
+    if (!total) continue;
+    splitStacks(total).forEach((n, i) => {
+      parts.push({
+        key: 'p' + id + ':' + i,
+        name: MATERIALS[id].name,
+        sub: `${MATERIALS[id].desc} You have ${total}.`,
+        badge: String(n),
+        n,
+        canvas: () => renderThumb({ kind: 'material', id }, 96),
+      });
     });
   }
 

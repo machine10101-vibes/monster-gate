@@ -258,7 +258,10 @@ export function lootRiftChest(game) {
   const gold = riftChestGold(run.party);
   const goods = riftChestGoods(run.party);
   game.addGold(gold);
-  for (const g of goods) game.progress.addGood(g.id, g.n);
+  for (const g of goods) {
+    const added = game.progress.addGood(g.id, g.n);
+    if (added < g.n) game.dropStack?.('good', g.id, g.n - added, r.chest.x, r.chest.y + 0.6, r.chest.z);
+  }
   game.progress.save();
   game.hud.toast(`Rift chest: +${gold} gold.`, 2800);
   game.audio.quest();

@@ -3,10 +3,18 @@ import { CLASSES, SKILLS, attrDef, weaponDef } from '../data/skills.js';
 import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX, SHAFTS_PER_LOG, SHAFT_FROM_LOG, SHAFT_IDS, SKILL_ORDER, SMELTS, levelForXp, xpForLevel } from '../data/gathering.js';
 import { PORTAL_IDS } from '../data/portals.js';
 import { readJson, savesFrozen } from './saveio.js';
+import {
+  BAG_SLOTS,
+  bagSlotsFrom,
+  roomForCount,
+  stackSlots,
+  storageStackSlots,
+} from './stacks.js';
 
 export const ANON_KEY = 'monster-gate-hunter-v1';
 
 export const STORAGE_SLOTS = 30;
+export { BAG_SLOTS, MAX_STACK } from './stacks.js';
 const POTION_IDS = new Set(['potion', 'manapotion']);
 
 export function saveKey(address) {
@@ -92,6 +100,7 @@ export class Progress {
     this.data.skills = normalizeSkills(this.data.skills);
     this.data.xp = normalizeXp(this.data.xp);
     this.data.goods = normalizeGoods(this.data.goods);
+    this.data.materials = normalizeMaterials(this.data.materials);
     if (!this.data.crafted || typeof this.data.crafted !== 'object') this.data.crafted = {};
     this.data.crafted.knife = true;
     this.data.hunter = normalizeHunter(this.data.hunter);
@@ -184,20 +193,21 @@ export class Progress {
     return this.data.materials[mat] || 0;
   }
 
-  /** Records a kill and rolls the monster's parts. Returns [{id, n}]. */
+  /** Records a kill and rolls the monster's parts. Returns {got, leftover}. */
   harvest(type) {
     this.data.kills[type] = this.kills(type) + 1;
     this.data.seen[type] = true;
     const got = [];
+    const leftover = [];
     for (const d of DROPS[type] || []) {
       if (Math.random() > d.chance) continue;
       const n = d.qty[0] + Math.floor(Math.random() * (d.qty[1] - d.qty[0] + 1));
-      if (GOODS[d.id]) this.data.goods[d.id] = this.good(d.id) + n;
-      else this.data.materials[d.id] = this.count(d.id) + n;
-      got.push({ id: d.id, n });
+      const added = GOODS[d.id] ? this.addGood(d.id, n, false) : this.addPart(d.id, n, false);
+      if (added) got.push({ id: d.id, n: added });
+      if (added < n) leftover.push({ id: d.id, n: n - added, k: GOODS[d.id] ? 'good' : 'part' });
     }
     this.save();
-    return got;
+    return { got, leftover };
   }
 
   gearSeen(gear) {
@@ -209,9 +219,23 @@ export class Progress {
     return !!this.data.crafted[id];
   }
 
+  recipeReady(gear) {
+    if (!gear || gear.found || this.crafted(gear.id)) return false;
+    return Object.entries(gear.recipe).every(([m, n]) => this.stockOf(m) >= n);
+  }
+
+  wouldFitCraft(gear) {
+    const spendGoods = {};
+    const spendParts = {};
+    for (const [m, n] of Object.entries(gear.recipe || {})) {
+      if (GOODS[m]) spendGoods[m] = -(n | 0);
+      else spendParts[m] = -(n | 0);
+    }
+    return this.wouldFit({ goods: spendGoods, materials: spendParts, gear: 1 });
+  }
+
   canCraft(gear) {
-    if (gear.found) return false;
-    return !this.crafted(gear.id) && Object.entries(gear.recipe).every(([m, n]) => this.stockOf(m) >= n);
+    return this.recipeReady(gear) && this.wouldFitCraft(gear);
   }
 
   /** Monster parts and smelted goods share a recipe. */
@@ -223,6 +247,7 @@ export class Progress {
   grantFound(id) {
     const g = gearById(id);
     if (!g || this.crafted(id)) return false;
+    if (!this.fitsBag(this.bagSlotsUsed() + 1)) return false;
     this.data.crafted[id] = true;
     if (this.meetsReq(g)) {
       if (g.type === 'weapon' && !this.data.weapon) this.data.weapon = id;
@@ -488,19 +513,90 @@ export class Progress {
     return this.data.goods[id] | 0;
   }
 
-  addGood(id, n = 1) {
-    if (!GOODS[id] || n < 1) return;
-    this.data.goods[id] = this.good(id) + n;
-    this.save();
+  bagSlotsUsed() {
+    const stored = this.data.storage.filter((s) => s && s.k === 'gear').map((s) => s.id);
+    return bagSlotsFrom({
+      goods: this.data.goods,
+      materials: this.data.materials,
+      crafted: this.data.crafted,
+      storedGear: stored,
+    });
+  }
+
+  fitsBag(nextUsed) {
+    const used = this.bagSlotsUsed();
+    if (nextUsed <= used) return true;
+    return nextUsed <= BAG_SLOTS;
+  }
+
+  roomFor(kind, id) {
+    const current = kind === 'good' ? this.good(id) : this.count(id);
+    const used = this.bagSlotsUsed();
+    const remaining = Math.max(0, BAG_SLOTS - used);
+    return roomForCount(current, remaining);
+  }
+
+  wouldFit({ goods = {}, materials = {}, gear = 0 } = {}) {
+    const nextGoods = { ...this.data.goods };
+    const nextMats = { ...this.data.materials };
+    for (const [id, d] of Object.entries(goods)) {
+      const n = (nextGoods[id] | 0) + (d | 0);
+      if (n < 0) return false;
+      if (n) nextGoods[id] = n;
+      else delete nextGoods[id];
+    }
+    for (const [id, d] of Object.entries(materials)) {
+      const n = (nextMats[id] | 0) + (d | 0);
+      if (n < 0) return false;
+      if (n) nextMats[id] = n;
+      else delete nextMats[id];
+    }
+    const stored = this.data.storage.filter((s) => s && s.k === 'gear').map((s) => s.id);
+    const after = bagSlotsFrom({
+      goods: nextGoods,
+      materials: nextMats,
+      crafted: this.data.crafted,
+      storedGear: stored,
+    }) + (gear | 0);
+    return this.fitsBag(after);
+  }
+
+  addGood(id, n = 1, echo = true) {
+    n = n | 0;
+    if (!GOODS[id] || n < 1) return 0;
+    const add = Math.min(n, this.roomFor('good', id));
+    if (add < 1) return 0;
+    this.data.goods[id] = this.good(id) + add;
+    if (echo) this.save();
     if (!this._filling && this.data.armor?.quiver && ARROW_TYPES.includes(id) && (id === this.data.ammo || !this.data.ammo)) {
       if (!this.data.ammo) this.data.ammo = id;
       this.refillQuiver();
     }
+    return add;
+  }
+
+  addPart(id, n = 1, echo = true) {
+    n = n | 0;
+    if (!MATERIALS[id] || n < 1) return 0;
+    const add = Math.min(n, this.roomFor('part', id));
+    if (add < 1) return 0;
+    this.data.materials[id] = this.count(id) + add;
+    if (echo) this.save();
+    return add;
   }
 
   takeGood(id, n = 1) {
     if (!GOODS[id] || this.good(id) < n) return false;
     this.data.goods[id] = this.good(id) - n;
+    if (!this.data.goods[id]) delete this.data.goods[id];
+    this.save();
+    return true;
+  }
+
+  takePart(id, n = 1) {
+    if (!MATERIALS[id] || this.count(id) < n) return false;
+    this.data.materials[id] = this.count(id) - n;
+    if (!this.data.materials[id]) delete this.data.materials[id];
     this.save();
     return true;
   }
@@ -509,7 +605,16 @@ export class Progress {
   smeltCan(id) {
     const rec = SMELTS[id];
     if (!rec) return 0;
-    return rec.ins.reduce((n, [good, need]) => Math.min(n, Math.floor(this.good(good) / need)), 999);
+    const byIng = rec.ins.reduce((n, [good, need]) => Math.min(n, Math.floor(this.good(good) / need)), 999);
+    let n = 0;
+    while (n < byIng) {
+      const goods = {};
+      for (const [good, need] of rec.ins) goods[good] = -need * (n + 1);
+      goods[rec.out] = rec.n * (n + 1);
+      if (!this.wouldFit({ goods })) break;
+      n += 1;
+    }
+    return n;
   }
 
   /** Run a named smelt. Pass `all` to drain the bag. */
@@ -530,8 +635,12 @@ export class Progress {
 
   /** One iron bar becomes fifteen arrowheads. */
   forgeHeads(all = false) {
-    const can = this.good('iron_bar');
-    const n = all ? can : Math.min(1, can);
+    let n = 0;
+    const cap = all ? this.good('iron_bar') : Math.min(1, this.good('iron_bar'));
+    while (n < cap) {
+      if (!this.wouldFit({ goods: { iron_bar: -(n + 1), arrowhead: HEADS_PER_BAR * (n + 1) } })) break;
+      n += 1;
+    }
     if (n < 1) return 0;
     this.takeGood('iron_bar', n);
     this.addGood('arrowhead', n * HEADS_PER_BAR);
@@ -540,6 +649,7 @@ export class Progress {
 
   craftKnife() {
     if (this.crafted('knife') || this.good('iron_bar') < 1) return false;
+    if (!this.wouldFit({ goods: { iron_bar: -1 } })) return false;
     this.takeGood('iron_bar', 1);
     this.data.crafted.knife = true;
     this.save();
@@ -550,8 +660,13 @@ export class Progress {
   carveShafts(logId, all = false) {
     const shaftId = SHAFT_FROM_LOG[logId];
     if (!this.crafted('knife') || !shaftId) return 0;
-    const can = this.good(logId);
-    const n = all ? can : Math.min(1, can);
+    let n = 0;
+    const cap = all ? this.good(logId) : Math.min(1, this.good(logId));
+    while (n < cap) {
+      const goods = { [logId]: -(n + 1), [shaftId]: SHAFTS_PER_LOG * (n + 1) };
+      if (!this.wouldFit({ goods })) break;
+      n += 1;
+    }
     if (n < 1) return 0;
     this.takeGood(logId, n);
     this.addGood(shaftId, n * SHAFTS_PER_LOG);
@@ -561,8 +676,19 @@ export class Progress {
   /** One arrowhead, one shaft and one feather become one iron arrow, then the quiver tops itself up. */
   fletchArrows(shaftId, all = false) {
     if (!SHAFT_IDS.includes(shaftId)) return 0;
-    const can = Math.min(this.good('arrowhead'), this.good(shaftId), this.good('feather'));
-    const n = all ? can : Math.min(1, can);
+    const cap = Math.min(this.good('arrowhead'), this.good(shaftId), this.good('feather'));
+    let n = 0;
+    const want = all ? cap : Math.min(1, cap);
+    while (n < want) {
+      const goods = {
+        arrowhead: -(n + 1),
+        [shaftId]: -(n + 1),
+        feather: -(n + 1),
+        iron_arrow: n + 1,
+      };
+      if (!this.wouldFit({ goods })) break;
+      n += 1;
+    }
     if (n < 1) return 0;
     this.takeGood('arrowhead', n);
     this.takeGood(shaftId, n);
@@ -648,19 +774,29 @@ export class Progress {
   }
 
   storageUsed() {
-    return this.data.storage.filter(Boolean).length;
+    return this.data.storage.reduce((n, s) => n + storageStackSlots(s), 0);
   }
 
-  canFitStorage(k, id) {
-    if (k !== 'gear' && this.data.storage.some((s) => s && s.k === k && s.id === id)) return true;
-    if (k === 'gear' && this.storedGear(id)) return false;
-    return this.data.storage.some((s) => !s);
+  canFitStorage(k, id, n = 1) {
+    n = n | 0;
+    if (n < 1) return false;
+    if (k === 'gear') {
+      if (this.storedGear(id)) return false;
+      if (!this.data.storage.some((s) => !s)) return false;
+      return this.storageUsed() < STORAGE_SLOTS;
+    }
+    const have = this.data.storage.find((s) => s && s.k === k && s.id === id);
+    const current = have?.n | 0;
+    const extra = stackSlots(current + n) - stackSlots(current);
+    if (!have && !this.data.storage.some((s) => !s)) return false;
+    if (extra < 1) return true;
+    return this.storageUsed() + extra <= STORAGE_SLOTS;
   }
 
   /** Merge into an existing stack, or take the first empty slot. Gear always uses its own slot. */
   putStorage(k, id, n) {
     n = n | 0;
-    if (n < 1 || !this.canFitStorage(k, id)) return false;
+    if (n < 1 || !this.canFitStorage(k, id, n)) return false;
     const slots = this.data.storage;
     if (k !== 'gear') {
       const have = slots.find((s) => s && s.k === k && s.id === id);
@@ -854,6 +990,17 @@ function normalizeLoad(raw) {
   const id = ARROW_TYPES.includes(q.id) ? q.id : null;
   const n = Math.max(0, Math.min(QUIVER_MAX, q.n | 0));
   return { id, n: id ? n : 0 };
+}
+
+function normalizeMaterials(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object') {
+    for (const id of Object.keys(MATERIALS)) {
+      const n = raw[id] | 0;
+      if (n > 0) out[id] = n;
+    }
+  }
+  return out;
 }
 
 function normalizeGoods(raw) {
