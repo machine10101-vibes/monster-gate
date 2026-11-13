@@ -4,7 +4,7 @@ import { ARROW_TYPES, GOODS, HEADS_PER_BAR, LEVEL_SKILLS, MAX_LEVEL, QUIVER_MAX,
 import { PORTAL_IDS } from '../data/portals.js';
 import { readJson, savesFrozen } from './saveio.js';
 
-const ANON_KEY = 'monster-gate-hunter-v1';
+export const ANON_KEY = 'monster-gate-hunter-v1';
 
 export const STORAGE_SLOTS = 30;
 const POTION_IDS = new Set(['potion', 'manapotion']);

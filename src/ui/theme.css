@@ -64,7 +64,8 @@
 #world-chat .wc-body,
 #world-status,
 #world-wake .ww-card,
-#world-name .wn-card {
+#world-name .wn-card,
+#mg-import .mg-import-card {
   position: relative;
   background:
     var(--mg-tex),
@@ -657,4 +658,54 @@ body.touch #menu-buttons .row.bottom {
 #world-name .wn-go {
   width: 100%;
   min-height: 44px;
+}
+
+/* old-origin save import ------------------------------------------------ */
+#mg-import {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: calc(10vh + var(--safe-t));
+  background: radial-gradient(ellipse at 50% 18%, rgba(11, 21, 36, 0.55), rgba(7, 13, 22, 0.82) 70%);
+}
+#mg-import .mg-import-card {
+  width: min(420px, 88vw);
+  padding: 22px 22px 18px;
+  text-align: center;
+}
+#mg-import small {
+  font-family: var(--font-px);
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--mg-gold-text);
+}
+#mg-import h2 {
+  margin: 10px 0 8px;
+  font-family: var(--font-px);
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--mg-gold-title);
+}
+#mg-import p {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--mg-ink-text);
+}
+#mg-import .mg-import-warn {
+  color: var(--mg-gold-text);
+  font-size: 14px;
+}
+#mg-import .mg-import-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+#mg-import .mg-import-actions .start {
+  width: min(280px, 100%);
+  min-height: 48px;
 }

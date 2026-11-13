@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Monster Gate save restore</title>
+    <style>
+      html, body { margin: 0; background: #0b1524; color: #d5deea; font-family: sans-serif; }
+      p { padding: 24px; }
+    </style>
+  </head>
+  <body>
+    <p>Moving your hunters…</p>
+    <script>
+      /* Keep encode in sync with src/systems/savebridge.js in monster-gate. */
+      const HOME = 'https://monstergate.online';
+      const SAVE_PREFIX = 'monster-gate-';
+      const NAME_KEY = 'mg-name';
+      const QUALITY_KEY = 'mg-quality';
+      const SKIP = new Set(['mg_migrated', 'mg-boot']);
+
+      function isSaveKey(key) {
+        const k = String(key || '');
+        if (!k || SKIP.has(k)) return false;
+        return k.startsWith(SAVE_PREFIX) || k === NAME_KEY || k === QUALITY_KEY;
+      }
+
+      function allowedReturn(raw) {
+        try {
+          const url = new URL(String(raw || ''), HOME);
+          if (url.protocol === 'https:' && url.hostname === 'monstergate.online') return HOME + '/';
+        } catch (e) { /* ignore */ }
+        return HOME + '/';
+      }
+
+      function collect() {
+        const ls = {};
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!isSaveKey(key)) continue;
+            const value = localStorage.getItem(key);
+            if (value != null) ls[key] = value;
+          }
+        } catch (e) { /* private mode */ }
+        return { v: 1, ls: ls };
+      }
+
+      function toBase64Url(bytes) {
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      async function gzipText(text) {
+        const bytes = new TextEncoder().encode(text);
+        const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+      }
+
+      async function encodeBundle(bundle) {
+        return toBase64Url(await gzipText(JSON.stringify(bundle)));
+      }
+
+      (async function go() {
+        const dest = allowedReturn(new URLSearchParams(location.search).get('return'));
+        let payload = 'none';
+        try {
+          const bundle = collect();
+          if (Object.keys(bundle.ls).length) payload = await encodeBundle(bundle);
+        } catch (e) {
+          payload = 'none';
+        }
+        location.replace(dest + '#mgimport=' + payload);
+      })();
+    </script>
+  </body>
+</html>
