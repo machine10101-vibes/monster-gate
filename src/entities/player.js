@@ -669,12 +669,13 @@ export class Player {
     };
     const nx = this.pos.x + dx;
     const nz = this.pos.z + dz;
+    const step = Math.hypot(dx, dz);
     if (fits(nx, nz)) {
       this.pos.x = nx;
       this.pos.z = nz;
-    } else if (fits(nx, this.pos.z)) this.pos.x = nx;
-    else if (fits(this.pos.x, nz)) this.pos.z = nz;
-    else if (dx || dz) {
+    } else if (Math.abs(dx) > step * 0.25 && fits(nx, this.pos.z)) this.pos.x = nx;
+    else if (Math.abs(dz) > step * 0.25 && fits(this.pos.x, nz)) this.pos.z = nz;
+    else if (step > 1e-6) {
       // Both input axes run into the pit or a corner. Step along the obstacle
       // toward the way the hunter is actually holding.
       const len = Math.hypot(dx, dz);
@@ -684,10 +685,11 @@ export class Player {
       const b = fits(this.pos.x - px * len, this.pos.z - pz * len);
       const da = a ? px * dx + pz * dz : -Infinity;
       const db = b ? -px * dx - pz * dz : -Infinity;
-      if (da > 0 && da >= db) {
+      // da == 0 is a head-on wall: step sideways along it instead of stopping.
+      if (a && da >= db && da >= 0) {
         this.pos.x += px * len;
         this.pos.z += pz * len;
-      } else if (db > 0) {
+      } else if (b && db >= 0) {
         this.pos.x -= px * len;
         this.pos.z -= pz * len;
       }
@@ -696,10 +698,24 @@ export class Player {
     this.keepOffLava();
   }
 
-  /** Don't let a lava overhang pull the body into the pool. */
+  /** Don't let a lava overhang pull the body into the pool. A center already in lava steps back onto land. */
   keepOffLava() {
     const w = this.game.world;
     const y = this.pos.y;
+    if (w.lavaAt(this.pos.x, this.pos.z)) {
+      for (let ring = 1; ring <= 6; ring++) {
+        for (let a = 0; a < 8; a++) {
+          const ang = (a / 8) * Math.PI * 2;
+          const nx = this.pos.x + Math.cos(ang) * ring * 0.34;
+          const nz = this.pos.z + Math.sin(ang) * ring * 0.34;
+          if (!w.lavaAt(nx, nz) && w.canStep(nx, nz, y)) {
+            this.pos.x = nx;
+            this.pos.z = nz;
+            return;
+          }
+        }
+      }
+    }
     for (const [ox, oz] of [[R, 0], [-R, 0], [0, R], [0, -R]]) {
       if (!w.lavaAt(this.pos.x + ox, this.pos.z + oz)) continue;
       const nx = this.pos.x - Math.sign(ox) * 0.06;

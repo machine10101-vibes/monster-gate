@@ -106,10 +106,13 @@ export function gradeWalkableHill(H, isLava) {
   }
 }
 
-/** West of the isle the moat stays a lava pit. The rest of that ring is the hill. */
+/**
+ * One lava pool in the southwest of the isle. It sits off the walks from the
+ * west, south, and east, so holding toward Volcanum never dead-ends in it.
+ */
 function approachKeepsLava(x, z, spec) {
   const L = spec.lair;
-  return x < L.cx - 16 && z > L.cz - L.moat && z < L.cz + L.moat;
+  return Math.hypot(x - (L.cx - 26), z - (L.cz + 20)) < 6;
 }
 
 function angDiff(a, b) {
@@ -197,8 +200,9 @@ export function volcanicFeature(h, x, z, spec) {
     const carved = lairFeature(natural, x, z, spec.lair);
     if (carved) out = carved;
   }
-  // The moat used to slice the south face of the cone. A hunter walking at the
-  // peak hit lava and stopped. Give that face back; the pit stays west of the isle.
+  // The moat used to slice the south face of the cone and ring the isle. A hunter
+  // walking at Volcanum hit lava and stopped. The ring is hillside again.
+  if (spec.lair && approachKeepsLava(x, z, spec)) return { h: spec.lair.lavaH, kind: K_LAVA };
   if (out?.kind === K_LAVA && spec.lair && spec.cone) {
     const L = spec.lair;
     const d = Math.hypot(x - L.cx, z - L.cz);
@@ -335,6 +339,9 @@ export function dressVolcanic(world, land, spec) {
   const seed = spec.seed;
   const D = spec.dress;
   const place = (parts, lx, lz, rot, scale, o = {}) => {
+    // Cinderfall's dressing was a field of solid disks. Trunks stay solid.
+    // Anything wider than a body became a wall between the hunter and the dragon.
+    if (spec.lair && o.collide > 0.4) o = { ...o, collide: 0 };
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
     if (!world.free(x, z, o.r ?? 1)) return false;
@@ -408,7 +415,8 @@ export function dressVolcanic(world, land, spec) {
     const { cx, cz, crater } = spec.cone;
     const x = land.x0 + cx + 0.5;
     const z = land.z0 + cz + 0.5;
-    world.circle(x, z, crater * 0.58);
+    // The crater lava already blocks the pit. A solid disk on Cinderfall fenced the rim.
+    if (!spec.lair) world.circle(x, z, crater * 0.58);
     world.occupy(x, z, crater * 1.6);
     world.lightSpots.push({ x, y: world.heightAt(x, z) + 3, z, color: 0xff7a24 });
     world.lightSpots.push({ x: x + 6, y: world.heightAt(x, z) + 3, z: z + 4, color: 0xff5a14 });

@@ -210,7 +210,8 @@ test('a hunter walking at the lava-pit hill from the south actually climbs it', 
   gradeWalkableHill(H, (i) => lava[i] === 1);
   // The south face the hunter walks into is land, and the pit is still there to the west.
   assert.equal(lava[115 * W + 58], 0, 'south face of the hill is lava');
-  assert.equal(lava[102 * W + 28], 1, 'west pit filled in');
+  assert.equal(lava[124 * W + 22], 1, 'lava pool filled in');
+  assert.equal(lava[102 * W + 28], 0, 'old moat still blocks the isle');
   const R = 0.32;
   const hAt = (x, z) => {
     const ix = Math.floor(x);
@@ -252,11 +253,12 @@ test('a hunter walking at the lava-pit hill from the south actually climbs it', 
       dz = (dz / dist) * speed * dt;
       const nx = p.x + dx;
       const nz = p.z + dz;
+      const step = Math.hypot(dx, dz);
       if (fits(nx, nz, p.y)) {
         p.x = nx;
         p.z = nz;
-      } else if (fits(nx, p.z, p.y)) p.x = nx;
-      else if (fits(p.x, nz, p.y)) p.z = nz;
+      } else if (Math.abs(dx) > step * 0.25 && fits(nx, p.z, p.y)) p.x = nx;
+      else if (Math.abs(dz) > step * 0.25 && fits(p.x, nz, p.y)) p.z = nz;
       else if (dx || dz) {
         const len = Math.hypot(dx, dz);
         const px = -dz / len;
@@ -287,6 +289,102 @@ test('a hunter walking at the lava-pit hill from the south actually climbs it', 
   }
 });
 
+test('every side of Cinderfall can walk to Volcanum', () => {
+  const spec = VOLCANIC_SPECS.cinderfall;
+  const W = 144;
+  const L = spec.lair;
+  const noiseAt = (x, z) => {
+    const broad = fbm(x * 0.028, z * 0.026, spec.seed, 4);
+    const mid = fbm(x * 0.07 + 2.2, z * 0.066, spec.seed + 5, 3);
+    const fine = fbm(x * 0.15, z * 0.14, spec.seed + 11, 2);
+    return (broad - 0.42) * spec.amp + (mid - 0.5) * spec.amp * 0.55 + (fine - 0.5) * 0.7;
+  };
+  const H = new Float32Array(W * W);
+  const lava = new Uint8Array(W * W);
+  for (let z = 0; z < W; z++) {
+    for (let x = 0; x < W; x++) {
+      let h = spec.base + noiseAt(x, z);
+      for (const [cx, cz, r, amp] of spec.knolls) {
+        const d = Math.hypot(x - cx, z - cz) / r;
+        if (d < 1) h += amp * (1 - d) * (1 - d);
+      }
+      if (spec.rim.n && z < 14) h += (14 - z) * 0.8;
+      if (spec.rim.w && x < 14) h += (14 - x) * 0.8;
+      const cell = volcanicFeature(h, x, z, spec);
+      if (cell) {
+        h = cell.h;
+        if (cell.kind === K_LAVA) lava[z * W + x] = 1;
+      }
+      H[z * W + x] = Math.round(h * 2) / 2;
+    }
+  }
+  gradeWalkableHill(H, (i) => lava[i] === 1);
+  assert.equal(lava[124 * W + 22], 1, 'lava pool is gone');
+  assert.equal(lava[104 * W + 24], 0, 'west walk to the isle is lava');
+  const R = 0.32;
+  const hAt = (x, z) => H[Math.floor(z) * W + Math.floor(x)];
+  const isLava = (x, z) => {
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    return ix >= 0 && iz >= 0 && ix < W && iz < W && lava[iz * W + ix] === 1;
+  };
+  const canStep = (x, z, y) => {
+    if (x < 1 || z < 1 || x >= W - 1 || z >= W - 1) return false;
+    const h = hAt(x, z);
+    if (h - y > 1.01 || h <= 0.45 || h >= 16.5 || isLava(x, z)) return false;
+    return true;
+  };
+  const fits = (nx, nz, y) => {
+    if (!canStep(nx, nz, y)) return false;
+    for (const [x, z] of [[nx + R, nz], [nx - R, nz], [nx, nz + R], [nx, nz - R]]) {
+      if (canStep(x, z, y)) continue;
+      if (isLava(x, z) && hAt(x, z) - y <= 1.01) continue;
+      return false;
+    }
+    return true;
+  };
+  const goal = [L.cx + 0.5, L.cz + 0.5];
+  const walk = (sx, sz) => {
+    const p = { x: sx, z: sz, y: hAt(sx, sz) };
+    const dt = 1 / 60;
+    for (let f = 0; f < 60 * 50; f++) {
+      let dx = goal[0] - p.x;
+      let dz = goal[1] - p.z;
+      const dist = Math.hypot(dx, dz) || 1;
+      if (dist < 3 && !isLava(p.x, p.z)) return true;
+      dx = (dx / dist) * 4.7 * dt;
+      dz = (dz / dist) * 4.7 * dt;
+      const nx = p.x + dx;
+      const nz = p.z + dz;
+      const step = Math.hypot(dx, dz);
+      if (fits(nx, nz, p.y)) { p.x = nx; p.z = nz; }
+      else if (Math.abs(dx) > step * 0.25 && fits(nx, p.z, p.y)) p.x = nx;
+      else if (Math.abs(dz) > step * 0.25 && fits(p.x, nz, p.y)) p.z = nz;
+      else {
+        const len = Math.hypot(dx, dz);
+        const px = -dz / len;
+        const pz = dx / len;
+        const a = fits(p.x + px * len, p.z + pz * len, p.y);
+        const b = fits(p.x - px * len, p.z - pz * len, p.y);
+        const da = a ? px * dx + pz * dz : -Infinity;
+        const db = b ? -px * dx - pz * dz : -Infinity;
+        if (a && da >= db && da >= 0) { p.x += px * len; p.z += pz * len; }
+        else if (b && db >= 0) { p.x -= px * len; p.z -= pz * len; }
+      }
+      const ground = hAt(p.x, p.z);
+      if (!isLava(p.x, p.z)) {
+        if (ground > p.y) p.y += (ground - p.y) * Math.min(1, dt * 20);
+        else p.y = ground;
+      }
+    }
+    return false;
+  };
+  for (const [x, z] of [[16.5, 104.5], [72.5, 136.5], [130.5, 100.5], [90.5, 30.5], [30.5, 40.5], [110.5, 40.5]]) {
+    assert.equal(isLava(x, z), false, `start ${x},${z} is in lava`);
+    assert.ok(walk(x, z), `from ${x},${z} cannot reach Volcanum`);
+  }
+});
+
 test('the cinderfall lair is a walkable isle inside a lava moat with a bridge', () => {
   const spec = VOLCANIC_SPECS.cinderfall;
   const L = spec.lair;
@@ -295,9 +393,11 @@ test('the cinderfall lair is a walkable isle inside a lava moat with a bridge', 
   const island = volcanicFeature(3.6, L.cx, L.cz, spec);
   assert.equal(island.kind, 0);
   assert.ok(island.h > 5 && island.h < 8.6);
-  const moat = volcanicFeature(3.6, 28, 102, spec);
+  const moat = volcanicFeature(3.6, 22, 124, spec);
   assert.equal(moat.kind, K_LAVA);
   assert.ok(moat.h < 2);
+  const opened = volcanicFeature(3.6, 28, 102, spec);
+  assert.equal(opened.kind, 0);
   const bridge = volcanicFeature(3.6, 66, 106, spec);
   assert.equal(bridge.kind, 0);
   assert.ok(bridge.h > 2);
