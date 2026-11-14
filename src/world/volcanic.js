@@ -73,6 +73,39 @@ function volcAmount(spec, z) {
 /** Steepest grade a hunter can step up. canStep allows 1.01; half-cell rounding needs headroom. */
 const WALK_STEP = 0.7;
 
+/**
+ * The lava moat and the cone above it were a wall: the bank stepped four units
+ * out of the pool, and rounding turned the skirt into one-unit rises the feet
+ * cannot clear. Lower any cell that stands more than half a step above a neighbor,
+ * lava included, so the hill is a ramp from the pool all the way up.
+ */
+export function gradeWalkableHill(H, isLava) {
+  const MAX = 0.5;
+  const side = Math.round(Math.sqrt(H.length));
+  let changed = true;
+  let guard = 0;
+  while (changed && guard++ < side + 2) {
+    changed = false;
+    for (let z = 1; z < side - 1; z++) {
+      for (let x = 1; x < side - 1; x++) {
+        const i = z * side + x;
+        if (isLava(i)) continue;
+        let floor = H[i];
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dz) continue;
+            floor = Math.min(floor, H[(z + dz) * side + (x + dx)] + MAX);
+          }
+        }
+        if (floor < H[i] - 0.001) {
+          H[i] = floor;
+          changed = true;
+        }
+      }
+    }
+  }
+}
+
 function angDiff(a, b) {
   let d = a - b;
   while (d > Math.PI) d -= Math.PI * 2;

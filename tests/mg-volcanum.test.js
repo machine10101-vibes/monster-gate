@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DROPS, GEAR, MATERIALS, MONSTERS, SETS, gearById } from '../src/data/catalog.js';
-import { K_LAVA, VOLCANIC_SPECS, volcanicFeature } from '../src/world/volcanic.js';
+import { readFileSync } from 'node:fs';
+import { K_LAVA, VOLCANIC_SPECS, gradeWalkableHill, volcanicFeature } from '../src/world/volcanic.js';
 import { buildVolcanumDragon } from '../src/entities/volcanum.js';
 import { MONSTER_STATS } from '../src/entities/monsters.js';
 import { buildProjectileMesh } from '../src/systems/skillfx.js';
@@ -88,6 +89,87 @@ test('a hunter can walk the cinderfall cone and the causeway onto the isle', () 
     }
   }
   assert.ok(climbed > 20, `south face of the cone stays a cliff (${climbed})`);
+});
+
+test('the lava pool hill is a half-step ramp a hunter can climb', () => {
+  const spec = VOLCANIC_SPECS.cinderfall;
+  const W = 144;
+  const H = new Float32Array(W * W);
+  const lava = new Uint8Array(W * W);
+  for (let z = 0; z < W; z++) {
+    for (let x = 0; x < W; x++) {
+      const cell = volcanicFeature(3.6, x, z, spec);
+      H[z * W + x] = cell ? Math.round(cell.h * 2) / 2 : 3.6;
+      if (cell?.kind === K_LAVA) lava[z * W + x] = 1;
+    }
+  }
+  gradeWalkableHill(H, (i) => lava[i] === 1);
+  for (let z = 1; z < W - 1; z++) {
+    for (let x = 1; x < W - 1; x++) {
+      const i = z * W + x;
+      if (lava[i]) continue;
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dz) continue;
+          const rise = H[i] - H[(z + dz) * W + (x + dx)];
+          assert.ok(rise <= 0.5 + 1e-6, `cliff at ${x},${z} rises ${rise}`);
+        }
+      }
+    }
+  }
+  const R = 0.32;
+  const seen = new Uint8Array(W * W);
+  const q = [];
+  for (let x = 30; x < 120; x++) {
+    const z = 138;
+    if (lava[z * W + x]) continue;
+    seen[z * W + x] = 1;
+    q.push(z * W + x);
+  }
+  const canEnter = (nx, nz, fromY) => {
+    for (const [x, z] of [[nx, nz], [nx + R, nz], [nx - R, nz], [nx, nz + R], [nx, nz - R]]) {
+      const ix = Math.floor(x);
+      const iz = Math.floor(z);
+      if (ix < 1 || iz < 1 || ix >= W - 1 || iz >= W - 1) return false;
+      const j = iz * W + ix;
+      if (lava[j] || H[j] <= 0.45 || H[j] >= 16.5) return false;
+      if (H[j] - fromY > 1.01) return false;
+    }
+    return true;
+  };
+  for (let qi = 0; qi < q.length; qi++) {
+    const i = q[qi];
+    const x = i % W;
+    const z = (i - x) / W;
+    const y = H[i] - 0.2;
+    for (let a = 0; a < 8; a++) {
+      const ang = (a / 8) * Math.PI * 2;
+      const nx = x + 0.5 + Math.cos(ang) * 0.85;
+      const nz = z + 0.5 + Math.sin(ang) * 0.85;
+      const jx = Math.floor(nx);
+      const jz = Math.floor(nz);
+      const j = jz * W + jx;
+      if (seen[j] || !canEnter(nx, nz, y)) continue;
+      seen[j] = 1;
+      q.push(j);
+    }
+  }
+  let hill = 0;
+  let west = 0;
+  for (let z = 0; z < W; z++) {
+    for (let x = 0; x < W; x++) {
+      if (!seen[z * W + x]) continue;
+      const h = H[z * W + x];
+      if (z < spec.lair.cz - spec.lair.moat && h >= 9) hill++;
+      if (x < spec.lair.cx && h >= 9) west++;
+    }
+  }
+  assert.ok(hill > 30, `north side of the lava pool stays a wall (${hill})`);
+  assert.ok(west > 10, `west side of the lava pool hill stays closed (${west})`);
+  const worldSrc = readFileSync(new URL('../src/world/world.js', import.meta.url), 'utf8');
+  const ringSrc = readFileSync(new URL('../src/world/ring.js', import.meta.url), 'utf8');
+  assert.match(ringSrc, /gradeWalkableHill\(H,/);
+  assert.doesNotMatch(worldSrc, /coneX <= 24/);
 });
 
 test('the cinderfall lair is a walkable isle inside a lava moat with a bridge', () => {
