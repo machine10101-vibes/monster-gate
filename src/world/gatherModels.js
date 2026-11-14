@@ -1,6 +1,7 @@
 import { VoxelModel, hash3, jitter, mix, shade } from '../engine/voxel.js';
 import { bundle } from './models.js';
 import { METALS } from '../data/metals.js';
+import { WOODS } from '../data/woods.js';
 
 const J = (c, x, y, z, s = 0, a = 0.07) => jitter(c, a, hash3(x, y, z, s));
 
@@ -647,6 +648,11 @@ const WOOD = {
   oak: { bark: 0x6a4529, barkHi: 0x8a5a34, cut: 0xd9b27a, heart: 0xc49555, ring: 0x8a5a30 },
   maple: { bark: 0x6e3824, barkHi: 0x8a4630, cut: 0xe2b070, heart: 0xc48448, ring: 0x5a2818 },
 };
+for (const w of WOODS) {
+  WOOD[w.id] = {
+    bark: w.bark, barkHi: w.barkHi, barkDark: w.barkDark, cut: w.cut, heart: w.heart, ring: w.ring, mark: w.mark,
+  };
+}
 
 /** Fresh-cut stump left when a tree is felled. */
 export function buildWoodStump(kind, seed = 1) {
@@ -661,8 +667,14 @@ export function buildWoodStump(kind, seed = 1) {
         if (d > r) continue;
         if (y === 4) {
           const band = Math.floor(d);
-          M.set(x, y, z, d < 1.2 ? w.heart : band % 2 === 0 ? w.cut : shade(w.cut, 0.86));
+          const ang = Math.atan2(z + 0.5 - c, x + 0.5 - c);
+          if (w.mark === 'stripe') M.set(x, y, z, Math.sin(ang * 8) > 0 ? w.heart : w.barkDark || w.ring);
+          else if (w.mark === 'swirl') M.set(x, y, z, Math.sin(ang * 4 + d) > 0 ? w.heart : w.ring);
+          else if (w.mark === 'heartwood' && d < 2.4) M.set(x, y, z, w.heart);
+          else M.set(x, y, z, d < 1.2 ? w.heart : band % 2 === 0 ? w.cut : shade(w.cut, 0.86));
         } else if (kind === 'birch' && y === 3) M.set(x, y, z, 0x2a2622);
+        else if (w.mark === 'eyes' && y === 3 && hash3(x, y, z, seed) > 0.72) M.set(x, y, z, 0x1a1612);
+        else if (w.mark === 'stripe' && Math.sin(Math.atan2(z + 0.5 - c, x + 0.5 - c) * 6 + y) > 0.2) M.set(x, y, z, w.barkHi);
         else M.set(x, y, z, J(shade(w.bark, hash3(x, 0, z, seed) > 0.6 ? 0.86 : 1), x, y, z, seed, 0.08));
       }
   }
@@ -708,8 +720,10 @@ export function buildCampfire(kind = 'birch') {
 }
 
 function logStack(kind) {
-  const w = WOOD[kind];
-  const seed = kind === 'birch' ? 11 : kind === 'maple' ? 13 : 12;
+  const w = WOOD[kind] || WOOD.oak;
+  let seed = 12;
+  for (let i = 0; i < kind.length; i++) seed = (seed * 33 + kind.charCodeAt(i)) >>> 0;
+  seed %= 97;
   const M = new VoxelModel(24, 16, 16);
   const one = (y0, z0) => {
     for (let x = 2; x < 22; x++)
@@ -722,6 +736,10 @@ function logStack(kind) {
           const ring = Math.hypot(dy, dz);
           let c = end ? (ring < 1.15 ? w.heart : ring < 2 ? w.cut : w.ring) : y === 4 ? w.barkHi : w.bark;
           if (!end && kind === 'birch' && y === 1 && z === 2 && x % 4 === 0) c = 0x2a2622;
+          else if (!end && w.mark === 'stripe' && (x + y) % 3 === 0) c = w.barkHi;
+          else if (!end && w.mark === 'heartwood' && y === 2 && x % 5 === 0) c = w.heart;
+          else if (!end && w.mark === 'swirl' && (x + z) % 4 === 0) c = w.heart;
+          else if (!end && w.mark === 'eyes' && y === 1 && x % 5 === 0) c = 0x1a1612;
           M.set(x, y0 + y, z0 + z, J(c, x, y, z, seed, 0.06));
         }
   };
@@ -809,12 +827,14 @@ const GOODS_MODELS = {
   birch_logs: () => logStack('birch'),
   oak_logs: () => logStack('oak'),
   maple_logs: () => logStack('maple'),
+  ...Object.fromEntries(WOODS.map((w) => [`${w.id}_logs`, () => logStack(w.id)])),
   ...Object.fromEntries(METALS.map((m) => [m.barId, () => tintBar(m.theme.plateHi, m.theme.plateLo)])),
   arrowhead: arrowHead,
   feather,
   birch_shaft: () => arrowShaft('birch'),
   oak_shaft: () => arrowShaft('oak'),
   maple_shaft: () => arrowShaft('maple'),
+  ...Object.fromEntries(WOODS.map((w) => [`${w.id}_shaft`, () => arrowShaft(w.id)])),
   arrow_shaft: () => arrowShaft('birch'),
   iron_arrow: ironArrow,
   quiver: quiverModel,

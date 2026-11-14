@@ -21,7 +21,8 @@ import { buildSmithy as makeSmithy } from './smithy.js';
 import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { placeTeleportPortals } from './teleport.js';
-import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
+import { FISH_SPOTS, WOOD_GROVES, buildGatherSites, scatterWorldWoods } from './gatherSite.js';
+import { WOOD_INK } from '../data/woods.js';
 
 const CH = 16;
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -386,6 +387,7 @@ export class World {
     dressRing(this);
     this.cave = buildCave(this);
     this.rift = buildRift(this);
+    scatterWorldWoods(this);
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
@@ -1247,10 +1249,13 @@ export class World {
     }
     const oak = this.tileCanvas[STARTER.id];
     const octx = oak.getContext('2d');
-    const woodInk = { birch: '#f4efe4', oak: '#3f9f47', maple: '#e24a22' };
     for (const n of this.treeNodes || []) {
-      octx.fillStyle = woodInk[n.type] || '#7dcc4a';
-      octx.fillRect(Math.floor(n.x) - 1, Math.floor(n.z) - 1, 3, 3);
+      const land = this.landAt(n.x, n.z);
+      const canvas = land && this.tileCanvas[land.tileId];
+      if (!canvas) continue;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = WOOD_INK[n.type] || '#7dcc4a';
+      ctx.fillRect(Math.floor(n.x - land.x0) - 1, Math.floor(n.z - land.z0) - 1, 3, 3);
     }
     if (this.waygate) {
       octx.fillStyle = '#7ef6ff';

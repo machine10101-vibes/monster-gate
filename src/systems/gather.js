@@ -468,7 +468,7 @@ export class Gathering {
       tree = owned[0] || null;
       if (!tree) {
         const any = Object.values(TREES).some((t) => g.progress.good(t.log) > 0);
-        g.hud.toast(any ? 'Those logs need a higher Firemaking level.' : 'You need logs. Chop birch, oak or maple west of town.', 2400);
+        g.hud.toast(any ? 'Those logs need a higher Firemaking level.' : 'You need logs. Chop the trees.', 2400);
         return false;
       }
     }

@@ -1066,7 +1066,7 @@ function mountMarket(body, game) {
     if (!any) {
       const p = document.createElement('p');
       p.className = 'bag-empty';
-      p.textContent = 'You have nothing to sell. Mine the Greyrock Pit, fish Mirrormere, or chop birch, oak and maple west of town.';
+      p.textContent = 'You have nothing to sell. Mine the Greyrock Pit, fish Mirrormere, or chop the trees.';
       body.appendChild(p);
     } else {
       const all = document.createElement('button');

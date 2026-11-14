@@ -1,11 +1,14 @@
 import * as THREE from 'three';
-import { DOCK, LAKE, MINE, TOWN, WATER_Y, ZONE } from './terrain.js';
+import { RNG } from '../engine/voxel.js';
+import { DOCK, LAKE, MINE, TOWN, W, WATER_Y, ZONE } from './terrain.js';
 import { FISH } from '../data/gathering.js';
-import { SAND_MINE } from './desert.js';
+import { WOODS, WOOD_BY_ID } from '../data/woods.js';
+import { OASIS, SAND_MINE } from './desert.js';
 import { originOf, TILES } from './tiles.js';
-import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock, buildWoodStump } from './gatherModels.js';
+import { buildDock, buildMineCart, buildMineFrame, buildOrePile, buildOreRock, buildWoodStump, goodsVoxels } from './gatherModels.js';
 import { buildOak } from './models.js';
-import { goodsVoxels } from './gatherModels.js';
+import { buildWoodTree } from './woodTrees.js';
+import { EXOTIC_KINDS, landKindOf, sampleWoodLocal, woodSpotOk } from './woodSpawn.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
 
@@ -330,9 +333,10 @@ function buildWoods(world) {
   const treeGroup = (type, seed) => {
     const key = type + (seed % 2);
     if (!variants[key]) {
-      const kind = type === 'oak' ? 'green' : type;
+      const spec = WOOD_BY_ID[type];
+      const parts = spec ? buildWoodTree(seed + 3, spec) : buildOak(seed + 3, type === 'oak' ? 'green' : type);
       variants[key] = {
-        full: partsToGroup(world, buildOak(seed + 3, kind)),
+        full: partsToGroup(world, parts),
         stump: partsToGroup(world, buildWoodStump(type, seed + 3)),
       };
     }
@@ -403,6 +407,118 @@ function buildWoods(world) {
   }
   world.treeNodes = nodes;
   world.woodGroves = WOOD_GROVES;
+}
+
+function cellPath(data, lx, lz, r) {
+  for (let z = Math.max(0, lz - r); z <= Math.min(W - 1, lz + r); z++)
+    for (let x = Math.max(0, lx - r); x <= Math.min(W - 1, lx + r); x++)
+      if (data.pathMask[z * W + x]) return true;
+  return false;
+}
+
+/**
+ * Scatter the newer woods across every built land.
+ * Tier 4 is limited to high-level monster ground. Called after the lands are dressed
+ * so keeps, nests and yards already occupy their footprints.
+ */
+export function scatterWorldWoods(world) {
+  const rng = new RNG(20261114);
+  const nodes = world.treeNodes || [];
+  const taken = nodes.map((n) => ({ x: n.x, z: n.z }));
+  const variants = {};
+  const treeGroup = (type, seed) => {
+    const key = type + (seed % 2);
+    if (!variants[key]) {
+      variants[key] = {
+        full: partsToGroup(world, buildWoodTree(seed + 3, WOOD_BY_ID[type])),
+        stump: partsToGroup(world, buildWoodStump(type, seed + 3)),
+      };
+    }
+    const full = variants[key].full.clone(true);
+    const stump = variants[key].stump.clone(true);
+    stump.visible = false;
+    return { full, stump };
+  };
+  const lands = (world.lands || []).map((land) => ({ land, kind: landKindOf(land) })).filter((row) => row.kind);
+  for (const wood of WOODS) {
+    const pool = lands.filter((row) => wood.tier < 4 || EXOTIC_KINDS.has(row.kind));
+    if (!pool.length) continue;
+    let placed = 0;
+    let guard = 0;
+    const gap = wood.tier >= 4 ? 6.2 : 4.2;
+    while (placed < wood.scatter && guard < wood.scatter * 90) {
+      const { land, kind } = pool[(placed * 5 + guard) % pool.length];
+      guard++;
+      const local = sampleWoodLocal(kind, rng, wood.tier);
+      const { lx, lz } = local;
+      const data = land.data;
+      const i = lz * W + lx;
+      if (!data?.H || i < 0 || i >= data.H.length) continue;
+      const x = land.x0 + lx + 0.5;
+      const z = land.z0 + lz + 0.5;
+      if (!woodSpotOk(wood, {
+        kind,
+        lx,
+        lz,
+        h: data.H[i],
+        slope: data.slope ? data.slope[i] : 0,
+        zone: data.zone[i],
+        path: cellPath(data, lx, lz, wood.tier >= 4 ? 3 : 2),
+        top: data.top[i],
+        blocked: false,
+      })) continue;
+      if (!world.playable(x, z) || world.onDock(x, z, 2.2)) continue;
+      if (WOOD_GROVES.some((g) => Math.hypot(x - g.x, z - g.z) < g.r + 2)) continue;
+      if (Math.hypot(x - OASIS.x, z - OASIS.z) < OASIS.r + 8) continue;
+      if (Math.hypot(x - SAND_MINE.x, z - SAND_MINE.z) < SAND_MINE.rimR + 3) continue;
+      if (world.waygate && Math.hypot(x - world.waygate.x, z - world.waygate.z) < 7) continue;
+      if ((world.teleports || []).some((p) => Math.hypot(x - p.x, z - p.z) < 6)) continue;
+      if ((world.jungle?.yards || []).some((a) => Math.hypot(x - a.x, z - a.z) < (a.r || 8) + 3)) continue;
+      if (taken.some((s) => Math.hypot(s.x - x, s.z - z) < gap)) continue;
+      if (!world.free(x, z, 1.8)) continue;
+      const h = data.H[i];
+      let stand = null;
+      for (let t = 0; t < 8; t++) {
+        const ang = t * 0.8 + 0.4;
+        const sx = x + Math.cos(ang) * 1.65;
+        const sz = z + Math.sin(ang) * 1.65;
+        const sh = world.heightAt(sx, sz);
+        if (sh < 0.9 || sh > 8.7 || Math.abs(sh - h) > 1.2) continue;
+        if (!world.playable(sx, sz)) continue;
+        stand = { x: sx, z: sz };
+        break;
+      }
+      if (!stand) continue;
+      const { full, stump } = treeGroup(wood.id, placed + wood.level);
+      const root = new THREE.Group();
+      root.position.set(x, h, z);
+      root.rotation.y = hashAngle(placed * 5 + wood.level);
+      root.scale.setScalar(wood.form === 'conifer' ? 0.72 : 0.68);
+      root.add(full, stump);
+      world.group.add(root);
+      world.circle(x, z, 0.48);
+      world.occupy(x, z, 1.55);
+      const node = {
+        id: `${wood.id}${placed}`,
+        type: wood.id,
+        x,
+        z,
+        y: h,
+        standX: stand.x,
+        standZ: stand.z,
+        root,
+        full,
+        dead: stump,
+        ready: true,
+        respawnT: 0,
+        pop: 0,
+      };
+      nodes.push(node);
+      taken.push(node);
+      placed++;
+    }
+  }
+  world.treeNodes = nodes;
 }
 
 function buildDeepwellMine(world) {
