@@ -4700,13 +4700,13 @@ html:has(#panel:not(.hidden)) #debug-badge {
 }
 .bag.rs .bag-grid,
 .bag.rs .bag-grid.slots {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 2px;
 }
 .bag.rs .bag-cell {
   aspect-ratio: 1;
   min-height: 0;
-  padding: 2px;
+  padding: 1px;
   gap: 0;
   border-radius: 1px;
   border: 1px solid #3d3226;
@@ -4744,7 +4744,7 @@ html:has(#panel:not(.hidden)) #debug-badge {
   background: none;
   border-radius: 0;
   color: #ffe56a;
-  font-size: 11px;
+  font-size: 9px;
   line-height: 1;
   text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
 }
@@ -4820,8 +4820,8 @@ body.touch .panel-card.wide.bag-sheet {
 body.touch .bag.rs .bag-scroll { max-height: none; }
 body.touch .bag.rs .bag-grid,
 body.touch .bag.rs .bag-grid.slots {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
 }
 body.touch .bag.rs .bag-cell,
 body.touch .bag.rs .bag-cell.empty {
