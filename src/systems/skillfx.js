@@ -9,6 +9,7 @@ const ICE = [0xffffff, 0xd7f4ff, 0x8fd4ff];
 const ZAP = [0xffffff, 0xd9ffff, 0x4ad0ff];
 const VOID = [0xf0c8ff, 0xb25cff, 0x6a2cc8];
 const TOXIN = [0xd7ffb0, 0x8fe35a, 0x4aa83a];
+const HOLY = [0xfffef6, 0xfff6c4, 0xffe08a, 0xfff2d0];
 
 /* ------------------------------------------------------------------ */
 /* projectile looks                                                   */
@@ -33,6 +34,10 @@ const STYLES = {
   snipe: { c1: 0x8fe4ff, size: 1.8, trail: [0xaee9ff, 0.26, 0.5], sparks: [0xffffff, 0x8fe4ff], rate: 36, arrow: { tip: 0xffffff, fletch: 0x8fe4ff, thick: 1.3 } },
   arrow: { c1: 0xfff2d0, size: 0, trail: [0xfff2d0, 0.09, 0.14], rate: 0, arrow: { tip: 0xdfe6ee, fletch: 0xf2efe6 } },
   stone: { c1: 0xd9c9a0, size: 0, trail: [0xd9c9a0, 0.12, 0.2], rate: 0 },
+  holybolt: { core: 0xfffef6, c1: 0xffe08a, size: 2.3, trail: [0xffe9a0, 0.42, 0.34], sparks: HOLY, rate: 58, light: 0xffe08a, coreSize: 0.3 },
+  smite: { core: 0xfffef6, c1: 0xffe08a, size: 2.3, trail: [0xffe9a0, 0.42, 0.34], sparks: HOLY, rate: 58, light: 0xffe08a, coreSize: 0.3 },
+  holyshield: { core: 0xfff6d0, c1: 0xffd98a, size: 2.5, trail: [0xffe9a0, 0.36, 0.32], sparks: HOLY, rate: 42, light: 0xffe08a, coreSize: 0.16, shield: true },
+  avengershield: { core: 0xfff6d0, c1: 0xffd98a, size: 2.5, trail: [0xffe9a0, 0.36, 0.32], sparks: HOLY, rate: 42, light: 0xffe08a, coreSize: 0.16, shield: true },
 };
 
 function styleOf(p) {
@@ -62,6 +67,19 @@ export function buildProjectileMesh(o) {
   }
   if (kind === 'stone') {
     g.add(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: 0xa9a9b2 })));
+    return g;
+  }
+  if (st.shield || kind === 'holyshield') {
+    const face = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.72, 0.08), new THREE.MeshBasicMaterial({ color: 0xfff6d0 }));
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.84, 0.04), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
+    rim.position.z = -0.02;
+    const boss = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.12), new THREE.MeshBasicMaterial({ color: 0xfffef6 }));
+    boss.position.z = 0.06;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.46, 0.06), new THREE.MeshBasicMaterial({ color: 0xfffef6 }));
+    const bar2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.06), new THREE.MeshBasicMaterial({ color: 0xfffef6 }));
+    bar.position.z = 0.05;
+    bar2.position.z = 0.05;
+    g.add(rim, face, boss, bar, bar2);
     return g;
   }
   if (kind === 'crescent') {
@@ -178,6 +196,14 @@ export function endProjectile(game, p, ground) {
       vfx.ring(x, y, z, { axis: 'cam', color: 0xffd23f, r0: 0.1, r1: 0.8, life: 0.2, thick: 0.2 });
       vfx.sparks(x, y, z, [0xffffff, 0xffd23f], 6, 5, 0.06, 0.3, 6);
       break;
+    case 'smite':
+    case 'holybolt':
+      holyBurst(game, x, y, z, 1.05);
+      break;
+    case 'avengershield':
+    case 'holyshield':
+      holyBurst(game, x, y, z, 1.35);
+      break;
     case 'stone':
       game.fx.dust(x, y, z, 4, 1, 0xb8b0a0);
       break;
@@ -189,6 +215,16 @@ export function endProjectile(game, p, ground) {
 /* ------------------------------------------------------------------ */
 /* shared bursts                                                      */
 /* ------------------------------------------------------------------ */
+
+export function holyBurst(game, x, y, z, s = 1) {
+  const v = game.vfx;
+  v.glow(x, y, z, 0xffffff, 1.5 * s, 0.12, { grow: 0.55 });
+  v.glow(x, y, z, 0xffe08a, 2.7 * s, 0.3, { grow: 0.75 });
+  v.ring(x, y, z, { axis: 'cam', color: 0xfff6c4, r0: 0.1, r1: 1.15 * s, life: 0.28, thick: 0.16 });
+  v.ring(x, y, z, { axis: 'cam', color: 0xffffff, r0: 0.05, r1: 0.7 * s, life: 0.18, thick: 0.22, delay: 0.04 });
+  v.sparks(x, y, z, HOLY, Math.round(12 * s), 5, 0.06, 0.5, 8);
+  v.prism(x, y - 0.35, z, { w: 0.26 * s, h: 1.7 * s, segs: 4, color: 0xffe08a, core: 0xfffef6, rise: 0.08, hold: 0.08, fall: 0.28, taper: 0.5, alpha: 0.5 });
+}
 
 export function iceBurst(game, x, y, z, s = 1) {
   const v = game.vfx;
@@ -774,6 +810,123 @@ export const SKILLFX = {
     v.sparks(x, y + 0.5, z, ZAP, 28, 8, 0.08, 0.6, 4, 1, 0.5);
     v.scorch(x, z, radius * 0.8, 0x101018, 0.5, 5);
     v.flash(x, y + 2, z, 0xaee4ff, 9, 0.4);
+  },
+
+  layhands(game, p) {
+    const v = game.vfx;
+    const x = p.pos.x;
+    const y = p.pos.y;
+    const z = p.pos.z;
+    v.prism(x, y, z, { w: 0.7, h: 3.2, segs: 6, color: 0xffe08a, core: 0xfffef6, rise: 0.16, hold: 0.18, fall: 0.45, taper: 0.35, alpha: 0.55, flicker: true });
+    v.ring(x, y + 0.12, z, { color: 0xfff6c4, r0: 0.2, r1: 1.8, life: 0.45, thick: 0.14, fill: 0.35 });
+    v.ring(x, y + 0.9, z, { axis: 'cam', color: 0xffffff, r0: 0.15, r1: 1.15, life: 0.35, thick: 0.16 });
+    v.glow(x, y + 1.2, z, 0xffe08a, 3.2, 0.4, { grow: 0.6 });
+    v.glow(x, y + 1.6, z, 0xffffff, 1.6, 0.22, { grow: 0.4 });
+    for (let i = 0; i < v.n(14); i++) {
+      const a = (i / 14) * TAU;
+      v.spark(x + Math.cos(a) * 0.45, y + 0.2, z + Math.sin(a) * 0.45, Math.cos(a) * 0.4, R(2.2, 4.2), Math.sin(a) * 0.4, i % 2 ? 0xfffef6 : 0xffe08a, 0.08, 0.7, -0.4, 1);
+    }
+  },
+
+  smite(game, p) {
+    const v = game.vfx;
+    const h = handPos(p);
+    const f = p.facing;
+    v.glow(h.x, h.y, h.z, 0xfffef6, 1.5, 0.12, { grow: 0.5 });
+    v.glow(h.x, h.y, h.z, 0xffe08a, 2.6, 0.26, { grow: 0.6 });
+    v.streak({ x: h.x, y: h.y, z: h.z }, { x: h.x + f.x * 14, y: h.y, z: h.z + f.z * 14 }, { color: 0xfff6c4, width: 0.16, life: 0.22 });
+    v.ring(h.x + f.x * 0.45, h.y, h.z + f.z * 0.45, { axis: f, color: 0xffe08a, r0: 0.08, r1: 0.9, life: 0.2, thick: 0.2 });
+    v.sparks(h.x, h.y, h.z, HOLY, 12, 5, 0.07, 0.4, 4);
+    v.flash(h.x, h.y, h.z, 0xfff6c4, 2.4, 0.16);
+  },
+
+  consecration(game, p, radius) {
+    const v = game.vfx;
+    const x = p.pos.x;
+    const y = p.pos.y;
+    const z = p.pos.z;
+    v.ring(x, y + 0.12, z, { color: 0xffe08a, r0: 0.3, r1: radius * 1.15, life: 0.5, thick: 0.12, fill: 0.25 });
+    v.ring(x, y + 0.16, z, { color: 0xfffef6, r0: 0.2, r1: radius * 0.72, life: 0.4, thick: 0.1, delay: 0.06 });
+    v.prism(x, y, z, { w: 0.45, h: 2.6, segs: 5, color: 0xffe08a, core: 0xfffef6, rise: 0.14, hold: 0.12, fall: 0.4, taper: 0.45, alpha: 0.4 });
+    v.glow(x, y + 0.4, z, 0xffe08a, radius * 1.6, 0.45, { grow: 0.4, gain: 0.7 });
+    v.sparks(x, y + 0.2, z, HOLY, 18, 3.5, 0.08, 0.8, -0.2, 2, 0.6);
+  },
+
+  crusader(game, p, reach, heavy) {
+    const v = game.vfx;
+    const f = p.facing;
+    const yaw = yawOf(f);
+    const y = p.pos.y + 1.05;
+    v.slashArc(p.pos.x, y, p.pos.z, yaw, { radius: reach * 0.92, thick: heavy ? 0.85 : 0.55, sweep: heavy ? 2.6 : 2.15, color: 0xffe08a, hot: 0xfffef6, life: 0.28, sweepT: 0.14, tail: 0.9, tilt: heavy ? 0.35 : 0.1 });
+    v.slashArc(p.pos.x, y - 0.15, p.pos.z, yaw, { radius: reach * 0.78, thick: 0.28, sweep: 2.0, color: 0xfff6c4, hot: 0xffffff, life: 0.22, sweepT: 0.12, delay: 0.02 });
+    const gx = p.pos.x + f.x * reach * 0.7;
+    const gz = p.pos.z + f.z * reach * 0.7;
+    v.glow(gx, y, gz, 0xffe08a, heavy ? 2.4 : 1.6, 0.22, { grow: 0.45 });
+    v.sparks(gx, p.pos.y + 0.4, gz, HOLY, heavy ? 16 : 10, 5, 0.07, 0.4, 6);
+    if (heavy) v.ring(gx, game.world.heightAt(gx, gz) + 0.1, gz, { color: 0xffe08a, r0: 0.15, r1: 1.5, life: 0.28, thick: 0.14, fill: 0.2 });
+  },
+
+  judgment(game, p, reach, heavy) {
+    const v = game.vfx;
+    const f = p.facing;
+    const y = p.pos.y;
+    v.slashArc(p.pos.x, y + 1.2, p.pos.z, yawOf(f), { radius: reach * 0.72, thick: 0.42, sweep: 0.9, color: 0xfff6c4, hot: 0xffffff, life: 0.26, sweepT: 0.12, tilt: 1.15, tail: 0.85 });
+    const steps = heavy ? 6 : 4;
+    for (let i = 1; i <= steps; i++) {
+      const d = (reach / steps) * i;
+      const px = p.pos.x + f.x * d;
+      const pz = p.pos.z + f.z * d;
+      const gy = game.world.heightAt(px, pz);
+      v.prism(px, gy, pz, { w: 0.28 + i * 0.03, h: 1.1 + i * 0.18, segs: 4, color: 0xffe08a, core: 0xfffef6, delay: i * 0.035, rise: 0.08, hold: 0.08, fall: 0.28, flicker: true });
+      v.glow(px, gy + 0.5, pz, 0xffe08a, 1.4, 0.22, { delay: i * 0.035, grow: 0.4 });
+    }
+    v.flash(p.pos.x + f.x * reach * 0.6, y + 1.1, p.pos.z + f.z * reach * 0.6, 0xfff6c4, heavy ? 3.2 : 2.2, 0.18);
+  },
+
+  divinestorm(game, p, radius) {
+    SKILLFX.whirlwind(game, p, radius, 0xffe08a, 0xfffef6);
+    const v = game.vfx;
+    v.slashArc(p.pos.x, p.pos.y + 1.35, p.pos.z, yawOf(p.facing), { radius: radius * 0.88, thick: radius * 0.28, sweep: 5.4, color: 0xfff6c4, hot: 0xffffff, life: 0.4, sweepT: 0.24, tilt: 0.45, follow: () => p.pos, lift: 1.35 });
+    v.prism(p.pos.x, p.pos.y, p.pos.z, { w: 0.35, h: 2.8, segs: 6, color: 0xffe08a, core: 0xfffef6, rise: 0.12, hold: 0.1, fall: 0.35, alpha: 0.35 });
+    v.sparks(p.pos.x, p.pos.y + 0.8, p.pos.z, HOLY, 20, 6, 0.07, 0.5, 3);
+  },
+
+  faithshield(game, p, dur) {
+    const v = game.vfx;
+    v.dome(() => p.pos, { radius: 1.5, color: 0xffe08a, life: dur, lift: 0.95 });
+    v.ring(p.pos.x, p.pos.y + 0.1, p.pos.z, { color: 0xffe08a, r0: 0.25, r1: 2.1, life: 0.45, thick: 0.12, fill: 0.22 });
+    v.glow(p.pos.x, p.pos.y + 1, p.pos.z, 0xfff6c4, 3.1, 0.32, { grow: 0.5 });
+    v.sparks(p.pos.x, p.pos.y + 0.3, p.pos.z, HOLY, 12, 3, 0.07, 0.55, -1, 2, 1);
+  },
+
+  avengershield(game, p) {
+    const v = game.vfx;
+    const f = p.facing;
+    const h = handPos(p);
+    v.glow(h.x, h.y, h.z, 0xffe08a, 2.2, 0.18, { grow: 0.5 });
+    v.ring(h.x, h.y, h.z, { axis: f, color: 0xfff6c4, r0: 0.1, r1: 1.15, life: 0.22, thick: 0.22 });
+    v.streak({ x: h.x, y: h.y, z: h.z }, { x: h.x + f.x * 10, y: h.y, z: h.z + f.z * 10 }, { color: 0xffe08a, width: 0.22, life: 0.2 });
+    v.sparks(h.x, h.y, h.z, HOLY, 8, 4, 0.06, 0.35, 5);
+  },
+
+  divineprotection(game, p, dur) {
+    const v = game.vfx;
+    v.dome(() => p.pos, { radius: 1.7, color: 0xfff6c4, life: dur, lift: 1.05 });
+    v.prism(p.pos.x, p.pos.y, p.pos.z, { w: 1.15, h: 3.6, segs: 6, color: 0xffe08a, core: 0xfffef6, rise: 0.16, hold: 0.12, fall: 0.4, taper: 0.35, alpha: 0.35, flicker: true });
+    v.ring(p.pos.x, p.pos.y + 0.12, p.pos.z, { color: 0xfffef6, r0: 0.3, r1: 2.5, life: 0.5, thick: 0.12, fill: 0.2 });
+    v.glow(p.pos.x, p.pos.y + 1.1, p.pos.z, 0xffe08a, 3.6, 0.4, { grow: 0.55 });
+    const t0 = game.time || 0;
+    v.add({
+      update: (dt, self) => {
+        if (self.t > dur || (p.faithT || 0) <= 0) return false;
+        const a = ((game.time || t0) - t0) * 1.8;
+        for (let i = 0; i < 3; i++) {
+          const aa = a + (i / 3) * TAU;
+          v.glowNow(p.pos.x + Math.cos(aa) * 1.25, p.pos.y + 1.15 + Math.sin(aa * 1.4) * 0.15, p.pos.z + Math.sin(aa) * 1.25, i === 0 ? 0xfffef6 : 0xffe08a, 0.85, 0.9);
+        }
+        return true;
+      },
+    });
   },
 };
 

@@ -175,6 +175,65 @@ mage.weapons = [
   { id: 'tome', name: 'Spell Book', max: 3, blurb: 'Spell books add 7% spell damage, 6 spirit, and 3% crit each rank.', rankText: (n) => `+${n * 7}% spell damage, +${n * 6} spirit, +${n * 3}% crit` },
 ];
 
+const paladin = {
+  id: 'paladin',
+  name: 'Paladin',
+  blurb: 'An oath of light. Heal the wounded, smite the wicked, and hold the line.',
+  resource: 'mana',
+  color: '#f0d48a',
+  paths: [
+    {
+      id: 'holy',
+      name: 'Holy',
+      color: '#ffe08a',
+      skills: [
+        { id: 'devotion', name: 'Devotion', kind: 'passive', cost: 1, shape: 'cross', desc: 'Smite and holy healing are 12% stronger. +8 spirit and +4 health.' },
+        { id: 'layhands', name: 'Lay on Hands', kind: 'active', cost: 1, shape: 'heart', resource: 16, cd: 8, power: 22, desc: 'A burst of light mends you where you stand.' },
+        { id: 'smite', name: 'Smite', kind: 'special', cost: 2, shape: 'spark', resource: 14, cd: 5, power: 16, desc: 'A bolt of holy light. It strikes one foe and mends you for part of the blow.' },
+        { id: 'beacon', name: 'Beacon', kind: 'passive', cost: 1, shape: 'nova', desc: 'Lay on Hands mends more. Smite returns more of the life it spends. Holy spells hit a little harder.' },
+        { id: 'consecration', name: 'Consecration', kind: 'special', cost: 2, shape: 'ring', resource: 24, cd: 14, radius: 3.4, dur: 6, dps: 6, heal: 4, desc: 'Holy ground under your feet. It burns foes and mends you while you stand in it.' },
+      ],
+    },
+    {
+      id: 'juggernaut',
+      name: 'Juggernaut',
+      color: '#e0703a',
+      skills: [
+        { id: 'zeal', name: 'Zeal', kind: 'passive', cost: 1, shape: 'axe', desc: 'Melee hits harder, and a drawn two-hander adds another 10%. +6 health.' },
+        { id: 'crusader', name: 'Crusader Strike', kind: 'active', cost: 1, shape: 'hammer', resource: 16, cd: 6, power: 14, reach: 2.7, dot: 0.15, knock: 6, desc: 'A wide holy cleave. A two-hander makes the arc hit harder.' },
+        { id: 'judgment', name: 'Judgment', kind: 'special', cost: 2, shape: 'execute', resource: 20, cd: 8, power: 18, reach: 3.4, dot: 0.55, knock: 8, desc: 'An overhead smite in a tight line. A two-hander turns it into a finisher.' },
+        { id: 'reckoning', name: 'Reckoning', kind: 'passive', cost: 1, shape: 'drop', desc: 'Crusader Strike and Judgment hit harder and shove farther. Melee +10%.' },
+        { id: 'divinestorm', name: 'Divine Storm', kind: 'special', cost: 2, shape: 'whirl', resource: 26, cd: 12, power: 13, radius: 3.1, desc: 'Spin a ring of holy blades through everything around you.' },
+      ],
+    },
+    {
+      id: 'defender',
+      name: 'Defender',
+      color: '#8ec8ff',
+      skills: [
+        { id: 'aegis', name: 'Aegis', kind: 'passive', cost: 1, shape: 'shield', desc: 'Damage taken drops by 7%, or 16% with your shield up. Blocks shed more. +8 health.' },
+        { id: 'faithshield', name: 'Shield of Faith', kind: 'active', cost: 1, shape: 'wall', resource: 18, cd: 10, dur: 4, power: 8, desc: 'A golden barrier for 4 seconds, and a little mending as it rises.' },
+        { id: 'avengershield', name: "Avenger's Shield", kind: 'special', cost: 2, shape: 'bash', resource: 16, cd: 7, power: 11, stun: 1.15, desc: 'Hurl a holy shield. It smites the first foe and stuns them.' },
+        { id: 'sanctuary', name: 'Sanctuary', kind: 'passive', cost: 1, shape: 'shield', desc: 'A successful block mends you. Avenger\'s Shield stuns longer. +6 health.' },
+        { id: 'divineprotection', name: 'Divine Protection', kind: 'special', cost: 2, shape: 'wall', resource: 28, cd: 16, dur: 6, power: 3, desc: 'For 6 seconds incoming blows are blunted, and each one that lands mends you a little.' },
+      ],
+    },
+  ],
+};
+
+paladin.attributes = [
+  { id: 'faith', name: 'Faith', max: 3, blurb: '+6 spirit each rank.', rankText: (n) => `+${n * 6} spirit` },
+  { id: 'grace', name: 'Grace', max: 3, blurb: '+6% smite and holy healing each rank.', rankText: (n) => `+${n * 6}% holy power` },
+  { id: 'valor', name: 'Valor', max: 3, blurb: '+6% melee damage each rank.', rankText: (n) => `+${n * 6}% melee damage` },
+  { id: 'resolve', name: 'Resolve', max: 3, blurb: 'Damage taken drops 3% each rank.', rankText: (n) => `${n * 3}% less damage taken` },
+];
+
+paladin.weapons = [
+  { id: 'swordshield', name: 'Sword & Shield', max: 3, blurb: 'One-hand blades hit 8% harder each rank. A raised shield sheds 4% more.', rankText: (n) => `+${n * 8}% sword damage, +${n * 4}% while blocking` },
+  { id: 'twohand', name: 'Two-Handed', max: 3, blurb: 'Greatswords, hammers, and mauls hit 10% harder and shove farther each rank.', rankText: (n) => `+${n * 10}% damage, +${n * 12}% knockback` },
+  { id: 'smitearm', name: 'Smite', max: 3, blurb: 'Smite, Judgment, and holy healing grow 8% stronger each rank.', rankText: (n) => `+${n * 8}% holy power` },
+];
+
 export const STYLE_LABEL = {
   swordshield: 'Sword & Shield',
   twohand: 'Two-Handed',
@@ -187,7 +246,7 @@ export const STYLE_LABEL = {
   tome: 'Spell Book',
 };
 
-export const CLASSES = { warrior, ranger, mage };
+export const CLASSES = { warrior, ranger, mage, paladin };
 
 export function attrDef(classId, id) {
   return (CLASSES[classId]?.attributes || []).find((a) => a.id === id) || null;
@@ -219,4 +278,4 @@ for (const cls of Object.values(CLASSES)) {
   }
 }
 
-export const CLASS_LIST = [warrior, ranger, mage];
+export const CLASS_LIST = [warrior, ranger, mage, paladin];

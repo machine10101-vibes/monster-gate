@@ -102,6 +102,9 @@ export class Player {
     this.castAnim = '';
     this.ironHits = 0;
     this.ironT = 0;
+    this.faithT = 0;
+    this.faithDr = 0;
+    this.faithHeal = 0;
     this.setHeld('blade');
     this.syncObj();
   }
@@ -245,6 +248,12 @@ export class Player {
       g.punch(0.12);
       g.audio.block();
       g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), 'Blocked', 'gold');
+      if (g.progress.hasSkill('sanctuary')) {
+        const before = this.hp;
+        this.heal(Math.max(1, Math.round(3 * (skillMods(g).spell || 1))));
+        const got = Math.round(this.hp - before);
+        if (got > 0) g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.3, this.pos.z), '+' + got, 'gold');
+      }
       g.shake(0.08);
       this.invuln = 0.15;
       if (this.stamina <= 0) {
@@ -258,7 +267,8 @@ export class Player {
       this.ironHits--;
       dmg = 1;
     } else {
-      const dr = Math.min(0.65, this.reduction + (mods.dr || 0) + (this.shielding ? mods.blockDr || 0 : 0) + (this.bulwarkT > 0 ? 0.45 : 0));
+      const faith = this.faithT > 0 ? this.faithDr || 0 : 0;
+      const dr = Math.min(0.72, this.reduction + (mods.dr || 0) + (this.shielding ? mods.blockDr || 0 : 0) + (this.bulwarkT > 0 ? 0.45 : 0) + faith);
       dmg = Math.max(1, Math.round(dmg * (1 - dr)));
     }
     this.hp = Math.max(0, this.hp - dmg);
@@ -272,6 +282,12 @@ export class Player {
     g.audio.hurt();
     g.hud.hurtFlash();
     g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 1.9, this.pos.z), '-' + dmg, 'hurt');
+    if (this.faithT > 0 && this.faithHeal > 0 && this.hp > 0) {
+      const before = this.hp;
+      this.heal(this.faithHeal);
+      const got = Math.round(this.hp - before);
+      if (got > 0) g.hud.floatText(...g.screenOf(this.pos.x, this.pos.y + 2.35, this.pos.z), '+' + got, 'gold');
+    }
     g.shake(auto ? 0.08 : 0.25);
     g.hitstop(0.07);
     if (this.state === 'gather') g.gather.cancel();
@@ -473,6 +489,11 @@ export class Player {
     this.bulwarkT = Math.max(0, this.bulwarkT - dt);
     this.ironT = Math.max(0, this.ironT - dt);
     if (this.ironT <= 0) this.ironHits = 0;
+    this.faithT = Math.max(0, (this.faithT || 0) - dt);
+    if (this.faithT <= 0) {
+      this.faithDr = 0;
+      this.faithHeal = 0;
+    }
     this.warcryT = Math.max(0, this.warcryT - dt);
     this.packT = Math.max(0, this.packT - dt);
     for (const k of Object.keys(this.cds)) {
@@ -1196,6 +1217,51 @@ export class Player {
         armR = -2.5;
         armL = -2.5;
         lean = 0.35;
+      } else if (this.castAnim === 'heal') {
+        const tt = clamp(this.stateT / Math.max(0.2, this.stateDur), 0, 1);
+        const sw = Math.sin(Math.min(1, tt) * Math.PI);
+        armR = -2.35 * sw;
+        armL = -2.15 * sw;
+        lean = -0.22 * sw;
+        headPitch = -0.38 * sw;
+        torsoYaw = 0;
+        legL = 0.15 * sw;
+        legR = -0.12 * sw;
+      } else if (this.castAnim === 'smite') {
+        const tt = clamp(this.stateT / Math.max(0.2, this.stateDur), 0, 1);
+        const wind = ease(clamp(tt / 0.38, 0, 1));
+        const strike = ease(clamp((tt - 0.38) / 0.22, 0, 1));
+        const settle = ease(clamp((tt - 0.68) / 0.32, 0, 1));
+        armR = lerp(lerp(-0.45, -2.55, wind), -0.55, strike);
+        armR = lerp(armR, -0.7, settle);
+        armL = lerp(-0.25, -1.05, wind) * (1 - strike * 0.45);
+        lean = lerp(lerp(0.02, -0.28, wind), 0.32, strike) * (1 - settle * 0.75);
+        torsoYaw = lerp(0.18 * wind, -0.22, strike) * (1 - settle);
+        headPitch = lerp(-0.12 * wind, 0.16, strike);
+      } else if (this.castAnim === 'cleave') {
+        const tt = clamp(this.stateT / Math.max(0.2, this.stateDur), 0, 1);
+        const wind = ease(clamp(tt / 0.42, 0, 1));
+        const strike = ease(clamp((tt - 0.42) / 0.2, 0, 1));
+        const settle = ease(clamp((tt - 0.7) / 0.3, 0, 1));
+        armR = lerp(lerp(-0.4, -2.9, wind), 0.25, strike);
+        armL = lerp(lerp(-0.3, -2.4, wind), -0.15, strike);
+        armR = lerp(armR, -0.55, settle);
+        armL = lerp(armL, -0.35, settle);
+        torsoYaw = lerp(0.35 * wind, -0.7, strike) * (1 - settle);
+        lean = lerp(lerp(0, -0.16, wind), 0.22, strike) * (1 - settle * 0.8);
+        crouch = 0.03 * strike * (1 - settle);
+        legL = 0.28 * strike;
+        legR = -0.16 * strike;
+        headPitch = 0.1 * strike * (1 - settle);
+      } else if (this.castAnim === 'guard') {
+        const tt = clamp(this.stateT / Math.max(0.2, this.stateDur), 0, 1);
+        const up = ease(clamp(tt / 0.35, 0, 1));
+        armL = lerp(-0.3, -1.85, up);
+        armR = lerp(-0.2, -0.7, up);
+        torsoYaw = 0.4 * up;
+        lean = 0.12 * up;
+        crouch = 0.07 * up;
+        headPitch = 0.08 * up;
       }
     }
 

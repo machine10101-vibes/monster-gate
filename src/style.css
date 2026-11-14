@@ -2056,7 +2056,7 @@ body.touch .how {
 }
 .sk-pick {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 .sk-class {
@@ -3400,7 +3400,7 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   -webkit-user-select: text;
 }
 .cs-input:focus { outline: 2px solid var(--gold); }
-.cs-classes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cs-classes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .cs-class {
   display: flex;
   flex-direction: column;
@@ -3413,7 +3413,7 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   border-radius: 4px;
   cursor: pointer;
 }
-.cs-class b { font-family: var(--font-px); font-weight: normal; font-size: 8px; }
+.cs-class b { font-family: var(--font-px); font-weight: normal; font-size: 8px; max-width: 100%; text-align: center; }
 .cs-class.on {
   color: #fff;
   border-color: var(--c);
