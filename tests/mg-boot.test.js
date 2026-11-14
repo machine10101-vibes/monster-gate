@@ -107,6 +107,26 @@ test('boot helpers hold the fire-eyes logo frame and honor the min display', () 
   assert.equal(emberCount({}), 22);
 });
 
+test('loading clip stays on the video element while the world builds', () => {
+  const boot = src('src/ui/boot.js');
+  assert.doesNotMatch(boot, /raf\(tick\)/);
+  assert.match(boot, /video\.play\?\.\(\)/);
+  const doc = fakeDoc();
+  const frames = [];
+  mountLoading(doc, {
+    reduced: false,
+    mobile: true,
+    fadeMs: 0,
+    now: 1000,
+    setInterval() { return 0; },
+    requestAnimationFrame(fn) { frames.push(fn); return 1; },
+  });
+  assert.equal(frames.length, 0);
+  assert.equal(doc.map.loading.classList.contains('keyed'), false);
+  assert.equal(doc.map['load-video'].paused, false);
+  assert.equal(doc.map['load-video'].loop, false);
+});
+
 test('loading screen mounts, tracks progress, and dismisses', async () => {
   const doc = fakeDoc();
   const ui = mountLoading(doc, { reduced: false, mobile: true, fadeMs: 0, now: 1000 });
