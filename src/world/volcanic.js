@@ -70,36 +70,45 @@ function volcAmount(spec, z) {
   return 1 - smoothstep(spec.blend.z0, spec.blend.z1, z);
 }
 
+/** Steepest grade a hunter can step up. canStep allows 1.01; half-cell rounding needs headroom. */
+const WALK_STEP = 0.7;
+
+function angDiff(a, b) {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+/**
+ * The moat sits on the volcano's south skirt. Carve the isle and the lava,
+ * then climb back to the hillside that was already there. A hard blend left
+ * a wall about nine units tall, which canStep will not cross.
+ */
 function lairFeature(h, x, z, lair) {
   const dx = x - lair.cx;
   const dz = z - lair.cz;
   const d = Math.hypot(dx, dz);
-  if (d > lair.outer + 4) return null;
-  const ang = Math.atan2(dx, dz);
-  let da = ang - lair.bridge;
-  while (da > Math.PI) da -= Math.PI * 2;
-  while (da < -Math.PI) da += Math.PI * 2;
-  const onBridge = Math.abs(da) < 0.28 && d <= lair.outer + 1.5;
+  const onBridge = Math.abs(angDiff(Math.atan2(dx, dz), lair.bridge)) < 0.28;
   if (d <= lair.island) return { h: lair.islandH, kind: 0 };
-  if (onBridge) {
-    const u = clamp((d - lair.island) / Math.max(1, lair.outer - lair.island), 0, 1);
-    return { h: lerp(lair.islandH, lair.bankH, u), kind: 0 };
+  if (d <= lair.moat && !onBridge) {
+    if (d <= lair.shore) {
+      const u = (d - lair.island) / Math.max(1, lair.shore - lair.island);
+      return { h: lerp(lair.islandH, lair.lavaH + 0.6, u), kind: u > 0.72 ? K_LAVA : 0 };
+    }
+    return { h: lair.lavaH, kind: K_LAVA };
   }
-  if (d <= lair.shore) {
-    const u = (d - lair.island) / Math.max(1, lair.shore - lair.island);
-    return { h: lerp(lair.islandH, lair.lavaH + 0.6, u), kind: u > 0.72 ? K_LAVA : 0 };
+  if (onBridge && d <= lair.moat) {
+    const u = clamp((d - lair.island) / Math.max(1, lair.moat - lair.island), 0, 1);
+    return { h: lerp(lair.islandH, Math.min(lair.bankH, h), u), kind: 0 };
   }
-  if (d <= lair.moat) return { h: lair.lavaH, kind: K_LAVA };
-  const u = clamp((d - lair.moat) / Math.max(1, lair.outer - lair.moat), 0, 1);
-  const lip = lerp(lair.lavaH + 0.35, lair.bankH, smoothstep(0, 1, u));
-  return { h: lerp(lip, h, smoothstep(0.7, 1, u)), kind: 0 };
+  const rise = WALK_STEP * Math.max(0, d - lair.moat);
+  const graded = Math.min(h, lair.bankH + rise);
+  if (graded >= h - 0.02) return null;
+  return { h: graded, kind: 0 };
 }
 
-export function volcanicFeature(h, x, z, spec) {
-  if (spec.lair) {
-    const carved = lairFeature(h, x, z, spec.lair);
-    if (carved) return carved;
-  }
+function volcanicShape(h, x, z, spec) {
   if (spec.plateau) {
     const { cx, cz, hw, hd, h: ph, fall } = spec.plateau;
     const dx = Math.max(0, Math.abs(x - cx) - hw);
@@ -113,13 +122,19 @@ export function volcanicFeature(h, x, z, spec) {
     const wob = 1 + 0.08 * Math.sin(a * 3 + 1.1) + 0.05 * Math.sin(a * 7);
     const d = Math.hypot(z - cz, x - cx) / wob;
     if (d < r) {
-      const t = 1 - d / r;
-      const body = lerp(h, top, Math.pow(t, 1.15));
+      const flank = (dist) => {
+        const t = 1 - dist / r;
+        return lerp(h, top, Math.pow(Math.max(0, t), 1.15));
+      };
+      // The lip used to spike to top+0.4, a four-unit step the hunter could not take.
+      const rimH = Math.max(h, flank(crater));
       if (d < crater) {
-        if (d < crater * 0.62) return { h: top - 3.6, kind: K_LAVA };
-        return { h: lerp(top - 3.6, top + 0.4, (d - crater * 0.62) / (crater * 0.38)), kind: 0 };
+        const floor = rimH - 3.2;
+        if (d < crater * 0.62) return { h: floor, kind: K_LAVA };
+        const u = (d - crater * 0.62) / (crater * 0.38);
+        return { h: lerp(floor, rimH, u), kind: 0 };
       }
-      return { h: Math.max(h, body), kind: 0 };
+      return { h: Math.max(h, flank(d)), kind: 0 };
     }
   }
   if (spec.lava) {
@@ -133,6 +148,16 @@ export function volcanicFeature(h, x, z, spec) {
     }
   }
   return null;
+}
+
+export function volcanicFeature(h, x, z, spec) {
+  const shaped = volcanicShape(h, x, z, spec);
+  const natural = shaped ? shaped.h : h;
+  if (spec.lair) {
+    const carved = lairFeature(natural, x, z, spec.lair);
+    if (carved) return carved;
+  }
+  return shaped;
 }
 
 function localSlope(H, x, z) {

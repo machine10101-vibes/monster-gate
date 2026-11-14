@@ -134,15 +134,26 @@ export class World {
     if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
     const land = this.landAt(x, z);
     if (!land || land.role !== 'ring') return false;
+    if (h <= 0.45) return false;
     // Rim peaks are already above walking height. A pass cut through one stays open,
     // including Harefield's north gate into Ashen Road (tile 34) and the volcanic block.
-    return h < 8.6 && h > 0.45;
+    if (h < 8.6) return true;
+    // Cinderfall's cone keeps climbing past that cap. The north and west rims stay closed.
+    if (land.kind !== 'cinderfall' || h >= 16.5) return false;
+    const coneX = Math.floor(x) - land.x0;
+    const coneZ = Math.floor(z) - land.z0;
+    if (coneX <= 24 || coneZ <= 24 || coneX >= W - 4 || coneZ >= W - 4) return false;
+    return land.data.top[coneZ * W + coneX] !== TILE.LAVA;
   }
 
   /** can a body walk from height `fromY` to (x,z)? */
   canStep(x, z, fromY) {
     const h = this.heightAt(x, z);
-    return h - fromY <= 1.01 && h < 9 && this.playable(x, z);
+    if (h - fromY > 1.01) return false;
+    if (!this.playable(x, z)) return false;
+    if (h < 9) return true;
+    const land = this.landAt(x, z);
+    return land?.kind === 'cinderfall' && h < 16.5;
   }
 
   /* ---------------------------- colliders ---------------------------- */

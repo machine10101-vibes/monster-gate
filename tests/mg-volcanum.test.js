@@ -47,6 +47,49 @@ test('Volcanum drops forge a full weapon and armor set above dusk', () => {
   for (const id of SET_IDS) assert.ok(SETS.find((s) => s.id === id), id);
 });
 
+test('a hunter can walk the cinderfall cone and the causeway onto the isle', () => {
+  const spec = VOLCANIC_SPECS.cinderfall;
+  const W = 144;
+  const H = new Float32Array(W * W);
+  const lava = new Uint8Array(W * W);
+  for (let z = 0; z < W; z++) {
+    for (let x = 0; x < W; x++) {
+      const cell = volcanicFeature(3.6, x, z, spec);
+      H[z * W + x] = cell ? cell.h : 3.6;
+      if (cell?.kind === K_LAVA) lava[z * W + x] = 1;
+    }
+  }
+  const seen = new Uint8Array(W * W);
+  const q = [[100, 130]];
+  seen[130 * W + 100] = 1;
+  for (let qi = 0; qi < q.length; qi++) {
+    const [x, z] = q[qi];
+    const y = H[z * W + x];
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const nz = z + dz;
+      if (nx < 1 || nz < 1 || nx >= W - 1 || nz >= W - 1) continue;
+      const i = nz * W + nx;
+      if (seen[i] || lava[i]) continue;
+      const nh = H[i];
+      if (nh - y > 1.01 || nh >= 16.5 || nh <= 0.45) continue;
+      seen[i] = 1;
+      q.push([nx, nz]);
+    }
+  }
+  const reach = (x, z) => seen[z * W + x] === 1;
+  assert.ok(reach(48, 104), 'isle');
+  let climbed = 0;
+  for (let z = 0; z < W; z++) {
+    for (let x = 0; x < W; x++) {
+      if (!seen[z * W + x]) continue;
+      const d = Math.hypot(x - 58, z - 56);
+      if (d > 12 && d < 18 && H[z * W + x] > 10) climbed++;
+    }
+  }
+  assert.ok(climbed > 20, `south face of the cone stays a cliff (${climbed})`);
+});
+
 test('the cinderfall lair is a walkable isle inside a lava moat with a bridge', () => {
   const spec = VOLCANIC_SPECS.cinderfall;
   const L = spec.lair;
