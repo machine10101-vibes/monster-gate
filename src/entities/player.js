@@ -654,25 +654,61 @@ export class Player {
 
   moveBy(dx, dz) {
     const w = this.game.world;
-    const tryAxis = (nx, nz) => {
-      const pts = [
-        [nx, nz],
-        [nx + R, nz],
-        [nx - R, nz],
-        [nx, nz + R],
-        [nx, nz - R],
-      ];
-      for (const [x, z] of pts) if (!w.canStep(x, z, this.pos.y)) return false;
+    const y = this.pos.y;
+    // The center has to stand on land. A shoulder that only hangs over lava
+    // is not a wall — rejecting it froze hunters against the Cinderfall pit.
+    const fits = (nx, nz) => {
+      if (!w.canStep(nx, nz, y)) return false;
+      const shoulders = [[nx + R, nz], [nx - R, nz], [nx, nz + R], [nx, nz - R]];
+      for (const [x, z] of shoulders) {
+        if (w.canStep(x, z, y)) continue;
+        if (w.lavaAt(x, z) && w.heightAt(x, z) - y <= 1.01) continue;
+        return false;
+      }
       return true;
     };
     const nx = this.pos.x + dx;
     const nz = this.pos.z + dz;
-    if (tryAxis(nx, nz)) {
+    if (fits(nx, nz)) {
       this.pos.x = nx;
       this.pos.z = nz;
-    } else if (tryAxis(nx, this.pos.z)) this.pos.x = nx;
-    else if (tryAxis(this.pos.x, nz)) this.pos.z = nz;
+    } else if (fits(nx, this.pos.z)) this.pos.x = nx;
+    else if (fits(this.pos.x, nz)) this.pos.z = nz;
+    else if (dx || dz) {
+      // Both input axes run into the pit or a corner. Step along the obstacle
+      // toward the way the hunter is actually holding.
+      const len = Math.hypot(dx, dz);
+      const px = -dz / len;
+      const pz = dx / len;
+      const a = fits(this.pos.x + px * len, this.pos.z + pz * len);
+      const b = fits(this.pos.x - px * len, this.pos.z - pz * len);
+      const da = a ? px * dx + pz * dz : -Infinity;
+      const db = b ? -px * dx - pz * dz : -Infinity;
+      if (da > 0 && da >= db) {
+        this.pos.x += px * len;
+        this.pos.z += pz * len;
+      } else if (db > 0) {
+        this.pos.x -= px * len;
+        this.pos.z -= pz * len;
+      }
+    }
     w.resolve(this.pos, R);
+    this.keepOffLava();
+  }
+
+  /** Don't let a lava overhang pull the body into the pool. */
+  keepOffLava() {
+    const w = this.game.world;
+    const y = this.pos.y;
+    for (const [ox, oz] of [[R, 0], [-R, 0], [0, R], [0, -R]]) {
+      if (!w.lavaAt(this.pos.x + ox, this.pos.z + oz)) continue;
+      const nx = this.pos.x - Math.sign(ox) * 0.06;
+      const nz = this.pos.z - Math.sign(oz) * 0.06;
+      if (w.canStep(nx, nz, y) && !w.lavaAt(nx, nz)) {
+        this.pos.x = nx;
+        this.pos.z = nz;
+      }
+    }
   }
 
   updateGround(dt) {

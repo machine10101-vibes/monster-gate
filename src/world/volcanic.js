@@ -74,10 +74,8 @@ function volcAmount(spec, z) {
 const WALK_STEP = 0.7;
 
 /**
- * The lava moat and the cone above it were a wall: the bank stepped four units
- * out of the pool, and rounding turned the skirt into one-unit rises the feet
- * cannot clear. Lower any cell that stands more than half a step above a neighbor,
- * lava included, so the hill is a ramp from the pool all the way up.
+ * Land beside land stays a half step. Lava is not a floor: pulling the hillside
+ * down to the pool dug a shelf that ended in the pit, and hunters stopped there.
  */
 export function gradeWalkableHill(H, isLava) {
   const MAX = 0.5;
@@ -94,7 +92,9 @@ export function gradeWalkableHill(H, isLava) {
         for (let dz = -1; dz <= 1; dz++) {
           for (let dx = -1; dx <= 1; dx++) {
             if (!dx && !dz) continue;
-            floor = Math.min(floor, H[(z + dz) * side + (x + dx)] + MAX);
+            const j = (z + dz) * side + (x + dx);
+            if (isLava(j)) continue;
+            floor = Math.min(floor, H[j] + MAX);
           }
         }
         if (floor < H[i] - 0.001) {
@@ -104,6 +104,12 @@ export function gradeWalkableHill(H, isLava) {
       }
     }
   }
+}
+
+/** West of the isle the moat stays a lava pit. The rest of that ring is the hill. */
+function approachKeepsLava(x, z, spec) {
+  const L = spec.lair;
+  return x < L.cx - 16 && z > L.cz - L.moat && z < L.cz + L.moat;
 }
 
 function angDiff(a, b) {
@@ -186,11 +192,21 @@ function volcanicShape(h, x, z, spec) {
 export function volcanicFeature(h, x, z, spec) {
   const shaped = volcanicShape(h, x, z, spec);
   const natural = shaped ? shaped.h : h;
+  let out = shaped;
   if (spec.lair) {
     const carved = lairFeature(natural, x, z, spec.lair);
-    if (carved) return carved;
+    if (carved) out = carved;
   }
-  return shaped;
+  // The moat used to slice the south face of the cone. A hunter walking at the
+  // peak hit lava and stopped. Give that face back; the pit stays west of the isle.
+  if (out?.kind === K_LAVA && spec.lair && spec.cone) {
+    const L = spec.lair;
+    const d = Math.hypot(x - L.cx, z - L.cz);
+    const inMoat = d > L.island && d <= L.moat;
+    const inCrater = Math.hypot(x - spec.cone.cx, z - spec.cone.cz) < spec.cone.crater;
+    if (inMoat && !inCrater && !approachKeepsLava(x, z, spec)) return { h: Math.max(natural, 2), kind: 0 };
+  }
+  return out;
 }
 
 function localSlope(H, x, z) {
@@ -356,7 +372,8 @@ export function dressVolcanic(world, land, spec) {
     const [lx, lz, r] = pool;
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
-    world.circle(x, z, r * 0.8);
+    // The lava cells stop the hunter. A solid disk was wider than the pool and
+    // read as an invisible wall on the bank around it.
     world.occupy(x, z, r * 1.3);
     world.lightSpots.push({ x, y: 1.9, z, color: 0xff6a1a });
     for (let k = 0; k < 7; k++) {
@@ -379,7 +396,8 @@ export function dressVolcanic(world, land, spec) {
       while (da < -Math.PI) da += TAU;
       if (Math.abs(da) < 0.42) continue;
       const rad = L.outer - 1.2;
-      place(V.obsidianSpires[k % 3], Math.round(L.cx + Math.sin(a) * rad), Math.round(L.cz + Math.cos(a) * rad), a, 1.15 + (k % 3) * 0.25, { r: 2, collide: 0.8, occ: 1.6, light: k % 4 === 0 ? [0xff6a1a, 2.2] : null });
+      // Visual only. A collide ring around the moat was the fence on the slope.
+      place(V.obsidianSpires[k % 3], Math.round(L.cx + Math.sin(a) * rad), Math.round(L.cz + Math.cos(a) * rad), a, 1.15 + (k % 3) * 0.25, { r: 2, occ: 1.6, light: k % 4 === 0 ? [0xff6a1a, 2.2] : null });
     }
     for (let k = 0; k < 5; k++) {
       const a = L.bridge + Math.PI + (k - 2) * 0.35;

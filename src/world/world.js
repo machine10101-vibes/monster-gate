@@ -149,6 +149,16 @@ export class World {
     return false;
   }
 
+  /** True when this cell is painted lava. Shoulders may overhang it; the body center may not. */
+  lavaAt(x, z) {
+    const land = this.landAt(x, z);
+    if (!land?.data?.top) return false;
+    const lx = Math.floor(x) - land.x0;
+    const lz = Math.floor(z) - land.z0;
+    if (lx < 0 || lz < 0 || lx >= W || lz >= W) return false;
+    return land.data.top[lz * W + lx] === TILE.LAVA;
+  }
+
   /** can a body walk from height `fromY` to (x,z)? */
   canStep(x, z, fromY) {
     const h = this.heightAt(x, z);

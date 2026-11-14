@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DROPS, GEAR, MATERIALS, MONSTERS, SETS, gearById } from '../src/data/catalog.js';
 import { readFileSync } from 'node:fs';
+import { fbm } from '../src/engine/voxel.js';
 import { K_LAVA, VOLCANIC_SPECS, gradeWalkableHill, volcanicFeature } from '../src/world/volcanic.js';
 import { buildVolcanumDragon } from '../src/entities/volcanum.js';
 import { MONSTER_STATS } from '../src/entities/monsters.js';
@@ -111,7 +112,9 @@ test('the lava pool hill is a half-step ramp a hunter can climb', () => {
       for (let dz = -1; dz <= 1; dz++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dz) continue;
-          const rise = H[i] - H[(z + dz) * W + (x + dx)];
+          const j = (z + dz) * W + (x + dx);
+          if (lava[j]) continue;
+          const rise = H[i] - H[j];
           assert.ok(rise <= 0.5 + 1e-6, `cliff at ${x},${z} rises ${rise}`);
         }
       }
@@ -170,6 +173,118 @@ test('the lava pool hill is a half-step ramp a hunter can climb', () => {
   const ringSrc = readFileSync(new URL('../src/world/ring.js', import.meta.url), 'utf8');
   assert.match(ringSrc, /gradeWalkableHill\(H,/);
   assert.doesNotMatch(worldSrc, /coneX <= 24/);
+  const playerSrc = readFileSync(new URL('../src/entities/player.js', import.meta.url), 'utf8');
+  assert.match(playerSrc, /lavaAt\(x, z\)/);
+  const dress = readFileSync(new URL('../src/world/volcanic.js', import.meta.url), 'utf8');
+  assert.match(dress, /Visual only/);
+});
+
+test('a hunter walking at the lava-pit hill from the south actually climbs it', () => {
+  const spec = VOLCANIC_SPECS.cinderfall;
+  const W = 144;
+  const noiseAt = (x, z) => {
+    const broad = fbm(x * 0.028, z * 0.026, spec.seed, 4);
+    const mid = fbm(x * 0.07 + 2.2, z * 0.066, spec.seed + 5, 3);
+    const fine = fbm(x * 0.15, z * 0.14, spec.seed + 11, 2);
+    return (broad - 0.42) * spec.amp + (mid - 0.5) * spec.amp * 0.55 + (fine - 0.5) * 0.7;
+  };
+  const H = new Float32Array(W * W);
+  const lava = new Uint8Array(W * W);
+  for (let z = 0; z < W; z++) {
+    for (let x = 0; x < W; x++) {
+      let h = spec.base + noiseAt(x, z);
+      for (const [cx, cz, r, amp] of spec.knolls) {
+        const d = Math.hypot(x - cx, z - cz) / r;
+        if (d < 1) h += amp * (1 - d) * (1 - d);
+      }
+      if (spec.rim.n && z < 14) h += (14 - z) * 0.8;
+      if (spec.rim.w && x < 14) h += (14 - x) * 0.8;
+      const cell = volcanicFeature(h, x, z, spec);
+      if (cell) {
+        h = cell.h;
+        if (cell.kind === K_LAVA) lava[z * W + x] = 1;
+      }
+      H[z * W + x] = Math.round(h * 2) / 2;
+    }
+  }
+  gradeWalkableHill(H, (i) => lava[i] === 1);
+  // The south face the hunter walks into is land, and the pit is still there to the west.
+  assert.equal(lava[115 * W + 58], 0, 'south face of the hill is lava');
+  assert.equal(lava[102 * W + 28], 1, 'west pit filled in');
+  const R = 0.32;
+  const hAt = (x, z) => {
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    if (ix < 0 || iz < 0 || ix >= W || iz >= W) return 12;
+    return H[iz * W + ix];
+  };
+  const isLava = (x, z) => {
+    const ix = Math.floor(x);
+    const iz = Math.floor(z);
+    return ix >= 0 && iz >= 0 && ix < W && iz < W && lava[iz * W + ix] === 1;
+  };
+  const canStep = (x, z, y) => {
+    const h = hAt(x, z);
+    if (h - y > 1.01 || h <= 0.45 || h >= 16.5) return false;
+    if (isLava(x, z)) return false;
+    return true;
+  };
+  const fits = (nx, nz, y) => {
+    if (!canStep(nx, nz, y)) return false;
+    for (const [x, z] of [[nx + R, nz], [nx - R, nz], [nx, nz + R], [nx, nz - R]]) {
+      if (canStep(x, z, y)) continue;
+      if (isLava(x, z) && hAt(x, z) - y <= 1.01) continue;
+      return false;
+    }
+    return true;
+  };
+  const climb = (sx, sz) => {
+    const p = { x: sx, z: sz, y: hAt(sx, sz) };
+    const goal = [58.5, 52];
+    let max = p.y;
+    const dt = 1 / 60;
+    const speed = 4.7;
+    for (let f = 0; f < 60 * 45; f++) {
+      let dx = goal[0] - p.x;
+      let dz = goal[1] - p.z;
+      const dist = Math.hypot(dx, dz) || 1;
+      dx = (dx / dist) * speed * dt;
+      dz = (dz / dist) * speed * dt;
+      const nx = p.x + dx;
+      const nz = p.z + dz;
+      if (fits(nx, nz, p.y)) {
+        p.x = nx;
+        p.z = nz;
+      } else if (fits(nx, p.z, p.y)) p.x = nx;
+      else if (fits(p.x, nz, p.y)) p.z = nz;
+      else if (dx || dz) {
+        const len = Math.hypot(dx, dz);
+        const px = -dz / len;
+        const pz = dx / len;
+        const a = fits(p.x + px * len, p.z + pz * len, p.y);
+        const b = fits(p.x - px * len, p.z - pz * len, p.y);
+        const da = a ? px * dx + pz * dz : -Infinity;
+        const db = b ? -px * dx - pz * dz : -Infinity;
+        if (da > 0 && da >= db) {
+          p.x += px * len;
+          p.z += pz * len;
+        } else if (db > 0) {
+          p.x -= px * len;
+          p.z -= pz * len;
+        }
+      }
+      const ground = hAt(p.x, p.z);
+      if (ground > p.y) p.y += (ground - p.y) * Math.min(1, dt * 20);
+      else p.y = ground;
+      max = Math.max(max, ground);
+      if (max >= 10 && p.z < spec.lair.cz - spec.lair.moat) break;
+    }
+    return { max, x: p.x, z: p.z, y: p.y };
+  };
+  for (const [x, z] of [[70.5, 135.5], [48.5, 140.5], [90.5, 130.5], [40.5, 138.5]]) {
+    const got = climb(x, z);
+    assert.ok(got.max >= 9, `from ${x},${z} stopped at h ${got.max.toFixed(1)} (${got.x.toFixed(1)},${got.z.toFixed(1)})`);
+  }
 });
 
 test('the cinderfall lair is a walkable isle inside a lava moat with a bridge', () => {
