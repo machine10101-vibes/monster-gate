@@ -22,6 +22,7 @@ function closeBagAsk() {
 }
 
 const TABS = [
+  ['bag', 'Bag'],
   ['carried', 'Hotbar'],
   ['tools', 'Tools'],
   ['goods', 'Gathered'],
@@ -29,15 +30,37 @@ const TABS = [
   ['parts', 'Parts'],
 ];
 
-/** The hunter's bag. Tabs keep each kind of item in one grid, with a detail card. */
-export function mountBag(body, game) {
-  let tab = 'carried';
-  let sel = null;
+function slotList(groups) {
+  const filled = [...groups.goods, ...groups.parts, ...groups.gear];
+  const cells = filled.slice();
+  while (cells.length < BAG_SLOTS) cells.push(null);
+  return cells;
+}
 
-  const paint = () => {
+/** The hunter's bag. The Bag tab is 40 slots. Other tabs sort the same hunt. */
+export function mountBag(body, game) {
+  let tab = 'bag';
+  let sel = null;
+  let built = '';
+
+  const paint = (mode = 'full') => {
     closeBagAsk();
     const groups = collect(game);
-    if (!groups[tab].some((it) => it.key === sel)) sel = groups[tab][0]?.key || null;
+    groups.bag = slotList(groups);
+    const list = groups[tab];
+    const filled = list.filter(Boolean);
+    if (!filled.some((it) => it.key === sel)) sel = filled[0]?.key || null;
+    const signature = `${tab}|${list.map((it) => (it ? `${it.key}:${it.badge || ''}:${it.worn ? 1 : 0}` : '.')).join(',')}`;
+    const scroller = body.closest('.panel-card');
+    const top = scroller ? scroller.scrollTop : 0;
+    if (mode === 'select' && signature === built && body.querySelector('.bag-grid')) {
+      body.querySelectorAll('.bag-cell').forEach((b) => b.classList.toggle('sel', b.dataset.key === sel));
+      const detail = body.querySelector('.bag-detail');
+      if (detail) fillDetail(detail, filled.find((it) => it.key === sel) || null, game, paint);
+      flushThumbs(240);
+      return;
+    }
+    built = signature;
     body.innerHTML = '';
     const root = document.createElement('div');
     root.className = 'bag';
@@ -57,10 +80,11 @@ export function mountBag(body, game) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'bag-tab' + (id === tab ? ' on' : '');
-      b.textContent = `${label} ${groups[id].length}`;
+      const n = id === 'bag' ? game.progress.bagSlotsUsed() : groups[id].filter(Boolean).length;
+      b.textContent = `${label} ${n}`;
       b.onclick = () => {
         tab = id;
-        sel = groups[id][0]?.key || null;
+        sel = (id === 'bag' ? groups.bag : groups[id]).find(Boolean)?.key || null;
         paint();
       };
       tabs.appendChild(b);
@@ -70,17 +94,27 @@ export function mountBag(body, game) {
     const stage = document.createElement('div');
     stage.className = 'bag-stage';
     const grid = document.createElement('div');
-    grid.className = 'bag-grid';
-    const list = groups[tab];
-    if (!list.length) {
+    grid.className = 'bag-grid' + (tab === 'bag' ? ' slots' : '');
+    if (!filled.length && tab !== 'bag') {
       const p = document.createElement('p');
       p.className = 'bag-empty';
       p.textContent = emptyText(tab);
       grid.appendChild(p);
     }
     for (const it of list) {
+      if (!it) {
+        const empty = document.createElement('button');
+        empty.type = 'button';
+        empty.className = 'bag-cell empty';
+        empty.disabled = true;
+        empty.tabIndex = -1;
+        empty.setAttribute('aria-label', 'Empty slot');
+        grid.appendChild(empty);
+        continue;
+      }
       const b = document.createElement('button');
       b.type = 'button';
+      b.dataset.key = it.key;
       b.className = 'bag-cell' + (it.key === sel ? ' sel' : '') + (it.worn ? ' worn' : '');
       b.appendChild(it.canvas());
       b.title = it.name;
@@ -93,7 +127,7 @@ export function mountBag(body, game) {
       bindBagHold(b, {
         onSelect: () => {
           sel = it.key;
-          paint();
+          paint('select');
         },
         onMenu: () => {
           sel = it.key;
@@ -106,72 +140,77 @@ export function mountBag(body, game) {
 
     const detail = document.createElement('aside');
     detail.className = 'bag-detail';
-    const current = list.find((it) => it.key === sel);
-    if (!current) {
-      const p = document.createElement('span');
-      p.textContent = emptyText(tab);
-      detail.appendChild(p);
-    } else {
-      detail.appendChild(current.canvas());
-      const name = document.createElement('b');
-      name.textContent = current.name;
-      const sub = document.createElement('span');
-      sub.textContent = current.sub;
-      detail.append(name, sub);
-      if (current.stats?.length) {
-        const box = document.createElement('div');
-        box.className = 'bag-stats';
-        for (const [label, value] of current.stats) {
-          const row = document.createElement('div');
-          const k = document.createElement('small');
-          k.textContent = label;
-          const v = document.createElement('b');
-          v.textContent = String(value);
-          row.append(k, v);
-          box.appendChild(row);
-        }
-        detail.appendChild(box);
-      }
-      if (current.setNote) {
-        const note = document.createElement('p');
-        note.className = 'bag-set';
-        note.textContent = current.setNote;
-        detail.appendChild(note);
-      }
-      const held = bagHoldChoices(current);
-      const actions = current.actions
-        ? current.actions.slice()
-        : (held.use ? [held.use] : []);
-      if (held.drop) {
-        actions.push({
-          label: 'Drop',
-          run: (done) => {
-            if (game.dropBagItem(held.drop)) done();
-          },
-        });
-      }
-      if (actions.length) {
-        const row = document.createElement('div');
-        row.className = 'bag-acts';
-        for (const act of actions) {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'bag-act';
-          b.textContent = act.label;
-          b.onclick = () => act.run(paint);
-          row.appendChild(b);
-        }
-        detail.appendChild(row);
-      }
-    }
+    fillDetail(detail, filled.find((it) => it.key === sel) || null, game, paint);
     stage.appendChild(detail);
     root.appendChild(stage);
     body.appendChild(root);
+    if (scroller) scroller.scrollTop = top;
     flushThumbs(240);
   };
 
   paint();
   return () => closeBagAsk();
+}
+
+function fillDetail(detail, current, game, paint) {
+  detail.innerHTML = '';
+  if (!current) {
+    const p = document.createElement('span');
+    p.textContent = `Empty slot. The bag holds ${BAG_SLOTS}.`;
+    detail.appendChild(p);
+    return;
+  }
+  detail.appendChild(current.canvas());
+  const name = document.createElement('b');
+  name.textContent = current.name;
+  const sub = document.createElement('span');
+  sub.textContent = current.sub;
+  detail.append(name, sub);
+  if (current.stats?.length) {
+    const box = document.createElement('div');
+    box.className = 'bag-stats';
+    for (const [label, value] of current.stats) {
+      const row = document.createElement('div');
+      const k = document.createElement('small');
+      k.textContent = label;
+      const v = document.createElement('b');
+      v.textContent = String(value);
+      row.append(k, v);
+      box.appendChild(row);
+    }
+    detail.appendChild(box);
+  }
+  if (current.setNote) {
+    const note = document.createElement('p');
+    note.className = 'bag-set';
+    note.textContent = current.setNote;
+    detail.appendChild(note);
+  }
+  const held = bagHoldChoices(current);
+  const actions = current.actions
+    ? current.actions.slice()
+    : (held.use ? [held.use] : []);
+  if (held.drop) {
+    actions.push({
+      label: held.drop.label || 'Drop',
+      run: (done) => {
+        if (game.dropBagItem(held.drop)) done();
+      },
+    });
+  }
+  if (actions.length) {
+    const row = document.createElement('div');
+    row.className = 'bag-acts';
+    for (const act of actions) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bag-act';
+      b.textContent = act.label;
+      b.onclick = () => act.run(paint);
+      row.appendChild(b);
+    }
+    detail.appendChild(row);
+  }
 }
 
 function bindBagHold(button, { onSelect, onMenu }) {
@@ -258,7 +297,7 @@ function openBagMenu(anchor, item, game, paint) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'bag-ask-drop';
-    b.textContent = 'Drop';
+    b.textContent = drop.label || 'Drop';
     b.onclick = () => {
       closeBagAsk();
       if (game.dropBagItem(drop)) paint();
@@ -319,6 +358,7 @@ function heldStats(it) {
 }
 
 function emptyText(tab) {
+  if (tab === 'bag') return `The bag holds ${BAG_SLOTS} slots.`;
   if (tab === 'carried') return 'Weapons and supplies on your hotbar show up here.';
   if (tab === 'tools') return 'The tinderbox lights logs you have chopped.';
   if (tab === 'goods') return 'Ore, fish, and logs are kept here. Chop birch, oak, and maple west of town.';
@@ -385,8 +425,10 @@ function collect(game) {
 
   const goods = [];
   const seenGoods = new Set();
-  const sessionIds = Object.keys(game.progress.data?.goods || {}).filter((id) => GOODS[id]?.session);
-  for (const id of [...sessionIds, ...GOODS_ORDER]) {
+  const ownedIds = Object.keys(game.progress.data?.goods || {}).filter((id) => GOODS[id]);
+  const sessionIds = ownedIds.filter((id) => GOODS[id].session);
+  const extraIds = ownedIds.filter((id) => !GOODS[id].session && !GOODS_ORDER.includes(id));
+  for (const id of [...sessionIds, ...GOODS_ORDER, ...extraIds]) {
     if (seenGoods.has(id)) continue;
     seenGoods.add(id);
     const total = game.progress.good(id);
@@ -444,9 +486,18 @@ function collect(game) {
         canvas: () => renderThumb({ kind: 'good', id }, 96),
         action,
         actions,
-        drop: { k: 'good', id, n, name: g.name },
+        drop: { k: 'good', id, n: 1, name: g.name, label: n > 1 ? 'Drop 1' : 'Drop' },
         run,
       });
+      const cell = goods[goods.length - 1];
+      if (n > 1) {
+        const pile = { k: 'good', id, n, name: g.name };
+        const actions = cell.actions ? cell.actions.slice() : (cell.action && cell.run ? [{ label: cell.action, run: cell.run }] : []);
+        actions.push({ label: `Drop ${n}`, run: (paint) => { if (game.dropBagItem(pile)) paint(); } });
+        cell.actions = actions;
+        cell.action = null;
+        cell.run = null;
+      }
     });
   }
 
@@ -483,8 +534,13 @@ function collect(game) {
         badge: String(n),
         n,
         canvas: () => renderThumb({ kind: 'material', id }, 96),
-        drop: { k: 'part', id, n, name: MATERIALS[id].name },
+        drop: { k: 'part', id, n: 1, name: MATERIALS[id].name, label: n > 1 ? 'Drop 1' : 'Drop' },
       });
+      if (n > 1) {
+        const cell = parts[parts.length - 1];
+        const pile = { k: 'part', id, n, name: MATERIALS[id].name };
+        cell.actions = [{ label: `Drop ${n}`, run: (paint) => { if (game.dropBagItem(pile)) paint(); } }];
+      }
     });
   }
 

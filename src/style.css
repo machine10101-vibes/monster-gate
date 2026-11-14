@@ -2605,6 +2605,18 @@ body.touch .how {
   grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
   gap: 8px;
 }
+.bag-grid.slots {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.bag-cell.empty {
+  min-height: 72px;
+  border-style: dashed;
+  border-color: #3b3f4a;
+  background: #14161a;
+  cursor: default;
+  opacity: 1;
+}
+.bag-cell.empty:disabled { opacity: 1; }
 .bag-detail {
   position: sticky;
   top: 8px;
@@ -3618,6 +3630,8 @@ body.touch .cat-actions { margin-top: 8px; }
 body.touch .bag-tabs { gap: 4px; margin-bottom: 6px; }
 body.touch .bag section { margin-bottom: 8px; }
 body.touch .bag-grid { gap: 6px; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+body.touch .bag-grid.slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+body.touch .bag-cell.empty { min-height: 52px; }
 body.touch .bag-cell { min-height: 0; padding: 4px; }
 body.touch .bag-cell canvas { width: 44px; height: 44px; }
 body.touch .bag-detail { gap: 4px; min-height: 0; padding: 8px; }
