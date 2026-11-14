@@ -131,7 +131,7 @@ export function mountCarve(body, game) {
     if (!any) {
       const note = document.createElement('p');
       note.className = 'cat-muted';
-      note.textContent = 'No logs in the bag. Birch, oak and maple each make their own shafts.';
+      note.textContent = 'No logs in the bag. Any log you chop shaves into shafts of that wood.';
       body.appendChild(note);
     }
     const have = document.createElement('p');

@@ -26,6 +26,10 @@ export const TEMPLATES = [
   { id: 'birch', kind: 'gather', good: 'birch_logs', need: 4, skill: 'woodcutting', minSkill: 1, label: 'Birch logs' },
   { id: 'oak', kind: 'gather', good: 'oak_logs', need: 3, skill: 'woodcutting', minSkill: 1, label: 'Oak logs' },
   { id: 'maple', kind: 'gather', good: 'maple_logs', need: 2, skill: 'woodcutting', minSkill: 10, label: 'Maple logs' },
+  { id: 'pine', kind: 'gather', good: 'pine_logs', need: 4, skill: 'woodcutting', minSkill: 1, label: 'Pine logs' },
+  { id: 'redoak', kind: 'gather', good: 'redoak_logs', need: 3, skill: 'woodcutting', minSkill: 28, label: 'Red Oak logs' },
+  { id: 'walnut', kind: 'gather', good: 'walnut_logs', need: 2, skill: 'woodcutting', minSkill: 60, label: 'Black Walnut logs' },
+  { id: 'ebony', kind: 'gather', good: 'ebony_logs', need: 1, skill: 'woodcutting', minSkill: 96, label: 'Ebony logs' },
 ];
 
 export const TEMPLATE_BY_ID = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]));
