@@ -22,12 +22,12 @@ function closeBagAsk() {
 }
 
 const TABS = [
-  ['bag', 'Bag'],
-  ['carried', 'Hotbar'],
-  ['tools', 'Tools'],
-  ['goods', 'Gathered'],
-  ['gear', 'Gear'],
-  ['parts', 'Parts'],
+  ['bag', 'Bag', 'bag'],
+  ['carried', 'Hotbar', 'blade'],
+  ['tools', 'Tools', 'pick'],
+  ['goods', 'Gathered', 'potion'],
+  ['gear', 'Gear', 'gear'],
+  ['parts', 'Parts', 'shield'],
 ];
 
 function slotList(groups) {
@@ -37,68 +37,116 @@ function slotList(groups) {
   return cells;
 }
 
-/** The hunter's bag. The Bag tab is 40 slots. Other tabs sort the same hunt. */
+function filterIcon(name) {
+  const cv = document.createElement('canvas');
+  cv.width = 16;
+  cv.height = 16;
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(iconCanvas(name), 0, 0);
+  return cv;
+}
+
+function searchGlyph() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'bag-search-ico');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = '<circle cx="7" cy="7" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 10.4 L14 14" stroke="currentColor" stroke-width="1.6"/>';
+  return svg;
+}
+
+/** The hunter's bag. The Bag tab is 40 slots, laid out like a RuneScape pack. */
 export function mountBag(body, game) {
   let tab = 'bag';
   let sel = null;
-  let built = '';
+  let query = '';
+
+  const root = document.createElement('div');
+  root.className = 'bag rs';
+
+  const filters = document.createElement('div');
+  filters.className = 'bag-filters';
+  const tabButtons = [];
+  for (const [id, label, icon] of TABS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bag-tab';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.appendChild(filterIcon(icon));
+    b.onclick = () => {
+      tab = id;
+      query = '';
+      search.value = '';
+      sel = null;
+      paint('tab');
+    };
+    tabButtons.push([id, label, b]);
+    filters.appendChild(b);
+  }
+  const gold = document.createElement('p');
+  gold.className = 'bag-gold';
+  filters.appendChild(gold);
+
+  const scroller = document.createElement('div');
+  scroller.className = 'bag-scroll';
+  const grid = document.createElement('div');
+  scroller.appendChild(grid);
+
+  const examine = document.createElement('div');
+  examine.className = 'bag-examine';
+
+  const searchWrap = document.createElement('label');
+  searchWrap.className = 'bag-search';
+  searchWrap.appendChild(searchGlyph());
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.placeholder = 'Search...';
+  search.setAttribute('aria-label', 'Search inventory');
+  search.addEventListener('input', () => {
+    query = search.value;
+    paint('grid');
+  });
+  searchWrap.appendChild(search);
+
+  root.append(filters, scroller, examine, searchWrap);
+  body.appendChild(root);
 
   const paint = (mode = 'full') => {
     closeBagAsk();
     const groups = collect(game);
     groups.bag = slotList(groups);
-    const list = groups[tab];
+    const q = query.trim().toLowerCase();
+    const source = groups[tab] || [];
+    const list = q ? source.filter((it) => it && it.name.toLowerCase().includes(q)) : source;
     const filled = list.filter(Boolean);
     if (!filled.some((it) => it.key === sel)) sel = filled[0]?.key || null;
-    const signature = `${tab}|${list.map((it) => (it ? `${it.key}:${it.badge || ''}:${it.worn ? 1 : 0}` : '.')).join(',')}`;
-    const scroller = body.closest('.panel-card');
-    const top = scroller ? scroller.scrollTop : 0;
-    if (mode === 'select' && signature === built && body.querySelector('.bag-grid')) {
-      body.querySelectorAll('.bag-cell').forEach((b) => b.classList.toggle('sel', b.dataset.key === sel));
-      const detail = body.querySelector('.bag-detail');
-      if (detail) fillDetail(detail, filled.find((it) => it.key === sel) || null, game, paint);
+    const current = filled.find((it) => it.key === sel) || null;
+    const signature = `${tab}|${q}|${list.map((it) => (it ? `${it.key}:${it.badge || ''}:${it.worn ? 1 : 0}` : '.')).join(',')}`;
+
+    gold.textContent = `Gold ${game.gold} · ${game.progress.bagSlotsUsed()} / ${BAG_SLOTS} slots`;
+    for (const [id, label, b] of tabButtons) {
+      const n = id === 'bag' ? game.progress.bagSlotsUsed() : (groups[id] || []).filter(Boolean).length;
+      b.classList.toggle('on', id === tab);
+      b.setAttribute('aria-label', `${label} ${n}`);
+    }
+
+    if (mode === 'select' && grid.dataset.built === signature) {
+      grid.querySelectorAll('.bag-cell').forEach((b) => b.classList.toggle('sel', b.dataset.key === sel));
+      fillDetail(examine, current, game, paint);
       flushThumbs(240);
       return;
     }
-    built = signature;
-    body.innerHTML = '';
-    const root = document.createElement('div');
-    root.className = 'bag';
 
-    const gold = document.createElement('p');
-    gold.className = 'bag-gold';
-    gold.textContent = `Gold ${game.gold} · ${game.progress.bagSlotsUsed()} / ${BAG_SLOTS} slots`;
-    root.appendChild(gold);
-    const hint = document.createElement('p');
-    hint.className = 'bag-hint';
-    hint.textContent = 'Hold an item to Use or Drop it.';
-    root.appendChild(hint);
-
-    const tabs = document.createElement('div');
-    tabs.className = 'bag-tabs';
-    for (const [id, label] of TABS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'bag-tab' + (id === tab ? ' on' : '');
-      const n = id === 'bag' ? game.progress.bagSlotsUsed() : groups[id].filter(Boolean).length;
-      b.textContent = `${label} ${n}`;
-      b.onclick = () => {
-        tab = id;
-        sel = (id === 'bag' ? groups.bag : groups[id]).find(Boolean)?.key || null;
-        paint();
-      };
-      tabs.appendChild(b);
-    }
-    root.appendChild(tabs);
-
-    const stage = document.createElement('div');
-    stage.className = 'bag-stage';
-    const grid = document.createElement('div');
+    const top = scroller.scrollTop;
+    grid.dataset.built = signature;
     grid.className = 'bag-grid' + (tab === 'bag' ? ' slots' : '');
-    if (!filled.length && tab !== 'bag') {
+    grid.innerHTML = '';
+    if (!filled.length && (tab !== 'bag' || q)) {
       const p = document.createElement('p');
       p.className = 'bag-empty';
-      p.textContent = emptyText(tab);
+      p.textContent = q ? 'Nothing matches that search.' : emptyText(tab);
       grid.appendChild(p);
     }
     for (const it of list) {
@@ -136,15 +184,8 @@ export function mountBag(body, game) {
       });
       grid.appendChild(b);
     }
-    stage.appendChild(grid);
-
-    const detail = document.createElement('aside');
-    detail.className = 'bag-detail';
-    fillDetail(detail, filled.find((it) => it.key === sel) || null, game, paint);
-    stage.appendChild(detail);
-    root.appendChild(stage);
-    body.appendChild(root);
-    if (scroller) scroller.scrollTop = top;
+    fillDetail(examine, current, game, paint);
+    scroller.scrollTop = mode === 'grid' || mode === 'tab' ? 0 : top;
     flushThumbs(240);
   };
 
@@ -156,11 +197,11 @@ function fillDetail(detail, current, game, paint) {
   detail.innerHTML = '';
   if (!current) {
     const p = document.createElement('span');
-    p.textContent = `Empty slot. The bag holds ${BAG_SLOTS}.`;
+    p.className = 'bag-hint';
+    p.textContent = 'Hold an item to Use or Drop it.';
     detail.appendChild(p);
     return;
   }
-  detail.appendChild(current.canvas());
   const name = document.createElement('b');
   name.textContent = current.name;
   const sub = document.createElement('span');
