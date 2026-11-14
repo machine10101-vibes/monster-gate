@@ -63,7 +63,8 @@ test('the hunt save keeps one total per item, with no count cap', () => {
   assert.equal(p.good('copper_ore'), 5000);
 });
 
-test('a full 28-slot bag rejects new stacks and leftover harvest', () => {
+test('a full 40-slot bag rejects new stacks and leftover harvest', () => {
+  assert.equal(BAG_SLOTS, 40);
   const ids = GOODS_ORDER.slice(0, BAG_SLOTS);
   assert.equal(ids.length, BAG_SLOTS);
   const goods = Object.fromEntries(ids.map((id) => [id, 1]));
@@ -92,6 +93,42 @@ test('saves and the hunter function still store one total per item', () => {
   assert.doesNotMatch(progress, /goods\[id\]\s*=\s*\[/);
   assert.match(hunter, /from\("hunter_accounts"\)/);
   assert.doesNotMatch(hunter, /splitStacks/);
+});
+
+test('a full bag does not swallow quiver arrows or grow past 40', () => {
+  const ids = GOODS_ORDER.filter((id) => id !== 'iron_arrow').slice(0, BAG_SLOTS - 1);
+  assert.equal(ids.length, BAG_SLOTS - 1);
+  const p = hunt({
+    goods: Object.fromEntries(ids.map((id) => [id, 1])),
+    crafted: { knife: true, quiver: true },
+    armor: { quiver: 'quiver' },
+    ammo: 'iron_arrow',
+    quiverLoad: { id: 'iron_arrow', n: 20 },
+  });
+  assert.equal(p.bagSlotsUsed(), BAG_SLOTS);
+  assert.equal(p.quiverFitsBag(), false);
+  assert.equal(p.setAmmo('iron_arrow'), false);
+  assert.equal(p.good('iron_arrow'), 0);
+  assert.equal(p.data.quiverLoad.n, 20);
+  assert.equal(p.toggleWear('quiver'), false);
+  assert.equal(p.worn('quiver'), true);
+  assert.equal(p.bagSlotsUsed(), BAG_SLOTS);
+  p.data.goods[ids[0]] = 0;
+  delete p.data.goods[ids[0]];
+  assert.equal(p.quiverFitsBag(), true);
+  assert.equal(p.toggleWear('quiver'), true);
+  assert.equal(p.worn('quiver'), false);
+  assert.equal(p.good('iron_arrow'), 20);
+  assert.equal(p.bagSlotsUsed(), BAG_SLOTS);
+});
+
+test('the crate stores what fits when a pile is larger than the free slots', () => {
+  const p = hunt();
+  assert.equal(p.roomInStorage('good', 'copper_ore', 45), 45);
+  assert.equal(p.putStorage('good', 'copper_ore', 20 * 29), true);
+  assert.equal(p.storageUsed(), 29);
+  assert.equal(p.roomInStorage('good', 'tin_ore', 45), 20);
+  assert.equal(p.roomInStorage('good', 'copper_ore', 45), 20);
 });
 
 test('storage occupancy is also ceil(n/20) and 45 shows as three cells', () => {

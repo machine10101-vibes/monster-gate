@@ -2605,6 +2605,18 @@ body.touch .how {
   grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
   gap: 8px;
 }
+.bag-grid.slots {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.bag-cell.empty {
+  min-height: 72px;
+  border-style: dashed;
+  border-color: #3b3f4a;
+  background: #14161a;
+  cursor: default;
+  opacity: 1;
+}
+.bag-cell.empty:disabled { opacity: 1; }
 .bag-detail {
   position: sticky;
   top: 8px;
@@ -3618,6 +3630,8 @@ body.touch .cat-actions { margin-top: 8px; }
 body.touch .bag-tabs { gap: 4px; margin-bottom: 6px; }
 body.touch .bag section { margin-bottom: 8px; }
 body.touch .bag-grid { gap: 6px; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+body.touch .bag-grid.slots { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+body.touch .bag-cell.empty { min-height: 52px; }
 body.touch .bag-cell { min-height: 0; padding: 4px; }
 body.touch .bag-cell canvas { width: 44px; height: 44px; }
 body.touch .bag-detail { gap: 4px; min-height: 0; padding: 8px; }
@@ -4592,3 +4606,226 @@ html.windows-open #debug-badge,
 html:has(#panel:not(.hidden)) #debug-badge {
   visibility: hidden;
 }
+
+/* RuneScape pack: icon filters, square slots, search pinned at the bottom. */
+.panel-card.bag-sheet {
+  width: min(560px, 96vw);
+  max-height: min(92vh, 780px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+  background: #1a1510;
+  border: 2px solid #a68445;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px #3a2c18,
+    inset 0 0 0 1px #6b542c,
+    0 18px 40px rgba(0, 0, 0, 0.75);
+}
+.panel-card.bag-sheet h2 {
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 11px 48px 9px;
+  color: #e7c56a;
+  background: linear-gradient(#2e261c, #1a1510 80%);
+  border-bottom: 1px solid rgba(198, 161, 90, 0.45);
+}
+.panel-card.bag-sheet #panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 10px;
+  overflow: hidden;
+}
+.bag.rs {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bag.rs .bag-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+}
+.bag.rs .bag-tab {
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  border-radius: 2px;
+  border: 1px solid #4a3b28;
+  background: #241c14;
+  box-shadow: inset 0 0 0 1px #120e0a;
+}
+.bag.rs .bag-tab canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+.bag.rs .bag-tab.on {
+  border-color: #ffe14a;
+  background: #3d3218;
+  box-shadow: inset 0 0 0 1px #ffe14a, 0 0 8px rgba(255, 210, 70, 0.35);
+}
+.bag.rs .bag-gold {
+  margin: 0 0 0 auto;
+  padding-left: 8px;
+  color: #e7c56a;
+  font-family: var(--font-px);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.bag.rs .bag-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(52vh, 440px);
+  overflow: auto;
+  padding: 4px 6px 4px 4px;
+  background: #14110e;
+  border: 1px solid #3a2e22;
+  scrollbar-color: #c6a15a #1a140f;
+  scrollbar-width: thin;
+}
+.bag.rs .bag-scroll::-webkit-scrollbar { width: 10px; }
+.bag.rs .bag-scroll::-webkit-scrollbar-track { background: #1a140f; }
+.bag.rs .bag-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(#e6c36a, #8a6a32);
+  border: 2px solid #1a140f;
+}
+.bag.rs .bag-grid,
+.bag.rs .bag-grid.slots {
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 2px;
+}
+.bag.rs .bag-cell {
+  aspect-ratio: 1;
+  min-height: 0;
+  padding: 1px;
+  gap: 0;
+  border-radius: 1px;
+  border: 1px solid #3d3226;
+  background: #221c16;
+  box-shadow: inset 0 0 0 1px #0d0b09;
+}
+.bag.rs .bag-cell canvas {
+  width: 82%;
+  height: 82%;
+  background: transparent;
+  border-radius: 0;
+}
+.bag.rs .bag-cell.empty {
+  min-height: 0;
+  border-style: solid;
+  border-color: #2c241c;
+  background: #16130f;
+  opacity: 1;
+}
+.bag.rs .bag-cell:hover:not(.empty):not(:disabled) {
+  border-color: #c6a15a;
+}
+.bag.rs .bag-cell.sel {
+  border-color: #ffe14a;
+  background: radial-gradient(circle, rgba(255, 214, 80, 0.42), rgba(80, 60, 16, 0.2) 72%);
+  box-shadow: inset 0 0 10px rgba(255, 210, 60, 0.65), 0 0 0 1px #ffe14a;
+}
+.bag.rs .bag-cell.worn { border-color: #e2b84a; }
+.bag.rs .bag-n,
+.bag.rs .bag-worn {
+  right: 2px;
+  bottom: 0;
+  top: auto;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  color: #ffe56a;
+  font-size: 9px;
+  line-height: 1;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+}
+.bag.rs .bag-worn {
+  left: 2px;
+  right: auto;
+  font-size: 7px;
+  letter-spacing: 0;
+}
+.bag.rs .bag-empty {
+  grid-column: 1 / -1;
+  margin: 12px 4px;
+  text-align: center;
+}
+.bag.rs .bag-examine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-height: 22px;
+  color: #f0e2c0;
+}
+.bag.rs .bag-examine b { color: #ffe7a0; font-size: 14px; }
+.bag.rs .bag-examine > span {
+  flex: 1 1 140px;
+  min-width: 0;
+  color: #b7a88a;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bag.rs .bag-hint { margin: 0; color: #8d7d64; font-size: 12px; }
+.bag.rs .bag-stats {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px 10px;
+}
+.bag.rs .bag-stats div { padding: 0; border: 0; }
+.bag.rs .bag-set { flex: 1 1 100%; margin: 0; }
+.bag.rs .bag-acts { margin: 0 0 0 auto; }
+.bag.rs .bag-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  color: #c6a15a;
+  background: #100e0c;
+  border: 1px solid #6a5430;
+  border-radius: 2px;
+}
+.bag.rs .bag-search-ico { width: 16px; height: 16px; flex: none; }
+.bag.rs .bag-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: #f3ead8;
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  text-align: center;
+}
+.bag.rs .bag-search input::placeholder { color: #8a7a62; }
+.bag.rs .bag-search input:focus { outline: none; }
+body.touch .panel-card.bag-sheet,
+body.touch .panel-card.wide.bag-sheet {
+  width: auto;
+  max-width: none;
+}
+body.touch .bag.rs .bag-scroll { max-height: none; }
+body.touch .bag.rs .bag-grid,
+body.touch .bag.rs .bag-grid.slots {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+}
+body.touch .bag.rs .bag-cell,
+body.touch .bag.rs .bag-cell.empty {
+  min-height: 0;
+  padding: 2px;
+}
+body.touch .bag.rs .bag-cell canvas { width: 82%; height: 82%; }

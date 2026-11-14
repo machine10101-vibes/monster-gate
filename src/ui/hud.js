@@ -585,6 +585,7 @@ export class HUD {
     const card = this.el.panel.querySelector('.panel-card');
     const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
     card?.classList.toggle('wide', wide);
+    card?.classList.toggle('bag-sheet', name === 'bag');
     card?.classList.toggle('adventures', name === 'quest');
     card?.querySelectorAll(':scope > .mg-corner').forEach((n) => n.remove());
     if (name !== 'quest') decorateFrame(card);
@@ -905,7 +906,7 @@ export class HUD {
     this.runCleanup();
     this.panelId = null;
     this.journalRefresh = null;
-    this.el.panel.querySelector('.panel-card')?.classList.remove('adventures', 'wide');
+    this.el.panel.querySelector('.panel-card')?.classList.remove('adventures', 'wide', 'bag-sheet');
     this.el.panel.classList.add('hidden');
     this.syncWindows();
   }
