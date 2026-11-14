@@ -126,6 +126,42 @@ function paintMinimapArrow(ctx, x, y, yaw, { fill = '#e9fff1', stroke = '#000', 
   ctx.restore();
 }
 
+/** Saturated blue, distinct from the cyan waygate and the pale arrows of other hunters. */
+export const PARTY_DOT = '#2f7dff';
+export const PARTY_DOT_CORE = '#e7f2ff';
+
+/** Halo size and strength for a party blip. `time` is seconds. */
+export function partyDotPulse(time) {
+  const wave = 0.5 + 0.5 * Math.sin(Number(time) * 5);
+  return {
+    wave,
+    halo: 3.4 + wave * 2.8,
+    core: 2.15 + wave * 0.7,
+    alpha: 0.22 + wave * 0.48,
+  };
+}
+
+function paintPartyDot(ctx, x, y, time) {
+  const pulse = partyDotPulse(time);
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = `rgba(47, 125, 255, ${pulse.alpha.toFixed(3)})`;
+  ctx.arc(x, y, pulse.halo, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle = PARTY_DOT;
+  ctx.arc(x, y, pulse.core, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#071433';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.fillStyle = PARTY_DOT_CORE;
+  ctx.arc(x, y, 1.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export class HUD {
   constructor() {
     const $ = (id) => document.getElementById(id);
@@ -548,14 +584,18 @@ export class HUD {
     }
     ctx.fillStyle = '#5ad0ff';
     for (const n of npcs) if (inView(n.x, n.z)) ctx.fillRect(toX(n.x) - 2, toZ(n.z) - 2, 4, 4);
+    const mates = [];
     if (remotes) {
       for (const r of remotes) {
         if (!r.ready || !inView(r.x, r.z)) continue;
-        const mate = isPartyRemote(r, partyOf);
+        if (isPartyRemote(r, partyOf)) {
+          mates.push(r);
+          continue;
+        }
         paintMinimapArrow(ctx, toX(r.x), toZ(r.z), r.yaw, {
-          fill: mate ? '#ffe27a' : '#9ad7ff',
-          stroke: mate ? '#6a4a10' : '#14343a',
-          scale: mate ? 0.78 : 0.62,
+          fill: '#9ad7ff',
+          stroke: '#14343a',
+          scale: 0.62,
         });
       }
     }
@@ -567,6 +607,7 @@ export class HUD {
       ctx.fillRect(toX(m.x) - 1, toZ(m.z) - 1, 2, 2);
       ctx.fillStyle = '#ff4d4d';
     }
+    for (const r of mates) paintPartyDot(ctx, toX(r.x), toZ(r.z), time);
     paintMinimapArrow(ctx, toX(px), toZ(pz), yaw);
     const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, cv.width * 0.35, cv.width / 2, cv.height / 2, cv.width * 0.72);
     g.addColorStop(0, 'rgba(0,0,0,0)');
