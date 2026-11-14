@@ -146,30 +146,19 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   const mobile = opts.mobile ?? (typeof matchMedia === 'function' && matchMedia('(max-width: 900px), (max-height: 520px)').matches);
   const startedAt = opts.now ?? Date.now();
   const fadeMs = opts.fadeMs ?? LOAD_FADE_MS;
-  const raf = opts.requestAnimationFrame || globalThis.requestAnimationFrame;
-  const caf = opts.cancelAnimationFrame || globalThis.cancelAnimationFrame;
   let tipIndex = 0;
   let tipTimer = 0;
   let held = false;
-  let rafId = 0;
-  let keyed = false;
 
   el.classList.toggle('reduced', reduced);
   spawnEmbers(embers, emberCount({ mobile, reduced }), (tag) => doc.createElement(tag));
 
   const paint = (src) => {
     if (!keySourceToCanvas(src, canvas)) return false;
-    keyed = true;
     canvas.classList?.add?.('on');
     stage?.classList?.add?.('is-keyed');
     el.classList.add('keyed');
     return true;
-  };
-
-  const paintVideo = () => {
-    if (!video || reduced) return paint(poster);
-    if ((video.readyState || 0) >= 2) return paint(video);
-    return paint(poster);
   };
 
   const hold = () => {
@@ -177,37 +166,28 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     if (holdVideoAtLogo(video)) {
       held = true;
       el.classList.add('held');
-      paint(video);
     }
   };
 
-  const tick = () => {
-    rafId = 0;
-    if (held || reduced) {
-      paintVideo();
-      return;
-    }
-    paintVideo();
-    if (typeof raf === 'function') rafId = raf(tick);
-  };
-
-  if (poster && !poster.complete) poster.addEventListener?.('load', () => { if (!keyed || reduced || held) paint(poster); });
-  else if (poster) paint(poster);
-
+  // The clip plays on the video element. Copying each frame through a canvas
+  // readback runs on the main thread while the world is building, so the
+  // animation freezes and the logo gets resampled. The decoder keeps the
+  // original 24 fps timing even when that work is busy.
   if (reduced) {
     try { video?.pause?.(); } catch { /* ignore */ }
-    paint(poster);
   } else if (video) {
     video.loop = false;
     video.muted = true;
     video.playsInline = true;
     video.addEventListener('timeupdate', hold);
     video.addEventListener('ended', hold);
-    video.addEventListener('seeked', () => paint(video));
-    video.addEventListener('play', () => { if (!rafId && typeof raf === 'function') rafId = raf(tick); });
     const play = video.play?.();
-    if (play && typeof play.catch === 'function') play.catch(() => { el.classList.add('held'); paintVideo(); });
-    if (typeof raf === 'function') rafId = raf(tick);
+    if (play && typeof play.catch === 'function') {
+      play.catch(() => {
+        el.classList.add('held');
+        paint(poster);
+      });
+    }
   }
 
   if (tipEl) {
@@ -235,7 +215,6 @@ export function mountLoading(root = globalThis.document, opts = {}) {
       el.classList.add('hidden');
       el.setAttribute('aria-hidden', 'true');
       try { video?.pause?.(); } catch { /* ignore */ }
-      if (rafId && typeof caf === 'function') caf(rafId);
       if (tipTimer) (opts.clearInterval || clearInterval)(tipTimer);
       return true;
     },

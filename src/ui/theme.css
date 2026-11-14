@@ -536,8 +536,14 @@ h1 em,
   mask-repeat: no-repeat;
 }
 .load-poster { z-index: 0; }
-#load-video { z-index: 1; }
-.load-key { z-index: 2; }
+#load-video {
+  z-index: 1;
+  /* Own compositor layer so world-build work on the main thread does not stall the clip. */
+  transform: translateZ(0);
+}
+.load-key { z-index: 2; visibility: hidden; }
+#loading.keyed .load-key,
+.load-stage.is-keyed .load-key { visibility: visible; }
 #loading.keyed #load-video,
 #loading.keyed .load-poster,
 .load-stage.is-keyed #load-video,
