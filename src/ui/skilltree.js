@@ -27,6 +27,9 @@ const SHAPES = {
   nova: [[7, 2, 2, 2], [7, 12, 2, 2], [2, 7, 2, 2], [12, 7, 2, 2], [5, 5, 6, 6], [7, 7, 2, 2]],
   spark: [[8, 1, 2, 4], [5, 5, 4, 2], [9, 6, 3, 3], [6, 9, 3, 4], [4, 11, 2, 2]],
   chain: [[2, 3, 2, 2], [4, 5, 3, 2], [7, 7, 3, 2], [10, 5, 3, 2], [12, 8, 2, 2], [8, 10, 3, 2]],
+  cross: [[7, 1, 2, 14], [2, 4, 12, 2]],
+  hammer: [[7, 1, 2, 11], [3, 2, 10, 3], [4, 5, 8, 1]],
+  ring: [[5, 2, 6, 2], [3, 4, 2, 8], [11, 4, 2, 8], [5, 12, 6, 2], [6, 6, 4, 4]],
 };
 
 const ACCENT = {
@@ -37,6 +40,9 @@ const ACCENT = {
   spark: [[9, 2, 1, 2]],
   eye: [[7, 7, 2, 2]],
   mark: [[7, 4, 2, 2]],
+  cross: [[7, 4, 2, 2]],
+  hammer: [[4, 2, 8, 2]],
+  ring: [[7, 7, 2, 2]],
 };
 
 export function paintSkillIcon(canvas, shape, tint) {
@@ -64,9 +70,10 @@ const ATTR_SHAPE = {
   vitality: 'heart', might: 'axe', guard: 'shield', wrath: 'drop',
   endurance: 'leap', precision: 'eye', agility: 'arrow', toxin: 'poison',
   spiritwell: 'nova', arcana: 'spark', focus: 'mark', potency: 'fire',
+  faith: 'cross', grace: 'spark', valor: 'axe', resolve: 'shield',
 };
 const WEAPON_SHAPE = {
-  swordshield: 'bash', twohand: 'axe', dual: 'execute',
+  swordshield: 'bash', twohand: 'axe', dual: 'execute', smitearm: 'hammer',
   shortbow: 'arrow', longbow: 'shot', crossbow: 'mark',
   staff: 'wave', wand: 'spark', tome: 'eye',
 };
@@ -114,7 +121,7 @@ export function mountSkillTree(body, game) {
     intro.className = 'sk-intro';
     const slain = Math.max(0, game.progress.totalKills() - game.progress.kills('chicken'));
     const banked = Math.floor(slain / SKILL_POINT_PER_KILLS);
-    intro.textContent = `Choose a path. You start with 2 points, plus 1 for every ${SKILL_POINT_PER_KILLS} monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on the round action buttons 1, 2, and 3 (keys Z, X, and V).`;
+    intro.textContent = `Choose a class. Warrior, Ranger, Mage, and Paladin are all here. You start with 2 points, plus 1 for every ${SKILL_POINT_PER_KILLS} monsters slain (${slain} slain, ${banked} banked). Passives turn on when learned. Actives and specials go on the round action buttons 1, 2, and 3 (keys Z, X, and V).`;
     root.appendChild(intro);
     const row = document.createElement('div');
     row.className = 'sk-pick';
@@ -180,7 +187,7 @@ export function mountSkillTree(body, game) {
     const change = document.createElement('button');
     change.type = 'button';
     change.className = 'sk-btn';
-    change.textContent = 'Change path';
+    change.textContent = 'Change class';
     change.onclick = () => {
       picking = true;
       paint();
