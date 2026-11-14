@@ -1,6 +1,7 @@
 import * as budgeMetal from './armor.js';
 import { makeMetalArmor } from './armorIron.js';
 import * as darkMetal from './armorDark.js';
+import * as volcanumMetal from './armorVolcanum.js';
 import * as frostMetal from './armorFrost.js';
 import { makeSoftArmor } from './armorSoft.js';
 import { withDetail } from './armorDetail.js';
@@ -13,6 +14,7 @@ const BUILD = {
   ...Object.fromEntries(METALS.map((m) => [m.setId, () => makeMetalArmor(m.armorPal)])),
   budgeset: () => budgeMetal,
   darksyceset: () => darkMetal,
+  volcanumset: () => volcanumMetal,
   yetiset: () => frostMetal,
   demonset: () => demonPlate,
   holyset: () => holyPlate,
@@ -20,6 +22,8 @@ const BUILD = {
   budgecloth: () => makeSoftArmor('budgecloth'),
   darkleather: () => makeSoftArmor('darkleather'),
   darkcloth: () => makeSoftArmor('darkcloth'),
+  volcanumleather: () => makeSoftArmor('volcanumleather'),
+  volcanumcloth: () => makeSoftArmor('volcanumcloth'),
   yetileather: () => makeSoftArmor('yetileather'),
   yeticloth: () => makeSoftArmor('yeticloth'),
   ...Object.fromEntries(JUNGLE_SETS.map((id) => [id, () => makeJungleArmor(id)])),

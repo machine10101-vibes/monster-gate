@@ -16,6 +16,13 @@ export const MATERIALS = {
   gloommembrane: { name: 'Gloom Membrane', desc: 'Wing skin the colour of dusk, laced with violet veins.' },
   duskhide: { name: 'Dusk Hide', desc: 'Supple indigo hide with a faint violet sheen. It takes a stitch well.' },
   gloomcore: { name: 'Gloom Core', desc: 'A fist-sized crystal of condensed dusk. It hums when it is near its owner.' },
+  cinderscale: { name: 'Cinder Scale', desc: 'Obsidian plate split by a thread of cooling lava. Still warm.' },
+  lavavein: { name: 'Lava Vein', desc: 'A ribbon of stone with liquid fire running through it. It never quite hardens.' },
+  ashmembrane: { name: 'Ash Membrane', desc: 'Purple wing skin veined with ember. Light, and hot along the seams.' },
+  obsidianclaw: { name: 'Obsidian Talon', desc: 'A pale claw the length of a forearm, blackened at the root.' },
+  spirehorn: { name: 'Spire Horn', desc: 'A horn like an obsidian spire, purple at the base and knife-sharp at the tip.' },
+  hearthcore: { name: 'Hearth Core', desc: 'The heart of the mountain, still beating. It throws heat you can see.' },
+  cinderhide: { name: 'Cinder Hide', desc: 'Black scaled hide, supple once the ash is beaten out of it.' },
   rimefur: { name: 'Rime Fur', desc: 'Shaggy blue-white fur stiff with frost. It crackles when you bend it.' },
   yetihide: { name: 'Yeti Hide', desc: 'Thick hide matted with ice. Warm on the inside, tough as a drum on the outside.' },
   glacierclaw: { name: 'Glacier Claw', desc: 'A curved claw the length of a forearm, cold enough to numb the hand that holds it.' },
@@ -35,7 +42,7 @@ export const MATERIALS = {
   scorpsting: { name: 'Scorpion Sting', desc: 'The hooked tip of a desert scorpion\'s tail. The point is still sharp.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'cinderscale', 'lavavein', 'ashmembrane', 'obsidianclaw', 'spirehorn', 'hearthcore', 'cinderhide', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -57,6 +64,15 @@ export const DROPS = {
     { id: 'duskclaw', chance: 0.6, qty: [1, 2], rate: 'Uncommon' },
     { id: 'scythehorn', chance: 0.45, qty: [1, 2], rate: 'Uncommon' },
     { id: 'gloomcore', chance: 0.3, qty: [1, 1], rate: 'Rare' },
+  ],
+  volcanum: [
+    { id: 'cinderscale', chance: 1, qty: [4, 7], rate: 'Common' },
+    { id: 'cinderhide', chance: 0.7, qty: [2, 4], rate: 'Common' },
+    { id: 'ashmembrane', chance: 0.75, qty: [2, 4], rate: 'Uncommon' },
+    { id: 'obsidianclaw', chance: 0.65, qty: [1, 3], rate: 'Uncommon' },
+    { id: 'spirehorn', chance: 0.5, qty: [1, 2], rate: 'Rare' },
+    { id: 'lavavein', chance: 0.45, qty: [1, 2], rate: 'Rare' },
+    { id: 'hearthcore', chance: 0.16, qty: [1, 1], rate: 'Very rare' },
   ],
   snowyeti: [
     { id: 'rimefur', chance: 1, qty: [3, 5], rate: 'Common' },
@@ -126,6 +142,10 @@ export const MONSTERS = [
   {
     id: 'darksycledragon', name: 'Darksycle Dragon', level: 7, temper: 'Calculating', style: 'Ranged', habitat: 'The cave in Southford, south of Oakhollow',
     desc: 'A graphite-scaled dragon with violet wings, a blue crystal crest and a glowing chest core. It hovers out of reach and hurls spinning crescents, then follows up with a homing gloom orb. Every so often it beats its wings and climbs high for about four seconds, raining crescents, gloom and crystal strikes from the air before diving at your position. Melee cannot reach it up there, so dodge the marked circles and use ranged attacks. Hit its wind-up hard to stagger it.',
+  },
+  {
+    id: 'volcanum', name: 'Volcanum', level: 300, temper: 'Sovereign', style: 'Ranged', habitat: 'The lava-moated isle on Cinderfall, world tile 13',
+    desc: 'The dragon of the volcanic wasteland. Obsidian plate, lava down the chest and the wing bones, purple membranes and a mouth that pours liquid fire. Holy knights and demon knights alike keep their keeps and will not hunt the mountain while he is awake. He circles his isle, rakes with pale claws, sweeps his tail, and breathes a stream of lava you have to step out of. Below half health the mountain wakes: the breath runs longer and he climbs to rain fire before he dives. A heavy hit during a claw or tail wind-up can stagger him. The breath, once it starts, does not.',
   },
   {
     id: 'snowyeti', name: 'Ravenous Snow Yeti', level: 9, temper: 'Ravenous', style: 'Brawler', habitat: 'The flat-topped mountain of Rimecrown, high in the Arctic north',
@@ -340,6 +360,21 @@ GEAR.push(
   weapon('yetiscythe', 'scythe', 'Whiteout Scythe', 'snowyeti', 'A great ice-claw blade on a fur-bound haft, with a frostheart-blue glow where the blade meets the shaft. It sweeps wide.', { frostshard: 3, rimefur: 2, glacierclaw: 1 }, M('twohand', 21, 2.9, 2.7, 0.56, 0.24, 12, 7, 'Two-handed. Long reach, wide sweep.')),
 );
 
+const VOLC = 'volcanum';
+GEAR.push(
+  weapon('volcsword', 'onesword', 'Hearthsaber', VOLC, 'An obsidian saber with a lava fuller and a horn guard the colour of cooling magma.', { spirehorn: 2, cinderscale: 2, obsidianclaw: 1 }, M('swordshield', 52, 2.6, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. Obsidian with a lava edge.'), { reqLevel: 42 }),
+  weapon('volcgreatsword', 'twosword', 'Volcanum\'s Greatsword', VOLC, 'A slab of cinder scale and spire horn. The fuller runs with liquid lava.', { spirehorn: 4, cinderscale: 4, lavavein: 1, hearthcore: 1 }, M('twohand', 78, 3.0, 2.6, 0.6, 0.27, 14, 10, 'Two-handed. The mountain, forged into a blade.'), { reqLevel: 48 }),
+  weapon('volcdual', 'dual', 'Twin Embers', VOLC, 'Two hooked talon blades. Each edge weeps a thread of lava.', { spirehorn: 3, cinderscale: 2, obsidianclaw: 2 }, M('dual', 36, 2.3, 1.9, 0.27, 0.11, 6, 4, 'Dual swords. Hooked obsidian blades.'), { reqLevel: 42 }),
+  weapon('volchammer', 'hammer', 'Caldera Maul', VOLC, 'A hearth core set in a cinder-scale head. It lands like a vent opening.', { cinderscale: 6, lavavein: 2, hearthcore: 1 }, M('twohand', 70, 2.6, 2.4, 0.76, 0.36, 17, 14, 'Two-handed. Splits stone and plate.'), { reqLevel: 48 }),
+  weapon('volcspear', 'spear', 'Spire Lance', VOLC, 'A spire horn head on a lava-veined shaft. It reaches across a moat.', { spirehorn: 2, cinderscale: 2, lavavein: 1, obsidianclaw: 1 }, M('twohand', 58, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, burning reach.'), { reqLevel: 42 }),
+  weapon('volcscythe', 'scythe', 'Ashfall Scythe', VOLC, 'A great talon blade on a horn haft, with lava where the blade meets the shaft.', { obsidianclaw: 3, spirehorn: 2, ashmembrane: 1, lavavein: 1 }, M('twohand', 56, 2.9, 2.7, 0.56, 0.24, 12, 8, 'Two-handed. Long reach, wide sweep.'), { reqLevel: 44 }),
+  weapon('volcstaff', 'staff', 'Hearthcore Staff', VOLC, 'Horns cradle a hearth core. It throws gobs of liquid lava.', { hearthcore: 1, spirehorn: 2, lavavein: 2, ashmembrane: 1 }, R('staff', 38, 0.62, 6, 'A war staff. Lobbed lava.', { spell: true, proj: 'lavabolt', shotLabel: 'Lava' }), { reqLevel: 42 }),
+  weapon('volcwand', 'wand', 'Emberfang Wand', VOLC, 'A talon-thin wand with a drop of lava caught at the tip.', { lavavein: 1, obsidianclaw: 1, ashmembrane: 1 }, R('wand', 26, 0.32, 4, 'A wand. Rapid lava bolts.', { spell: true, proj: 'lavabolt', shotLabel: 'Lava' }), { reqLevel: 40 }),
+  weapon('volcshortbow', 'shortbow', 'Cinder Shortbow', VOLC, 'A compact horn bow strung with heated sinew. It throws small bolts of lava.', { ashmembrane: 2, obsidianclaw: 1, cinderscale: 1 }, R('shortbow', 34, 0.36, 5, 'A short bow. Quick lava bolts.', { proj: 'lavabolt', shotLabel: 'Lava' }), { reqLevel: 40 }),
+  weapon('volcbow', 'longbow', 'Spire Wingbow', VOLC, 'A long bow of spire horn and ash membrane. The shot falls like a cinder.', { spirehorn: 2, ashmembrane: 2, lavavein: 1, cinderscale: 2 }, R('longbow', 46, 0.5, 8, 'A longbow. Heavy lava bolts.', { proj: 'lavabolt', shotLabel: 'Lava' }), { reqLevel: 44 }),
+  weapon('volccrossbow', 'crossbow', 'Magmalock Crossbow', VOLC, 'A cinder-scale stock and horn prods. Each bolt is a lump of lava.', { spirehorn: 1, cinderscale: 4, ashmembrane: 2, lavavein: 1 }, R('crossbow', 54, 0.64, 8, 'A crossbow. Slow, heavy lava.'), { reqLevel: 44 }),
+);
+
 const BUDGE_ARMOR = 'budgedragon';
 const DARK_ARMOR = 'darksycledragon';
 const YETI_ARMOR = 'snowyeti';
@@ -352,6 +387,7 @@ function armorSet(monster, set, defs) {
 GEAR.push(
   { id: 'budgeshield', type: 'armor', slot: 'shield', name: 'Budgescale Shield', monster: BUDGE_ARMOR, set: 'budgeset', def: 2, desc: 'A scale-faced kite shield with a horn boss and a gold-banded rim.', recipe: { budgescale: 5, budgehorn: 1, budgehide: 1 } },
   { id: 'darkshield', type: 'armor', slot: 'shield', name: 'Duskscale Shield', monster: DARK_ARMOR, set: 'darksyceset', def: 4, desc: 'An indigo scale shield with a gloom gem and a silver blade fin on each side.', recipe: { duskscale: 5, scythehorn: 1, gloommembrane: 1 } },
+  { id: 'volcshield', type: 'armor', slot: 'shield', name: 'Cinderscale Shield', monster: VOLC, set: 'volcanumset', def: 6, reqLevel: 40, desc: 'An obsidian kite shield with a hearth-core boss and a lava rim.', recipe: { cinderscale: 6, spirehorn: 1, lavavein: 1 } },
   { id: 'yetishield', type: 'armor', slot: 'shield', name: 'Glacierplate Shield', monster: YETI_ARMOR, set: 'yetiset', def: 3, desc: 'A slab of frost-shard plate in a rime-fur rim, with a frostheart blue boss and a claw fin on each side.', recipe: { frostshard: 4, rimefur: 3, frostheart: 1 } },
 );
 
@@ -384,6 +420,34 @@ armorSet(DARK_ARMOR, 'darkcloth', [
   ['legs', 'darkclothlegs', 'Gloomweave Trousers', 2, 'Dusk-silk trousers with a violet sash at each knee.', { gloommembrane: 3, duskhide: 1 }],
   ['boots', 'darkclothboots', 'Gloomweave Slippers', 0, 'Silent silk slippers that glow faintly at the heel.', { gloommembrane: 2, duskhide: 1 }],
   ['book', 'darkbook', 'Gloomcore Grimoire', 0, 'A membrane-bound tome that hums with a caged gloom core.', { gloomcore: 1, gloommembrane: 2, scythehorn: 1, duskhide: 1 }, { mana: 40, spell: 0.12 }],
+]);
+
+function armorSetReq(monster, set, req, defs) {
+  for (const [slot, id, name, def, desc, recipe, bonus] of defs) {
+    GEAR.push({ id, type: 'armor', slot, name, monster, set, def, desc, recipe, reqLevel: req, ...(bonus ? { bonus } : {}) });
+  }
+}
+armorSetReq(VOLC, 'volcanumset', 40, [
+  ['helm', 'volchelm', 'Cinderscale Helm', 4, 'An obsidian helm with purple spines and eyes that glow like vents.', { cinderscale: 4, spirehorn: 1, lavavein: 1 }],
+  ['chest', 'volcchest', 'Cinderscale Cuirass', 10, 'Black plate with a hearth core at the sternum and lava running the seams.', { cinderscale: 8, lavavein: 2, hearthcore: 1, ashmembrane: 1 }],
+  ['arms', 'volcarms', 'Cinderscale Gauntlets', 4, 'Obsidian gauntlets with talon knuckles and a lava line down each vambrace.', { cinderscale: 4, obsidianclaw: 2, lavavein: 1 }],
+  ['legs', 'volclegs', 'Cinderscale Greaves', 7, 'Heavy cinder greaves. The knees are purple crystal, the seams still hot.', { cinderscale: 6, lavavein: 1, cinderhide: 2 }],
+  ['boots', 'volcboots', 'Cinderscale Sabatons', 4, 'Broad obsidian boots with pale talon toes.', { cinderscale: 3, obsidianclaw: 2, cinderhide: 1 }],
+]);
+armorSetReq(VOLC, 'volcanumleather', 36, [
+  ['helm', 'volcleatherhelm', 'Ashhide Cowl', 3, 'Black hide with a purple fin and an ember brow.', { cinderhide: 4, obsidianclaw: 1 }],
+  ['chest', 'volcleatherchest', 'Ashhide Jerkin', 6, 'Cinder hide laced with lava-vein cord and a scale collar.', { cinderhide: 7, cinderscale: 3, lavavein: 1 }],
+  ['arms', 'volcleathergloves', 'Ashhide Gloves', 3, 'Dark hide gloves with obsidian talon bracers.', { cinderhide: 3, obsidianclaw: 1 }],
+  ['legs', 'volcleatherlegs', 'Ashhide Leggings', 4, 'Fitted black leggings with scale knees and ember stitching.', { cinderhide: 5, cinderscale: 2 }],
+  ['boots', 'volcleatherboots', 'Ashhide Boots', 3, 'Soft-soled boots with a pale talon toe cap.', { cinderhide: 3, obsidianclaw: 1 }],
+]);
+armorSetReq(VOLC, 'volcanumcloth', 36, [
+  ['helm', 'volcclothhood', 'Magmaweave Hood', 2, 'A purple hood with an ember gem and a trailing point.', { ashmembrane: 3, cinderhide: 1 }],
+  ['chest', 'volcclothrobe', 'Magmaweave Robe', 5, 'Ash-membrane robes with a hearth-core clasp and lava hem stitching.', { ashmembrane: 6, cinderhide: 2, hearthcore: 1 }],
+  ['arms', 'volcclothgloves', 'Magmaweave Gloves', 1, 'Purple gloves under flared cuffs threaded with lava.', { ashmembrane: 2, obsidianclaw: 1 }],
+  ['legs', 'volcclothlegs', 'Magmaweave Trousers', 3, 'Light membrane trousers with an ember sash at each knee.', { ashmembrane: 4, cinderhide: 1 }],
+  ['boots', 'volcclothboots', 'Magmaweave Slippers', 1, 'Silent slippers that glow at the heel.', { ashmembrane: 2, cinderhide: 1 }],
+  ['book', 'volcbook', 'Hearthcore Grimoire', 0, 'A membrane-bound tome clasped around a hearth core. The pages radiate heat.', { hearthcore: 1, ashmembrane: 3, spirehorn: 1, cinderhide: 1 }, { mana: 70, spell: 0.18 }],
 ]);
 
 armorSet(YETI_ARMOR, 'yetiset', [
@@ -552,6 +616,9 @@ export const SETS = [
   set('darksyceset', 'Duskscale Plate', DARK_ARMOR, 'metal', 'Warrior', { hp: 4, mana: 40 }, 'Full set: +4 max health (2 hearts) and +40 max mana.'),
   set('darkleather', 'Duskhide Leathers', DARK_ARMOR, 'leather', 'Ranger', { stamina: 40, crit: 0.08 }, 'Full set: +40 max stamina and +8% critical chance.'),
   set('darkcloth', 'Gloomweave Robes', DARK_ARMOR, 'cloth', 'Mage', { mana: 60, spell: 0.16 }, 'Full set: +60 max mana and +16% spell damage.'),
+  set('volcanumset', 'Cinderscale Plate', VOLC, 'metal', 'Warrior', { hp: 8, stamina: 16 }, 'Full set: +8 max health (4 hearts) and +16 max stamina.'),
+  set('volcanumleather', 'Ashhide Leathers', VOLC, 'leather', 'Ranger', { stamina: 60, crit: 0.12 }, 'Full set: +60 max stamina and +12% critical chance.'),
+  set('volcanumcloth', 'Magmaweave Robes', VOLC, 'cloth', 'Mage', { mana: 90, spell: 0.22 }, 'Full set: +90 max mana and +22% spell damage.'),
   set('yetiset', 'Glacierplate', YETI_ARMOR, 'metal', 'Warrior', { hp: 4, stamina: 10 }, 'Full set: +4 max health (2 hearts) and +10 max stamina.'),
   set('yetileather', 'Rimehide Leathers', YETI_ARMOR, 'leather', 'Ranger', { stamina: 30, ranged: 0.08 }, 'Full set: +30 max stamina and +8% ranged damage.'),
   set('yeticloth', 'Frostweave Robes', YETI_ARMOR, 'cloth', 'Mage', { mana: 36, spell: 0.1 }, 'Full set: +36 max mana and +10% spell damage.'),

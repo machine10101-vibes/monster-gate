@@ -52,7 +52,7 @@ const RING = {
   '3,2': ['warfield', 'North of Ashen Road. The Endless Field is the battleground of the Holy Knight and the Demon Knight, strewn with broken swords, shields, siege engines and the banners of both armies.'],
   '2,2': ['dawnspire', 'West of the Endless Field. Dawnspire is the Holy Knight\'s white marble castle, with gold-trimmed towers, a cathedral keep and a courtyard of blue fire.'],
   '3,1': ['hellspire', 'North of the Endless Field. Hellspire is the Demon Knight\'s black fortress, ringed in iron spikes, with lava in every crack and a gate shaped like a mouth.'],
-  '2,1': ['cinderfall', 'West of Hellspire. Cinderfall is a smoking volcano of black basalt, surrounded by obsidian spires, lava pools and magma vents.'],
+  '2,1': ['cinderfall', 'West of Hellspire. Cinderfall is a smoking volcano of black basalt. South of the cone, a lava moat rings the isle where Volcanum rests.'],
   '2,5': ['lagoon', 'West of Brookside. A pass through the western peaks opens onto Mirrormere Oasis, a turquoise lagoon ringed by palms, ferns and flowering jungle.'],
   '1,5': ['canopy', 'West of the oasis. Silverrun Canopy is thick jungle under giant trees, with an overgrown stone temple, carved idols and roaming Bengal Tigers.'],
   '2,6': ['sunken', 'South of the oasis, west of Longacre. Southmead is dense jungle with bamboo groves, pools and tall grass, where Battle Raptors hunt in packs.'],

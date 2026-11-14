@@ -56,8 +56,9 @@ export const VOLCANIC_SPECS = {
     banner: ['The Smoking Mountain', 'Cinderfall'], volcanic: true, shade: 0.05, forest: 0.08, amp: 2.8, base: 3.6, seed: 65,
     rim: { n: true, w: true },
     cone: { cx: 58, cz: 56, r: 44, top: 17, crater: 10 },
-    knolls: [[116, 112, 8, 3.2], [118, 36, 7, 2.6], [30, 116, 8, 2.8]],
-    lava: [[108, 88, 6], [28, 100, 5.5]],
+    knolls: [[116, 112, 8, 3.2], [118, 36, 7, 2.6], [16, 132, 8, 2.8]],
+    lava: [[108, 88, 6], [18, 74, 5.5]],
+    lair: { cx: 48, cz: 104, island: 11, shore: 14, moat: 25, outer: 30, islandH: 6.2, lavaH: 1.15, bankH: 4.8, bridge: 1.46 },
     roads: [[[143, 72], [112, 84], [84, 108], [72, 143]]],
     dress: { ash: 24, thorns: 14, blooms: 24, spires: 8, rocks: 30, boulders: 12, mounds: 16, vents: 6, logs: 4, bones: 3 },
   },
@@ -69,7 +70,36 @@ function volcAmount(spec, z) {
   return 1 - smoothstep(spec.blend.z0, spec.blend.z1, z);
 }
 
+function lairFeature(h, x, z, lair) {
+  const dx = x - lair.cx;
+  const dz = z - lair.cz;
+  const d = Math.hypot(dx, dz);
+  if (d > lair.outer + 4) return null;
+  const ang = Math.atan2(dx, dz);
+  let da = ang - lair.bridge;
+  while (da > Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  const onBridge = Math.abs(da) < 0.28 && d <= lair.outer + 1.5;
+  if (d <= lair.island) return { h: lair.islandH, kind: 0 };
+  if (onBridge) {
+    const u = clamp((d - lair.island) / Math.max(1, lair.outer - lair.island), 0, 1);
+    return { h: lerp(lair.islandH, lair.bankH, u), kind: 0 };
+  }
+  if (d <= lair.shore) {
+    const u = (d - lair.island) / Math.max(1, lair.shore - lair.island);
+    return { h: lerp(lair.islandH, lair.lavaH + 0.6, u), kind: u > 0.72 ? K_LAVA : 0 };
+  }
+  if (d <= lair.moat) return { h: lair.lavaH, kind: K_LAVA };
+  const u = clamp((d - lair.moat) / Math.max(1, lair.outer - lair.moat), 0, 1);
+  const lip = lerp(lair.lavaH + 0.35, lair.bankH, smoothstep(0, 1, u));
+  return { h: lerp(lip, h, smoothstep(0.7, 1, u)), kind: 0 };
+}
+
 export function volcanicFeature(h, x, z, spec) {
+  if (spec.lair) {
+    const carved = lairFeature(h, x, z, spec.lair);
+    if (carved) return carved;
+  }
   if (spec.plateau) {
     const { cx, cz, hw, hd, h: ph, fall } = spec.plateau;
     const dx = Math.max(0, Math.abs(x - cx) - hw);
@@ -250,6 +280,7 @@ export function dressVolcanic(world, land, spec) {
     const i = lz * W + lx;
     const h = data.H[i];
     const t = data.top[i];
+    if (spec.lair && Math.hypot(lx - spec.lair.cx, lz - spec.lair.cz) < spec.lair.outer + 1) return false;
     return !data.pathMask[i] && h >= lo && h <= hi && t !== TILE.LAVA && !reserved(lx, lz);
   };
   const scatter = (count, tag, tries, fn) => {
@@ -273,6 +304,28 @@ export function dressVolcanic(world, land, spec) {
     for (let k = 0; k < 7; k++) {
       const a = (k / 7) * TAU + 0.3;
       place(V.rocks[k % V.rocks.length], Math.round(lx + Math.cos(a) * r * 1.25), Math.round(lz + Math.sin(a) * r * 1.25), a, 0.8 + (k % 3) * 0.25, { r: 1, collide: 0.5, occ: 0.8 });
+    }
+  }
+  if (spec.lair) {
+    const L = spec.lair;
+    const x = land.x0 + L.cx + 0.5;
+    const z = land.z0 + L.cz + 0.5;
+    world.volcanumLair = { x, z, r: L.island };
+    world.lightSpots.push({ x, y: L.islandH + 2.4, z, color: 0xff6a1a });
+    world.lightSpots.push({ x: x + 6, y: L.lavaH + 1.2, z, color: 0xff5a12 });
+    world.lightSpots.push({ x: x - 6, y: L.lavaH + 1.2, z, color: 0xff8a24 });
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * TAU;
+      let da = a - L.bridge;
+      while (da > Math.PI) da -= TAU;
+      while (da < -Math.PI) da += TAU;
+      if (Math.abs(da) < 0.42) continue;
+      const rad = L.outer - 1.2;
+      place(V.obsidianSpires[k % 3], Math.round(L.cx + Math.sin(a) * rad), Math.round(L.cz + Math.cos(a) * rad), a, 1.15 + (k % 3) * 0.25, { r: 2, collide: 0.8, occ: 1.6, light: k % 4 === 0 ? [0xff6a1a, 2.2] : null });
+    }
+    for (let k = 0; k < 5; k++) {
+      const a = L.bridge + Math.PI + (k - 2) * 0.35;
+      place(V.boulders[k % 2], Math.round(L.cx + Math.sin(a) * (L.island - 2.2)), Math.round(L.cz + Math.cos(a) * (L.island - 2.2)), a, 0.7, { r: 1.2, collide: 0.6, occ: 1 });
     }
   }
   if (spec.cone) {
