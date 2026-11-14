@@ -235,7 +235,7 @@ const ZONE_MOBS = {
   silverrun: ['tiger', 'raptor'],
   runmouth: ['cursedpirate', 'pirate'],
   longacre: ['boar', 'slime'],
-  cinderfall: ['demonknight'],
+  cinderfall: ['volcanum'],
   hellspire: ['demonknight'],
   glimmerfrost: ['snowyeti'],
   dawnspire: ['holyknight'],

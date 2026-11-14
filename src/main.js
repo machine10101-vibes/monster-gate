@@ -1628,6 +1628,7 @@ class Game {
       if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember' || p.kind === 'frost') m.rotation.x += dt * 8;
       if (p.kind === 'crescent') m.rotation.y += dt * 16;
       if (p.kind === 'gloom') m.rotation.y += dt * 5;
+      if (p.kind === 'lavabolt') m.rotation.x += dt * 6;
       if (p.homing && p.age > 0.25) this.steerProjectile(p, dt);
       tickProjectile(this, p, dt);
       if (p.age > p.life) {

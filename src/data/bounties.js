@@ -16,6 +16,7 @@ export const TEMPLATES = [
   { id: 'darksycle', kind: 'kill', type: 'darksycledragon', need: 1, minRank: 3, label: 'Darksycle Dragons' },
   { id: 'demon', kind: 'kill', type: 'demonknight', need: 1, minRank: 4, label: 'Demon Knights' },
   { id: 'holy', kind: 'kill', type: 'holyknight', need: 1, minRank: 4, label: 'Holy Knights' },
+  { id: 'volcanum', kind: 'kill', type: 'volcanum', need: 1, minRank: 4, label: 'Volcanum' },
   { id: 'copper', kind: 'gather', good: 'copper_ore', need: 4, skill: 'mining', minSkill: 1, label: 'Copper ore' },
   { id: 'iron', kind: 'gather', good: 'iron_ore', need: 3, skill: 'mining', minSkill: 15, label: 'Iron ore' },
   { id: 'coal', kind: 'gather', good: 'coal', need: 3, skill: 'mining', minSkill: 30, label: 'Coal' },

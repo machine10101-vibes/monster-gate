@@ -56,8 +56,9 @@ export const VOLCANIC_SPECS = {
     banner: ['The Smoking Mountain', 'Cinderfall'], volcanic: true, shade: 0.05, forest: 0.08, amp: 2.8, base: 3.6, seed: 65,
     rim: { n: true, w: true },
     cone: { cx: 58, cz: 56, r: 44, top: 17, crater: 10 },
-    knolls: [[116, 112, 8, 3.2], [118, 36, 7, 2.6], [30, 116, 8, 2.8]],
-    lava: [[108, 88, 6], [28, 100, 5.5]],
+    knolls: [[116, 112, 8, 3.2], [118, 36, 7, 2.6], [16, 132, 8, 2.8]],
+    lava: [[108, 88, 6], [18, 74, 5.5]],
+    lair: { cx: 48, cz: 104, island: 11, shore: 14, moat: 25, outer: 30, islandH: 6.2, lavaH: 1.15, bankH: 4.8, bridge: 1.46 },
     roads: [[[143, 72], [112, 84], [84, 108], [72, 143]]],
     dress: { ash: 24, thorns: 14, blooms: 24, spires: 8, rocks: 30, boulders: 12, mounds: 16, vents: 6, logs: 4, bones: 3 },
   },
@@ -69,7 +70,87 @@ function volcAmount(spec, z) {
   return 1 - smoothstep(spec.blend.z0, spec.blend.z1, z);
 }
 
-export function volcanicFeature(h, x, z, spec) {
+/** Steepest grade a hunter can step up. canStep allows 1.01; half-cell rounding needs headroom. */
+const WALK_STEP = 0.7;
+
+/**
+ * Land beside land stays a half step. Lava is not a floor: pulling the hillside
+ * down to the pool dug a shelf that ended in the pit, and hunters stopped there.
+ */
+export function gradeWalkableHill(H, isLava) {
+  const MAX = 0.5;
+  const side = Math.round(Math.sqrt(H.length));
+  let changed = true;
+  let guard = 0;
+  while (changed && guard++ < side + 2) {
+    changed = false;
+    for (let z = 1; z < side - 1; z++) {
+      for (let x = 1; x < side - 1; x++) {
+        const i = z * side + x;
+        if (isLava(i)) continue;
+        let floor = H[i];
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dz) continue;
+            const j = (z + dz) * side + (x + dx);
+            if (isLava(j)) continue;
+            floor = Math.min(floor, H[j] + MAX);
+          }
+        }
+        if (floor < H[i] - 0.001) {
+          H[i] = floor;
+          changed = true;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * One lava pool in the southwest of the isle. It sits off the walks from the
+ * west, south, and east, so holding toward Volcanum never dead-ends in it.
+ */
+function approachKeepsLava(x, z, spec) {
+  const L = spec.lair;
+  return Math.hypot(x - (L.cx - 26), z - (L.cz + 20)) < 6;
+}
+
+function angDiff(a, b) {
+  let d = a - b;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+/**
+ * The moat sits on the volcano's south skirt. Carve the isle and the lava,
+ * then climb back to the hillside that was already there. A hard blend left
+ * a wall about nine units tall, which canStep will not cross.
+ */
+function lairFeature(h, x, z, lair) {
+  const dx = x - lair.cx;
+  const dz = z - lair.cz;
+  const d = Math.hypot(dx, dz);
+  const onBridge = Math.abs(angDiff(Math.atan2(dx, dz), lair.bridge)) < 0.28;
+  if (d <= lair.island) return { h: lair.islandH, kind: 0 };
+  if (d <= lair.moat && !onBridge) {
+    if (d <= lair.shore) {
+      const u = (d - lair.island) / Math.max(1, lair.shore - lair.island);
+      return { h: lerp(lair.islandH, lair.lavaH + 0.6, u), kind: u > 0.72 ? K_LAVA : 0 };
+    }
+    return { h: lair.lavaH, kind: K_LAVA };
+  }
+  if (onBridge && d <= lair.moat) {
+    const u = clamp((d - lair.island) / Math.max(1, lair.moat - lair.island), 0, 1);
+    return { h: lerp(lair.islandH, Math.min(lair.bankH, h), u), kind: 0 };
+  }
+  const rise = WALK_STEP * Math.max(0, d - lair.moat);
+  const graded = Math.min(h, lair.bankH + rise);
+  if (graded >= h - 0.02) return null;
+  return { h: graded, kind: 0 };
+}
+
+function volcanicShape(h, x, z, spec) {
   if (spec.plateau) {
     const { cx, cz, hw, hd, h: ph, fall } = spec.plateau;
     const dx = Math.max(0, Math.abs(x - cx) - hw);
@@ -83,13 +164,19 @@ export function volcanicFeature(h, x, z, spec) {
     const wob = 1 + 0.08 * Math.sin(a * 3 + 1.1) + 0.05 * Math.sin(a * 7);
     const d = Math.hypot(z - cz, x - cx) / wob;
     if (d < r) {
-      const t = 1 - d / r;
-      const body = lerp(h, top, Math.pow(t, 1.15));
+      const flank = (dist) => {
+        const t = 1 - dist / r;
+        return lerp(h, top, Math.pow(Math.max(0, t), 1.15));
+      };
+      // The lip used to spike to top+0.4, a four-unit step the hunter could not take.
+      const rimH = Math.max(h, flank(crater));
       if (d < crater) {
-        if (d < crater * 0.62) return { h: top - 3.6, kind: K_LAVA };
-        return { h: lerp(top - 3.6, top + 0.4, (d - crater * 0.62) / (crater * 0.38)), kind: 0 };
+        const floor = rimH - 3.2;
+        if (d < crater * 0.62) return { h: floor, kind: K_LAVA };
+        const u = (d - crater * 0.62) / (crater * 0.38);
+        return { h: lerp(floor, rimH, u), kind: 0 };
       }
-      return { h: Math.max(h, body), kind: 0 };
+      return { h: Math.max(h, flank(d)), kind: 0 };
     }
   }
   if (spec.lava) {
@@ -103,6 +190,27 @@ export function volcanicFeature(h, x, z, spec) {
     }
   }
   return null;
+}
+
+export function volcanicFeature(h, x, z, spec) {
+  const shaped = volcanicShape(h, x, z, spec);
+  const natural = shaped ? shaped.h : h;
+  let out = shaped;
+  if (spec.lair) {
+    const carved = lairFeature(natural, x, z, spec.lair);
+    if (carved) out = carved;
+  }
+  // The moat used to slice the south face of the cone and ring the isle. A hunter
+  // walking at Volcanum hit lava and stopped. The ring is hillside again.
+  if (spec.lair && approachKeepsLava(x, z, spec)) return { h: spec.lair.lavaH, kind: K_LAVA };
+  if (out?.kind === K_LAVA && spec.lair && spec.cone) {
+    const L = spec.lair;
+    const d = Math.hypot(x - L.cx, z - L.cz);
+    const inMoat = d > L.island && d <= L.moat;
+    const inCrater = Math.hypot(x - spec.cone.cx, z - spec.cone.cz) < spec.cone.crater;
+    if (inMoat && !inCrater && !approachKeepsLava(x, z, spec)) return { h: Math.max(natural, 2), kind: 0 };
+  }
+  return out;
 }
 
 function localSlope(H, x, z) {
@@ -231,6 +339,9 @@ export function dressVolcanic(world, land, spec) {
   const seed = spec.seed;
   const D = spec.dress;
   const place = (parts, lx, lz, rot, scale, o = {}) => {
+    // Cinderfall's dressing was a field of solid disks. Trunks stay solid.
+    // Anything wider than a body became a wall between the hunter and the dragon.
+    if (spec.lair && o.collide > 0.4) o = { ...o, collide: 0 };
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
     if (!world.free(x, z, o.r ?? 1)) return false;
@@ -250,6 +361,7 @@ export function dressVolcanic(world, land, spec) {
     const i = lz * W + lx;
     const h = data.H[i];
     const t = data.top[i];
+    if (spec.lair && Math.hypot(lx - spec.lair.cx, lz - spec.lair.cz) < spec.lair.outer + 1) return false;
     return !data.pathMask[i] && h >= lo && h <= hi && t !== TILE.LAVA && !reserved(lx, lz);
   };
   const scatter = (count, tag, tries, fn) => {
@@ -267,7 +379,8 @@ export function dressVolcanic(world, land, spec) {
     const [lx, lz, r] = pool;
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
-    world.circle(x, z, r * 0.8);
+    // The lava cells stop the hunter. A solid disk was wider than the pool and
+    // read as an invisible wall on the bank around it.
     world.occupy(x, z, r * 1.3);
     world.lightSpots.push({ x, y: 1.9, z, color: 0xff6a1a });
     for (let k = 0; k < 7; k++) {
@@ -275,11 +388,35 @@ export function dressVolcanic(world, land, spec) {
       place(V.rocks[k % V.rocks.length], Math.round(lx + Math.cos(a) * r * 1.25), Math.round(lz + Math.sin(a) * r * 1.25), a, 0.8 + (k % 3) * 0.25, { r: 1, collide: 0.5, occ: 0.8 });
     }
   }
+  if (spec.lair) {
+    const L = spec.lair;
+    const x = land.x0 + L.cx + 0.5;
+    const z = land.z0 + L.cz + 0.5;
+    world.volcanumLair = { x, z, r: L.island };
+    world.lightSpots.push({ x, y: L.islandH + 2.4, z, color: 0xff6a1a });
+    world.lightSpots.push({ x: x + 6, y: L.lavaH + 1.2, z, color: 0xff5a12 });
+    world.lightSpots.push({ x: x - 6, y: L.lavaH + 1.2, z, color: 0xff8a24 });
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * TAU;
+      let da = a - L.bridge;
+      while (da > Math.PI) da -= TAU;
+      while (da < -Math.PI) da += TAU;
+      if (Math.abs(da) < 0.42) continue;
+      const rad = L.outer - 1.2;
+      // Visual only. A collide ring around the moat was the fence on the slope.
+      place(V.obsidianSpires[k % 3], Math.round(L.cx + Math.sin(a) * rad), Math.round(L.cz + Math.cos(a) * rad), a, 1.15 + (k % 3) * 0.25, { r: 2, occ: 1.6, light: k % 4 === 0 ? [0xff6a1a, 2.2] : null });
+    }
+    for (let k = 0; k < 5; k++) {
+      const a = L.bridge + Math.PI + (k - 2) * 0.35;
+      place(V.boulders[k % 2], Math.round(L.cx + Math.sin(a) * (L.island - 2.2)), Math.round(L.cz + Math.cos(a) * (L.island - 2.2)), a, 0.7, { r: 1.2, collide: 0.6, occ: 1 });
+    }
+  }
   if (spec.cone) {
     const { cx, cz, crater } = spec.cone;
     const x = land.x0 + cx + 0.5;
     const z = land.z0 + cz + 0.5;
-    world.circle(x, z, crater * 0.58);
+    // The crater lava already blocks the pit. A solid disk on Cinderfall fenced the rim.
+    if (!spec.lair) world.circle(x, z, crater * 0.58);
     world.occupy(x, z, crater * 1.6);
     world.lightSpots.push({ x, y: world.heightAt(x, z) + 3, z, color: 0xff7a24 });
     world.lightSpots.push({ x: x + 6, y: world.heightAt(x, z) + 3, z: z + 4, color: 0xff5a14 });

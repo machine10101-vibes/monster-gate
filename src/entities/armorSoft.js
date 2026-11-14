@@ -1,6 +1,7 @@
 import { hash3, jitter } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { VOLC } from '../data/volcanum.js';
 import { YETI } from '../data/yeti.js';
 
 const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
@@ -30,6 +31,14 @@ export const SOFT_PALETTES = {
   darkcloth: {
     main: 0x4a3a9c, lo: 0x33296a, hi: 0x7a64d0, strap: 0x8a7ad0, strapHi: 0xb8aae8, trim: DARK.trim, trimLo: DARK.bladeDark,
     bone: DARK.blade, boneLo: DARK.bladeDark, scale: DARK.scale, scaleLo: DARK.scaleLo, glow: DARK.glow, accent: DARK.glowHi,
+  },
+  volcanumleather: {
+    main: 0x2a2428, lo: 0x161214, hi: 0x4a4048, strap: 0x3a2014, strapHi: 0x6a3820, trim: VOLC.trim, trimLo: VOLC.bellyDark,
+    bone: VOLC.claw, boneLo: VOLC.scale, scale: VOLC.scaleHi, scaleLo: VOLC.scale, glow: VOLC.glow, accent: VOLC.glowHi,
+  },
+  volcanumcloth: {
+    main: 0x3a2068, lo: 0x241448, hi: 0x7a4cb0, strap: 0xff6a12, strapHi: 0xffe08a, trim: VOLC.trim, trimLo: VOLC.bellyDark,
+    bone: VOLC.claw, boneLo: VOLC.scale, scale: VOLC.scaleHi, scaleLo: VOLC.scale, glow: VOLC.glow, accent: VOLC.glowHi,
   },
 };
 
