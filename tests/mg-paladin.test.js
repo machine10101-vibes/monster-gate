@@ -47,7 +47,12 @@ test('paladin actives have casts, holy projectiles, and body animations', () => 
   assert.match(tree, /smitearm: 'hammer'/);
   const css = src('../src/style.css');
   assert.match(css, /\.cs-classes \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(css, /\.sk-pick \{\s*display: grid;\s*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.sk-pick \{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  const html = src('../index.html');
+  const classAt = html.indexOf('id="cs-classes"');
+  const nameAt = html.indexOf('id="cs-name-input"');
+  assert.ok(classAt > 0 && classAt < nameAt, 'class choices sit above the name field');
+  assert.match(html, />Class</);
 });
 
 function paladinGame(learned, extra = {}) {
