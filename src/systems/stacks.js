@@ -3,7 +3,7 @@
 import { gearById } from '../data/catalog.js';
 
 export const MAX_STACK = 20;
-export const BAG_SLOTS = 28;
+export const BAG_SLOTS = 40;
 export const INVENTORY_FULL = 'Inventory full';
 
 /** How many inventory slots a total occupies. Gear is always one. */
