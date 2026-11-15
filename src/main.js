@@ -40,6 +40,7 @@ import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
+import { loadStaffRole } from './wallet/staff.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
 import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
@@ -191,6 +192,8 @@ class Game {
     this.guestBound = false;
     this.parkedHunt = null;
     this.wallet = null;
+    this.staffRole = null;
+    this.staff = null;
     this.roster = null;
     this.character = null;
     this.walletBusy = false;
@@ -528,6 +531,8 @@ class Game {
     const gate = { open: true };
     this.cloudGate = gate;
     this.wallet = session;
+    this.staffRole = null;
+    this.staff = null;
     this.cloudConflict = false;
     this.stopAutosave();
     this.progress.onCloud = null;
@@ -543,6 +548,9 @@ class Game {
     this.cloudSyncing = true;
     this.cloudState = 'off';
     this.refreshWalletUi();
+    const staffP = session.kind === 'email'
+      ? loadStaffRole(session).catch(() => ({ role: null, admin: false, moderator: false, worldCreator: false }))
+      : Promise.resolve({ role: null, admin: false, moderator: false, worldCreator: false });
     let result = { state: 'error', replaced: false };
     try {
       for (let attempt = 0; attempt < 2 && gate.open && this.wallet === session; attempt++) {
@@ -560,6 +568,10 @@ class Game {
       if (this.cloudGate === gate) this.cloudSyncing = false;
     }
     if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
+    const staff = await staffP;
+    if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
+    this.staff = staff;
+    this.staffRole = staff?.role || null;
     this.cloudState = result?.abandoned ? 'off' : (result?.state || 'error');
     if (result?.replaced) this.walletNote = 'loaded';
     if (this.cloudState === 'on') {
@@ -588,6 +600,8 @@ class Game {
     if (this.started || this.walletBusy) return;
     this.closeAccount();
     this.wallet = { kind: 'guest', address: 'guest:local' };
+    this.staffRole = null;
+    this.staff = null;
     this.cloudState = 'off';
     this.cloudSyncing = false;
     this.cloudConflict = false;
@@ -602,6 +616,14 @@ class Game {
 
   leaveCharacterSelect() {
     this.signOut(false);
+  }
+
+  isAdmin() {
+    return !!this.staff?.admin;
+  }
+
+  canWorldCreator() {
+    return !!this.staff?.worldCreator;
   }
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
@@ -773,6 +795,8 @@ class Game {
     clearCloudToken();
     this.progress.onCloud = null;
     this.wallet = null;
+    this.staffRole = null;
+    this.staff = null;
     this.roster = null;
     this.character = null;
     this.walletNote = '';

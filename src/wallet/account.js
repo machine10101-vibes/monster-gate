@@ -382,6 +382,11 @@ async function freshSession(session) {
   return adoptSession(session, await refreshOnce(session, cfg));
 }
 
+/** Refreshed access token for other guild functions (staff, hunter). */
+export async function bearerSession(session) {
+  return freshSession(session);
+}
+
 async function accountOp(session, body, keepalive = false) {
   const { guildPost } = await import('./cloud.js');
   const current = await freshSession(session);
