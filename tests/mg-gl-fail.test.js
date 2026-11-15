@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { BUILD_ID } from '../src/ui/buildId.js';
 import {
   GL_FAIL_RETRY,
+  GL_FAIL_STILL,
   GL_FAIL_TIPS,
   GL_FAIL_TITLE,
+  GL_FAIL_TRYING,
   GL_RESTORE_MS,
   armContextLost,
+  glFailStatusLine,
+  hideGlFailPanel,
   isWebGLFailure,
   probeWebGL,
   shouldForceNoGL,
@@ -23,6 +28,8 @@ function fakeNode(id, extras = {}) {
     textContent: extras.textContent ?? '',
     children: [],
     className: extras.className || '',
+    disabled: extras.disabled ?? false,
+    dataset: extras.dataset || {},
     listeners: {},
     style: {},
     classList: {
@@ -39,35 +46,52 @@ function fakeNode(id, extras = {}) {
       if (sel === 'h1') return node.children.find((c) => c.id === 'h1' || c.tag === 'h1') || null;
       if (sel === 'ul') return node.children.find((c) => c.id === 'ul' || c.tag === 'ul') || null;
       if (sel === '#gl-fail-retry' || sel === 'button') return node.children.find((c) => c.id === 'gl-fail-retry') || null;
+      if (sel === '.gl-fail-status' || sel === '#gl-fail-status') return node.children.find((c) => c.id === 'gl-fail-status') || null;
+      if (sel === '.gl-fail-build' || sel === '#gl-fail-build') return node.children.find((c) => c.id === 'gl-fail-build') || null;
       return null;
     },
     ...extras,
   };
+  if (!node.dataset) node.dataset = {};
   return node;
 }
 
 function fakeDoc() {
   const h1 = fakeNode('h1', { tag: 'p', className: 'gl-fail-title', textContent: GL_FAIL_TITLE });
-  const ul = fakeNode('ul', { tag: 'ul', children: GL_FAIL_TIPS.map((t) => fakeNode('', { textContent: t })) });
+  const ul = fakeNode('ul', { tag: 'ul' });
   ul.children = GL_FAIL_TIPS.map((t) => fakeNode('', { textContent: t }));
+  const status = fakeNode('gl-fail-status', { tag: 'p', className: 'gl-fail-status', hidden: true });
   const btn = fakeNode('gl-fail-retry', { tag: 'button', textContent: GL_FAIL_RETRY });
+  const build = fakeNode('gl-fail-build', { tag: 'p', className: 'gl-fail-build', textContent: '' });
   const card = fakeNode('card');
   const panel = fakeNode('gl-fail', { hidden: true, className: 'gl-fail hidden' });
   panel.classList.add('hidden');
   card.appendChild(h1);
   card.appendChild(ul);
+  card.appendChild(status);
   card.appendChild(btn);
+  card.appendChild(build);
   panel.appendChild(card);
   panel.querySelector = (sel) => {
     if (sel === '.gl-fail-title' || sel === 'h1') return h1;
     if (sel === 'ul') return ul;
     if (sel === '#gl-fail-retry' || sel === 'button') return btn;
+    if (sel === '.gl-fail-status' || sel === '#gl-fail-status') return status;
+    if (sel === '.gl-fail-build' || sel === '#gl-fail-build') return build;
     return null;
   };
   const loading = fakeNode('loading');
-  const map = { loading, 'gl-fail': panel, 'gl-fail-retry': btn };
+  const pageBuild = fakeNode('build-id', { textContent: '' });
+  const map = {
+    loading,
+    'gl-fail': panel,
+    'gl-fail-retry': btn,
+    'gl-fail-status': status,
+    'gl-fail-build': build,
+    'build-id': pageBuild,
+  };
   return {
-    map, h1, ul, btn, panel, loading,
+    map, h1, ul, btn, panel, loading, status, build, pageBuild,
     getElementById(id) { return map[id] || null; },
     createElement(tag) { return fakeNode(tag, { tag }); },
   };
@@ -100,10 +124,20 @@ test('shouldForceNoGL honors the nogl test hook', () => {
   assert.equal(shouldForceNoGL({ search: '', win: { __mgForceNoGL: true } }), true);
 });
 
-test('showGlFailPanel paints the loading fallback and Retry reloads', () => {
+test('MG-UI-40: fallback panel shows the HUD build tag', () => {
   const doc = fakeDoc();
-  let reloads = 0;
-  const panel = showGlFailPanel(doc, { reload: () => { reloads += 1; } });
+  showGlFailPanel(doc, { probe: () => ({ ok: false }) });
+  assert.equal(doc.build.textContent, BUILD_ID);
+  assert.equal(doc.pageBuild.textContent, BUILD_ID);
+  const html = src('../index.html');
+  assert.match(html, /id="gl-fail-build"/);
+  assert.match(src('../src/ui/glFail.js'), /BUILD_ID/);
+  assert.match(src('../src/ui/theme.css'), /gl-fail-build/);
+});
+
+test('showGlFailPanel paints the loading fallback', () => {
+  const doc = fakeDoc();
+  const panel = showGlFailPanel(doc, { probe: () => ({ ok: false }) });
   assert.equal(panel, doc.panel);
   assert.equal(doc.loading.classList.contains('gl-failed'), true);
   assert.equal(doc.loading.classList.contains('hidden'), false);
@@ -114,8 +148,47 @@ test('showGlFailPanel paints the loading fallback and Retry reloads', () => {
   assert.match(doc.ul.children[1].textContent, /Chrome, Edge, or Safari/);
   assert.match(doc.ul.children[2].textContent, /heavy tabs/i);
   assert.equal(doc.btn.textContent, 'Retry');
+  assert.equal(doc.status.hidden, true);
+});
+
+test('Retry shows Trying again then a still-failed line with the attempt count', () => {
+  const doc = fakeDoc();
+  let during = null;
+  showGlFailPanel(doc, {
+    probe: () => {
+      during = { text: doc.btn.textContent, disabled: doc.btn.disabled, status: doc.status.textContent };
+      return { ok: false, reason: 'force' };
+    },
+  });
   doc.btn.onclick({ preventDefault() {} });
-  assert.equal(reloads, 1);
+  assert.equal(during.text, GL_FAIL_TRYING);
+  assert.equal(during.disabled, true);
+  assert.equal(during.status, GL_FAIL_TRYING);
+  assert.equal(doc.btn.disabled, false);
+  assert.equal(doc.btn.textContent, GL_FAIL_RETRY);
+  assert.equal(doc.status.hidden, false);
+  assert.equal(doc.status.textContent, glFailStatusLine(1));
+  assert.match(doc.status.textContent, /Still couldn't start 3D/);
+  assert.match(doc.status.textContent, /Try 1/);
+  doc.btn.onclick({ preventDefault() {} });
+  assert.equal(doc.status.textContent, glFailStatusLine(2));
+  assert.match(doc.status.textContent, /Try 2/);
+  assert.equal(GL_FAIL_STILL, "Still couldn't start 3D. Check the tips above.");
+});
+
+test('Retry success hides the panel and continues boot', () => {
+  const doc = fakeDoc();
+  let boots = 0;
+  showGlFailPanel(doc, {
+    probe: () => ({ ok: true }),
+    onSuccess: () => { boots += 1; },
+  });
+  doc.btn.onclick({ preventDefault() {} });
+  assert.equal(boots, 1);
+  assert.equal(doc.panel.hidden, true);
+  assert.equal(doc.loading.classList.contains('gl-failed'), false);
+  hideGlFailPanel(doc);
+  assert.equal(doc.panel.hidden, true);
 });
 
 test('context lost waits ~5s and is cancelled if WebGL restores', () => {
@@ -162,10 +235,13 @@ test('loading markup, Retry, and Game boot all wire the WebGL fallback', () => {
   const boot = src('../src/ui/boot.js');
   assert.match(html, /Your browser couldn't start 3D graphics/);
   assert.match(html, /id="gl-fail-retry"[^>]*>Retry/);
+  assert.match(html, /id="gl-fail-status"/);
+  assert.match(html, /id="gl-fail-build"/);
   assert.match(html, /hardware acceleration/);
-  assert.match(main, /showGlFailPanel/);
+  assert.match(main, /showBootGlFail/);
+  assert.match(main, /defaultGlProbe/);
   assert.match(main, /armContextLost/);
-  assert.match(main, /probeWebGL/);
+  assert.match(main, /onSuccess/);
   assert.doesNotMatch(main, /localStorage\.(removeItem|clear)/);
   assert.doesNotMatch(boot, /saveio|savebridge/);
 });
