@@ -53,6 +53,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_BUILD_ID': JSON.stringify(shortSha()),
     'import.meta.env.VITE_MMO_URL': JSON.stringify(resolveMmoUrl()),
+    'import.meta.env.VITE_WORLD_URL': JSON.stringify(resolveMmoUrl()),
   },
   build: {
     target: 'es2020',

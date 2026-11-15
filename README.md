@@ -18,9 +18,9 @@ npm run preview       # serve the production build
 
 ## Shared world (World 1)
 
-The title screen and in-game Menu have **Play Online — World 1** next to offline play (Play as guest / Play offline). That reloads the page with `?mmo=1`, keeps other query params, and drops mock/debug flags. A small **Online** / **Offline** pill sits in the HUD. Returning hunters land in their last mode (`localStorage` key `mg-world-mode`); first visits stay offline.
+Guests play solo from the title (**Play as guest**). After sign-in, account creation, or a returning signed-in Play, **Choose a world** offers **World 1 — Online** (live `/healthz` status: Online + player count, or **Waking…**) and **Solo — Offline**. World 1 reloads with `?mmo=1` and a one-shot continue marker so the hunter lands in the hunt with connecting/waking UI, not back on the title. The last pick is remembered (`localStorage` key `mg-world-mode`) and preselected next time. The in-game Menu has a **Switch world** row (World 1 / Solo). A small **Online** / **Offline** pill sits in the HUD.
 
-The button is **World 1 coming soon** (disabled) when no world URL is configured. The public GitHub Pages build leaves that URL empty on purpose.
+World 1 is **World 1 coming soon** (disabled) when no world URL is configured. Guests and anyone without a session token never open the world socket; `?mmo=1` without a session drops to solo and shows **Sign in to hunt online**. The public GitHub Pages build leaves the world URL empty on purpose.
 
 `VITE_MMO_URL` is a build-time input. Rebuild `gh-pages` from `main` with Vite base `/`, `public/CNAME` = `monstergate.online`, and `VITE_BUILD_ID` set to the `main` HEAD. Read the world URL from `MG_WORLD_URL` (leave it empty until World 1 is live):
 

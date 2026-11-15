@@ -52,7 +52,7 @@ Web service, Docker or native Node. Start: `npm run start:server`. Health check:
 
 ## Client URL
 
-The title screen **Play Online — World 1** button reloads with `?mmo=1`. Pages stays offline until a world URL is configured (`MG_WORLD_URL` / `VITE_MMO_URL` at build time, or `?server=`). With no URL the button reads **World 1 coming soon** and stays disabled.
+After sign-in, **Choose a world** → **World 1 — Online** reloads with `?mmo=1`. Pages stays offline until a world URL is configured (`MG_WORLD_URL` / `VITE_MMO_URL` at build time, or `?server=`). With no URL World 1 reads **World 1 coming soon** and stays disabled. Guests never open the socket.
 
 Manual flags still work:
 

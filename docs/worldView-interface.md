@@ -86,6 +86,8 @@ worldView.setStatus(state, detail?)           // or { status, detail?, online? }
 
 `setStatus('error', { code: 'name_taken', message })` (or `{ status: 'error', code: 'name_taken', message }`) is **final**. It does not auto-reconnect. The view shows a themed prompt that the hunter name is taken, asks for another, and focuses the name field. Submitting a valid new name emits `{ type: 'rename', name }`.
 
+`setStatus` with `code: 'auth'` or a detail/message of `Sign in to hunt online…` (as `mmo.js` forwards `{ detail: msg.message || msg.code }`) **latches** a Sign in / Play solo panel. Later `reconnecting` / `offline` updates must not replace it. If `game.mmo.dispose` (or `close` / `disconnect` / `stop`) exists, the view calls it so the socket stops retrying. `worldView.js` still does not open sockets.
+
 `setStatus('waking', { secondsLeft, elapsedMs })` (or `{ status: 'waking', detail: { secondsLeft, elapsedMs } }`) shows the login-queue overlay:
 
 - Copy: “Server starting, you're in the login queue”
