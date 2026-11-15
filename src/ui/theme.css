@@ -77,6 +77,7 @@
 #world-status,
 #world-mode-pill,
 #world-wake .ww-card,
+#gl-fail .gl-fail-card,
 #world-name .wn-card,
 #mg-import .mg-import-card,
 #party-frame,
@@ -678,6 +679,59 @@ h1 em,
 }
 #loading.reduced #load-video { display: none; }
 #loading.reduced .load-embers { display: none; }
+#loading.gl-failed .load-shell,
+#loading.gl-failed .load-embers,
+#loading.gl-failed .load-runes {
+  display: none;
+}
+#gl-fail {
+  display: none;
+  width: min(420px, 90vw);
+  padding: 0 12px;
+  pointer-events: auto;
+  z-index: 6;
+}
+#loading.gl-failed #gl-fail {
+  display: block;
+}
+.gl-fail-card {
+  padding: 22px 20px 18px;
+  text-align: center;
+}
+#gl-fail .gl-fail-title {
+  margin: 0 0 14px;
+  font-family: var(--font-px);
+  font-size: clamp(11px, 3.4vw, 16px);
+  letter-spacing: 1px;
+  line-height: 1.4;
+  color: var(--mg-gold-title);
+  text-shadow: 0 2px 0 #1a0808;
+}
+#gl-fail ul {
+  margin: 0 0 16px;
+  padding: 0 8px;
+  list-style: none;
+  text-align: left;
+  color: var(--mg-ink-text);
+  font-size: 15px;
+  line-height: 1.45;
+}
+#gl-fail li {
+  margin: 0 0 10px;
+  padding-left: 1.1em;
+  position: relative;
+}
+#gl-fail li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--mg-gold-hi);
+}
+#gl-fail .start {
+  animation: none;
+  width: min(260px, 100%);
+  min-height: 48px;
+}
 
 /* dialog / toast / faint ------------------------------------------------ */
 #dialog {
