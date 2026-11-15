@@ -105,6 +105,8 @@ export class MmoClient {
     this.resumeToken = '';
     this.bound = false;
     this.fatal = false;
+    this.fatalReason = null;
+    this.authRejectedToken = null;
     this.entities = { monsters: [], nodes: [] };
     this.nearby = new Map();
     this.wakeGen = 0;
@@ -137,7 +139,52 @@ export class MmoClient {
     }
   }
 
+  currentToken() {
+    const stored = readAccessToken({ ...this.opts, token: '' });
+    const explicit = typeof this.opts?.token === 'string' ? this.opts.token : '';
+    if (explicit) {
+      if (stored && stored !== explicit) return stored;
+      return explicit;
+    }
+    return stored;
+  }
+
+  /**
+   * Clear an auth rejection so a later sign-in can join without reloading.
+   * Does not clear a name_taken or zone_full rejection.
+   */
+  resetAuth() {
+    if (this.fatalReason && this.fatalReason !== 'auth') return;
+    this.fatal = false;
+    this.fatalReason = null;
+    this.closed = false;
+    this.authRejectedToken = null;
+    clearTimeout(this.timer);
+    this.timer = 0;
+  }
+
+  /**
+   * Provide a sign-in token. A new/changed token after an auth rejection
+   * resets the rejection and reconnects.
+   */
+  setToken(token) {
+    const next = typeof token === 'string' ? token.trim() : '';
+    this.opts = { ...this.opts, token: next };
+    if (next && next !== this.authRejectedToken && (!this.fatalReason || this.fatalReason === 'auth')) {
+      this.resetAuth();
+      this.connect();
+    }
+    return next;
+  }
+
+  maybeClearAuthRejection() {
+    if (!this.fatal || this.fatalReason !== 'auth') return;
+    const token = this.currentToken();
+    if (token && token !== this.authRejectedToken) this.resetAuth();
+  }
+
   connect() {
+    this.maybeClearAuthRejection();
     if (this.closed || this.fatal || !this.url || !this.Socket) return;
     this.bind();
     void this.wakeThenOpen();
@@ -219,7 +266,13 @@ export class MmoClient {
   }
 
   openSocket() {
+    this.maybeClearAuthRejection();
     if (this.closed || this.fatal || !this.url || !this.Socket) return;
+    if (this.ws) {
+      const prev = this.ws;
+      this.ws = null;
+      try { prev.close(); } catch { /* already closing */ }
+    }
     this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
     let ws;
     try {
@@ -233,7 +286,7 @@ export class MmoClient {
       if (this.ws !== ws) return;
       this.attempt = 0;
       this.startPing();
-      const token = readAccessToken(this.opts);
+      const token = this.currentToken();
       const payload = {
         token,
         name: localName(this.game),
@@ -245,7 +298,8 @@ export class MmoClient {
     const onMessage = (ev) => this.onFrame(ev?.data ?? ev);
     const onClose = () => {
       this.stopPing();
-      if (this.ws === ws) this.ws = null;
+      if (this.ws !== ws) return;
+      this.ws = null;
       if (!this.closed && !this.fatal) this.schedule();
     };
     if (typeof ws.addEventListener === 'function') {
@@ -312,6 +366,7 @@ export class MmoClient {
     } else if (msg.type === TYPES.error) {
       if (msg.code === 'name_taken') {
         this.fatal = true;
+        this.fatalReason = 'name_taken';
         const message = msg.message || 'That hunter name is already taken.';
         toast(this.game, message);
         this.dispose('error', { code: 'name_taken', message });
@@ -319,6 +374,8 @@ export class MmoClient {
       }
       if (msg.code === 'auth' || (msg.code === 'zone_full' && !this.you)) {
         this.fatal = true;
+        this.fatalReason = msg.code === 'auth' ? 'auth' : 'zone_full';
+        if (msg.code === 'auth') this.authRejectedToken = this.currentToken();
         toast(this.game, msg.message || (msg.code === 'zone_full' ? 'That town is full.' : 'Sign in to hunt online. Guests stay solo.'));
         this.dispose('offline', msg.message);
         return;
@@ -414,6 +471,7 @@ export class MmoClient {
   }
 
   retry() {
+    this.maybeClearAuthRejection();
     if (this.fatal) return;
     this.closed = false;
     this.attempt = 0;

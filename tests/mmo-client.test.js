@@ -156,6 +156,80 @@ test('auth errors stop reconnect and go offline', async () => {
   assert.ok(toasts.some((t) => /sign in/i.test(t)));
 });
 
+test('MG-MMO-4: setToken after auth rejection reconnects without a reload', async () => {
+  const sockets = [];
+  class TrackingSocket extends FakeSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  }
+  const view = stubView();
+  const client = new MmoClient({ hud: { toast() {} }, wallet: { kind: 'account' } }, view, {
+    url: 'ws://world.test',
+    WebSocket: TrackingSocket,
+    token: 'stale',
+    guest: false,
+    fetch: okFetch(),
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 30));
+  sockets[0].push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
+  assert.equal(client.fatal, true);
+  client.retry();
+  assert.equal(client.fatal, true);
+  assert.equal(sockets.length, 1);
+
+  client.setToken('fresh-token');
+  assert.equal(client.fatal, false);
+  assert.equal(client.closed, false);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(sockets.length, 2);
+  assert.equal(client.ws, sockets[1]);
+  const hello = parseFrame(client.ws.sent[0]);
+  assert.equal(hello.type, 'hello');
+  assert.equal(hello.token, 'fresh-token');
+  client.dispose();
+});
+
+test('MG-MMO-4: resetAuth and retry work once a new token is present', async () => {
+  const sockets = [];
+  class TrackingSocket extends FakeSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  }
+  const view = stubView();
+  const client = new MmoClient({ hud: { toast() {} }, wallet: { kind: 'account' } }, view, {
+    url: 'ws://world.test',
+    WebSocket: TrackingSocket,
+    token: 'bad',
+    guest: false,
+    fetch: okFetch(),
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 30));
+  sockets[0].push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
+  assert.equal(client.fatal, true);
+  client.resetAuth();
+  assert.equal(client.fatal, false);
+  client.setToken('after-reset');
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(sockets.length, 2);
+  assert.equal(parseFrame(sockets[1].sent[0]).token, 'after-reset');
+
+  sockets[1].push({ v: 1, type: 'error', code: 'auth', message: 'That sign-in is not valid.' });
+  assert.equal(client.fatal, true);
+  client.opts = { ...client.opts, token: 'brand-new' };
+  client.retry();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(client.fatal, false);
+  assert.equal(sockets.length, 3);
+  assert.equal(parseFrame(sockets[2].sent[0]).token, 'brand-new');
+  client.dispose();
+});
+
 test('healthzUrl uses the https form of a wss world URL', () => {
   assert.equal(healthzUrl('wss://world.example/'), 'https://world.example/healthz');
   assert.equal(healthzUrl('ws://localhost:8080/ws'), 'http://localhost:8080/healthz');
