@@ -34,6 +34,13 @@ import {
 } from './net/worldPlay.js';
 import { BUILD_ID } from './ui/buildId.js';
 import { mountLoading } from './ui/boot.js';
+import {
+  armContextLost,
+  isWebGLFailure,
+  probeWebGL,
+  shouldForceNoGL,
+  showGlFailPanel,
+} from './ui/glFail.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
 import { BAG_TOSS_SIT, tossFrom } from './systems/bagDrop.js';
@@ -234,7 +241,10 @@ class Game {
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
     this.uiBlocking = false;
 
-    this.initRenderer();
+    if (!this.initRenderer()) {
+      this.glFailed = true;
+      return;
+    }
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.3, 320);
     this.tmpV = new THREE.Vector3();
@@ -247,24 +257,35 @@ class Game {
   initRenderer() {
     // iPad Safari and Brave reload the tab when the framebuffer peaks at the end of loading.
     // No multisample buffer, and no preserved backbuffer, on that browser.
-    const lite = this.lightBoot;
-    const r = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      antialias: !lite,
-      alpha: false,
-      powerPreference: lite ? 'default' : 'high-performance',
-      preserveDrawingBuffer: false,
-    });
-    r.outputColorSpace = THREE.SRGBColorSpace;
-    r.toneMapping = THREE.NoToneMapping;
-    r.setClearColor(0x0b0d10, 1);
-    r.shadowMap.enabled = true;
-    r.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer = r;
-    this.canvas.addEventListener('webglcontextlost', (ev) => {
-      ev.preventDefault();
-      this.reportFault(new Error('This device ran out of graphics memory. Refresh the page.'));
-    });
+    const scratch = typeof document !== 'undefined' ? document.createElement('canvas') : this.canvas;
+    const probe = probeWebGL(scratch, { force: shouldForceNoGL() });
+    if (!probe.ok) {
+      showGlFailPanel();
+      return false;
+    }
+    try {
+      const lite = this.lightBoot;
+      const r = new THREE.WebGLRenderer({
+        canvas: this.canvas,
+        antialias: !lite,
+        alpha: false,
+        powerPreference: lite ? 'default' : 'high-performance',
+        preserveDrawingBuffer: false,
+      });
+      r.outputColorSpace = THREE.SRGBColorSpace;
+      r.toneMapping = THREE.NoToneMapping;
+      r.setClearColor(0x0b0d10, 1);
+      r.shadowMap.enabled = true;
+      r.shadowMap.type = THREE.PCFShadowMap;
+      this.renderer = r;
+      this.glWatch = armContextLost(this.canvas, {
+        onFail: () => showGlFailPanel(),
+      });
+      return true;
+    } catch {
+      showGlFailPanel();
+      return false;
+    }
   }
 
   /** Say what broke, once, on the loading screen or the character camp. */
@@ -3292,7 +3313,19 @@ class Game {
 
 function startGame() {
   if (maybeResumeOnline()) return;
-  const game = new Game();
+  if (shouldForceNoGL() || !probeWebGL(typeof document !== 'undefined' ? document.createElement('canvas') : null, { force: shouldForceNoGL() }).ok) {
+    showGlFailPanel();
+    return;
+  }
+  let game;
+  try {
+    game = new Game();
+  } catch (err) {
+    showGlFailPanel();
+    console.error(err);
+    return;
+  }
+  if (game.glFailed) return;
   window.__game = game;
   try {
     installMockWallet();
@@ -3319,6 +3352,10 @@ function startGame() {
   }
   game.load().catch((e) => {
     console.error(e);
+    if (isWebGLFailure(e)) {
+      showGlFailPanel();
+      return;
+    }
     document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
   });
 }
