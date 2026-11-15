@@ -55,3 +55,28 @@ test('move and chat rate limits', () => {
   t = 2000;
   assert.equal(lim.allowChat(), true);
 });
+
+test('debug and unlock flags are rejected on any frame', () => {
+  assert.throws(() => parseMessage(encode('hello', { token: 'abc', debug: 1 })), (err) => err instanceof ProtocolError && err.code === 'debug');
+  assert.throws(() => parseMessage(encode('move', { x: 74, z: 72, unlock: true })), (err) => err instanceof ProtocolError && err.code === 'debug');
+  assert.throws(() => parseMessage(encode('chat', { channel: 'zone', text: 'hi', flags: { debug: '1' } })), (err) => err instanceof ProtocolError && err.code === 'debug');
+  const ok = parseMessage(encode('hello', { token: 'abc', name: 'Ann' }));
+  assert.equal(ok.type, 'hello');
+});
+
+test('applyMove keeps the server-owned held, look, and armor', () => {
+  const prev = {
+    x: 72, y: 3, z: 72, yaw: 0, move: 0, anim: 0,
+    held: 'budgeblade', sheath: null,
+    look: { skin: 2 }, armor: { helm: 'budgehelm' },
+    zone: 'Oakhollow', movedAt: 1000,
+  };
+  const next = applyMove(prev, {
+    ...prev, x: 73, z: 72.4,
+    held: 'demonsword', look: { skin: 0 }, armor: { helm: 'ironhelm' },
+  }, 1100);
+  assert.equal(next.teleport, false);
+  assert.equal(next.pose.held, 'budgeblade');
+  assert.equal(next.pose.look.skin, 2);
+  assert.equal(next.pose.armor.helm, 'budgehelm');
+});
