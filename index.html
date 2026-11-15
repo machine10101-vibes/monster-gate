@@ -28,8 +28,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-BOdrktvL.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CfhrAY0C.css">
+    <script type="module" crossorigin src="/assets/index-DL8pz4hP.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BPMcPEE0.css">
   </head>
   <body>
     <div id="app">
@@ -209,10 +209,21 @@
           <p id="wallet-status" class="wallet-status" aria-live="polite">Play as a guest on this device, or sign in to keep the hunt on your account.</p>
           <div id="account-choices" class="account-choices">
             <button id="btn-guest" class="start" type="button">Play as guest</button>
-            <button id="btn-world1" class="start" type="button">Play Online — World 1</button>
+            <p id="world-guest-note" class="world-guest-note">Sign in to play online</p>
             <button id="btn-account-create" class="start" type="button">Create an account</button>
             <button id="btn-account-signin" class="start" type="button">Sign in with email</button>
             <button id="btn-wallet" class="start" type="button">Log in with Klever</button>
+          </div>
+          <div id="world-picker" class="world-picker hidden" hidden>
+            <p class="world-picker-kicker">World 1</p>
+            <p class="world-picker-title">Choose a world</p>
+            <button id="pick-world1" class="start world-pick" type="button" aria-pressed="false">
+              <b>World 1 — Online</b>
+              <small id="pick-world1-status">Checking…</small>
+            </button>
+            <button id="pick-solo" class="start quiet world-pick" type="button" aria-pressed="false">
+              <b>Solo — Offline</b>
+            </button>
           </div>
           <form id="account-panel" class="account-panel mg-frame hidden" novalidate>
             <label class="wg-label" for="account-email">Email</label>
@@ -307,6 +318,16 @@
               <button id="cs-confirm-yes" class="cs-btn" type="button">Delete</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div id="world-auth" class="world-auth hidden" hidden>
+        <div class="wa-card mg-frame">
+          <small>World 1</small>
+          <p class="wa-title">Sign in to hunt online</p>
+          <p class="wa-msg">Guests stay solo.</p>
+          <button type="button" class="start" id="world-auth-signin">Sign in</button>
+          <button type="button" class="start quiet" id="world-auth-solo">Play solo</button>
         </div>
       </div>
 
