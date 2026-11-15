@@ -16,6 +16,9 @@ const HASH_ITERS = 210_000;
 const MIN_ITERS = 100_000;
 const MAX_ITERS = 600_000;
 
+export const CLOUD_UNAVAILABLE = "Couldn't reach the account service. Check your connection and try again.";
+export const CLOUD_UNAVAILABLE_RETRY = 'Retry';
+
 function fail(code, message) {
   const err = new Error(message);
   err.code = code;
@@ -307,7 +310,7 @@ export async function createAccount(email, password, confirm) {
   if (secret !== String(confirm ?? '')) throw fail('mismatch', 'Those passwords do not match.');
   const cfg = await cloudConfig();
   if (!cfg.url || !cfg.key) {
-    throw fail('unavailable', 'Supabase is not connected to this site yet, so the account cannot be saved.');
+    throw fail('unavailable', CLOUD_UNAVAILABLE);
   }
   const remote = await createRemote(cfg, normalized, secret);
   if (!remote) throw fail('unavailable', 'The account service could not be reached.');
@@ -329,7 +332,7 @@ export async function signInAccount(email, password) {
   }
   const userId = await verifyLocal(normalized, secret);
   if (!userId) {
-    throw fail('unavailable', 'Supabase is not connected to this site yet, so this account cannot be opened on another device.');
+    throw fail('unavailable', CLOUD_UNAVAILABLE);
   }
   return saveAccount({ kind: 'email', email: normalized, userId, at: Date.now() });
 }

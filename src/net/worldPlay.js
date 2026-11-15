@@ -173,7 +173,7 @@ export function worldPlayButton({ search, env, online, loc } = {}) {
     return { ready: false, disabled: true, label: WORLD_PLAY_SOON, action: 'none' };
   }
   if (on) {
-    return { ready: true, disabled: true, label: WORLD_PLAY_HERE, action: 'none' };
+    return { ready: true, disabled: false, label: WORLD_PLAY_HERE, action: 'online' };
   }
   return { ready: true, disabled: false, label: WORLD_PLAY_READY, action: 'online' };
 }
@@ -181,7 +181,8 @@ export function worldPlayButton({ search, env, online, loc } = {}) {
 export function paintWorldPlayButton(el, opts = {}) {
   if (!el) return null;
   const state = worldPlayButton(opts);
-  const shortOnline = opts.short && state.action === 'online';
+  const locSearch = locSearchOf(opts);
+  const shortOnline = opts.short && state.action === 'online' && !isWorldOnline(locSearch);
   if (opts.syncLabel !== false) el.textContent = shortOnline ? 'World 1' : state.label;
   el.disabled = state.disabled;
   el.setAttribute('aria-disabled', state.disabled ? 'true' : 'false');
@@ -346,9 +347,64 @@ export function enterOnlineWorld(opts = {}) {
   if (!worldServerConfigured(search, opts.env)) return false;
   rememberWorldMode('online', opts.storage);
   markWorldJoin('online', opts.session || opts.storage);
-  if (isWorldOnline(search)) return true;
-  loc.assign(hrefWithSearch(onlineSearch(search, { join: true }), loc));
+  const href = hrefWithSearch(onlineSearch(search, { join: true }), loc);
+  const here = `${loc.pathname || '/'}${loc.search || ''}${loc.hash || ''}`;
+  if (href === here) {
+    if (typeof loc.reload === 'function') loc.reload();
+    else loc.assign(href);
+    return true;
+  }
+  loc.assign(href);
   return true;
+}
+
+/** True when this client was disposed; retry()/connect() will no-op. Missing is not closed. */
+export function mmoClientClosed(mmo) {
+  return !!(mmo && mmo.closed === true);
+}
+
+/**
+ * Signed-in hunter whose live client was rejected must not reuse it.
+ * A missing client on boot is not a reject — attachMmo still runs.
+ * Picker / Switch world always navigate; this flag is for in-page remount after sign-in.
+ */
+export function shouldFreshMmoClient({
+  search = '',
+  signedIn = false,
+  authReject = false,
+  mmo = null,
+} = {}) {
+  if (!signedIn) return false;
+  if (authReject) return true;
+  if (isWorldOnline(search) && mmoClientClosed(mmo)) return true;
+  return false;
+}
+
+export function disposeMmoClient(mmo, game) {
+  if (!mmo) {
+    if (game) game.mmo = null;
+    return null;
+  }
+  const stop = mmo.dispose || mmo.close || mmo.disconnect || mmo.stop;
+  if (typeof stop === 'function') {
+    try { stop.call(mmo); } catch { /* already down */ }
+  }
+  if (game && game.mmo === mmo) game.mmo = null;
+  if (typeof window !== 'undefined' && window.__mmo === mmo) window.__mmo = null;
+  return null;
+}
+
+/**
+ * Tear down the current mmo client and mount a new one via `attach`.
+ * Does not import src/net/mmo.js — callers pass attachMmo.
+ */
+export function remountMmoClient({ game, view, mmo, attach, search } = {}) {
+  const current = mmo || game?.mmo || (typeof window !== 'undefined' ? window.__mmo : null);
+  disposeMmoClient(current, game);
+  view?.clearAuthLatch?.();
+  if (typeof attach !== 'function') return null;
+  const next = attach(game, view, search != null ? { search } : {});
+  return next || game?.mmo || null;
 }
 
 export function leaveOnlineWorld(opts = {}) {
@@ -458,7 +514,7 @@ function stripJoinParam(loc, search) {
 function currentLoc(loc) {
   if (loc) return loc;
   if (typeof window !== 'undefined' && window.location) return window.location;
-  return { search: '', pathname: '/', hash: '', assign() {}, replace() {}, replaceState() {} };
+  return { search: '', pathname: '/', hash: '', assign() {}, replace() {}, replaceState() {}, reload() {} };
 }
 
 function storageOf(storage) {

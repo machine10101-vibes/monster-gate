@@ -1,4 +1,4 @@
-import { errorMessage, ERRORS } from './constants.js';
+import { errorMessage, ERRORS, SOCIAL_GUEST_NOTE, SOCIAL_SOLO_NOTE } from './constants.js';
 import { emptySnapshot } from './offline.js';
 
 /**
@@ -69,7 +69,8 @@ export class SocialSession {
 
   async run(name, ...args) {
     if (this.mode === 'offline' || !this.backend?.act) {
-      return fail(ERRORS.offline, 'Friends and parties are Online only.');
+      const guest = this.game?.wallet?.kind === 'guest' || !this.game?.wallet?.address;
+      return fail(ERRORS.offline, guest ? SOCIAL_GUEST_NOTE : SOCIAL_SOLO_NOTE);
     }
     try {
       const res = await this.backend.act(name, ...args);

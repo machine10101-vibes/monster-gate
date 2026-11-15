@@ -240,7 +240,9 @@ test('?mockwallet is session-only and never a signup path', () => {
   const walletFn = src('../supabase/functions/wallet/index.ts');
   assert.match(html, /Log in with Klever/);
   assert.match(html, /id="wallet-unlinked"/);
-  assert.match(html, /No account is linked to this wallet\. Sign in with email, then connect your wallet in Account settings\./);
+  assert.match(html, /This Klever wallet isn't linked yet\. Your email account and progress are safe/);
+  assert.match(main, /UNLINKED_HINT/);
+  assert.match(main, /wallet-unlinked-email[\s\S]*focus/);
   assert.match(main, /loginWithKlever/);
   assert.match(main, /kind === 'email'/);
   assert.doesNotMatch(main, /account \|\| klever/);

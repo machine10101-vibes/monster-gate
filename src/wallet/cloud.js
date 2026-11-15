@@ -6,39 +6,112 @@
 
 const TOKEN_KEY = 'monster-gate-cloud-token';
 
+export const CONFIG_ATTEMPTS = 3;
+export const CONFIG_BACKOFF_MS = [200, 500];
+
 let configPromise = null;
 let timer = 0;
 let pending = null;
 
-function envValue(name) {
-  const env = import.meta.env;
-  return env && typeof env[name] === 'string' ? env[name].trim() : '';
+function envOf(env) {
+  return env ?? (typeof import.meta !== 'undefined' ? import.meta.env : undefined);
 }
 
-function acceptUrl(url) {
+function envValue(name, env) {
+  const src = envOf(env);
+  return src && typeof src[name] === 'string' ? src[name].trim() : '';
+}
+
+export function acceptCloudUrl(url) {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(url);
 }
 
-async function readConfig() {
-  const url = envValue('VITE_SUPABASE_URL').replace(/\/$/, '');
-  const key = envValue('VITE_SUPABASE_ANON_KEY');
-  if (url && key && acceptUrl(url)) return { url, key };
+function rejectServiceRole(key) {
+  return /service_role/i.test(String(key || ''));
+}
+
+export function parseCloudJson(json) {
+  const url = String(json?.url || '').trim().replace(/\/$/, '');
+  const key = String(json?.key || json?.anonKey || '').trim();
+  if (!url || !key || !acceptCloudUrl(url) || rejectServiceRole(key)) return { url: '', key: '' };
+  return { url, key };
+}
+
+export function viteCloudConfig(env) {
+  let url = '';
+  let key = '';
+  if (env) {
+    url = envValue('VITE_SUPABASE_URL', env).replace(/\/$/, '');
+    key = envValue('VITE_SUPABASE_ANON_KEY', env);
+  } else {
+    url = (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env.VITE_SUPABASE_URL === 'string'
+      ? import.meta.env.VITE_SUPABASE_URL
+      : '').trim().replace(/\/$/, '');
+    key = (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env.VITE_SUPABASE_ANON_KEY === 'string'
+      ? import.meta.env.VITE_SUPABASE_ANON_KEY
+      : '').trim();
+  }
+  if (!url || !key || !acceptCloudUrl(url) || rejectServiceRole(key)) return { url: '', key: '' };
+  return { url, key };
+}
+
+function emptyConfig() {
+  return { url: '', key: '' };
+}
+
+async function fetchConfigOnce({ fetchFn, baseURI } = {}) {
+  const fetchImpl = fetchFn || (typeof fetch !== 'undefined' ? fetch.bind(globalThis) : null);
+  if (!fetchImpl) return emptyConfig();
+  const href = typeof baseURI === 'string' && baseURI
+    ? new URL('supabase.json', baseURI).href
+    : (typeof document !== 'undefined' ? new URL('supabase.json', document.baseURI).href : 'supabase.json');
   try {
-    const res = await fetch(new URL('supabase.json', document.baseURI), { cache: 'no-store' });
-    if (!res.ok) return { url: '', key: '' };
-    const json = await res.json();
-    const fileUrl = String(json.url || '').trim().replace(/\/$/, '');
-    const fileKey = String(json.key || json.anonKey || '').trim();
-    if (!fileUrl || !fileKey || !acceptUrl(fileUrl)) return { url: '', key: '' };
-    return { url: fileUrl, key: fileKey };
+    const res = await fetchImpl(href, { cache: 'no-store' });
+    if (!res?.ok) return emptyConfig();
+    const json = typeof res.json === 'function' ? await res.json() : {};
+    return parseCloudJson(json);
   } catch {
-    return { url: '', key: '' };
+    return emptyConfig();
   }
 }
 
-export function loadCloudConfig() {
-  if (!configPromise) configPromise = readConfig();
-  return configPromise;
+function waitMs(ms, sleep) {
+  if (typeof sleep === 'function') return sleep(ms);
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Fetch supabase.json with retries. Empty results are never treated as success. */
+export async function readCloudConfig(opts = {}) {
+  const baked = viteCloudConfig(opts.env);
+  if (baked.url && baked.key) return baked;
+  const attempts = Math.max(1, Number(opts.attempts) || CONFIG_ATTEMPTS);
+  let last = emptyConfig();
+  for (let i = 0; i < attempts; i++) {
+    last = await fetchConfigOnce(opts);
+    if (last.url && last.key) return last;
+    if (i < attempts - 1) await waitMs(CONFIG_BACKOFF_MS[Math.min(i, CONFIG_BACKOFF_MS.length - 1)], opts.sleep);
+  }
+  return last;
+}
+
+export function resetCloudConfig() {
+  configPromise = null;
+}
+
+export function loadCloudConfig(opts = {}) {
+  if (!opts.fresh && configPromise) return configPromise;
+  const pending = readCloudConfig(opts).then((cfg) => {
+    if (!cfg.url || !cfg.key) {
+      if (configPromise === pending) configPromise = null;
+      return cfg;
+    }
+    return cfg;
+  }, (err) => {
+    if (configPromise === pending) configPromise = null;
+    throw err;
+  });
+  configPromise = pending;
+  return pending;
 }
 
 export async function cloudEnabled() {

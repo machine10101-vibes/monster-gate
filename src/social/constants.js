@@ -72,6 +72,18 @@ export const SOCIAL_INBOUND = new Set([
   'whisper',
 ]);
 
+export const SOCIAL_SOLO_NOTE = 'Friends and parties work in World 1.';
+export const SOCIAL_SOLO_BTN = 'Join World 1';
+export const SOCIAL_GUEST_NOTE = 'Sign in to add friends and party up.';
+export const SOCIAL_GUEST_BTN = 'Sign in';
+
+export function socialOfflinePrompt({ guest = false, signedIn = false } = {}) {
+  if (guest || !signedIn) {
+    return { note: SOCIAL_GUEST_NOTE, action: 'signin', label: SOCIAL_GUEST_BTN };
+  }
+  return { note: SOCIAL_SOLO_NOTE, action: 'world', label: SOCIAL_SOLO_BTN };
+}
+
 export function errorMessage(code, fallback) {
   const key = String(code || '');
   return ERROR_TEXT[key] || fallback || key || 'Something went wrong.';

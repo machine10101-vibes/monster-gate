@@ -39,8 +39,10 @@ import {
   paintWorldModePill,
   paintWorldPicker,
   rememberWorldMode,
+  remountMmoClient,
   shouldDropOnlineWithoutSession,
   shouldForceWorldPick,
+  shouldFreshMmoClient,
   shouldMountOnline,
   worldJoinContinue,
   worldPickerState,
@@ -77,7 +79,7 @@ import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRift
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
-import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
+import { UNLINKED_CODE, UNLINKED_HINT } from '../supabase/functions/_shared/linkAuth.js';
 import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
@@ -637,7 +639,32 @@ class Game {
     } else if (this.cloudState === 'error') this.startAutosave();
     this.paintCloudStatus();
     this.refreshWalletUi();
-    if (!this.started && this.cloudState !== 'error') this.continueAfterAccount();
+    if (this.cloudState === 'error') return;
+    if (shouldFreshMmoClient({
+      search: typeof location !== 'undefined' ? location.search : '',
+      signedIn: !!(session && session.kind !== 'guest'),
+      authReject: !!this.worldView?.authReject,
+      mmo: this.mmo,
+    })) {
+      await this.remountOnlineClient();
+      return;
+    }
+    if (!this.started) this.continueAfterAccount();
+  }
+
+  async remountOnlineClient() {
+    const view = this.worldView;
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (!view || !isWorldOnline(search)) {
+      enterOnlineWorld();
+      return null;
+    }
+    view.clearAuthLatch?.();
+    this.hideWorldAuth();
+    const { attachMmo } = await import('./net/mmo.js');
+    const next = remountMmoClient({ game: this, view, attach: attachMmo, search });
+    if (!this.started) this.continueSignedInHunt();
+    return next;
   }
 
   continueAfterAccount() {
@@ -748,10 +775,6 @@ class Game {
     this.paintWorldPickerUi();
     rememberWorldMode('online');
     markWorldJoin('online');
-    if (isWorldOnline(search)) {
-      this.continueSignedInHunt();
-      return;
-    }
     enterOnlineWorld();
   }
 
@@ -797,6 +820,33 @@ class Game {
     this.worldView?.clearAuthLatch?.();
     if (isWorldOnline(typeof location !== 'undefined' ? location.search : '')) leaveOnlineWorld();
     else this.refreshWalletUi();
+  }
+
+  openSocialSignIn() {
+    document.getElementById('title')?.classList.remove('hidden');
+    this.openAccount('signin');
+  }
+
+  joinWorld1() {
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (!hasWorldSessionToken()) {
+      this.openSocialSignIn();
+      return;
+    }
+    if (shouldFreshMmoClient({
+      search,
+      signedIn: true,
+      authReject: !!this.worldView?.authReject,
+      mmo: this.mmo,
+    })) {
+      this.remountOnlineClient();
+      return;
+    }
+    if (!this.started && !isWorldOnline(search)) {
+      this.showWorldPicker();
+      return;
+    }
+    enterOnlineWorld();
   }
 
   openCharacterSelect() {
@@ -949,6 +999,7 @@ class Game {
     if (submit) submit.textContent = mode === 'create' ? 'Create account' : 'Sign in';
     if (password) password.setAttribute('autocomplete', mode === 'create' ? 'new-password' : 'current-password');
     document.getElementById('account-pass-hint')?.classList.toggle('hidden', mode !== 'create');
+    document.getElementById('account-retry')?.classList.add('hidden');
     if (error) error.textContent = '';
     if (status) {
       status.textContent = mode === 'create'
@@ -965,6 +1016,7 @@ class Game {
     panel?.classList.add('hidden');
     const error = document.getElementById('account-error');
     if (error) error.textContent = '';
+    document.getElementById('account-retry')?.classList.add('hidden');
     this.hideWalletUnlinked();
   }
 
@@ -981,6 +1033,7 @@ class Game {
     this.walletBusy = true;
     if (submit) submit.disabled = true;
     if (error) error.textContent = '';
+    document.getElementById('account-retry')?.classList.add('hidden');
     try {
       const session = mode === 'create'
         ? await createAccount(email, password, confirm)
@@ -990,6 +1043,7 @@ class Game {
       this.watchAccount();
     } catch (err) {
       if (error) error.textContent = err.message || 'The account could not be created.';
+      document.getElementById('account-retry')?.classList.toggle('hidden', err.code !== 'unavailable');
     } finally {
       this.walletBusy = false;
       if (submit) submit.disabled = false;
@@ -1130,11 +1184,12 @@ class Game {
     const panel = document.getElementById('wallet-unlinked');
     const status = document.getElementById('wallet-status');
     const text = document.getElementById('wallet-unlinked-text');
-    if (text) text.textContent = UNLINKED_MESSAGE;
+    if (text) text.textContent = UNLINKED_HINT;
     panel?.classList.remove('hidden');
     document.getElementById('account-choices')?.classList.add('hidden');
     document.getElementById('wallet-help')?.classList.add('hidden');
     if (status) status.textContent = '';
+    document.getElementById('wallet-unlinked-email')?.focus();
   }
 
   captureHunter() {
@@ -1214,6 +1269,9 @@ class Game {
     document.getElementById('account-cancel')?.addEventListener('click', () => {
       this.closeAccount();
       this.refreshWalletUi();
+    });
+    document.getElementById('account-retry')?.addEventListener('click', () => {
+      document.getElementById('account-panel')?.requestSubmit();
     });
     document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
     swap.addEventListener('click', () => this.signOut(false));

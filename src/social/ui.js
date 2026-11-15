@@ -1,5 +1,5 @@
 import { decorateFrame } from '../ui/theme.js';
-import { PRESENCE, errorMessage, cleanHunterName } from './constants.js';
+import { PRESENCE, errorMessage, cleanHunterName, socialOfflinePrompt } from './constants.js';
 
 const CORNERS = ['nw', 'ne', 'sw', 'se'];
 
@@ -37,7 +37,17 @@ export function mountFriends(body, game) {
     const snap = social?.snapshot?.() || { mode: 'offline', friends: [], pendingIn: [], pendingOut: [], party: null };
     root.innerHTML = '';
     if (!social || snap.mode === 'offline' || !snap.online) {
-      root.appendChild(el('p', 'mg-social-note', 'Friends and parties are <b>Online only</b>. Load the hunt with <code>?mmo=1</code> to add hunters and form a party of four.'));
+      const guest = game?.wallet?.kind === 'guest' || !game?.wallet?.address;
+      const prompt = socialOfflinePrompt({ guest, signedIn: !guest });
+      root.appendChild(el('p', 'mg-social-note', prompt.note));
+      const go = el('button', 'mg-btn', prompt.label);
+      go.type = 'button';
+      go.id = prompt.action === 'signin' ? 'mg-social-signin' : 'mg-social-join-world';
+      go.addEventListener('click', () => {
+        if (prompt.action === 'signin') game?.openSocialSignIn?.() || game?.openAccount?.('signin');
+        else game?.joinWorld1?.();
+      });
+      root.appendChild(go);
       return;
     }
     if (snap.mode === 'mmo' && !snap.caps.friends && !snap.caps.party) {
@@ -304,7 +314,10 @@ export function mountSocialHud(game) {
     const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty });
     menu.innerHTML = `
       <b>${escapeHtml(player.name)}</b>
-      ${offline ? '<p class="mg-social-note">Friends and parties are <b>Online only</b>.</p>' : ''}
+      ${offline ? `<p class="mg-social-note">${escapeHtml(socialOfflinePrompt({
+        guest: game?.wallet?.kind === 'guest' || !game?.wallet?.address,
+        signedIn: !!(game?.wallet && game.wallet.kind !== 'guest'),
+      }).note)}</p>` : ''}
       ${items.map((it) => `<button type="button" data-act="${it.act}" ${it.disabled ? 'disabled' : ''}>${it.label}</button>`).join('')}`;
     for (const c of CORNERS) {
       if (menu.querySelector(`:scope > .mg-corner.${c}`)) continue;
