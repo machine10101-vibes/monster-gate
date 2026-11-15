@@ -814,11 +814,9 @@ export class HUD {
       }
       body.appendChild(jumps);
       const q = game.quality;
+      const liveSearch = typeof location !== 'undefined' ? location.search : '';
       const rows = [
-        ['World 1', '<button id="set-world1" type="button">Play Online — World 1</button>'],
-        ...(game.worldView || game.mmo || isWorldOnline(typeof location !== 'undefined' ? location.search : '')
-          ? [['Hunt', '<button id="set-world-offline" type="button">Play offline</button>']]
-          : []),
+        ['Switch world', '<span class="world-switch"><button id="set-world1" type="button">World 1</button><button id="set-world-solo" type="button">Solo</button></span>'],
         ...(name === 'menu'
           ? [
               ['Skill & Spell Book', '<button id="set-book">Open</button>'],
@@ -891,9 +889,15 @@ export class HUD {
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
       const worldBtn = document.getElementById('set-world1');
-      paintWorldPlayButton(worldBtn);
-      worldBtn?.addEventListener('click', () => onWorldPlayClick());
-      document.getElementById('set-world-offline')?.addEventListener('click', () => leaveOnlineWorld());
+      paintWorldPlayButton(worldBtn, { search: liveSearch, short: true });
+      worldBtn?.addEventListener('click', () => onWorldPlayClick({
+        search: liveSearch,
+        onNeedSignIn: () => game.showWorldAuth?.(),
+      }));
+      document.getElementById('set-world-solo')?.addEventListener('click', () => {
+        if (isWorldOnline(liveSearch)) leaveOnlineWorld({ search: liveSearch });
+      });
+      paintWorldModePill(document.getElementById('world-mode-pill'), { search: liveSearch });
       document.getElementById('set-spawn')?.addEventListener('click', () => game.debugSpawn?.());
       document.getElementById('set-spawn-tank')?.addEventListener('click', () => game.debugSpawnTank?.());
       document.getElementById('set-autoatk')?.addEventListener('click', () => {

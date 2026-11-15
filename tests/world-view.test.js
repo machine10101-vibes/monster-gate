@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  ANIM, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S, REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
-  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows, planLogCull, newestKeepIndex,
-  normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
+  ANIM, AUTH_SIGNIN_BTN, AUTH_SIGNIN_TITLE, AUTH_SOLO_BTN, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S,
+  REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
+  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows, isAuthReject, planLogCull,
+  newestKeepIndex, normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
 import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
@@ -441,6 +442,7 @@ test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () =>
   assert.doesNotMatch(viewSrc, /new WebSocket/);
   const main = src('../src/main.js');
   assert.match(main, /q\.get\('mmo'\) === '1'/);
+  assert.match(main, /shouldMountOnline/);
   assert.match(main, /import\('\.\/net\/worldView\.js'\)/);
   assert.match(main, /import\('\.\/net\/mmo\.js'\)/);
   assert.doesNotMatch(main, /from '\.\/net\/mmo\.js'/);
@@ -490,4 +492,47 @@ test('setStatus error name_taken accepts object detail without auto-reconnect', 
   assert.equal(view.status, STATUS.error);
   view.setStatus({ status: 'error', code: 'name_taken', message: 'Pick another hunter name.' });
   assert.equal(view.errorCode(), 'name_taken');
+});
+
+test('auth reject latches Sign in panel and ignores later reconnecting (MG-MMO-3)', () => {
+  assert.equal(isAuthReject({ code: 'auth' }), true);
+  assert.equal(isAuthReject('auth'), true);
+  assert.equal(isAuthReject({ status: 'online', detail: 'Sign in to hunt online. Guests stay solo.' }), true);
+  assert.equal(isAuthReject('reconnecting'), false);
+  assert.equal(isAuthReject({ code: 'name_taken' }), false);
+  assert.equal(AUTH_SIGNIN_TITLE, 'Sign in to hunt online');
+  assert.equal(AUTH_SIGNIN_BTN, 'Sign in');
+  assert.equal(AUTH_SOLO_BTN, 'Play solo');
+
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  let disposed = 0;
+  game.mmo = {
+    dispose() {
+      disposed += 1;
+      view.setStatus('offline');
+    },
+  };
+  view.setStatus({ status: 'connecting', detail: 'Sign in to hunt online. Guests stay solo.' });
+  assert.equal(view.authReject, true);
+  assert.equal(view.authOpen, true);
+  assert.equal(view.status, STATUS.error);
+  assert.equal(view.errorCode(), 'auth');
+  assert.match(view.errorMessage(), /Sign in to hunt online/);
+  assert.equal(disposed, 1);
+
+  view.setStatus('reconnecting');
+  view.setStatus({ status: 'reconnecting' });
+  view.setStatus('offline');
+  assert.equal(view.authReject, true);
+  assert.equal(view.status, STATUS.error);
+  assert.equal(view.errorCode(), 'auth');
+  assert.match(view.errorMessage(), /Sign in to hunt online/);
+
+  const bare = new WorldView(stubGame(), { spawnRemote: stubRemote, search: '?mmo=1' });
+  bare.setStatus({ status: 'online', detail: 'auth' });
+  bare.setStatus('reconnecting', 'World server unreachable');
+  assert.equal(bare.authReject, true);
+  assert.equal(bare.status, STATUS.error);
+  assert.equal(bare.errorCode(), 'auth');
 });

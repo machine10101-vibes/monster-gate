@@ -25,6 +25,33 @@ import { leaveOnlineWorld } from './worldPlay.js';
 import { decorateFrame } from '../ui/theme.js';
 import { applyWeaponCursor } from '../ui/weaponCursor.js';
 
+export const AUTH_SIGNIN_TITLE = 'Sign in to hunt online';
+export const AUTH_SIGNIN_MSG = 'Guests stay solo.';
+export const AUTH_SIGNIN_BTN = 'Sign in';
+export const AUTH_SOLO_BTN = 'Play solo';
+
+/** True when the world server rejected the hunter for missing / bad auth. */
+export function isAuthReject(status, detail) {
+  const bags = [status, detail];
+  for (const bag of bags) {
+    if (bag == null || bag === '') continue;
+    if (typeof bag === 'string') {
+      const s = bag.trim();
+      if (/^auth$/i.test(s)) return true;
+      if (/sign in to hunt online/i.test(s) || /guests stay solo/i.test(s)) return true;
+      continue;
+    }
+    if (typeof bag === 'object') {
+      const code = String(bag.code || '');
+      const msg = String(bag.message || (typeof bag.detail === 'string' ? bag.detail : '') || '');
+      if (code === 'auth' || /^auth$/i.test(msg)) return true;
+      if (/sign in to hunt online/i.test(msg) || /guests stay solo/i.test(msg)) return true;
+      if (bag.detail && typeof bag.detail === 'object' && isAuthReject(null, bag.detail)) return true;
+    }
+  }
+  return false;
+}
+
 export const WORLD_VIEW = 1;
 export const REMOTE_PREFIX = 'wv:';
 export const CHAT_MAX = 120;
@@ -394,6 +421,9 @@ export class WorldView {
     this.wakeTick = 0;
     this.nameUi = null;
     this.nameTakenOpen = false;
+    this.authUi = null;
+    this.authReject = false;
+    this.authOpen = false;
     this.online = 0;
     this.intents = [];
     this.onIntent = null;
@@ -629,7 +659,17 @@ export class WorldView {
           : { code: status.code, message: status.message || extra };
       }
     }
-    this.status = STATUS[next] || next || STATUS.offline;
+    const incoming = STATUS[next] || next || STATUS.offline;
+    if (isAuthReject(status, extra) || isAuthReject(status, detail)) {
+      this.latchAuthReject(extra);
+      return;
+    }
+    if (this.authReject && incoming !== STATUS.online) {
+      this.syncAuthPanel();
+      return;
+    }
+    if (this.authReject && incoming === STATUS.online) this.clearAuthLatch();
+    this.status = incoming;
     if (this.status === STATUS.waking) {
       this.wakeDetail = extra && typeof extra === 'object' ? extra : {};
       this.wakeMarkedAt = this.now();
@@ -646,6 +686,45 @@ export class WorldView {
     this.paintHud();
     this.syncWakeOverlay();
     this.syncNamePrompt();
+    this.syncAuthPanel();
+  }
+
+  latchAuthReject(extra) {
+    const msg = extra && typeof extra === 'object'
+      ? String(extra.message || extra.detail || AUTH_SIGNIN_TITLE)
+      : (String(extra || '').trim() || AUTH_SIGNIN_TITLE);
+    this.authReject = true;
+    this.authOpen = true;
+    this.status = STATUS.error;
+    this.detail = {
+      code: 'auth',
+      message: /sign in|guest/i.test(msg) ? msg : AUTH_SIGNIN_TITLE,
+    };
+    this.nameTakenOpen = false;
+    this.stopMmoTransport();
+    this.paintHud();
+    this.syncWakeOverlay();
+    this.syncNamePrompt();
+    this.syncAuthPanel();
+  }
+
+  clearAuthLatch() {
+    this.authReject = false;
+    this.authOpen = false;
+    this.hideAuthPanel();
+  }
+
+  /** Call mmo.js public dispose/close if present. Do not open sockets here. */
+  stopMmoTransport() {
+    const mmo = this.game?.mmo || (typeof window !== 'undefined' ? window.__mmo : null);
+    if (!mmo) return;
+    const stop = mmo.dispose || mmo.close || mmo.disconnect || mmo.stop;
+    if (typeof stop !== 'function') return;
+    try {
+      stop.call(mmo);
+    } catch {
+      /* transport already down */
+    }
   }
 
   errorCode() {
@@ -808,6 +887,7 @@ export class WorldView {
     this.wakeDismissed = true;
     this.hideWakeOverlay();
     this.stopWakeTick();
+    this.clearAuthLatch();
     leaveOnlineWorld({ search: this.search });
   }
 
@@ -866,6 +946,89 @@ export class WorldView {
   hideNamePrompt() {
     this.nameUi?.root?.remove();
     this.nameUi = null;
+  }
+
+  syncAuthPanel() {
+    if (!this.authReject || !this.authOpen) {
+      this.hideAuthPanel();
+      return;
+    }
+    this.ensureAuthPanel();
+    this.paintAuthPanel();
+  }
+
+  ensureAuthPanel() {
+    if (typeof document === 'undefined') return;
+    if (this.authUi) return;
+    let root = document.getElementById('world-auth');
+    let created = false;
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'world-auth';
+      root.innerHTML = `
+        <div class="wa-card mg-frame">
+          <small>World 1</small>
+          <p class="wa-title">${AUTH_SIGNIN_TITLE}</p>
+          <p class="wa-msg">${AUTH_SIGNIN_MSG}</p>
+          <button type="button" class="start" id="world-auth-signin">${AUTH_SIGNIN_BTN}</button>
+          <button type="button" class="start quiet" id="world-auth-solo">${AUTH_SOLO_BTN}</button>
+        </div>`;
+      (document.getElementById('app') || document.body).appendChild(root);
+      created = true;
+    }
+    root.classList.remove('hidden');
+    root.hidden = false;
+    const sign = root.querySelector('#world-auth-signin');
+    const solo = root.querySelector('#world-auth-solo');
+    if (sign && !sign.dataset.wvBound) {
+      sign.dataset.wvBound = '1';
+      sign.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.onAuthSignIn();
+      });
+    }
+    if (solo && !solo.dataset.wvBound) {
+      solo.dataset.wvBound = '1';
+      solo.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.onAuthSolo();
+      });
+    }
+    if (created) decorateFrame(root.querySelector('.wa-card'));
+    this.authUi = { root, sign, solo, created };
+    this.unsubs.push(() => this.hideAuthPanel());
+  }
+
+  paintAuthPanel() {
+    const root = this.authUi?.root || (typeof document !== 'undefined' ? document.getElementById('world-auth') : null);
+    if (!root) return;
+    root.classList.remove('hidden');
+    root.hidden = false;
+    const title = root.querySelector('.wa-title');
+    const msg = root.querySelector('.wa-msg');
+    if (title) title.textContent = AUTH_SIGNIN_TITLE;
+    if (msg) msg.textContent = this.errorMessage() || AUTH_SIGNIN_MSG;
+  }
+
+  hideAuthPanel() {
+    const root = this.authUi?.root;
+    if (root) {
+      root.classList.add('hidden');
+      root.hidden = true;
+      if (this.authUi?.created) root.remove();
+    }
+    this.authUi = null;
+  }
+
+  onAuthSignIn() {
+    const title = typeof document !== 'undefined' ? document.getElementById('title') : null;
+    title?.classList.remove('hidden');
+    this.game?.openAccount?.('signin');
+  }
+
+  onAuthSolo() {
+    this.clearAuthLatch();
+    this.playOffline();
   }
 
   applyHunterName(raw) {
@@ -1146,9 +1309,11 @@ export class WorldView {
             ? 'Reconnecting…'
             : st === STATUS.error && this.errorCode() === 'name_taken'
               ? 'Name taken'
-              : st === STATUS.error
-                ? 'Error'
-                : 'Offline';
+              : st === STATUS.error && (this.authReject || this.errorCode() === 'auth')
+                ? 'Sign in'
+                : st === STATUS.error
+                  ? 'Error'
+                  : 'Offline';
     const canRetry = (st === STATUS.offline || st === STATUS.reconnecting)
       && this.errorCode() !== 'name_taken';
     this.ui.status.dataset.state = st;

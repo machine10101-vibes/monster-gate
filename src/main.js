@@ -25,12 +25,27 @@ import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import {
+  consumeWorldAuth,
+  consumeWorldJoin,
+  dropOnlineWithoutSession,
+  enterOnlineWorld,
+  fetchWorldHealth,
+  hasWorldSessionToken,
+  healthzUrl,
   isWorldOnline,
-  maybeResumeOnline,
-  onWorldPlayClick,
+  lastWorldMode,
+  leaveOnlineWorld,
+  markWorldJoin,
   paintWorldModePill,
-  paintWorldPlayButton,
+  paintWorldPicker,
   rememberWorldMode,
+  shouldDropOnlineWithoutSession,
+  shouldForceWorldPick,
+  shouldMountOnline,
+  worldJoinContinue,
+  worldPickerState,
+  worldServerConfigured,
+  worldWsUrl,
 } from './net/worldPlay.js';
 import { BUILD_ID } from './ui/buildId.js';
 import { mountLoading } from './ui/boot.js';
@@ -416,7 +431,10 @@ class Game {
 
     if (loadingScreen) await loadingScreen.dismiss();
     else document.getElementById('loading')?.classList.add('hidden');
-    if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
+    if (consumeWorldAuth()) this.showWorldAuth();
+    if (shouldForceWorldPick() && !this.started) this.showWorldPicker({ force: true });
+    if (this.started) document.getElementById('title')?.classList.add('hidden');
+    else if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -619,7 +637,166 @@ class Game {
     } else if (this.cloudState === 'error') this.startAutosave();
     this.paintCloudStatus();
     this.refreshWalletUi();
-    if (!this.started && this.cloudState !== 'error') this.openCharacterSelect();
+    if (!this.started && this.cloudState !== 'error') this.continueAfterAccount();
+  }
+
+  continueAfterAccount() {
+    if (this.started) return;
+    if (shouldForceWorldPick()) {
+      this.showWorldPicker({ force: true });
+      return;
+    }
+    const join = consumeWorldJoin();
+    const signed = !!(this.wallet && this.wallet.kind !== 'guest');
+    const next = worldJoinContinue({
+      signedIn: signed && hasWorldSessionToken(),
+      join,
+      hasCharacter: !!this.roster?.chars?.length,
+    });
+    if (next === 'enter') {
+      this.continueSignedInHunt();
+      return;
+    }
+    if (next === 'select') {
+      this.openCharacterSelect();
+      return;
+    }
+    if (next === 'signin') {
+      this.showWorldAuth();
+      return;
+    }
+    if (signed) {
+      this.showWorldPicker();
+      return;
+    }
+    if (this.wallet) this.openCharacterSelect();
+  }
+
+  continueSignedInHunt() {
+    this.hideWorldPicker();
+    this.hideWorldAuth();
+    document.getElementById('title')?.classList.add('hidden');
+    const char = this.roster?.get(this.roster.last) || this.roster?.chars?.[0];
+    if (char) this.enterWorld(char);
+    else this.openCharacterSelect();
+  }
+
+  showWorldPicker({ force = false } = {}) {
+    if (this.started) return;
+    this.worldPickOpen = true;
+    this.worldJoining = false;
+    this.hideWorldAuth();
+    this.charSelect?.close?.();
+    document.getElementById('title')?.classList.remove('hidden');
+    document.getElementById('account-choices')?.classList.add('hidden');
+    const root = document.getElementById('world-picker');
+    if (root) {
+      root.hidden = false;
+      root.classList.remove('hidden');
+    }
+    this.paintWorldPickerUi({ force });
+    this.refreshWorldHealth();
+  }
+
+  hideWorldPicker() {
+    this.worldPickOpen = false;
+    this.worldJoining = false;
+    const root = document.getElementById('world-picker');
+    if (root) {
+      root.hidden = true;
+      root.classList.add('hidden');
+    }
+  }
+
+  paintWorldPickerUi({ force = false } = {}) {
+    const signed = !!(this.wallet && this.wallet.kind !== 'guest');
+    const state = worldPickerState({
+      search: typeof location !== 'undefined' ? location.search : '',
+      last: lastWorldMode(),
+      health: this.worldHealth,
+      joining: !!this.worldJoining,
+      signedIn: signed,
+      force: force || shouldForceWorldPick() || this.worldPickOpen,
+    });
+    paintWorldPicker(document.getElementById('world-picker'), state);
+    return state;
+  }
+
+  refreshWorldHealth() {
+    const url = healthzUrl(worldWsUrl(typeof location !== 'undefined' ? location.search : ''));
+    const gen = (this.worldHealthGen = (this.worldHealthGen || 0) + 1);
+    fetchWorldHealth(url).then((health) => {
+      if (gen !== this.worldHealthGen) return;
+      this.worldHealth = health;
+      if (this.worldPickOpen) this.paintWorldPickerUi();
+    }).catch(() => {
+      if (gen !== this.worldHealthGen) return;
+      this.worldHealth = { live: false, label: 'Waking…', players: null };
+      if (this.worldPickOpen) this.paintWorldPickerUi();
+    });
+  }
+
+  pickWorldOnline() {
+    if (this.started || this.worldJoining) return;
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (!worldServerConfigured(search)) return;
+    if (!hasWorldSessionToken()) {
+      this.showWorldAuth();
+      return;
+    }
+    this.worldJoining = true;
+    this.paintWorldPickerUi();
+    rememberWorldMode('online');
+    markWorldJoin('online');
+    if (isWorldOnline(search)) {
+      this.continueSignedInHunt();
+      return;
+    }
+    enterOnlineWorld();
+  }
+
+  pickWorldSolo() {
+    if (this.started || this.worldJoining) return;
+    rememberWorldMode('offline');
+    this.hideWorldPicker();
+    if (isWorldOnline(typeof location !== 'undefined' ? location.search : '')) {
+      leaveOnlineWorld();
+      return;
+    }
+    this.openCharacterSelect();
+  }
+
+  showWorldAuth() {
+    this.hideWorldPicker();
+    const root = document.getElementById('world-auth');
+    if (root) {
+      root.hidden = false;
+      root.classList.remove('hidden');
+    }
+    this.worldView?.latchAuthReject?.('Sign in to hunt online. Guests stay solo.');
+    document.getElementById('title')?.classList.remove('hidden');
+  }
+
+  hideWorldAuth() {
+    const root = document.getElementById('world-auth');
+    if (root) {
+      root.hidden = true;
+      root.classList.add('hidden');
+    }
+    if (this.worldView?.authReject) this.worldView.clearAuthLatch();
+  }
+
+  onWorldAuthSignIn() {
+    this.hideWorldAuth();
+    document.getElementById('title')?.classList.remove('hidden');
+    this.openAccount('signin');
+  }
+
+  onWorldAuthSolo() {
+    this.hideWorldAuth();
+    this.worldView?.clearAuthLatch?.();
+    if (isWorldOnline(typeof location !== 'undefined' ? location.search : '')) leaveOnlineWorld();
+    else this.refreshWalletUi();
   }
 
   openCharacterSelect() {
@@ -637,6 +814,8 @@ class Game {
   playAsGuest() {
     if (this.started || this.walletBusy) return;
     this.closeAccount();
+    this.hideWorldPicker();
+    this.hideWorldAuth();
     this.wallet = { kind: 'guest', address: 'guest:local' };
     this.cloudState = 'off';
     this.cloudSyncing = false;
@@ -693,10 +872,16 @@ class Game {
     const panel = document.getElementById('account-panel');
     const forming = !!panel && !panel.classList.contains('hidden');
     const unlinkedOpen = !!document.getElementById('wallet-unlinked') && !document.getElementById('wallet-unlinked').classList.contains('hidden');
+    const picking = !!this.worldPickOpen;
     const signed = !!this.wallet?.address;
     const email = this.wallet?.kind === 'email';
     const guest = this.wallet?.kind === 'guest';
-    choices?.classList.toggle('hidden', signed || forming || unlinkedOpen);
+    choices?.classList.toggle('hidden', signed || forming || unlinkedOpen || picking);
+    const picker = document.getElementById('world-picker');
+    if (picker && !picking) {
+      picker.hidden = true;
+      picker.classList.add('hidden');
+    }
     sign.classList.toggle('hidden', signed || forming || unlinkedOpen);
     start.classList.add('hidden');
     start.textContent = 'Begin the hunt';
@@ -755,6 +940,8 @@ class Game {
     const error = document.getElementById('account-error');
     if (!panel) return;
     this.hideWalletUnlinked();
+    this.hideWorldPicker();
+    this.hideWorldAuth();
     panel.dataset.mode = mode;
     panel.classList.remove('hidden');
     confirm?.classList.toggle('hidden', mode !== 'create');
@@ -835,6 +1022,8 @@ class Game {
       return;
     }
     this.charSelect.close();
+    this.hideWorldPicker();
+    this.hideWorldAuth();
     document.getElementById('title').classList.remove('hidden');
     this.closeAccount();
     this.refreshWalletUi();
@@ -1010,10 +1199,16 @@ class Game {
     });
     sign.addEventListener('click', () => this.onWallet());
     document.getElementById('btn-guest')?.addEventListener('click', () => this.playAsGuest());
-    const worldBtn = document.getElementById('btn-world1');
-    paintWorldPlayButton(worldBtn);
-    worldBtn?.addEventListener('click', () => onWorldPlayClick());
-    paintWorldModePill(document.getElementById('world-mode-pill'));
+    document.getElementById('pick-world1')?.addEventListener('click', () => this.pickWorldOnline());
+    document.getElementById('pick-solo')?.addEventListener('click', () => this.pickWorldSolo());
+    document.getElementById('world-auth-signin')?.addEventListener('click', () => this.onWorldAuthSignIn());
+    document.getElementById('world-auth-solo')?.addEventListener('click', () => this.onWorldAuthSolo());
+    paintWorldModePill(document.getElementById('world-mode-pill'), {
+      search: typeof location !== 'undefined' ? location.search : '',
+    });
+    if (typeof window !== 'undefined') {
+      window.__mgShowWorldPicker = () => this.showWorldPicker({ force: true });
+    }
     document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
     document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
     document.getElementById('account-cancel')?.addEventListener('click', () => {
@@ -1028,8 +1223,9 @@ class Game {
     });
     window.addEventListener('keydown', (e) => {
       if (this.started || this.charSelect.active || (e.code !== 'Enter' && e.code !== 'Space')) return;
-      if (e.target?.closest?.('input, textarea, #account-panel')) return;
+      if (e.target?.closest?.('input, textarea, #account-panel, #world-picker, #world-auth')) return;
       if (!document.getElementById('account-panel')?.classList.contains('hidden')) return;
+      if (this.worldPickOpen) return;
       if (this.wallet) {
         e.preventDefault();
         return;
@@ -3312,7 +3508,12 @@ class Game {
 }
 
 function startGame() {
-  if (maybeResumeOnline()) return;
+  const bootSearch = typeof location !== 'undefined' ? location.search : '';
+  let pendingWorldAuth = false;
+  if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
+    dropOnlineWithoutSession({ search: bootSearch });
+    pendingWorldAuth = true;
+  }
   if (shouldForceNoGL() || !probeWebGL(typeof document !== 'undefined' ? document.createElement('canvas') : null, { force: shouldForceNoGL() }).ok) {
     showGlFailPanel();
     return;
@@ -3332,7 +3533,11 @@ function startGame() {
     attachDebug(game);
     attachSocial(game);
     const q = new URLSearchParams(location.search);
-    if (q.get('mmo') === '1') {
+    const liveSearch = location.search;
+    const mockOn = q.get('mock') === '1';
+    const wakeRaw = q.get('mockwake');
+    const mockWake = !!(wakeRaw && wakeRaw !== '0' && wakeRaw !== 'false');
+    if (q.get('mmo') === '1' && (shouldMountOnline({ search: liveSearch }) || mockOn || mockWake)) {
       import('./net/worldView.js').then(async (m) => {
         const flags = m.parseMmoFlags(location.search);
         const view = await m.init(game.scene, {
@@ -3341,7 +3546,7 @@ function startGame() {
           search: location.search,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
-        if (!flags.mock && !flags.mockwake) {
+        if (!flags.mock && !flags.mockwake && shouldMountOnline({ search: location.search })) {
           const { attachMmo } = await import('./net/mmo.js');
           attachMmo(game, view);
         }
@@ -3350,7 +3555,9 @@ function startGame() {
   } catch {
     /* query parsing failed; stay offline */
   }
-  game.load().catch((e) => {
+  game.load().then(() => {
+    if (pendingWorldAuth) game.showWorldAuth();
+  }).catch((e) => {
     console.error(e);
     if (isWebGLFailure(e)) {
       showGlFailPanel();
