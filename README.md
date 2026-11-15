@@ -16,6 +16,32 @@ npm run build:gh-path # same build with base `/monster-gate/` if you need the ol
 npm run preview       # serve the production build
 ```
 
+## Shared world (World 1)
+
+The title screen and in-game Menu have **Play Online — World 1** next to offline play (Play as guest / Play offline). That reloads the page with `?mmo=1`, keeps other query params, and drops mock/debug flags. A small **Online** / **Offline** pill sits in the HUD. Returning hunters land in their last mode (`localStorage` key `mg-world-mode`); first visits stay offline.
+
+The button is **World 1 coming soon** (disabled) when no world URL is configured. The public GitHub Pages build leaves that URL empty on purpose.
+
+`VITE_MMO_URL` is a build-time input. Rebuild `gh-pages` from `main` with Vite base `/`, `public/CNAME` = `monstergate.online`, and `VITE_BUILD_ID` set to the `main` HEAD. Read the world URL from `MG_WORLD_URL` (leave it empty until World 1 is live):
+
+```bash
+git checkout main
+git pull origin main
+MAIN_SHA=$(git rev-parse --short HEAD)
+git checkout gh-pages
+MG_WORLD_URL= VITE_BUILD_ID=$MAIN_SHA npx vite build --base /
+# copy dist onto the gh-pages tree (never git add -A)
+# keep public/CNAME = monstergate.online
+```
+
+When the shared world is up:
+
+```bash
+MG_WORLD_URL=wss://YOUR_HOST VITE_BUILD_ID=$MAIN_SHA npx vite build --base /
+```
+
+`?server=wss://…` still overrides the build-time URL. Do not commit a world secret or service-role key.
+
 ## Controls
 
 | Action | Desktop | Touch |

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { publicBase, resolveBuildId } from '../vite.config.js';
+import { publicBase, resolveBuildId, resolveMmoUrl } from '../vite.config.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -16,6 +16,13 @@ test('Pages CNAME is the custom domain and the Vite base defaults to /', () => {
   assert.match(src('../docs/worldView-interface.md'), /https:\/\/monstergate\.online\/\?mmo=1&mockwake=1/);
   assert.match(src('../docs/worldView-interface.md'), /mocksocial=1/);
   assert.match(src('../docs/SOCIAL_SPEC.md'), /monstergate\.online\/\?mmo=1&mocksocial=1/);
+});
+
+test('gh-pages World 1 URL comes from MG_WORLD_URL and stays empty by default', () => {
+  assert.equal(resolveMmoUrl({}), '');
+  assert.equal(resolveMmoUrl({ MG_WORLD_URL: 'wss://world.example/ws' }), 'wss://world.example/ws');
+  assert.match(src('../vite.config.js'), /MG_WORLD_URL/);
+  assert.match(src('../README.md'), /MG_WORLD_URL=/);
 });
 
 test('gh-pages build stamps origin/main, not the deploy-branch SHA', () => {

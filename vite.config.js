@@ -14,6 +14,13 @@ export function publicBase(env = process.env) {
  * `VITE_BUILD_ID` wins. A gh-pages checkout stamps `origin/main`, not the
  * deploy branch SHA (or a stale working-tree HEAD).
  */
+/** Build-time World 1 URL. `MG_WORLD_URL` wins, then `VITE_MMO_URL`. Empty on public Pages. */
+export function resolveMmoUrl(env = process.env) {
+  const mg = String(env?.MG_WORLD_URL ?? '').trim();
+  if (mg) return mg;
+  return String(env?.VITE_MMO_URL ?? '').trim();
+}
+
 export function resolveBuildId({ env = process.env, branch = '', headSha = '', mainSha = '' } = {}) {
   const raw = env?.VITE_BUILD_ID;
   if (raw != null && String(raw).trim() !== '') return String(raw).trim();
@@ -45,6 +52,7 @@ export default defineConfig({
   base: publicBase(),
   define: {
     'import.meta.env.VITE_BUILD_ID': JSON.stringify(shortSha()),
+    'import.meta.env.VITE_MMO_URL': JSON.stringify(resolveMmoUrl()),
   },
   build: {
     target: 'es2020',

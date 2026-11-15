@@ -104,6 +104,7 @@ export const HUD_SAFE_IDS = [
   'debug-badge',
   'world-status',
   'world-status-slot',
+  'world-mode-pill',
   'world-chat',
   'cast-buttons',
 ];

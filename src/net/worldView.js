@@ -21,6 +21,7 @@
  */
 
 import { lookOptions, cleanName as rosterCleanName, nameProblem } from '../systems/roster.js';
+import { leaveOnlineWorld } from './worldPlay.js';
 import { decorateFrame } from '../ui/theme.js';
 import { applyWeaponCursor } from '../ui/weaponCursor.js';
 
@@ -807,6 +808,7 @@ export class WorldView {
     this.wakeDismissed = true;
     this.hideWakeOverlay();
     this.stopWakeTick();
+    leaveOnlineWorld({ search: this.search });
   }
 
   syncNamePrompt() {
