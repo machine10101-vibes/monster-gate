@@ -70,16 +70,18 @@ test('keep assault quest walks both keeps and the warden', () => {
   assert.ok(QUESTS.some((row) => row.id === 'keepassault'));
 });
 
-test('Ashen Brand sits between Budgefang and Hellrend', () => {
+test('Ashen Brand sits between iron and Hellrend', () => {
   const brand = gearById('ashenbrand');
-  const budge = gearById('budgeblade');
+  const iron = gearById('ironsword');
   const hell = gearById('demonsword');
   const dusk = gearById('darkhammer');
+  const budge = gearById('budgeblade');
   assert.equal(brand.item.dmg, 20);
   assert.equal(brand.reqLevel, 12);
-  assert.ok(budge.item.dmg < brand.item.dmg);
+  assert.ok(iron.item.dmg < brand.item.dmg);
   assert.ok(brand.item.dmg < hell.item.dmg);
   assert.ok(brand.item.dmg < dusk.item.dmg);
+  assert.ok(brand.item.dmg < budge.item.dmg);
   assert.ok(GEAR.some((g) => g.id === 'ashenbrand' && g.found));
 });
 
