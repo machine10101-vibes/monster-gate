@@ -3,6 +3,8 @@
  * Does not read or write hunter saves.
  */
 
+import { BUILD_ID } from './buildId.js';
+
 export const GL_RESTORE_MS = 5000;
 export const GL_FAIL_TITLE = "Your browser couldn't start 3D graphics";
 export const GL_FAIL_TIPS = [
@@ -11,6 +13,8 @@ export const GL_FAIL_TIPS = [
   'Close other heavy tabs and try again.',
 ];
 export const GL_FAIL_RETRY = 'Retry';
+export const GL_FAIL_TRYING = 'Trying again…';
+export const GL_FAIL_STILL = "Still couldn't start 3D. Check the tips above.";
 
 export function shouldForceNoGL({ search, win } = {}) {
   const w = win || (typeof window !== 'undefined' ? window : null);
@@ -31,6 +35,13 @@ export function probeWebGL(canvas, { force = false } = {}) {
   } catch (error) {
     return { ok: false, reason: 'throw', error };
   }
+}
+
+export function defaultGlProbe({ createCanvas, force } = {}) {
+  const canvas = createCanvas
+    ? createCanvas()
+    : (typeof document !== 'undefined' ? document.createElement('canvas') : null);
+  return probeWebGL(canvas, { force: force ?? shouldForceNoGL() });
 }
 
 export function isWebGLFailure(err) {
@@ -84,6 +95,23 @@ export function armContextLost(canvas, opts = {}) {
   };
 }
 
+export function glFailStatusLine(attempts) {
+  const n = Math.max(1, Number(attempts) || 1);
+  return `${GL_FAIL_STILL} Try ${n}.`;
+}
+
+export function hideGlFailPanel(doc = typeof document !== 'undefined' ? document : null) {
+  if (!doc?.getElementById) return;
+  const panel = doc.getElementById('gl-fail');
+  const loading = doc.getElementById('loading');
+  if (panel) {
+    panel.hidden = true;
+    panel.classList?.add?.('hidden');
+  }
+  loading?.classList?.remove?.('gl-failed');
+  if (typeof window !== 'undefined') window.__mgGlFailShown = false;
+}
+
 export function showGlFailPanel(doc = typeof document !== 'undefined' ? document : null, opts = {}) {
   if (!doc?.getElementById) return null;
   const loading = doc.getElementById('loading');
@@ -91,33 +119,36 @@ export function showGlFailPanel(doc = typeof document !== 'undefined' ? document
   if (!panel) {
     panel = ensurePanel(doc, loading, opts);
   }
-  paintPanel(panel, opts);
+  paintPanel(panel, opts, doc);
   panel.hidden = false;
   panel.classList?.remove?.('hidden');
   loading?.classList?.remove?.('hidden', 'fading');
   loading?.classList?.add?.('gl-failed');
   loading?.removeAttribute?.('aria-hidden');
   if (loading) loading.hidden = false;
-  const retry = doc.getElementById('gl-fail-retry') || panel.querySelector?.('#gl-fail-retry');
-  const reload = opts.reload || (() => {
-    if (typeof location !== 'undefined') location.reload();
-  });
-  if (retry) {
-    retry.onclick = (ev) => {
-      ev?.preventDefault?.();
-      reload();
-    };
-  }
+  bindRetry(doc, panel, opts);
   if (typeof window !== 'undefined') window.__mgGlFailShown = true;
   return panel;
 }
 
-function paintPanel(panel, opts = {}) {
+function q(panel, doc, ...sels) {
+  for (const sel of sels) {
+    const fromPanel = panel.querySelector?.(sel);
+    if (fromPanel) return fromPanel;
+    if (sel.startsWith('#') && doc?.getElementById) {
+      const byId = doc.getElementById(sel.slice(1));
+      if (byId) return byId;
+    }
+  }
+  return null;
+}
+
+function paintPanel(panel, opts = {}, doc = null) {
   const title = opts.title || GL_FAIL_TITLE;
   const tips = opts.tips || GL_FAIL_TIPS;
-  const heading = panel.querySelector?.('.gl-fail-title') || panel.querySelector?.('h1');
+  const heading = q(panel, doc, '.gl-fail-title', 'h1');
   if (heading) heading.textContent = title;
-  const list = panel.querySelector?.('ul');
+  const list = q(panel, doc, 'ul');
   if (list && !list.children?.length) {
     for (const tip of tips) {
       const li = (opts.createElement || (typeof document !== 'undefined' ? document.createElement.bind(document) : null))?.('li');
@@ -126,8 +157,85 @@ function paintPanel(panel, opts = {}) {
       list.appendChild(li);
     }
   }
-  const btn = panel.querySelector?.('#gl-fail-retry') || panel.querySelector?.('button');
-  if (btn && !btn.textContent) btn.textContent = opts.retryLabel || GL_FAIL_RETRY;
+  const btn = q(panel, doc, '#gl-fail-retry', 'button');
+  if (btn) {
+    if (!btn.textContent || btn.textContent === GL_FAIL_TRYING) btn.textContent = opts.retryLabel || GL_FAIL_RETRY;
+    btn.disabled = false;
+  }
+  const build = String(opts.buildId || BUILD_ID || 'dev');
+  const buildEl = q(panel, doc, '.gl-fail-build', '#gl-fail-build');
+  if (buildEl) {
+    buildEl.textContent = build;
+    buildEl.hidden = false;
+  }
+  const pageBuild = doc?.getElementById?.('build-id')
+    || (typeof document !== 'undefined' ? document.getElementById?.('build-id') : null);
+  if (pageBuild && !pageBuild.textContent) pageBuild.textContent = build;
+  const status = q(panel, doc, '.gl-fail-status', '#gl-fail-status');
+  if (status && !opts.keepStatus) {
+    status.textContent = '';
+    status.hidden = true;
+  }
+}
+
+function bindRetry(doc, panel, opts = {}) {
+  const retry = doc.getElementById('gl-fail-retry') || panel.querySelector?.('#gl-fail-retry');
+  if (!retry) return;
+  const probe = opts.probe || defaultGlProbe;
+  const onSuccess = opts.onSuccess || opts.reload || (() => {
+    if (typeof location !== 'undefined') location.reload();
+  });
+  retry.onclick = (ev) => {
+    ev?.preventDefault?.();
+    if (retry.disabled) return;
+    const attempts = (Number(panel.dataset?.tries || panel.tries) || 0) + 1;
+    if (panel.dataset) panel.dataset.tries = String(attempts);
+    else panel.tries = attempts;
+    paintTrying(retry, panel, doc);
+    const finish = (result) => {
+      if (result?.ok) {
+        hideGlFailPanel(doc);
+        onSuccess(result);
+        return;
+      }
+      paintStillFailed(retry, panel, attempts, doc);
+      opts.onFail?.(result, attempts);
+    };
+    let out;
+    try {
+      out = probe({ force: shouldForceNoGL() });
+    } catch {
+      finish({ ok: false, reason: 'throw' });
+      return;
+    }
+    if (out && typeof out.then === 'function') {
+      out.then(finish, () => finish({ ok: false, reason: 'throw' }));
+      return;
+    }
+    finish(out);
+  };
+}
+
+function paintTrying(retry, panel, doc) {
+  retry.disabled = true;
+  retry.setAttribute?.('aria-busy', 'true');
+  retry.textContent = GL_FAIL_TRYING;
+  const status = q(panel, doc, '.gl-fail-status', '#gl-fail-status');
+  if (status) {
+    status.hidden = false;
+    status.textContent = GL_FAIL_TRYING;
+  }
+}
+
+function paintStillFailed(retry, panel, attempts, doc) {
+  retry.disabled = false;
+  retry.removeAttribute?.('aria-busy');
+  retry.textContent = GL_FAIL_RETRY;
+  const status = q(panel, doc, '.gl-fail-status', '#gl-fail-status');
+  if (status) {
+    status.hidden = false;
+    status.textContent = glFailStatusLine(attempts);
+  }
 }
 
 function ensurePanel(doc, loading, opts = {}) {
@@ -147,13 +255,33 @@ function ensurePanel(doc, loading, opts = {}) {
     li.textContent = tip;
     list.appendChild(li);
   }
+  const status = make('p');
+  status.id = 'gl-fail-status';
+  status.className = 'gl-fail-status';
+  status.hidden = true;
   const btn = make('button');
   btn.id = 'gl-fail-retry';
   btn.type = 'button';
   btn.className = 'start';
   btn.textContent = opts.retryLabel || GL_FAIL_RETRY;
-  card.append(heading, list, btn);
+  const build = make('p');
+  build.id = 'gl-fail-build';
+  build.className = 'gl-fail-build';
+  build.textContent = String(opts.buildId ?? BUILD_ID ?? 'dev');
+  card.appendChild(heading);
+  card.appendChild(list);
+  card.appendChild(status);
+  card.appendChild(btn);
+  card.appendChild(build);
   panel.appendChild(card);
+  panel.querySelector = (sel) => {
+    if (sel === '.gl-fail-title' || sel === 'h1') return heading;
+    if (sel === 'ul') return list;
+    if (sel === '#gl-fail-retry' || sel === 'button') return btn;
+    if (sel === '.gl-fail-status' || sel === '#gl-fail-status') return status;
+    if (sel === '.gl-fail-build' || sel === '#gl-fail-build') return build;
+    return null;
+  };
   (loading || doc.body || doc.documentElement)?.appendChild?.(panel);
   return panel;
 }
@@ -162,9 +290,13 @@ if (typeof window !== 'undefined') {
   window.__mgGlFail = {
     probeWebGL,
     showGlFailPanel,
+    hideGlFailPanel,
     armContextLost,
     shouldForceNoGL,
     GL_RESTORE_MS,
     GL_FAIL_TITLE,
+    GL_FAIL_TRYING,
+    GL_FAIL_STILL,
+    BUILD_ID,
   };
 }

@@ -53,6 +53,7 @@ import { BUILD_ID } from './ui/buildId.js';
 import { mountLoading } from './ui/boot.js';
 import {
   armContextLost,
+  defaultGlProbe,
   isWebGLFailure,
   probeWebGL,
   shouldForceNoGL,
@@ -277,7 +278,7 @@ class Game {
     const scratch = typeof document !== 'undefined' ? document.createElement('canvas') : this.canvas;
     const probe = probeWebGL(scratch, { force: shouldForceNoGL() });
     if (!probe.ok) {
-      showGlFailPanel();
+      showBootGlFail();
       return false;
     }
     try {
@@ -296,11 +297,11 @@ class Game {
       r.shadowMap.type = THREE.PCFShadowMap;
       this.renderer = r;
       this.glWatch = armContextLost(this.canvas, {
-        onFail: () => showGlFailPanel(),
+        onFail: () => showBootGlFail(),
       });
       return true;
     } catch {
-      showGlFailPanel();
+      showBootGlFail();
       return false;
     }
   }
@@ -3565,6 +3566,19 @@ class Game {
   }
 }
 
+function showBootGlFail() {
+  showGlFailPanel({
+    probe: defaultGlProbe,
+    onSuccess() {
+      if (typeof window !== 'undefined' && window.__game && !window.__game.glFailed) {
+        location.reload();
+        return;
+      }
+      startGame();
+    },
+  });
+}
+
 function startGame() {
   const bootSearch = typeof location !== 'undefined' ? location.search : '';
   let pendingWorldAuth = false;
@@ -3572,15 +3586,15 @@ function startGame() {
     dropOnlineWithoutSession({ search: bootSearch });
     pendingWorldAuth = true;
   }
-  if (shouldForceNoGL() || !probeWebGL(typeof document !== 'undefined' ? document.createElement('canvas') : null, { force: shouldForceNoGL() }).ok) {
-    showGlFailPanel();
+  if (shouldForceNoGL() || !defaultGlProbe().ok) {
+    showBootGlFail();
     return;
   }
   let game;
   try {
     game = new Game();
   } catch (err) {
-    showGlFailPanel();
+    showBootGlFail();
     console.error(err);
     return;
   }
@@ -3618,7 +3632,7 @@ function startGame() {
   }).catch((e) => {
     console.error(e);
     if (isWebGLFailure(e)) {
-      showGlFailPanel();
+      showBootGlFail();
       return;
     }
     document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
