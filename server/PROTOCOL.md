@@ -6,7 +6,7 @@ JSON WebSocket messages for the authoritative World 1 server (`server/`) and the
 | --- | --- |
 | **Version** | `1` |
 | **Field** | every envelope has `"v": 1` and `"type"` |
-| **Transport** | UTF-8 JSON text frames, max 8 KiB |
+| **Transport** | UTF-8 JSON text frames, max 8 KiB. Larger frames close the socket with 1009. |
 | **Tick** | area-of-interest `delta`: **15 Hz** near (≤ 32 units), **~4 Hz** in the outer ring (32–96 units) |
 | **AOI** | same realm (over / cave) and within **96** world units. Pose broadcasts never go past this radius. |
 | **Deltas** | only changed, quantized fields (`x,z` to 0.1). Clients must merge patches onto the last known player. |
@@ -122,7 +122,7 @@ Balance (from `src/entities/monsters.js`): Darksycle Dragon level 7, 155 HP, 5 d
 
 ### hello (auth)
 
-First message. The server closes the socket if it does not arrive within 5 seconds.
+First message. The server closes the socket if it does not arrive within 5 seconds. Messages sent before a successful `hello` are rate-limited (2/s, burst 5). Excess is `error` `rate` and the socket is closed with 1008 (policy).
 
 ```json
 { "v": 1, "type": "hello", "token": "<supabase access_token>", "resume": "<resumeToken, optional>", "name": "Hunter", "look": {}, "armor": {}, "zone": "Oakhollow" }
@@ -348,12 +348,12 @@ Shared XP and loot (`loot_roll` / `loot_result`, 8% bonus per extra member in-zo
 
 | code | when |
 | --- | --- |
-| `protocol` | bad JSON, wrong `v`, missing `hello` |
+| `protocol` | bad JSON, wrong `v`, missing `hello`. Frames over 8 KiB also close the socket with 1009. |
 | `debug` | a `debug` or `unlock` flag was sent. The socket is closed if this arrives before welcome. |
 | `auth` | missing / invalid token; guests are rejected |
 | `persist` | character load / create failed |
 | `name_taken` | the hunter name is already used by another account. Message: "That hunter name is already taken." The socket is closed. |
-| `rate` | move, chat, or a social action too fast |
+| `rate` | move, chat, or a social action too fast; or too many messages before a successful `hello` (socket then closes with 1008) |
 | `teleport` | move jumped further than 40 units |
 | `chat` | empty / invalid channel |
 | `gather` | unknown node, not ready, or too far |
@@ -381,8 +381,10 @@ Shared XP and loot (`loot_roll` / `loot_result`, 8% bonus per extra member in-zo
 | Tick | 15 Hz near (≤ 32 units); ~4 Hz in the 32–96 ring |
 | AOI | 96 world units, same realm; pose broadcasts do not leave this radius |
 | Zone cap | `ZONE_CAP` default 150 per place name; `0` disables the cap |
-| Move | 12 messages / s; 16 u/s clamp; 40 u teleport reject |
-| Chat | 2 / s, 6 / 10 s, 120 characters |
+| Frame | max 8 KiB; larger frames close the socket with 1009 |
+| Pre-auth | 2 messages / s, burst 5, before a successful `hello`; excess is `error` `rate` and close 1008 |
+| Move | 12 messages / s; 16 u/s clamp; 40 u teleport reject (unchanged after auth) |
+| Chat | 2 / s, 6 / 10 s, 120 characters (unchanged after auth) |
 | Social | 4 / s, 20 / 10 s (friends, party, block, ignore) |
 | Friends | 100 accepted (+ outgoing pending) per account `user_id` |
 | Party | 4 hunters including the leader; invites expire after 60 s |

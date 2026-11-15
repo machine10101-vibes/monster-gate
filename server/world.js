@@ -3,9 +3,11 @@ import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify, originAllowed, parseOrigins } from './auth.js';
 import { appearanceFromState, createMonsters, createNodes, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
-import { applyMove, createLimiter } from './limits.js';
+import { applyMove, createBucket, createLimiter } from './limits.js';
 import {
-  AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, HELLO_MS, IDLE_MS, PROTOCOL, RESUME_MS, SAVE_MS, TICK_HZ, TYPES,
+  AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, CLOSE_POLICY, CLOSE_TOO_LARGE,
+  HELLO_MS, IDLE_MS, MAX_PAYLOAD, PRE_AUTH_BURST, PRE_AUTH_PER_SEC,
+  PROTOCOL, RESUME_MS, SAVE_MS, TICK_HZ, TYPES,
   encode, errorFrame, inAoi, monsterView, nodeView, parseMessage, parseZoneCap,
   playerPatch, playerView, quantizedPlayer, readChat, readGather, readHello, readMove,
   ProtocolError,
@@ -17,6 +19,21 @@ import { openPersistence } from './store.js';
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(typeof type === 'string' && extra !== undefined ? encode(type, extra) : type);
+}
+
+function frameBytes(data) {
+  if (data == null) return 0;
+  if (typeof data === 'string') return Buffer.byteLength(data);
+  if (Buffer.isBuffer(data)) return data.length;
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  if (ArrayBuffer.isView(data)) return data.byteLength;
+  return Buffer.byteLength(String(data));
+}
+
+function closeWith(ws, code, reason) {
+  if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+    try { ws.close(code, reason); } catch { /* already closing */ }
+  }
 }
 
 function resumeToken() {
@@ -108,6 +125,7 @@ export class World {
       helloAt: this.now(),
       last: this.now(),
       limiter: createLimiter(this.now),
+      preAuth: createBucket(PRE_AUTH_PER_SEC, PRE_AUTH_BURST, this.now),
       authed: false,
     };
     ws.on('message', (data) => {
@@ -127,13 +145,24 @@ export class World {
 
   async onMessage(session, data) {
     session.last = this.now();
+    if (frameBytes(data) > MAX_PAYLOAD) {
+      send(session.ws, errorFrame('protocol', 'Frame too large.'));
+      closeWith(session.ws, CLOSE_TOO_LARGE, 'Frame too large');
+      return;
+    }
+    if (!session.authed && session.preAuth && !session.preAuth.take()) {
+      send(session.ws, errorFrame('rate', 'Slow down.'));
+      closeWith(session.ws, CLOSE_POLICY, 'Rate limit');
+      return;
+    }
     let msg;
     try {
       msg = parseMessage(data);
     } catch (err) {
       const code = err instanceof ProtocolError ? err.code : (err.code || 'protocol');
       send(session.ws, errorFrame(code, err.message));
-      if ((code === 'auth' || code === 'debug') && !session.authed) session.ws.close();
+      if (err.message === 'Frame too large.') closeWith(session.ws, CLOSE_TOO_LARGE, 'Frame too large');
+      else if ((code === 'auth' || code === 'debug') && !session.authed) session.ws.close();
       return;
     }
     try {
@@ -601,7 +630,7 @@ export async function createWorldServer(options = {}) {
   });
   const wss = new WebSocketServer({
     server,
-    maxPayload: 8192,
+    maxPayload: MAX_PAYLOAD,
     verifyClient: (info) => originAllowed(info.origin, allowed),
   });
   wss.on('connection', (ws) => world.accept(ws));

@@ -299,3 +299,36 @@ test('a taken hunter name is rejected with name_taken', async () => {
   await closed;
   await srv.close();
 });
+
+test('pre-auth messages are rate-limited and then close with 1008', async () => {
+  const srv = await startWorld();
+  const ws = await open(srv.url);
+  const msgs = [];
+  collect(ws, msgs);
+  const closed = new Promise((resolve) => ws.once('close', (code) => resolve(code)));
+  for (let i = 0; i < 20; i++) ws.send(encode('ping', { t: i }));
+  const code = await closed;
+  assert.equal(code, 1008);
+  assert.ok(msgs.some((m) => m.type === 'error' && m.code === 'rate'));
+  assert.ok(msgs.some((m) => m.type === 'error' && m.code === 'protocol'));
+  await srv.close();
+});
+
+test('oversized frames close with 1009', async () => {
+  const srv = await startWorld();
+  const ws = await open(srv.url);
+  const closed = new Promise((resolve) => ws.once('close', (code) => resolve(code)));
+  ws.send('x'.repeat(9000));
+  const code = await closed;
+  assert.equal(code, 1009);
+  await srv.close();
+});
+
+test('a single hello still authenticates after pre-auth caps', async () => {
+  const srv = await startWorld();
+  const ws = await open(srv.url);
+  const welcome = await hello(ws, 'ann', { name: 'Ann' });
+  assert.equal(welcome.you.name, 'Ann');
+  ws.close();
+  await srv.close();
+});

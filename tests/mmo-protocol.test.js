@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   PROTOCOL, TYPES, CHAT_MAX, TELEPORT_MAX,
+  MAX_PAYLOAD, PRE_AUTH_BURST, PRE_AUTH_PER_SEC, CLOSE_POLICY, CLOSE_TOO_LARGE,
   parseMessage, encode, readHello, readMove, readChat, ProtocolError,
 } from '../server/protocol.js';
-import { applyMove, createLimiter } from '../server/limits.js';
+import { applyMove, createBucket, createLimiter } from '../server/limits.js';
 
 test('protocol envelopes require v=1 and a type', () => {
   assert.equal(PROTOCOL, 1);
@@ -79,4 +80,17 @@ test('applyMove keeps the server-owned held, look, and armor', () => {
   assert.equal(next.pose.held, 'budgeblade');
   assert.equal(next.pose.look.skin, 2);
   assert.equal(next.pose.armor.helm, 'budgehelm');
+});
+
+test('pre-auth bucket allows a short burst then refills', () => {
+  assert.equal(MAX_PAYLOAD, 8192);
+  assert.equal(CLOSE_POLICY, 1008);
+  assert.equal(CLOSE_TOO_LARGE, 1009);
+  let t = 0;
+  const bucket = createBucket(PRE_AUTH_PER_SEC, PRE_AUTH_BURST, () => t);
+  let allowed = 0;
+  for (let i = 0; i < 20; i++) if (bucket.take()) allowed += 1;
+  assert.equal(allowed, PRE_AUTH_BURST);
+  t = 1000;
+  assert.equal(bucket.take(), true);
 });
