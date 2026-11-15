@@ -24,6 +24,7 @@ import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from '
 import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
 import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
+import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -165,6 +166,7 @@ export class HUD {
     this.bindPanelClose();
     this.syncWindows();
     this.layoutHud();
+    paintWorldModePill(document.getElementById('world-mode-pill'));
   }
 
   bindPanelClose() {
@@ -813,6 +815,10 @@ export class HUD {
       body.appendChild(jumps);
       const q = game.quality;
       const rows = [
+        ['World 1', '<button id="set-world1" type="button">Play Online — World 1</button>'],
+        ...(game.worldView || game.mmo || isWorldOnline(typeof location !== 'undefined' ? location.search : '')
+          ? [['Hunt', '<button id="set-world-offline" type="button">Play offline</button>']]
+          : []),
         ...(name === 'menu'
           ? [
               ['Skill & Spell Book', '<button id="set-book">Open</button>'],
@@ -884,6 +890,10 @@ export class HUD {
         document.getElementById('set-wcur').textContent = weaponCursorEnabled() ? 'On' : 'Off';
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
+      const worldBtn = document.getElementById('set-world1');
+      paintWorldPlayButton(worldBtn);
+      worldBtn?.addEventListener('click', () => onWorldPlayClick());
+      document.getElementById('set-world-offline')?.addEventListener('click', () => leaveOnlineWorld());
       document.getElementById('set-spawn')?.addEventListener('click', () => game.debugSpawn?.());
       document.getElementById('set-spawn-tank')?.addEventListener('click', () => game.debugSpawnTank?.());
       document.getElementById('set-autoatk')?.addEventListener('click', () => {

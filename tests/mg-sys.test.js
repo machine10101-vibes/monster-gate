@@ -102,6 +102,7 @@ test('MG-UI title: guest play, matching email button, password hint, cover fit, 
   const css = src('../src/style.css');
   const main = src('../src/main.js');
   assert.match(html, /id="btn-guest"[^>]*>Play as guest/);
+  assert.match(html, /id="btn-world1"[^>]*>Play Online — World 1/);
   assert.match(html, /id="btn-account-signin" class="start"/);
   assert.match(html, /id="account-pass-hint"[^>]*>Use 8 to 72 characters/);
   assert.match(css, /#game \{[\s\S]*object-fit: cover/);

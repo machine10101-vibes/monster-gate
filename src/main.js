@@ -24,6 +24,14 @@ import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
+import {
+  isWorldOnline,
+  maybeResumeOnline,
+  onWorldPlayClick,
+  paintWorldModePill,
+  paintWorldPlayButton,
+  rememberWorldMode,
+} from './net/worldPlay.js';
 import { BUILD_ID } from './ui/buildId.js';
 import { mountLoading } from './ui/boot.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
@@ -637,6 +645,7 @@ class Game {
       this.roster.saveWarning = null;
       queueMicrotask(() => this.hud?.toast('A hunt save was damaged. A backup was kept. Starting a fresh hunt.', 5200));
     }
+    rememberWorldMode(isWorldOnline(location.search) ? 'online' : 'offline');
     if (this.cloudState === 'on' && !this.cloudConflict) this.bindCloudPush();
     this.player.lookOpts = lookOptions(char.look);
     this.player.armorKey = null;
@@ -980,6 +989,10 @@ class Game {
     });
     sign.addEventListener('click', () => this.onWallet());
     document.getElementById('btn-guest')?.addEventListener('click', () => this.playAsGuest());
+    const worldBtn = document.getElementById('btn-world1');
+    paintWorldPlayButton(worldBtn);
+    worldBtn?.addEventListener('click', () => onWorldPlayClick());
+    paintWorldModePill(document.getElementById('world-mode-pill'));
     document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
     document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
     document.getElementById('account-cancel')?.addEventListener('click', () => {
@@ -3278,6 +3291,7 @@ class Game {
 }
 
 function startGame() {
+  if (maybeResumeOnline()) return;
   const game = new Game();
   window.__game = game;
   try {

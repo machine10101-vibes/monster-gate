@@ -52,7 +52,9 @@ Web service, Docker or native Node. Start: `npm run start:server`. Health check:
 
 ## Client URL
 
-Pages stays offline unless the flag is set:
+The title screen **Play Online — World 1** button reloads with `?mmo=1`. Pages stays offline until a world URL is configured (`MG_WORLD_URL` / `VITE_MMO_URL` at build time, or `?server=`). With no URL the button reads **World 1 coming soon** and stays disabled.
+
+Manual flags still work:
 
 ```
 https://monstergate.online/?mmo=1&server=wss://YOUR_HOST
@@ -66,4 +68,11 @@ Local:
 http://localhost:5173/?mmo=1&server=ws://localhost:8080
 ```
 
-Optional build-time default: `VITE_MMO_URL=wss://YOUR_HOST`. Leave unset for the public GitHub Pages build. `?mmo=1&mock=1` is the local crowd only (no socket).
+Rebuild `gh-pages` from `main` with Vite base `/`, `public/CNAME` = `monstergate.online`, `VITE_BUILD_ID` = the `main` HEAD, and `MG_WORLD_URL` as the world URL (empty for now):
+
+```bash
+MAIN_SHA=$(git rev-parse --short main)
+MG_WORLD_URL= VITE_BUILD_ID=$MAIN_SHA npx vite build --base /
+```
+
+When World 1 is live, set `MG_WORLD_URL=wss://YOUR_HOST` on that build. `?mmo=1&mock=1` is the local crowd only (no socket).

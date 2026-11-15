@@ -1211,6 +1211,10 @@ body.touch #top-right {
   border-radius: 4px;
   font-size: 14px;
 }
+.panel-row button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .panel-row.account {
   margin-top: 8px;
   border-color: #6a4034;
@@ -1520,6 +1524,35 @@ h1 em {
   animation: none;
   opacity: 0.55;
   cursor: wait;
+}
+#btn-world1.start {
+  background: linear-gradient(#3ec8d4, #1a7a88);
+  border-color: #082428;
+  box-shadow: 0 0 0 2px #9be7ff, 0 6px 0 #0d3a42, 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+#btn-world1.start:disabled {
+  cursor: not-allowed;
+  background: linear-gradient(#4a5560, #2a3038);
+  border-color: #1a1c20;
+  box-shadow: 0 0 0 2px #6a7080, 0 6px 0 #1a1c20, 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+.world-mode-pill {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 8px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 4px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  letter-spacing: 0.4px;
+  color: #ffb4a8;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.world-mode-pill[data-mode="online"] {
+  color: #7ef6ff;
 }
 @keyframes float {
   to {
