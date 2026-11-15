@@ -1,9 +1,10 @@
 import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify } from './auth.js';
-import { applyMove, createLimiter } from './limits.js';
+import { applyMove, createBucket, createLimiter } from './limits.js';
 import {
-  HELLO_MS, IDLE_MS, PROTOCOL, TICK_HZ, TYPES,
+  CLOSE_POLICY, CLOSE_TOO_LARGE, HELLO_MS, IDLE_MS, MAX_PAYLOAD,
+  PRE_AUTH_BURST, PRE_AUTH_PER_SEC, PROTOCOL, TICK_HZ, TYPES,
   encode, errorFrame, parseMessage, playerView, readChat, readHello, readMove,
   ProtocolError,
 } from './protocol.js';
@@ -12,6 +13,21 @@ import { openPersistence } from './store.js';
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(typeof type === 'string' && extra !== undefined ? encode(type, extra) : type);
+}
+
+function frameBytes(data) {
+  if (data == null) return 0;
+  if (typeof data === 'string') return Buffer.byteLength(data);
+  if (Buffer.isBuffer(data)) return data.length;
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  if (ArrayBuffer.isView(data)) return data.byteLength;
+  return Buffer.byteLength(String(data));
+}
+
+function closeWith(ws, code, reason) {
+  if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+    try { ws.close(code, reason); } catch { /* already closing */ }
+  }
 }
 
 function spawnPose(name, extra = {}) {
@@ -68,6 +84,7 @@ export class World {
       helloAt: this.now(),
       last: this.now(),
       limiter: createLimiter(this.now),
+      preAuth: createBucket(PRE_AUTH_PER_SEC, PRE_AUTH_BURST, this.now),
       authed: false,
     };
     ws.on('message', (data) => {
@@ -87,11 +104,23 @@ export class World {
 
   async onMessage(session, data) {
     session.last = this.now();
+    if (frameBytes(data) > MAX_PAYLOAD) {
+      send(session.ws, errorFrame('protocol', 'Frame too large.'));
+      closeWith(session.ws, CLOSE_TOO_LARGE, 'Frame too large');
+      return;
+    }
+    if (!session.authed && session.preAuth && !session.preAuth.take()) {
+      send(session.ws, errorFrame('rate', 'Slow down.'));
+      closeWith(session.ws, CLOSE_POLICY, 'Rate limit');
+      return;
+    }
     let msg;
     try {
       msg = parseMessage(data);
     } catch (err) {
-      send(session.ws, errorFrame(err.code || 'protocol', err.message));
+      const code = err instanceof ProtocolError ? err.code : (err.code || 'protocol');
+      send(session.ws, errorFrame(code, err.message));
+      if (err.message === 'Frame too large.') closeWith(session.ws, CLOSE_TOO_LARGE, 'Frame too large');
       return;
     }
     try {
@@ -302,7 +331,7 @@ export async function createWorldServer(options = {}) {
     res.writeHead(404);
     res.end();
   });
-  const wss = new WebSocketServer({ server, maxPayload: 8192 });
+  const wss = new WebSocketServer({ server, maxPayload: MAX_PAYLOAD });
   wss.on('connection', (ws) => world.accept(ws));
   const port = Number(options.port ?? process.env.PORT ?? 8080);
   await listen(server, Number.isFinite(port) ? port : 8080);

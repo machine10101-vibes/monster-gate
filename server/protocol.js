@@ -9,6 +9,14 @@ export const HELLO_MS = 5000;
 export const IDLE_MS = 30_000;
 export const PING_MS = 15_000;
 
+/** Messages allowed before a successful hello. Excess is error `rate` + close 1008. */
+export const PRE_AUTH_PER_SEC = 2;
+export const PRE_AUTH_BURST = 5;
+/** WebSocket close: policy violation (pre-auth rate limit). */
+export const CLOSE_POLICY = 1008;
+/** WebSocket close: message too large (over MAX_PAYLOAD). */
+export const CLOSE_TOO_LARGE = 1009;
+
 export const SPEED_MAX = 16;
 export const TELEPORT_MAX = 40;
 export const WORLD_MIN = -50;

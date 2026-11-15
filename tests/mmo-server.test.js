@@ -121,3 +121,43 @@ test('openPersistence seam is in-memory until PR #60 lands', async () => {
   await persist.flushAll();
   await persist.close();
 });
+
+test('pre-auth messages are rate-limited and then close with 1008', async () => {
+  const persist = createMemoryPersistence();
+  const srv = await createWorldServer({ port: 0, persist, tickMs: 40, memory: true });
+  const url = `ws://127.0.0.1:${srv.port}`;
+  const ws = await open(url);
+  const msgs = [];
+  collect(ws, msgs);
+  const closed = new Promise((resolve) => ws.once('close', (code) => resolve(code)));
+  for (let i = 0; i < 20; i++) ws.send(encode('ping', { t: i }));
+  const code = await closed;
+  assert.equal(code, 1008);
+  assert.ok(msgs.some((m) => m.type === 'error' && m.code === 'rate'));
+  assert.ok(msgs.some((m) => m.type === 'error' && m.code === 'protocol'));
+  await srv.close();
+});
+
+test('oversized frames close with 1009', async () => {
+  const persist = createMemoryPersistence();
+  const srv = await createWorldServer({ port: 0, persist, tickMs: 40, memory: true });
+  const url = `ws://127.0.0.1:${srv.port}`;
+  const ws = await open(url);
+  const closed = new Promise((resolve) => ws.once('close', (code) => resolve(code)));
+  ws.send('x'.repeat(9000));
+  const code = await closed;
+  assert.equal(code, 1009);
+  await srv.close();
+});
+
+test('a single hello still joins after pre-auth caps', async () => {
+  const persist = createMemoryPersistence();
+  const srv = await createWorldServer({ port: 0, persist, tickMs: 40, memory: true });
+  const url = `ws://127.0.0.1:${srv.port}`;
+  const ws = await open(url);
+  ws.send(encode('hello', { name: 'Dee' }));
+  const welcome = await once(ws, 'welcome');
+  assert.equal(welcome.you.name, 'Dee');
+  ws.close();
+  await srv.close();
+});

@@ -6,9 +6,9 @@ JSON WebSocket messages for the shared-world server (`server/`) and client (`src
 | --- | --- |
 | **Version** | `1` |
 | **Field** | every envelope has `"v": 1` and `"type"` |
-| **Transport** | UTF-8 JSON text frames, max 8 KiB |
+| **Transport** | UTF-8 JSON text frames, max 8 KiB. Larger frames close the socket with 1009. |
 | **Tick** | server sends zone-scoped `delta` at 10 Hz |
-| **Auth** | optional Supabase JWT on `hello`; otherwise a guest name |
+| **Auth** | optional Supabase JWT on `hello`; otherwise a guest name. An `auth` error is final: the client stays solo and must not reconnect. |
 
 Mismatching `v` is an `error` with code `protocol`. Unknown `type` is ignored or `error`.
 
@@ -41,7 +41,7 @@ Used on `snapshot`, `delta.upsert`, and as the body of `move`:
 
 ### hello (auth)
 
-First message. The server closes the socket if it does not arrive within 5 seconds.
+First message. The server closes the socket if it does not arrive within 5 seconds. Messages sent before a successful `hello` are rate-limited (2/s, burst 5). Excess is `error` `rate` and the socket is closed with 1008 (policy).
 
 ```json
 { "v": 1, "type": "hello", "token": "<supabase access_token, optional>", "name": "Hunter", "look": {}, "armor": {} }
@@ -134,9 +134,9 @@ Zone-scoped patch, ~10 Hz, only for hunters in the same `zone`. `remove` is ids 
 
 | code | when |
 | --- | --- |
-| `protocol` | bad JSON, wrong `v`, missing `hello` |
-| `auth` | token explicitly rejected (still falls back to guest unless `hello` is malformed) |
-| `rate` | move or chat too fast |
+| `protocol` | bad JSON, wrong `v`, missing `hello`. Frames over 8 KiB also close the socket with 1009. |
+| `auth` | token explicitly rejected (still falls back to guest unless `hello` is malformed). The client must treat this as final: keep the message, stay solo, and do not reconnect. |
+| `rate` | move or chat too fast; or too many messages before a successful `hello` (socket then closes with 1008) |
 | `teleport` | move jumped further than the speed clamp allows |
 | `chat` | empty / invalid channel |
 
@@ -144,7 +144,9 @@ Zone-scoped patch, ~10 Hz, only for hunters in the same `zone`. `remove` is ids 
 
 | | |
 | --- | --- |
-| Move | 12 messages / s; 16 u/s clamp; 40 u teleport reject |
-| Chat | 2 / s, 6 / 10 s, 120 characters |
+| Frame | max 8 KiB; larger frames close the socket with 1009 |
+| Pre-auth | 2 messages / s, burst 5, before a successful `hello`; excess is `error` `rate` and close 1008 |
+| Move | 12 messages / s; 16 u/s clamp; 40 u teleport reject (unchanged after auth) |
+| Chat | 2 / s, 6 / 10 s, 120 characters (unchanged after auth) |
 | Heartbeat | ping/pong; idle 30 s |
 | World | `x,z` clamped to about `-50…1490` (10×10 tiles of 144) |

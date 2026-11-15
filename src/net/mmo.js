@@ -75,8 +75,10 @@ export class MmoClient {
     this.game = game;
     this.view = view;
     this.url = opts.url;
+    this.Socket = opts.WebSocket || (typeof WebSocket !== 'undefined' ? WebSocket : null);
     this.ws = null;
     this.closed = false;
+    this.fatal = false;
     this.attempt = 0;
     this.timer = 0;
     this.you = null;
@@ -98,12 +100,12 @@ export class MmoClient {
   }
 
   connect() {
-    if (this.closed || !this.url) return;
+    if (this.closed || this.fatal || !this.url || !this.Socket) return;
     this.bind();
     this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
     let ws;
     try {
-      ws = new WebSocket(this.url);
+      ws = new this.Socket(this.url);
     } catch (err) {
       this.fail(err);
       return;
@@ -121,10 +123,10 @@ export class MmoClient {
     ws.addEventListener('message', (ev) => this.onFrame(ev.data));
     ws.addEventListener('close', () => {
       if (this.ws === ws) this.ws = null;
-      if (!this.closed) this.schedule();
+      if (!this.closed && !this.fatal) this.schedule();
     });
     ws.addEventListener('error', () => {
-      /* close handler schedules reconnect */
+      /* close handler schedules reconnect unless auth already failed */
     });
   }
 
@@ -150,6 +152,10 @@ export class MmoClient {
     } else if (msg.type === 'leave' && msg.id) {
       this.view?.removePlayer?.(msg.id);
     } else if (msg.type === 'error') {
+      if (msg.code === 'auth') {
+        this.rejectAuth(msg.message);
+        return;
+      }
       this.view?.setStatus?.({ status: this.view.status || 'online', detail: msg.message || msg.code });
     }
   }
@@ -172,12 +178,13 @@ export class MmoClient {
   }
 
   fail() {
+    if (this.fatal) return;
     this.setStatus('reconnecting', 'World server unreachable');
     this.schedule();
   }
 
   schedule() {
-    if (this.closed) return;
+    if (this.closed || this.fatal) return;
     this.setStatus('reconnecting');
     const wait = BACKOFF[Math.min(this.attempt, BACKOFF.length - 1)];
     this.attempt += 1;
@@ -186,8 +193,10 @@ export class MmoClient {
   }
 
   retry() {
+    if (this.fatal) return;
     this.attempt = 0;
     clearTimeout(this.timer);
+    this.timer = 0;
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
       this.ws = null;
@@ -195,14 +204,26 @@ export class MmoClient {
     this.connect();
   }
 
-  dispose() {
+  /**
+   * Auth rejection is final. Keep the server message as the exposed
+   * status, stay solo, and do not schedule a reconnect.
+   */
+  rejectAuth(message) {
+    const text = String(message || 'Sign in to hunt online. Guests stay solo.');
+    this.fatal = true;
+    this.dispose('offline', text);
+  }
+
+  dispose(status = 'offline', detail) {
     this.closed = true;
     clearTimeout(this.timer);
+    this.timer = 0;
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
       this.ws = null;
     }
-    this.setStatus('offline');
+    if (detail != null && detail !== '') this.setStatus(status, detail);
+    else this.setStatus(status);
   }
 }
 
