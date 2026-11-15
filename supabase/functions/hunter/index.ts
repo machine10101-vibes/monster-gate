@@ -51,9 +51,16 @@ async function accountUser(accessToken: unknown): Promise<{ id: string; email: s
   return { id, email };
 }
 
+async function keepsLedger(admin: Admin, email: string): Promise<boolean> {
+  const { data, error } = await admin.from("admins").select("email").eq("email", email).maybeSingle();
+  if (error || !data) return false;
+  return true;
+}
+
 async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise<Response> {
   const user = await accountUser(body.accessToken);
   if (user instanceof Response) return user;
+  if (await keepsLedger(admin, user.email)) return json({ progress: null, revision: 0, savedAt: 0 });
   const { data, error } = await admin
     .from("hunter_accounts")
     .select("progress, revision")
@@ -72,6 +79,9 @@ async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise
 async function accountSave(admin: Admin, body: Record<string, unknown>): Promise<Response> {
   const user = await accountUser(body.accessToken);
   if (user instanceof Response) return user;
+  if (await keepsLedger(admin, user.email)) {
+    return json({ error: "This account keeps the ledger. It does not enter the hunt." }, 403);
+  }
   const progress = sanitizeProgress(body.progress, Date.now());
   if (!progress) return json({ error: "That hunt cannot be stored." }, 400);
   const { data: existing, error: readError } = await admin

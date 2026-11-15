@@ -1,5 +1,9 @@
 import { execSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+
+const rootDir = dirname(fileURLToPath(import.meta.url));
 
 /** Default '/' for the custom domain. Pass VITE_BASE=/monster-gate/ for a project-pages path build. */
 export function publicBase(env = process.env) {
@@ -57,6 +61,9 @@ export default defineConfig({
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      input: [resolve(rootDir, 'index.html'), resolve(rootDir, 'admin.html')],
+    },
   },
   server: { port: 5173 },
 });
