@@ -4,7 +4,7 @@ import { loadCloudConfig } from './cloud.js';
 
 export { canWorldCreator, isAdmin, isModerator, STAFF_ROLES } from '../../supabase/functions/_shared/staff.js';
 
-function emptyStaff() {
+export function emptyStaff() {
   return { role: null, admin: false, moderator: false, worldCreator: false };
 }
 

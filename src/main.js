@@ -40,7 +40,8 @@ import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
-import { loadStaffRole } from './wallet/staff.js';
+import { emptyStaff, loadStaffRole } from './wallet/staff.js';
+import { closeAdminDashboard, openAdminDashboard } from './wallet/adminDash.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
 import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
@@ -194,6 +195,7 @@ class Game {
     this.wallet = null;
     this.staffRole = null;
     this.staff = null;
+    this.adminOpen = false;
     this.roster = null;
     this.character = null;
     this.walletBusy = false;
@@ -369,7 +371,7 @@ class Game {
     progress(1, 'Ready');
 
     document.getElementById('loading').classList.add('hidden');
-    if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
+    if (!this.charSelect.active && !this.adminOpen) document.getElementById('title').classList.remove('hidden');
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -377,6 +379,7 @@ class Game {
 
   start() {
     if (this.started) return;
+    if (this.isAdmin() || this.adminOpen) return;
     if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
     if (this.wallet.kind === 'guest') this.cloudState = 'off';
     document.body.classList.add('hunting');
@@ -533,11 +536,32 @@ class Game {
     this.wallet = session;
     this.staffRole = null;
     this.staff = null;
+    this.closeAdminConsole();
     this.cloudConflict = false;
     this.stopAutosave();
     this.progress.onCloud = null;
     this.character = null;
     this.charSelect.close();
+    this.roster = null;
+    this.cloudSyncing = true;
+    this.cloudState = 'off';
+    this.refreshWalletUi();
+    if (session.kind === 'email') {
+      const staff = await loadStaffRole(session).catch(() => emptyStaff());
+      if (this.cloudGate !== gate || this.wallet !== session || !gate.open) {
+        if (this.cloudGate === gate) this.cloudSyncing = false;
+        return;
+      }
+      this.staff = staff;
+      this.staffRole = staff?.role || null;
+      if (staff.admin) {
+        this.cloudSyncing = false;
+        this.cloudState = 'off';
+        this.refreshWalletUi();
+        this.openAdminConsole();
+        return;
+      }
+    }
     this.roster = new Roster(session.address, session.email || '');
     if (session.kind === 'email' && session.email) {
       const oldId = legacyUserId(session.email);
@@ -545,12 +569,6 @@ class Game {
       if (oldOwner && oldOwner !== session.address) this.roster.absorbOwner(oldOwner);
     }
     this.walletNote = this.roster.chars.length ? 'loaded' : 'new';
-    this.cloudSyncing = true;
-    this.cloudState = 'off';
-    this.refreshWalletUi();
-    const staffP = session.kind === 'email'
-      ? loadStaffRole(session).catch(() => ({ role: null, admin: false, moderator: false, worldCreator: false }))
-      : Promise.resolve({ role: null, admin: false, moderator: false, worldCreator: false });
     let result = { state: 'error', replaced: false };
     try {
       for (let attempt = 0; attempt < 2 && gate.open && this.wallet === session; attempt++) {
@@ -568,10 +586,6 @@ class Game {
       if (this.cloudGate === gate) this.cloudSyncing = false;
     }
     if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
-    const staff = await staffP;
-    if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
-    this.staff = staff;
-    this.staffRole = staff?.role || null;
     this.cloudState = result?.abandoned ? 'off' : (result?.state || 'error');
     if (result?.replaced) this.walletNote = 'loaded';
     if (this.cloudState === 'on') {
@@ -585,8 +599,20 @@ class Game {
   }
 
   openCharacterSelect() {
-    if (this.started || !this.wallet?.address || !this.roster || this.cloudSyncing) return;
+    if (this.started || this.isAdmin() || this.adminOpen) return;
+    if (!this.wallet?.address || !this.roster || this.cloudSyncing) return;
     this.charSelect.open();
+  }
+
+  openAdminConsole() {
+    this.adminOpen = true;
+    this.charSelect.close();
+    openAdminDashboard(this);
+  }
+
+  closeAdminConsole() {
+    this.adminOpen = false;
+    closeAdminDashboard(this);
   }
 
   /** Open the github.io bridge so this device can re-read the old-origin saves. */
@@ -599,6 +625,7 @@ class Game {
   playAsGuest() {
     if (this.started || this.walletBusy) return;
     this.closeAccount();
+    this.closeAdminConsole();
     this.wallet = { kind: 'guest', address: 'guest:local' };
     this.staffRole = null;
     this.staff = null;
@@ -628,7 +655,7 @@ class Game {
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
   enterWorld(char) {
-    if (this.started || !this.roster?.get(char.id)) return;
+    if (this.started || this.isAdmin() || !this.roster?.get(char.id)) return;
     this.character = char;
     this.roster.played(char.id);
     this.progress.useCharacter(this.roster.charKey(char.id));
@@ -794,6 +821,7 @@ class Game {
     clearAccount();
     clearCloudToken();
     this.progress.onCloud = null;
+    this.closeAdminConsole();
     this.wallet = null;
     this.staffRole = null;
     this.staff = null;
@@ -801,6 +829,7 @@ class Game {
     this.character = null;
     this.walletNote = '';
     this.cloudState = 'off';
+    this.cloudSyncing = false;
     this.cloudReachable = false;
     this.cloudSavedAt = 0;
     if (leaveWorld) {
@@ -990,13 +1019,15 @@ class Game {
       this.refreshWalletUi();
     });
     document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
+    document.getElementById('admin-out')?.addEventListener('click', () => this.signOut(false));
+    document.getElementById('admin-world')?.addEventListener('click', () => this.hud.openPanel('world', this));
     swap.addEventListener('click', () => this.signOut(false));
     document.getElementById('wallet-unlinked-email')?.addEventListener('click', () => {
       this.hideWalletUnlinked();
       this.openAccount('signin');
     });
     window.addEventListener('keydown', (e) => {
-      if (this.started || this.charSelect.active || (e.code !== 'Enter' && e.code !== 'Space')) return;
+      if (this.started || this.charSelect.active || this.adminOpen || (e.code !== 'Enter' && e.code !== 'Space')) return;
       if (e.target?.closest?.('input, textarea, #account-panel')) return;
       if (!document.getElementById('account-panel')?.classList.contains('hidden')) return;
       if (this.wallet) {

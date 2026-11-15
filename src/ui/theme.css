@@ -304,7 +304,7 @@ html, body {
   height: 100dvh;
   max-height: 100dvh;
 }
-#app, #hud, #charselect, #title {
+#app, #hud, #charselect, #title, #admin-dash {
   overflow: hidden;
 }
 #loading,
@@ -887,6 +887,51 @@ body.mmo-view #top-left {
   border-top: 1px solid var(--mg-line);
 }
 .wallet-link-confirm.hidden { display: none; }
+
+#admin-dash {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  background:
+    var(--mg-tex),
+    radial-gradient(ellipse at 50% 40%, rgba(21, 38, 60, 0.92), rgba(7, 13, 22, 0.94) 72%);
+}
+#admin-dash.hidden { display: none; }
+.admin-inner {
+  width: min(560px, calc(100vw - 24px));
+  margin: max(24px, var(--safe-t)) auto max(24px, var(--safe-b));
+  padding: 12px 0 24px;
+}
+.admin-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.admin-card {
+  padding: 16px 16px 12px;
+  text-align: left;
+}
+.admin-copy {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--mg-ink-text);
+}
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.admin-actions .mg-btn { min-height: 40px; margin: 0; }
+body.admin-dash #panel { z-index: 40; }
+body.admin-dash #toast { z-index: 50; }
 
 .staff-card .wallet-link-who { margin-top: 10px; }
 .staff-field {

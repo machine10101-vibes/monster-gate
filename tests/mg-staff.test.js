@@ -205,6 +205,8 @@ test('MG-STAFF cannot promote or demote the admin, and players cannot staff', as
 test('MG-STAFF World Creator is gated and admin settings can promote existing accounts', () => {
   const hud = src('../src/ui/hud.js');
   const ui = src('../src/wallet/staffUi.js');
+  const dash = src('../src/wallet/adminDash.js');
+  const html = src('../index.html');
   const main = src('../src/main.js');
   const client = src('../src/wallet/staff.js');
   const fn = src('../supabase/functions/staff/index.ts');
@@ -219,7 +221,12 @@ test('MG-STAFF World Creator is gated and admin settings can promote existing ac
   assert.match(ui, /Make an existing account a moderator/);
   assert.match(ui, /promoteModerator/);
   assert.match(ui, /createModeratorAccount/);
+  assert.match(dash, /mountStaffSettings/);
+  assert.match(html, /id="admin-dash"/);
+  assert.match(html, /This account manages staff/);
   assert.match(main, /loadStaffRole/);
+  assert.match(main, /openAdminConsole/);
+  assert.match(main, /staff\.admin/);
   assert.match(main, /canWorldCreator\(\)/);
   assert.match(main, /isAdmin\(\)/);
   assert.match(client, /functions\/v1\/staff/);
@@ -228,7 +235,7 @@ test('MG-STAFF World Creator is gated and admin settings can promote existing ac
   assert.match(fn, /auth_user_by_email/);
   assert.match(fn, /op: String\(body.op/);
   assert.match(toml, /\[functions\.staff\]/);
-  assert.match(readme, /only moderator \(and admin\) accounts/);
+  assert.match(readme, /admin account is not a hunter/);
   assert.match(readme, /MG_ADMIN_EMAILS/);
   assert.match(shared, /op === 'promote'/);
   assert.doesNotMatch(fn, /@[a-z0-9.-]+\.[a-z]{2,}/i);
