@@ -43,7 +43,7 @@ export function resolveServerUrl(search = '', opts = {}) {
   return '';
 }
 
-function readAccessToken() {
+export function readAccessToken() {
   if (typeof sessionStorage === 'undefined') return '';
   for (const store of [sessionStorage, typeof localStorage !== 'undefined' ? localStorage : null]) {
     if (!store) continue;
@@ -75,10 +75,13 @@ export class MmoClient {
     this.game = game;
     this.view = view;
     this.url = opts.url;
+    this.opts = opts;
     this.Socket = opts.WebSocket || (typeof WebSocket !== 'undefined' ? WebSocket : null);
+    this.token = typeof opts.token === 'string' ? opts.token : '';
     this.ws = null;
     this.closed = false;
     this.fatal = false;
+    this.authRejectedToken = null;
     this.attempt = 0;
     this.timer = 0;
     this.you = null;
@@ -99,9 +102,51 @@ export class MmoClient {
     this.view?.setStatus?.(typeof state === 'string' ? { status: state, detail } : state);
   }
 
+  currentToken() {
+    const stored = readAccessToken();
+    if (typeof this.token === 'string' && this.token) {
+      if (stored && stored !== this.token) return stored;
+      return this.token;
+    }
+    return stored;
+  }
+
+  /**
+   * Clear an auth rejection so a later sign-in can join without reloading.
+   * No-op while there is no rejection to clear.
+   */
+  resetAuth() {
+    this.fatal = false;
+    this.closed = false;
+    this.authRejectedToken = null;
+    clearTimeout(this.timer);
+    this.timer = 0;
+  }
+
+  /**
+   * Provide a sign-in token. A new/changed token after an auth rejection
+   * resets the rejection and reconnects.
+   */
+  setToken(token) {
+    const next = typeof token === 'string' ? token.trim() : '';
+    this.token = next;
+    if (next && next !== this.authRejectedToken) {
+      this.resetAuth();
+      this.connect();
+    }
+    return next;
+  }
+
   connect() {
+    const token = this.currentToken();
+    if (this.fatal && token && token !== this.authRejectedToken) this.resetAuth();
     if (this.closed || this.fatal || !this.url || !this.Socket) return;
     this.bind();
+    if (this.ws) {
+      const prev = this.ws;
+      this.ws = null;
+      try { prev.close(); } catch { /* already closing */ }
+    }
     this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
     let ws;
     try {
@@ -115,14 +160,15 @@ export class MmoClient {
       if (this.ws !== ws) return;
       this.attempt = 0;
       ws.send(encode('hello', {
-        token: readAccessToken(),
+        token: this.currentToken(),
         name: localName(this.game),
         look: localLook(this.game),
       }));
     });
     ws.addEventListener('message', (ev) => this.onFrame(ev.data));
     ws.addEventListener('close', () => {
-      if (this.ws === ws) this.ws = null;
+      if (this.ws !== ws) return;
+      this.ws = null;
       if (!this.closed && !this.fatal) this.schedule();
     });
     ws.addEventListener('error', () => {
@@ -193,7 +239,9 @@ export class MmoClient {
   }
 
   retry() {
-    if (this.fatal) return;
+    const token = this.currentToken();
+    if (this.fatal && (!token || token === this.authRejectedToken)) return;
+    if (this.fatal) this.resetAuth();
     this.attempt = 0;
     clearTimeout(this.timer);
     this.timer = 0;
@@ -205,11 +253,13 @@ export class MmoClient {
   }
 
   /**
-   * Auth rejection is final. Keep the server message as the exposed
-   * status, stay solo, and do not schedule a reconnect.
+   * Auth rejection is final until a new token is supplied. Keep the
+   * server message as the exposed status, stay solo, and do not
+   * automatically reconnect on the rejected token.
    */
   rejectAuth(message) {
     const text = String(message || 'Sign in to hunt online. Guests stay solo.');
+    this.authRejectedToken = this.currentToken();
     this.fatal = true;
     this.dispose('offline', text);
   }
@@ -241,7 +291,7 @@ export function attachMmo(game, view, opts = {}) {
     target?.setStatus?.({ status: 'offline', detail: 'No world server' });
     return null;
   }
-  const client = new MmoClient(game, target, { url });
+  const client = new MmoClient(game, target, { ...opts, url });
   client.connect();
   if (game) game.mmo = client;
   if (typeof window !== 'undefined') window.__mmo = client;

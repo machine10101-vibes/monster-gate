@@ -8,7 +8,7 @@ JSON WebSocket messages for the shared-world server (`server/`) and client (`src
 | **Field** | every envelope has `"v": 1` and `"type"` |
 | **Transport** | UTF-8 JSON text frames, max 8 KiB. Larger frames close the socket with 1009. |
 | **Tick** | server sends zone-scoped `delta` at 10 Hz |
-| **Auth** | optional Supabase JWT on `hello`; otherwise a guest name. An `auth` error is final: the client stays solo and must not reconnect. |
+| **Auth** | optional Supabase JWT on `hello`; otherwise a guest name. An `auth` error is final until a new token is supplied: the client stays solo and must not automatically reconnect. |
 
 Mismatching `v` is an `error` with code `protocol`. Unknown `type` is ignored or `error`.
 
@@ -135,7 +135,7 @@ Zone-scoped patch, ~10 Hz, only for hunters in the same `zone`. `remove` is ids 
 | code | when |
 | --- | --- |
 | `protocol` | bad JSON, wrong `v`, missing `hello`. Frames over 8 KiB also close the socket with 1009. |
-| `auth` | token explicitly rejected (still falls back to guest unless `hello` is malformed). The client must treat this as final: keep the message, stay solo, and do not reconnect. |
+| `auth` | missing or invalid token, or a guest rejected by World 1. The client must treat this as final until a new token is supplied (`setToken` / `resetAuth()`, or `connect` / `retry` with a fresh token): keep the message, stay solo, and do not automatically reconnect. |
 | `rate` | move or chat too fast; or too many messages before a successful `hello` (socket then closes with 1008) |
 | `teleport` | move jumped further than the speed clamp allows |
 | `chat` | empty / invalid channel |

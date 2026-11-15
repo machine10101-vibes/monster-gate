@@ -109,3 +109,75 @@ test('attachMmo stays inert without ?mmo=1', () => {
   assert.equal(attachMmo({}, stubView(), { search: '' }), null);
   assert.equal(attachMmo({}, stubView(), { search: '?mmo=1&mock=1' }), null);
 });
+
+test('MG-MMO-4: setToken after auth rejection reconnects without a reload', async () => {
+  const sockets = [];
+  class TrackingSocket extends FakeSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  }
+  const view = stubView();
+  const client = new MmoClient({ character: { name: 'Ann' } }, view, {
+    url: 'ws://world.test',
+    WebSocket: TrackingSocket,
+    token: 'stale',
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 20));
+  sockets[0].push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
+  assert.equal(client.fatal, true);
+  client.retry();
+  assert.equal(client.fatal, true);
+  assert.equal(sockets.length, 1);
+
+  client.setToken('fresh-token');
+  assert.equal(client.fatal, false);
+  assert.equal(client.closed, false);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sockets.length, 2);
+  assert.equal(client.ws, sockets[1]);
+  assert.equal(client.ws.readyState, 1);
+  const hello = JSON.parse(client.ws.sent[0]);
+  assert.equal(hello.type, 'hello');
+  assert.equal(hello.token, 'fresh-token');
+  client.dispose();
+});
+
+test('MG-MMO-4: resetAuth and connect/retry work once a new token is present', async () => {
+  const sockets = [];
+  class TrackingSocket extends FakeSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  }
+  const view = stubView();
+  const client = new MmoClient({ character: { name: 'Ann' } }, view, {
+    url: 'ws://world.test',
+    WebSocket: TrackingSocket,
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 20));
+  sockets[0].push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
+  assert.equal(client.fatal, true);
+
+  client.resetAuth();
+  assert.equal(client.fatal, false);
+  assert.equal(client.authRejectedToken, null);
+  client.setToken('after-reset');
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(sockets.length, 2);
+  assert.equal(JSON.parse(sockets[1].sent[0]).token, 'after-reset');
+
+  sockets[1].push({ v: 1, type: 'error', code: 'auth', message: 'That sign-in is not valid.' });
+  assert.equal(client.fatal, true);
+  client.token = 'brand-new';
+  client.retry();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(client.fatal, false);
+  assert.equal(sockets.length, 3);
+  assert.equal(JSON.parse(sockets[2].sent[0]).token, 'brand-new');
+  client.dispose();
+});
