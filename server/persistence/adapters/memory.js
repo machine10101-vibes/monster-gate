@@ -26,6 +26,8 @@ export function createMemoryAdapter() {
   const byUser = new Map();
   const names = new Map();
   const friendships = new Map();
+  const hunterAccounts = new Map();
+  const locks = new Map();
   let writes = 0;
 
   function rowOf(userId) {
@@ -39,6 +41,38 @@ export function createMemoryAdapter() {
     names.set(next.name.toLowerCase(), userId);
     writes += 1;
     return characterView(next);
+  }
+
+  function locked(id, fn) {
+    const run = () => fn();
+    const prev = locks.get(id) || Promise.resolve();
+    const next = prev.then(run, run);
+    locks.set(id, next.catch(() => {}));
+    return next;
+  }
+
+  function createUnlocked(id, name, extra = {}) {
+    if (rowOf(id)) throw invalid('This account already has a character.');
+    const clean = requireName(name);
+    if (names.has(clean.toLowerCase())) throw nameTaken(clean);
+    const now = new Date().toISOString();
+    const state = sanitizeState({ ...blankState(clean, extra.look), ...extra.state, name: clean });
+    const cols = columnsFromState(state);
+    return put(id, {
+      user_id: id,
+      name: cols.name,
+      zone: cols.zone,
+      x: cols.x,
+      y: cols.y,
+      z: cols.z,
+      gold: cols.gold,
+      last_seen: cols.last_seen,
+      imported_at: cols.imported_at,
+      version: 1,
+      state,
+      created_at: now,
+      updated_at: now,
+    });
   }
 
   return {
@@ -55,27 +89,31 @@ export function createMemoryAdapter() {
 
     async create(userId, name, extra = {}) {
       const id = requireUserId(userId);
-      if (rowOf(id)) throw invalid('This account already has a character.');
-      const clean = requireName(name);
-      if (names.has(clean.toLowerCase())) throw nameTaken(clean);
-      const now = new Date().toISOString();
-      const state = sanitizeState({ ...blankState(clean, extra.look), ...extra.state, name: clean });
-      const cols = columnsFromState(state);
-      return put(id, {
-        user_id: id,
-        name: cols.name,
-        zone: cols.zone,
-        x: cols.x,
-        y: cols.y,
-        z: cols.z,
-        gold: cols.gold,
-        last_seen: cols.last_seen,
-        imported_at: cols.imported_at,
-        version: 1,
-        state,
-        created_at: now,
-        updated_at: now,
+      return locked(id, () => createUnlocked(id, name, extra));
+    },
+
+    /**
+     * Insert a clamped hunter_accounts hunt if this account has no
+     * characters row yet. Concurrent callers share one row.
+     */
+    async insertImported(userId, state) {
+      const id = requireUserId(userId);
+      return locked(id, () => {
+        const existing = rowOf(id);
+        if (existing) return characterView(existing);
+        return createUnlocked(id, state.name, { look: state.look, state });
       });
+    },
+
+    async loadLegacyHunt(userId) {
+      const id = requireUserId(userId);
+      if (!hunterAccounts.has(id)) return null;
+      return hunterAccounts.get(id);
+    },
+
+    seedHunterAccount(userId, progress) {
+      const id = requireUserId(userId);
+      hunterAccounts.set(id, progress);
     },
 
     async save(userId, state, { expectedVersion, importedAt } = {}) {
@@ -124,6 +162,7 @@ export function createMemoryAdapter() {
       byUser.clear();
       names.clear();
       friendships.clear();
+      hunterAccounts.clear();
       writes = 0;
     },
 

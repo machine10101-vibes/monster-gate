@@ -2,6 +2,7 @@ import { createMemoryAdapter } from './adapters/memory.js';
 import { createNoopAdapter } from './adapters/noop.js';
 import { alreadyImported, PersistenceError } from './errors.js';
 import { requireUserId } from './ids.js';
+import { loadWithLegacyImport } from './legacy.js';
 import { createSaveQueue } from './queue.js';
 import { extractLocalHunt, mergeState, sanitizeState } from './schema.js';
 
@@ -42,7 +43,7 @@ export function createPersistence(options = {}) {
     queue,
 
     async loadCharacter(userId) {
-      return remember(await adapter.load(userId));
+      return remember(await loadWithLegacyImport(adapter, userId, { log: options.log }));
     },
 
     async createCharacter(userId, name, extra = {}) {

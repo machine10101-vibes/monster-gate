@@ -13,7 +13,9 @@ export {
   columnsFromState,
   extractLocalHunt,
   mergeState,
+  pickRosterCharacter,
   sanitizeState,
   skillPointsEarned,
+  stateFromLegacyProgress,
 } from './schema.js';
 export { cleanName, nameProblem, requireName } from './names.js';

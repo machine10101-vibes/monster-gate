@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import {
+  PersistErrorCodes,
   alreadyFriends,
   alreadyImported,
   conflict,
@@ -35,9 +36,33 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
 
     async load(userId) {
       const id = requireUserId(userId);
-      const { data, error } = await db.from('characters').select('*').eq('user_id', id).maybeSingle();
+      return loadCharacterRow(db, id);
+    },
+
+    async loadLegacyHunt(userId) {
+      const id = requireUserId(userId);
+      const { data, error } = await db
+        .from('hunter_accounts')
+        .select('progress')
+        .eq('user_id', id)
+        .maybeSingle();
       if (error) throw wrap(error);
-      return data ? characterView(data) : null;
+      return data ? data.progress : null;
+    },
+
+    /**
+     * Insert a clamped hunter_accounts hunt if this account has no
+     * characters row. Concurrent first joins share one row: the RPC
+     * (or the PK unique) returns the winner's insert.
+     */
+    async insertImported(userId, state) {
+      const id = requireUserId(userId);
+      const existing = await loadCharacterRow(db, id);
+      if (existing) return existing;
+      const cols = columnsFromState(state);
+      const viaRpc = await tryImportRpc(db, id, state, cols);
+      if (viaRpc !== undefined) return viaRpc;
+      return insertImportedRow(db, id, state, cols);
     },
 
     async create(userId, name, extra = {}) {
@@ -176,6 +201,73 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
       return { ok: true, userId: id, otherUserId: other };
     },
   };
+}
+
+async function loadCharacterRow(db, id) {
+  const { data, error } = await db.from('characters').select('*').eq('user_id', id).maybeSingle();
+  if (error) throw wrap(error);
+  return data ? characterView(data) : null;
+}
+
+function isMissingImportFn(error) {
+  const code = String(error?.code || '');
+  const blob = [error?.message, error?.details, error?.hint].filter(Boolean).join(' ');
+  return code === 'PGRST202' || /character_import_legacy/i.test(blob);
+}
+
+function isCharacterPkConflict(error, extra = {}) {
+  const mapped = mapSupabaseError(error, extra);
+  return mapped.code === PersistErrorCodes.INVALID && /already has a character/i.test(mapped.message);
+}
+
+async function tryImportRpc(db, id, state, cols) {
+  if (typeof db.rpc !== 'function') return undefined;
+  const { data, error } = await db.rpc('character_import_legacy', {
+    p_user: id,
+    p_name: cols.name,
+    p_zone: cols.zone,
+    p_x: cols.x,
+    p_y: cols.y,
+    p_z: cols.z,
+    p_gold: cols.gold,
+    p_state: state,
+  });
+  if (!error) {
+    const row = Array.isArray(data) ? data[0] : data;
+    return row ? characterView(row) : null;
+  }
+  if (isMissingImportFn(error)) return undefined;
+  if (isCharacterPkConflict(error, { name: cols.name, userId: id })) {
+    const raced = await loadCharacterRow(db, id);
+    if (raced) return raced;
+  }
+  throw wrap(error, { name: cols.name, userId: id });
+}
+
+async function insertImportedRow(db, id, state, cols) {
+  const { data, error } = await db
+    .from('characters')
+    .insert({
+      user_id: id,
+      name: cols.name,
+      zone: cols.zone,
+      x: cols.x,
+      y: cols.y,
+      z: cols.z,
+      gold: cols.gold,
+      last_seen: cols.last_seen,
+      imported_at: cols.imported_at,
+      version: 1,
+      state,
+    })
+    .select('*')
+    .maybeSingle();
+  if (!error) return data ? characterView(data) : null;
+  if (isCharacterPkConflict(error, { name: cols.name, userId: id })) {
+    const raced = await loadCharacterRow(db, id);
+    if (raced) return raced;
+  }
+  throw wrap(error, { name: cols.name, userId: id });
 }
 
 function fromDb(row) {

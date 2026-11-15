@@ -170,13 +170,41 @@ export function sanitizeState(raw, { importMode = false } = {}) {
   return state;
 }
 
+/**
+ * Pick the active / most recently played roster entry.
+ * `roster.last` is what the client sets in `played()`; otherwise the highest
+ * `playedAt` / `hunt.savedAt` wins.
+ */
+export function pickRosterCharacter(chars, lastId) {
+  const list = Array.isArray(chars) ? chars.filter((c) => c && typeof c === 'object') : [];
+  if (!list.length) return null;
+  if (lastId) {
+    const active = list.find((c) => c.id === lastId);
+    if (active) return active;
+  }
+  let best = list[0];
+  let bestAt = rosterRecency(best);
+  for (let i = 1; i < list.length; i++) {
+    const at = rosterRecency(list[i]);
+    if (at > bestAt) {
+      best = list[i];
+      bestAt = at;
+    }
+  }
+  return best;
+}
+
+function rosterRecency(entry) {
+  const played = Number(entry?.playedAt) || 0;
+  const saved = Number(entry?.hunt && typeof entry.hunt === 'object' ? entry.hunt.savedAt : 0) || 0;
+  return Math.max(played, saved);
+}
+
 /** Pull a single hunt out of a Progress blob or a roster-shaped guild record. */
 export function extractLocalHunt(localSaveJson) {
   const raw = parseSave(localSaveJson);
   if (raw.roster && Array.isArray(raw.roster.chars)) {
-    const chars = raw.roster.chars.filter((c) => c && typeof c === 'object');
-    const lastId = raw.roster.last;
-    const chosen = chars.find((c) => c.id === lastId) || chars[0];
+    const chosen = pickRosterCharacter(raw.roster.chars, raw.roster.last);
     if (!chosen) throw invalid('That roster has no characters to import.');
     const hunt = chosen.hunt && typeof chosen.hunt === 'object' && !Array.isArray(chosen.hunt)
       ? chosen.hunt
@@ -185,13 +213,27 @@ export function extractLocalHunt(localSaveJson) {
       ...hunt,
       name: chosen.name,
       look: chosen.look,
-      savedAt: Number(hunt.savedAt) || Number(raw.savedAt) || 0,
+      savedAt: Number(hunt.savedAt) || Number(raw.savedAt) || Number(chosen.playedAt) || 0,
     };
   }
   if (raw.progress && typeof raw.progress === 'object' && !Array.isArray(raw.progress)) {
     return { ...raw.progress, name: raw.name, look: raw.look };
   }
   return raw;
+}
+
+/**
+ * Clamp a `hunter_accounts.progress` blob (roster or raw hunt) into a
+ * characters.state payload with `importedAt` set. Throws `invalid` when
+ * the blob cannot be parsed.
+ */
+export function stateFromLegacyProgress(progress) {
+  const hunt = extractLocalHunt(progress);
+  const state = sanitizeState(hunt, { importMode: true });
+  const now = Date.now();
+  state.importedAt = now;
+  state.last_seen = new Date(now).toISOString();
+  return state;
 }
 
 export function columnsFromState(state) {

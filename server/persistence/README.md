@@ -31,11 +31,13 @@ Copy `.env.example`. Do not commit secrets.
 
 ## Migrations to apply
 
-Apply **all three** before World 1 deploys:
+Apply **all of these** before World 1 deploys:
 
 1. `supabase/migrations/20261113150000_characters.sql`
 2. `supabase/migrations/20261113200000_friendships.sql`
 3. `supabase/migrations/20261113210000_friendships_accept_fn.sql`
+4. `supabase/migrations/20261115080000_trigger_fns_search_path.sql`
+5. `supabase/migrations/20261116010000_character_import_legacy.sql`
 
 ```bash
 supabase db push
@@ -43,7 +45,16 @@ supabase db push
 psql "$DATABASE_URL" -f supabase/migrations/20261113150000_characters.sql
 psql "$DATABASE_URL" -f supabase/migrations/20261113200000_friendships.sql
 psql "$DATABASE_URL" -f supabase/migrations/20261113210000_friendships_accept_fn.sql
+psql "$DATABASE_URL" -f supabase/migrations/20261115080000_trigger_fns_search_path.sql
+psql "$DATABASE_URL" -f supabase/migrations/20261116010000_character_import_legacy.sql
 ```
+
+The fifth migration adds `public.character_import_legacy(...)` (`SECURITY DEFINER`,
+`service_role` execute only). It takes an advisory lock on the account, inserts
+the clamped hunt with `imported_at` set, and returns the existing row if one
+is already there. The adapter falls back to a plain `characters` insert when
+the function is not yet applied, so deploying the JS without this migration
+still imports; apply it so concurrent first joins serialize in Postgres.
 
 Table `public.characters`: one row per `auth.users` id, unique hunter name,
 jsonb `state` plus typed `zone/x/y/z/gold/last_seen/version`. RLS lets an
@@ -75,6 +86,7 @@ const persist = await openPersistence();
 persist.installShutdownHandlers(); // flushes on SIGTERM / SIGINT
 
 // On auth (after the world server verifies a Supabase JWT):
+// loadCharacter imports hunter_accounts.progress once when no characters row exists.
 let character = await persist.loadCharacter(userId);
 if (!character) {
   character = await persist.createCharacter(userId, name);
@@ -111,7 +123,7 @@ Validation, unique-name, and version-conflict errors are not retried.
 
 | Method | Result |
 | --- | --- |
-| `loadCharacter(userId)` | Character view or `null` |
+| `loadCharacter(userId)` | Character view or `null`. If no `characters` row exists, performs a one-time clamped import from `hunter_accounts.progress` (roster last / most recently played hunt) and inserts with `imported_at` set. No `hunter_accounts` row returns `null` (world server creates a fresh character). Unparseable progress logs a warning and returns `null`; never throws. Existing `characters` rows are never overwritten. |
 | `createCharacter(userId, name, { look, state })` | New row, version `1` |
 | `saveCharacter(userId, state, { immediate, expectedVersion })` | Queued `{ ok, queued }` or the saved row when `immediate` |
 | `importLocalSave(userId, localSaveJson)` | Clamped import; rejects if `imported_at` is already set |
@@ -194,7 +206,7 @@ Writes also accept aliases used by an MMO tick:
 - `bank` → `storage`
 - `quests` → `journal.quests`
 
-`importLocalSave` also unwraps a roster-shaped guild record (`{ roster: { last, chars: [{ name, look, hunt }] } }`) and takes the last-played character.
+`importLocalSave` and `loadCharacter`'s legacy path unwrap a roster-shaped guild record (`{ savedAt, roster: { last, chars: [{ id, name, look, hunt, playedAt }] } }`) — the live `hunter_accounts.progress` shape — and take `roster.last`, else the highest `playedAt` / `hunt.savedAt`. A raw Progress blob (`gold`, `xp`, `hunter`, …) is accepted too. Extra hunt keys such as `bounties` are dropped.
 
 Import clamping (anti-cheat): unknown ids dropped; XP capped at the level-99 curve; gold ≤ 1_000_000; stacks ≤ 99_999; kills ≤ 10_000 per type; position boxed to the world; skill points spent cannot exceed points earned from kills (same 2 + floor(slayer/8) rule as the client). A second import for that user is rejected.
 
