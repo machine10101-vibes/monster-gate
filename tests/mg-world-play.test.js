@@ -28,6 +28,7 @@ import {
   leaveOnlineWorld,
   markWorldJoin,
   maybeResumeOnline,
+  mmoClientClosed,
   offlineSearch,
   onlineSearch,
   paintWorldModePill,
@@ -35,9 +36,11 @@ import {
   paintWorldPlayButton,
   parseWorldHealth,
   rememberWorldMode,
+  remountMmoClient,
   shouldAutoOnline,
   shouldDropOnlineWithoutSession,
   shouldForceWorldPick,
+  shouldFreshMmoClient,
   shouldMountOnline,
   viteMmoUrl,
   worldJoinContinue,
@@ -69,6 +72,7 @@ function fakeLoc({ search = '', pathname = '/', hash = '' } = {}) {
     history: '',
     assign(href) { this.assigned = href; },
     replace(href) { this.replaced = href; },
+    reload() { this.reloaded = true; },
     replaceState(_s, _t, href) {
       this.history = href;
       const q = String(href).includes('?') ? `?${String(href).split('?')[1].split('#')[0]}` : '';
@@ -110,14 +114,14 @@ test('World 1 button reads location.search so On World 1 is correct (MG-MMO-2)',
   const env = { VITE_MMO_URL: 'wss://world.example/ws' };
   const here = worldPlayButton({ loc: { search: '?mmo=1' }, env });
   assert.equal(here.ready, true);
-  assert.equal(here.disabled, true);
+  assert.equal(here.disabled, false);
   assert.equal(here.label, WORLD_PLAY_HERE);
-  assert.equal(here.action, 'none');
+  assert.equal(here.action, 'online');
 
   const btn = { textContent: '', disabled: false, title: '', dataset: {}, setAttribute() {} };
   paintWorldPlayButton(btn, { loc: { search: '?mmo=1' }, env, short: true });
   assert.equal(btn.textContent, WORLD_PLAY_HERE);
-  assert.equal(btn.disabled, true);
+  assert.equal(btn.disabled, false);
 
   const off = paintWorldPlayButton(
     { textContent: '', disabled: false, title: '', dataset: {}, setAttribute() {} },
@@ -194,7 +198,11 @@ test('enter / leave rewrite the URL without touching saves', () => {
 
   const already = fakeLoc({ search: '?mmo=1', pathname: '/' });
   assert.equal(enterOnlineWorld({ search: already.search, env, storage: store, session: store, loc: already }), true);
-  assert.equal(already.assigned, '');
+  assert.match(already.assigned, /mmo=1/);
+  assert.match(already.assigned, /join=1/);
+  const same = fakeLoc({ search: '?mmo=1&join=1', pathname: '/' });
+  assert.equal(enterOnlineWorld({ search: same.search, env, storage: store, session: store, loc: same }), true);
+  assert.equal(same.reloaded, true);
 
   const leave = fakeLoc({ search: '?mmo=1&server=wss://x&mock=1', pathname: '/' });
   assert.equal(leaveOnlineWorld({ search: leave.search, storage: store, session: store, loc: leave }), true);
@@ -382,6 +390,13 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   assert.match(main, /showWorldPicker/);
   assert.match(main, /__mgShowWorldPicker/);
   assert.match(main, /continueAfterAccount/);
+  assert.match(main, /continueSignedInHunt[\s\S]*roster\.last/);
+  assert.match(main, /this\.roster = new Roster\(session\.address/);
+  assert.match(main, /pickWorldSolo[\s\S]*openCharacterSelect/);
+  assert.match(main, /pickWorldOnline[\s\S]*enterOnlineWorld/);
+  assert.match(main, /remountOnlineClient/);
+  assert.match(main, /shouldFreshMmoClient/);
+  assert.doesNotMatch(main, /playAsGuest\(\)[\s\S]{0,80}showWorldPicker/);
   assert.match(hud, /Switch world/);
   assert.match(hud, /set-world1/);
   assert.match(hud, /set-world-solo/);
@@ -396,6 +411,97 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   assert.match(readme, /MG_WORLD_URL/);
   assert.match(readme, /Choose a world/);
   assert.equal(WORLD_GUEST_NOTE, 'Sign in to play online');
+});
+
+test('rejected mmo client is disposed and a new one connects after sign-in (MG-MMO-4)', () => {
+  let n = 0;
+  function makeClient() {
+    n += 1;
+    const client = {
+      id: n,
+      closed: false,
+      connected: false,
+      dispose() { this.closed = true; },
+      connect() {
+        if (this.closed) return false;
+        this.connected = true;
+        return true;
+      },
+    };
+    client.connect();
+    return client;
+  }
+
+  const rejected = makeClient();
+  rejected.dispose();
+  assert.equal(rejected.closed, true);
+  assert.equal(rejected.connect(), false);
+  assert.equal(mmoClientClosed(rejected), true);
+  assert.equal(mmoClientClosed(null), false);
+  assert.equal(shouldFreshMmoClient({
+    search: '?mmo=1',
+    signedIn: true,
+    mmo: null,
+  }), false);
+  assert.equal(shouldFreshMmoClient({
+    search: '?mmo=1',
+    signedIn: true,
+    authReject: true,
+    mmo: rejected,
+  }), true);
+  assert.equal(shouldFreshMmoClient({
+    search: '?mmo=1',
+    signedIn: false,
+    authReject: true,
+    mmo: rejected,
+  }), false);
+
+  const game = { mmo: rejected };
+  const view = {
+    authReject: true,
+    clearAuthLatch() { this.authReject = false; },
+  };
+  const next = remountMmoClient({
+    game,
+    view,
+    mmo: rejected,
+    attach: (g) => {
+      const fresh = makeClient();
+      g.mmo = fresh;
+      return fresh;
+    },
+  });
+  assert.notEqual(next, rejected);
+  assert.equal(next.id, 2);
+  assert.equal(next.closed, false);
+  assert.equal(next.connected, true);
+  assert.equal(game.mmo, next);
+  assert.equal(view.authReject, false);
+  assert.equal(rejected.closed, true);
+  assert.equal(shouldFreshMmoClient({
+    search: '?mmo=1',
+    signedIn: true,
+    authReject: false,
+    mmo: next,
+  }), false);
+  assert.equal(shouldFreshMmoClient({
+    search: '?mmo=1',
+    signedIn: true,
+    authReject: false,
+    mmo: rejected,
+  }), true);
+
+  const env = { VITE_MMO_URL: 'wss://world.example/ws' };
+  const loc = fakeLoc({ search: '?mmo=1', pathname: '/' });
+  assert.equal(enterOnlineWorld({ search: loc.search, env, storage: memoryStore(), session: memoryStore(), loc }), true);
+  assert.match(loc.assigned, /mmo=1/);
+  assert.match(loc.assigned, /join=1/);
+
+  const main = src('../src/main.js');
+  assert.match(main, /remountMmoClient/);
+  assert.match(main, /attachMmo/);
+  assert.doesNotMatch(src('../src/net/worldPlay.js'), /from ['\"]\.\/mmo\.js['\"]/);
+  assert.doesNotMatch(src('../src/net/mmo.js'), /shouldFreshMmoClient/);
 });
 
 test('resolveMmoUrl prefers MG_WORLD_URL and stays empty for Pages', () => {

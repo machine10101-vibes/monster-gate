@@ -1,4 +1,7 @@
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 /** Default '/' for the custom domain. Pass VITE_BASE=/monster-gate/ for a project-pages path build. */
@@ -19,6 +22,25 @@ export function resolveMmoUrl(env = process.env) {
   const mg = String(env?.MG_WORLD_URL ?? '').trim();
   if (mg) return mg;
   return String(env?.VITE_MMO_URL ?? '').trim();
+}
+
+/** Publishable project URL + anon key. Env wins; else public/supabase.json. Never a service-role key. */
+export function resolveSupabaseConfig(env = process.env, { readFile, filePath } = {}) {
+  let url = String(env?.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '');
+  let key = String(env?.VITE_SUPABASE_ANON_KEY ?? '').trim();
+  if (!url || !key) {
+    try {
+      const path = filePath || join(dirname(fileURLToPath(import.meta.url)), 'public', 'supabase.json');
+      const raw = (readFile || readFileSync)(path, 'utf8');
+      const json = JSON.parse(raw);
+      if (!url) url = String(json.url || '').trim().replace(/\/$/, '');
+      if (!key) key = String(json.key || json.anonKey || '').trim();
+    } catch {
+      /* Pages without a file stay empty unless env is set */
+    }
+  }
+  if (/service_role/i.test(key)) key = '';
+  return { url, key };
 }
 
 export function resolveBuildId({ env = process.env, branch = '', headSha = '', mainSha = '' } = {}) {
@@ -48,12 +70,16 @@ function shortSha() {
   }
 }
 
+const supabase = resolveSupabaseConfig();
+
 export default defineConfig({
   base: publicBase(),
   define: {
     'import.meta.env.VITE_BUILD_ID': JSON.stringify(shortSha()),
     'import.meta.env.VITE_MMO_URL': JSON.stringify(resolveMmoUrl()),
     'import.meta.env.VITE_WORLD_URL': JSON.stringify(resolveMmoUrl()),
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabase.url),
+    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabase.key),
   },
   build: {
     target: 'es2020',

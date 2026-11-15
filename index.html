@@ -232,13 +232,14 @@
             <label class="wg-label" id="account-confirm-label" for="account-confirm">Confirm password</label>
             <input id="account-confirm" class="account-input" name="confirm" type="password" autocomplete="new-password" maxlength="72" />
             <p id="account-error" class="account-error" role="alert"></p>
+            <button id="account-retry" class="start quiet hidden" type="button">Retry</button>
             <button id="account-submit" class="start quiet" type="submit">Create account</button>
             <button id="account-cancel" class="wallet-link" type="button">Back</button>
           </form>
           <button id="btn-start" class="start hidden" type="button">Begin the hunt</button>
           <button id="btn-wallet-switch" class="wallet-link hidden" type="button">Sign out</button>
           <div id="wallet-unlinked" class="wallet-unlinked mg-frame hidden" role="alert">
-            <p id="wallet-unlinked-text">No account is linked to this wallet. Sign in with email, then connect your wallet in Account settings.</p>
+            <p id="wallet-unlinked-text">This Klever wallet isn't linked yet. Your email account and progress are safe — sign in with email, then link the wallet in Account settings.</p>
             <button id="wallet-unlinked-email" class="start quiet" type="button">Sign in with email</button>
           </div>
           <div id="wallet-help" class="wallet-help hidden"></div>

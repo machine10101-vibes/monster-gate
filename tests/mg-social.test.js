@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  ERRORS, ERROR_TEXT, FRIENDS_CAP, INVITE_TTL_MS, MAX_PARTY, errorMessage, parseSocialFlags,
+  ERRORS, ERROR_TEXT, FRIENDS_CAP, INVITE_TTL_MS, MAX_PARTY, SOCIAL_GUEST_BTN, SOCIAL_GUEST_NOTE,
+  SOCIAL_SOLO_BTN, SOCIAL_SOLO_NOTE, errorMessage, parseSocialFlags, socialOfflinePrompt,
 } from '../src/social/constants.js';
 import {
   clampPartySize, lootWinner, needGreedResolve, nextLootTurn, splitGold, splitXp,
@@ -201,8 +202,36 @@ test('offline adapter and session refuse social actions', async () => {
   assert.equal(session.mode, 'offline');
   const res = await session.requestFriend('Bram');
   assert.equal(res.ok, false);
-  assert.match(res.message, /Online only/);
+  assert.equal(res.message, SOCIAL_GUEST_NOTE);
   assert.equal(session.snapshot().friends.length, 0);
+  const signed = new SocialSession({ wallet: { kind: 'email', address: 'acct:1' } }, backend, { offline: true });
+  const live = await signed.requestFriend('Bram');
+  assert.equal(live.message, SOCIAL_SOLO_NOTE);
+});
+
+test('friends panel copy: signed-in solo vs guest, never Not connected', async () => {
+  assert.deepEqual(socialOfflinePrompt({ guest: true }), {
+    note: SOCIAL_GUEST_NOTE, action: 'signin', label: SOCIAL_GUEST_BTN,
+  });
+  assert.deepEqual(socialOfflinePrompt({ signedIn: true }), {
+    note: SOCIAL_SOLO_NOTE, action: 'world', label: SOCIAL_SOLO_BTN,
+  });
+  const ui = src('../src/social/ui.js');
+  assert.match(ui, /socialOfflinePrompt/);
+  assert.match(ui, /mg-social-join-world|Join World 1/);
+  assert.match(ui, /mg-social-signin/);
+  assert.doesNotMatch(src('../src/social/mmo.js'), /Not connected\./);
+  const guest = new MmoSocial({ game: { wallet: { kind: 'guest', address: 'guest:local' } } });
+  guest.caps.friends = true;
+  const g = await guest.act('friend_request', 'Bram');
+  assert.equal(g.ok, false);
+  assert.equal(g.message, SOCIAL_GUEST_NOTE);
+  guest.dispose();
+  const email = new MmoSocial({ game: { wallet: { kind: 'email', address: 'acct:1' } } });
+  email.caps.friends = true;
+  const e = await email.act('friend_request', 'Bram');
+  assert.equal(e.message, SOCIAL_SOLO_NOTE);
+  email.dispose();
 });
 
 test('mmo adapter feature-detects missing methods and welcome.features', async () => {

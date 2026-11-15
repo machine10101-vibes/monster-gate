@@ -1,4 +1,4 @@
-import { ERRORS, SOCIAL_INBOUND, SOCIAL_PROTOCOL, cleanHunterName, errorMessage } from './constants.js';
+import { ERRORS, SOCIAL_INBOUND, SOCIAL_PROTOCOL, SOCIAL_GUEST_NOTE, SOCIAL_SOLO_NOTE, cleanHunterName, errorMessage } from './constants.js';
 import { emptySnapshot } from './offline.js';
 
 const METHOD = {
@@ -256,7 +256,10 @@ export class MmoSocial {
       return { ok: false, code: ERRORS.offline, message: 'The world server does not have this yet.' };
     }
     const client = this.client || this.game?.mmo;
-    if (!client) return { ok: false, code: ERRORS.offline, message: 'Not connected.' };
+    if (!client) {
+      const guest = this.game?.wallet?.kind === 'guest' || !this.game?.wallet?.address;
+      return { ok: false, code: ERRORS.offline, message: guest ? SOCIAL_GUEST_NOTE : SOCIAL_SOLO_NOTE };
+    }
     const method = METHOD[name];
     try {
       if (method && typeof client[method] === 'function') {
