@@ -888,6 +888,42 @@ body.mmo-view #top-left {
 }
 .wallet-link-confirm.hidden { display: none; }
 
+.staff-card .wallet-link-who { margin-top: 10px; }
+.staff-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--mg-ink-text);
+}
+.staff-field input {
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: #fff;
+  background: #0e1014;
+  border: 2px solid var(--mg-line);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+.staff-card .mg-btn { min-height: 40px; margin: 0 0 8px; }
+.staff-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.staff-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.staff-row .mg-btn { margin: 0; min-height: 32px; }
+.staff-empty { font-size: 13px; color: var(--mg-ink-text); }
+.account-error.staff-ok { color: var(--mg-gold-text); }
+
 #mock-wallet-badge {
   position: absolute;
   top: calc(8px + var(--safe-t));

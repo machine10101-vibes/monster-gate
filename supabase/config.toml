@@ -435,6 +435,12 @@ verify_jwt = false
 import_map = "./functions/signup/deno.json"
 entrypoint = "./functions/signup/index.ts"
 
+[functions.staff]
+enabled = true
+verify_jwt = false
+import_map = "./functions/staff/deno.json"
+entrypoint = "./functions/staff/index.ts"
+
 [functions.hunter]
 enabled = true
 verify_jwt = false

@@ -18,6 +18,7 @@ import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
 import { mountWalletSettings } from '../wallet/settings.js';
+import { mountStaffSettings } from '../wallet/staffUi.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
@@ -566,8 +567,12 @@ export class HUD {
       title.textContent = 'Skill & Spell Book';
       this.cleanup = mountSpellbook(body, game);
     } else if (name === 'world') {
-      title.textContent = 'World Map';
-      this.cleanup = mountWorldMap(body, game);
+      title.textContent = 'World Creator';
+      if (!game.canWorldCreator?.()) {
+        add('<p class="panel-help">World Creator is only available on moderator accounts.</p>');
+      } else {
+        this.cleanup = mountWorldMap(body, game);
+      }
     } else if (name === 'friends') {
       title.textContent = 'Friends';
       this.cleanup = mountFriends(body, game);
@@ -682,13 +687,14 @@ export class HUD {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
       const jumps = document.createElement('div');
       jumps.className = 'set-jumps';
-      for (const [id, label, sub] of [
+      const jumpRows = [
         ['tome', 'Teleportation Tome', 'Travel to a remembered place'],
         ['friends', 'Friends', 'Friends list and party'],
         ['gear', 'Character', 'Equipped and unequipped'],
         ['bag', 'Inventory', 'Bag, tools and goods'],
-        ['world', 'World Creator', '100-tile map'],
-      ]) {
+      ];
+      if (game.canWorldCreator?.()) jumpRows.push(['world', 'World Creator', '100-tile map']);
+      for (const [id, label, sub] of jumpRows) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'set-jump';
@@ -717,6 +723,7 @@ export class HUD {
       ];
       rows.forEach(([a, b]) => add(`<div class="panel-row"><span>${a}</span>${b}</div>`));
       if (game.wallet?.kind === 'email') mountWalletSettings(body, game);
+      if (game.isAdmin?.()) mountStaffSettings(body, game);
       if (game.wallet?.address) {
         const row = document.createElement('div');
         row.className = 'panel-row account';
