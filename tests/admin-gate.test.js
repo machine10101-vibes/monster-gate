@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import { adminHref, gameHref, isAdminAccount } from '../src/admin/gate.js';
+
+const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+
+test('the guild master is sent to the ledger before a hunt can start', () => {
+  const main = src('../src/main.js');
+  const hunter = src('../supabase/functions/hunter/index.ts');
+  const admin = src('../supabase/functions/admin/index.ts');
+  const migration = src('../supabase/migrations/20261115230000_admin_ledger.sql');
+  const page = src('../admin.html');
+  assert.match(main, /if \(isAdminAccount\(readAccount\(\)\)\)/);
+  assert.match(main, /location\.replace\(adminHref\(\)\)/);
+  const boot = main.indexOf('function startGame');
+  const construct = main.indexOf('const game = new Game', boot);
+  assert.ok(boot > 0 && construct > boot);
+  assert.match(main.slice(boot, construct), /isAdminAccount\(readAccount\(\)\)/);
+  assert.match(hunter, /keepsLedger/);
+  assert.match(hunter, /from\("admins"\)/);
+  assert.match(hunter, /It does not enter the hunt/);
+  assert.match(admin, /admin_account_facts/);
+  assert.match(admin, /admin_wallet_facts/);
+  assert.match(admin, /This gate is for the guild master/);
+  assert.match(src('../src/admin/api.js'), /buildLedger/);
+  assert.match(migration, /monstergateonline@gmail\.com/);
+  assert.match(migration, /admin_hunt_facts/);
+  assert.match(page, /Guild ledger/);
+  assert.match(page, /src\/admin\/main\.js/);
+  assert.doesNotMatch(page, /src\/main\.js/);
+  assert.match(src('../vite.config.js'), /admin\.html/);
+  assert.equal(adminHref(), '/admin.html');
+  assert.equal(gameHref(), '/');
+  assert.equal(isAdminAccount({ kind: 'email', email: 'monstergateonline@gmail.com' }), true);
+  assert.equal(isAdminAccount({ kind: 'email', email: 'bram@hunt.test' }), false);
+  assert.equal(isAdminAccount({ kind: 'guest', email: 'monstergateonline@gmail.com' }), false);
+  assert.equal(isAdminAccount(null), false);
+});
