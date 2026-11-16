@@ -900,7 +900,7 @@ export class HUD {
       paintWorldPlayButton(worldBtn, { search: liveSearch, short: true });
       worldBtn?.addEventListener('click', () => onWorldPlayClick({
         search: liveSearch,
-        onNeedSignIn: () => game.showWorldAuth?.(),
+        onNeedSignIn: () => game.openSocialSignIn?.(),
       }));
       document.getElementById('set-world-solo')?.addEventListener('click', () => {
         if (isWorldOnline(liveSearch)) leaveOnlineWorld({ search: liveSearch });

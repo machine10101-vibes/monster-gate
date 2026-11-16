@@ -390,6 +390,12 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   assert.match(main, /showWorldPicker/);
   assert.match(main, /__mgShowWorldPicker/);
   assert.match(main, /continueAfterAccount/);
+  assert.doesNotMatch(main, /pendingWorldAuth/);
+  assert.doesNotMatch(main, /if \(consumeWorldAuth\(\)\) this\.showWorldAuth/);
+  assert.match(main, /next === 'signin'[\s\S]{0,80}openSocialSignIn/);
+  assert.match(main, /pickWorldOnline[\s\S]*openSocialSignIn/);
+  assert.doesNotMatch(hud, /showWorldAuth/);
+  assert.match(hud, /openSocialSignIn/);
   const apply = main.indexOf('async applyWallet');
   const fresh = main.indexOf('shouldFreshMmoClient', apply);
   assert.ok(apply > 0 && fresh > apply);

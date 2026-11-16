@@ -462,7 +462,7 @@ class Game {
 
     if (loadingScreen) await loadingScreen.dismiss();
     else document.getElementById('loading')?.classList.add('hidden');
-    if (consumeWorldAuth()) this.showWorldAuth();
+    consumeWorldAuth();
     if (shouldForceWorldPick() && !this.started) this.showWorldPicker({ force: true });
     if (this.started) document.getElementById('title')?.classList.add('hidden');
     else if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
@@ -767,7 +767,7 @@ class Game {
       return;
     }
     if (next === 'signin') {
-      this.showWorldAuth();
+      this.openSocialSignIn();
       return;
     }
     if (signed) {
@@ -846,7 +846,7 @@ class Game {
     const search = typeof location !== 'undefined' ? location.search : '';
     if (!worldServerConfigured(search)) return;
     if (!hasWorldSessionToken()) {
-      this.showWorldAuth();
+      this.openSocialSignIn();
       return;
     }
     this.worldJoining = true;
@@ -3671,10 +3671,8 @@ function startGame() {
     return;
   }
   const bootSearch = typeof location !== 'undefined' ? location.search : '';
-  let pendingWorldAuth = false;
   if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
     dropOnlineWithoutSession({ search: bootSearch });
-    pendingWorldAuth = true;
   }
   if (shouldForceNoGL() || !defaultGlProbe().ok) {
     showBootGlFail();
@@ -3717,9 +3715,7 @@ function startGame() {
   } catch {
     /* query parsing failed; stay offline */
   }
-  game.load().then(() => {
-    if (pendingWorldAuth) game.showWorldAuth();
-  }).catch((e) => {
+  game.load().catch((e) => {
     console.error(e);
     if (isWebGLFailure(e)) {
       showBootGlFail();
