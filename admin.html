@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#070d16" />
+    <title>Guild Ledger — Monster Gate</title>
+    <link rel="icon" href="./favicon.ico" sizes="any" />
+    <script type="module" crossorigin src="/assets/admin-RD4umorn.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/gate-CMfOGSrw.js">
+    <link rel="stylesheet" crossorigin href="/assets/gate-BD2OhcJF.css">
+    <link rel="stylesheet" crossorigin href="/assets/admin-BlJOFfJA.css">
+  </head>
+  <body>
+    <div id="gate" class="gate">
+      <div class="gate-card mg-frame">
+        <h1>MONSTER <em>GATE</em></h1>
+        <p class="lede">Guild ledger. This gate keeps the record. It does not enter the hunt.</p>
+        <form id="login" novalidate>
+          <label class="wg-label" for="email">Email</label>
+          <input id="email" class="account-input" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required />
+          <label class="wg-label" for="password">Password</label>
+          <input id="password" class="account-input" name="password" type="password" autocomplete="current-password" maxlength="72" required />
+          <p id="login-error" class="account-error" role="alert"></p>
+          <button class="start" type="submit">Open the ledger</button>
+        </form>
+        <a class="back" id="back" href="./">Return to the hunt</a>
+      </div>
+    </div>
+
+    <div id="app" class="shell hidden">
+      <header class="top">
+        <div class="brand">
+          <b>MONSTER <em>GATE</em></b>
+          <span>Guild ledger</span>
+        </div>
+        <span id="who" class="who"></span>
+        <button type="button" class="mini" id="refresh">Refresh</button>
+        <button type="button" class="mini" id="hold" aria-pressed="false">Live</button>
+        <button type="button" class="mini" id="signout">Sign out</button>
+      </header>
+      <div class="tools">
+        <input id="q" type="search" placeholder="Search hunters" autocomplete="off" spellcheck="false" maxlength="64" aria-label="Search hunters" />
+        <div id="windows" class="seg-row"></div>
+        <div id="chips" class="chips"></div>
+        <span id="note" class="note"></span>
+      </div>
+      <p id="banner" class="banner hidden" role="alert"></p>
+      <div class="work">
+        <nav id="rail" class="rail" aria-label="Ledger">
+          <button type="button" data-tab="ledger"><kbd>1</kbd>Ledger</button>
+          <button type="button" data-tab="hunters"><kbd>2</kbd>Hunters</button>
+          <button type="button" data-tab="coffers"><kbd>3</kbd>Coffers</button>
+          <button type="button" data-tab="bestiary"><kbd>4</kbd>Bestiary</button>
+          <button type="button" data-tab="paths"><kbd>5</kbd>Paths</button>
+        </nav>
+        <div id="board" class="board">
+          <div id="stage" class="stage"></div>
+          <div id="drawer"></div>
+        </div>
+      </div>
+      <footer class="keys">
+        <span><kbd>1-5</kbd> pages</span>
+        <span><kbd>/</kbd> search</span>
+        <span><kbd>J K</kbd> hunters</span>
+        <span><kbd>F</kbd> span</span>
+        <span><kbd>R</kbd> refresh</span>
+        <span><kbd>Esc</kbd> close</span>
+        <span>Guest hunts stay on the device.</span>
+      </footer>
+    </div>
+  </body>
+</html>
