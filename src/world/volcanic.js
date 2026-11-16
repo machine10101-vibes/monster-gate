@@ -57,7 +57,9 @@ export const VOLCANIC_SPECS = {
     rim: { n: true, w: true },
     cone: { cx: 58, cz: 56, r: 44, top: 17, crater: 10 },
     knolls: [[116, 112, 8, 3.2], [118, 36, 7, 2.6], [30, 116, 8, 2.8]],
-    lava: [[108, 88, 6], [28, 100, 5.5]],
+    lava: [[108, 88, 6], [120, 36, 5.5]],
+    // South shoulder of the cone, past the old height-9 wall and clear of the crater.
+    lair: { cx: 58, cz: 72 },
     roads: [[[143, 72], [112, 84], [84, 108], [72, 143]]],
     dress: { ash: 24, thorns: 14, blooms: 24, spires: 8, rocks: 30, boulders: 12, mounds: 16, vents: 6, logs: 4, bones: 3 },
   },
@@ -292,6 +294,7 @@ export function dressVolcanic(world, land, spec) {
     const i = lz * W + lx;
     const h = data.H[i];
     const t = data.top[i];
+    if (spec.lair && Math.hypot(lx - spec.lair.cx, lz - spec.lair.cz) < 8) return false;
     return !data.pathMask[i] && h >= lo && h <= hi && t !== TILE.LAVA && !reserved(lx, lz);
   };
   const scatter = (count, tag, tries, fn) => {
@@ -316,6 +319,16 @@ export function dressVolcanic(world, land, spec) {
       const a = (k / 7) * TAU + 0.3;
       place(V.rocks[k % V.rocks.length], Math.round(lx + Math.cos(a) * r * 1.25), Math.round(lz + Math.sin(a) * r * 1.25), a, 0.8 + (k % 3) * 0.25, { r: 1, collide: 0.5, occ: 0.8 });
     }
+  }
+  if (spec.lair) {
+    const L = spec.lair;
+    const x = land.x0 + L.cx + 0.5;
+    const z = land.z0 + L.cz + 0.5;
+    // The nest sits on the slope itself. A moat or a ring of solid spires here
+    // was the wall that stopped the climb short of Volcanum.
+    world.volcanumLair = { x, z, r: 8 };
+    world.lightSpots.push({ x, y: world.heightAt(x, z) + 4, z, color: 0xff6a1a });
+    world.lightSpots.push({ x: x + 4, y: world.heightAt(x, z) + 2, z: z + 3, color: 0xff5a12 });
   }
   if (spec.cone) {
     const { cx, cz, crater } = spec.cone;

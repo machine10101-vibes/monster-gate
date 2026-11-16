@@ -173,7 +173,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? (spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'tiger' || spec.id === 'raptor' ? 0.78 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'volcanum' ? 0.52 : spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'tiger' || spec.id === 'raptor' ? 0.78 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 

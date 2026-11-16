@@ -4,6 +4,7 @@ import { W, generateTile } from '../src/world/terrain.js';
 import { SOUTH_Z, generateSouthford, openSouthPass } from '../src/world/southford.js';
 import { openSouthfordDesert } from '../src/world/desert.js';
 import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.js';
+import { VOLCANIC_SPECS } from '../src/world/volcanic.js';
 import { World } from '../src/world/world.js';
 import { TILE } from '../src/engine/materials.js';
 
@@ -77,6 +78,13 @@ test('a hunter can climb the Cinderfall cone past the old height wall', () => {
     const got = climb(w, sx, sz, gx, gz);
     assert.ok(got.max >= 12, `from ${lx},${lz} stopped at ${got.max.toFixed(1)} (${(got.x - land.x0).toFixed(1)},${(got.z - land.z0).toFixed(1)})`);
   }
+
+  const nest = VOLCANIC_SPECS.cinderfall.lair;
+  const [nx, nz] = at(nest.cx, nest.cz);
+  assert.equal(w.canStep(nx, nz, w.heightAt(nx, nz + 1)), true, 'the step onto Volcanum is sealed');
+  assert.ok(w.heightAt(nx, nz) >= 9, `Volcanum is still below the old wall (${w.heightAt(nx, nz)})`);
+  const fromSouth = climb(w, ...at(58, 130), nx, nz);
+  assert.ok(Math.hypot(fromSouth.x - nx, fromSouth.z - nz) < 3, `south climb stopped at ${(fromSouth.x - land.x0).toFixed(1)},${(fromSouth.z - land.z0).toFixed(1)} h=${fromSouth.max.toFixed(1)}`);
 
   // The cell just above the old cap is a half step, and it has to accept the body.
   const [bx, bz] = at(59, 78);

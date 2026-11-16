@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { VOLC } from '../data/volcanum.js';
 import { YETI } from '../data/yeti.js';
 import { holyHammerVoxels, demonSwordVoxels, demonShieldVoxels } from './knightWeapons.js';
 import { jungleWeapons, jungleShield, jungleBook, JUNGLE_DUAL, JUNGLE_TALL, JUNGLE_EDGE, JUNGLE_SHIELD_SETS, JUNGLE_BOOK_SETS } from './weaponsJungle.js';
@@ -14,9 +15,9 @@ const J = (c, x, y, z, s = 0, a = 0.04) => jitter(c, a, hash3(x, y, z, s));
 const lerp = (a, b, t) => a + (b - a) * t;
 
 /** Held kinds that wield a matching blade in each hand. */
-export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual', 'yetidual', ...JUNGLE_DUAL]);
+export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual', 'yetidual', 'volcdual', ...JUNGLE_DUAL]);
 /** Held kinds whose model is taller than wide (bows). */
-export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow', ...JUNGLE_TALL]);
+export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow', 'volcbow', 'volcshortbow', ...JUNGLE_TALL]);
 
 /**
  * Swords are sculpted flat in the horizontal plane. Rolled a quarter turn,
@@ -26,6 +27,7 @@ const EDGE_HOLD = new Set([
   'blade', 'dual',
   'budgeblade', 'budgegreatsword', 'budgedual',
   'darksword', 'darkgreatsword', 'darkdual',
+  'volcsword', 'volcgreatsword', 'volcdual',
   'orcblade',
   'yetisword', 'yetigreatsword', 'yetidual',
   'demonsword',
@@ -39,7 +41,7 @@ const EDGE_HOLD = new Set([
  * The same quarter roll that stands a sword on its edge stands that bar
  * up and down. The iron mallet's face is already taller than it is wide.
  */
-const HAMMER_HOLD = new Set(['budgemaul', 'darkhammer', 'yetihammer', 'holyhammer']);
+const HAMMER_HOLD = new Set(['budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer']);
 
 /**
  * Resting roll of a weapon in the hand, around the grip.
@@ -96,6 +98,11 @@ const THEMES = {
     wrap: 0x3d3378, wrapLo: 0x2b2450, wrapHi: 0x6a5cb8, blade: DARK.blade, edge: DARK.edge, dark: DARK.bladeDark,
     guard: DARK.trim, guardHi: DARK.blade, glow: DARK.glow, glow2: DARK.glowHi, wood: 0x3d3378, string: DARK.glow,
     membrane: DARK.membrane, membraneHi: DARK.membraneHi, claw: DARK.claw, horn: DARK.blade, hornDark: DARK.bladeDark,
+  },
+  volcanum: {
+    wrap: VOLC.scale, wrapLo: VOLC.scaleLo, wrapHi: VOLC.scaleHi, blade: VOLC.scaleHi, edge: VOLC.edge, dark: VOLC.scaleLo,
+    guard: VOLC.trim, guardHi: VOLC.glow, glow: VOLC.glow, glow2: VOLC.glowHi, wood: 0x2a1810, string: VOLC.glow,
+    membrane: VOLC.membrane, membraneHi: VOLC.membraneHi, claw: VOLC.claw, horn: VOLC.scaleHi, hornDark: VOLC.scale,
   },
   frost: {
     wrap: 0x8fb0cf, wrapLo: 0x5d84ac, wrapHi: 0xcfe6f6, blade: 0xa9dcff, edge: 0xf2fbff, dark: 0x5d84ac,
@@ -373,6 +380,12 @@ const SWORDS = {
     }),
   darksword: () =>
     sword(THEMES.dark, { guardHalf: 11, sweep: 5, cap: 'fang', gem: THEMES.dark.glow2, pgem: THEMES.dark.glow2, b: { z1: 93, w0: 10, curve: 10, exp: 2.2, fuller: 'glow', glowEvery: 5, runes: 7, tip: 0.74 } }),
+  volcsword: () =>
+    sword(THEMES.volcanum, { guardHalf: 11, sweep: 5, cap: 'fang', gem: THEMES.volcanum.glow2, pgem: THEMES.volcanum.glow2, b: { z1: 96, w0: 11, curve: 8, exp: 2.1, fuller: 'glow', glowEvery: 4, serr: 5, tip: 0.74 } }),
+  volcgreatsword: () =>
+    sword(THEMES.volcanum, { g0: -10, g1: 28, gr: 2.4, guardHalf: 16, sweep: 6, cap: 'fang', pommel: 'claw', gem: THEMES.volcanum.glow2, pgem: THEMES.volcanum.glow2, b: { z1: 124, w0: 15, curve: 8, exp: 2.2, fuller: 'glow', glowEvery: 4, serr: 5, tip: 0.78 } }),
+  volcdual: () =>
+    sword(THEMES.volcanum, { g0: -4, g1: 8, gr: 1.8, guardHalf: 8, sweep: 4, cap: 'fang', pommel: 'ball', pgem: THEMES.volcanum.glow2, b: { z1: 64, w0: 7, curve: 14, exp: 1.7, tip: 0.5, thick: 2, fuller: 'glow', glowEvery: 4 } }),
   yetisword: () =>
     sword(THEMES.frost, { guardHalf: 11, sweep: 4, cap: 'fang', pommel: 'claw', gem: THEMES.frost.glow2, pgem: THEMES.frost.glow2, b: { z1: 94, w0: 11, curve: 8, exp: 2, fuller: 'glow', glowEvery: 4, serr: 6, tip: 0.76 } }),
   yetigreatsword: () =>
@@ -419,7 +432,7 @@ function blockHead(c, T, o) {
 
 function maul(T, o) {
   const c = ctx();
-  const dark = T === THEMES.dark || T === THEMES.frost;
+  const dark = T === THEMES.dark || T === THEMES.frost || T === THEMES.volcanum;
   haft(c, T, -14, 62, 2, T.wood, 0);
   wrapRod(c, T, -12, 26, 2.2);
   for (const z of [-12, 26, 40]) ringAt(c, z, 2.2, T.guard, z & 3);
@@ -663,8 +676,7 @@ function budgeStaff() {
   return c.done();
 }
 
-function darkStaff() {
-  const T = THEMES.dark;
+function darkStaff(T = THEMES.dark) {
   const c = ctx();
   haft(c, T, -14, 82, 2, T.wrapLo, 0);
   wrapRod(c, T, -6, 24, 2.2);
@@ -706,8 +718,7 @@ function budgeWand() {
   return c.done();
 }
 
-function darkWand() {
-  const T = THEMES.dark;
+function darkWand(T = THEMES.dark) {
   const c = ctx();
   wrapRod(c, T, -6, 20, 1.8);
   ringAt(c, -6, 1.8, T.guard, 1);
@@ -859,8 +870,10 @@ const BOWS = {
   bow: () => bow(THEMES.iron, { L: 34, D: 15, recurve: 4, style: 'wood' }),
   budgebow: () => bow(THEMES.budge, { L: 40, D: 20, recurve: 6, style: 'horn' }),
   darkbow: () => bow(THEMES.dark, { L: 44, D: 22, recurve: 7, style: 'dark' }),
+  volcbow: () => bow(THEMES.volcanum, { L: 46, D: 22, recurve: 7, style: 'dark' }),
   budgeshortbow: () => bow(THEMES.budge, { L: 32, D: 14, recurve: 5, style: 'horn', grip: 5 }),
   darkshortbow: () => bow(THEMES.dark, { L: 32, D: 14, recurve: 5, style: 'dark', grip: 5 }),
+  volcshortbow: () => bow(THEMES.volcanum, { L: 32, D: 14, recurve: 5, style: 'dark', grip: 5 }),
   yetilongbow: () => bow(THEMES.frost, { L: 44, D: 21, recurve: 7, style: 'horn' }),
   yetishortbow: () => bow(THEMES.frost, { L: 32, D: 14, recurve: 5, style: 'horn', grip: 5 }),
 };
@@ -1007,7 +1020,13 @@ const BUILDERS = {
   crossbow: () => crossbow(THEMES.iron, 'iron'),
   budgemaul: () => maul(THEMES.budge),
   darkhammer: () => maul(THEMES.dark),
+  volchammer: () => maul(THEMES.volcanum),
   darkscythe: scythe,
+  volcscythe: () => scythe(THEMES.volcanum),
+  volcspear: () => spear(THEMES.volcanum, false),
+  volcstaff: () => darkStaff(THEMES.volcanum),
+  volcwand: () => darkWand(THEMES.volcanum),
+  volccrossbow: () => crossbow(THEMES.volcanum, 'dark'),
   budgespear: () => spear(THEMES.budge, true),
   darkspear: () => spear(THEMES.dark, false),
   budgestaff: budgeStaff,
@@ -1036,6 +1055,7 @@ export function buildWeaponVoxels(kind) {
 const themeOf = (setId) => {
   if (METAL_SET_IDS.includes(setId)) return THEMES[setId] || THEMES.iron;
   if (setId.startsWith('dark')) return THEMES.dark;
+  if (setId.startsWith('volc')) return THEMES.volcanum;
   if (setId.startsWith('yeti')) return THEMES.frost;
   return THEMES.budge;
 };
@@ -1045,7 +1065,7 @@ export function buildShieldModel(setId) {
   if (setId === 'demonset') return demonShieldVoxels();
   if (JUNGLE_SHIELD_SETS.has(setId)) return jungleShield(KIT, setId);
   const T = themeOf(setId);
-  const dark = T === THEMES.dark || T === THEMES.frost;
+  const dark = T === THEMES.dark || T === THEMES.frost || T === THEMES.volcanum;
   const c = ctx();
   const R = 24;
   for (let z = 0; z < 48; z++)
@@ -1093,7 +1113,7 @@ export function buildShieldModel(setId) {
 export function buildBookModel(setId) {
   if (JUNGLE_BOOK_SETS.has(setId)) return jungleBook(KIT, setId);
   const T = themeOf(setId);
-  const dark = T === THEMES.dark || T === THEMES.frost;
+  const dark = T === THEMES.dark || T === THEMES.frost || T === THEMES.volcanum;
   const c = ctx();
   const W = 11;
   const Ln = 32;
