@@ -1302,6 +1302,14 @@ body.touch #top-right {
 #loading.gl-failed .load-embers,
 #loading.gl-failed .load-runes {
   display: none;
+  pointer-events: none;
+}
+#loading.gl-failed {
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+#loading.gl-failed > :not(#gl-fail) {
+  pointer-events: none;
 }
 #gl-fail.hidden,
 #gl-fail[hidden] {
@@ -1309,6 +1317,14 @@ body.touch #top-right {
 }
 #loading.gl-failed #gl-fail {
   display: block;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+#gl-fail-retry,
+#gl-fail .start {
+  touch-action: manipulation;
+  pointer-events: auto;
+  min-height: 44px;
 }
 #gl-fail .gl-fail-status {
   min-height: 1.3em;

@@ -685,15 +685,25 @@ h1 em,
 #loading.gl-failed .load-runes {
   display: none;
 }
+#loading.gl-failed {
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+#loading.gl-failed > :not(#gl-fail) {
+  pointer-events: none;
+}
 #gl-fail {
   display: none;
+  position: relative;
   width: min(420px, 90vw);
   padding: 0 12px;
   pointer-events: auto;
-  z-index: 6;
+  touch-action: manipulation;
+  z-index: 8;
 }
 #loading.gl-failed #gl-fail {
   display: block;
+  pointer-events: auto;
 }
 .gl-fail-card {
   padding: 22px 20px 18px;
@@ -728,12 +738,19 @@ h1 em,
   left: 0;
   color: var(--mg-gold-hi);
 }
-#gl-fail .start {
+#gl-fail .start,
+#gl-fail-retry {
   animation: none;
+  position: relative;
+  z-index: 2;
   width: min(260px, 100%);
   min-height: 48px;
+  min-width: 44px;
+  touch-action: manipulation;
+  pointer-events: auto;
 }
-#gl-fail .start:disabled {
+#gl-fail .start:disabled,
+#gl-fail-retry:disabled {
   opacity: 0.65;
   cursor: wait;
 }
