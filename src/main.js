@@ -1796,7 +1796,10 @@ class Game {
       return false;
     }
     const was = this.progress.worn(id);
-    this.progress.toggleWear(id);
+    if (this.progress.toggleWear(id) === false) {
+      this.hud.toast(INVENTORY_FULL, 1400);
+      return false;
+    }
     this.applyGear();
     if (g.type === 'weapon') this.selectSlot(0, true);
     this.audio.select();
@@ -3109,9 +3112,18 @@ class Game {
       this.hud.toast('That is already in the crate', 1400);
       return false;
     }
-    if (!pr.canFitStorage(k, id, n)) {
-      this.hud.toast('The crate is full', 1400);
-      return false;
+    const asked = n;
+    if (k === 'gear') {
+      if (!pr.canFitStorage(k, id, n)) {
+        this.hud.toast('The crate is full', 1400);
+        return false;
+      }
+    } else {
+      n = pr.roomInStorage(k, id, n);
+      if (n < 1) {
+        this.hud.toast('The crate is full', 1400);
+        return false;
+      }
     }
     const refund = () => {
       if (k === 'good') pr.addGood(id, n);
@@ -3133,7 +3145,18 @@ class Game {
       if (!pr.crafted(id)) return false;
       const g = gearById(id);
       if (pr.worn(id)) {
-        pr.toggleWear(id);
+        const freeing = g?.slot === 'quiver' ? 1 : 0;
+        if (freeing && !pr.quiverFitsBag(freeing)) {
+          this.hud.toast(INVENTORY_FULL, 1400);
+          return false;
+        }
+        if (freeing && !pr.quiverFitsBag()) {
+          pr.data.armor.quiver = null;
+          pr.dumpQuiver();
+        } else if (pr.toggleWear(id) === false) {
+          this.hud.toast(INVENTORY_FULL, 1400);
+          return false;
+        }
         this.applyGear();
         if (g?.type === 'weapon') this.selectSlot(0, true);
       }
@@ -3149,6 +3172,7 @@ class Game {
       this.hud.toast('The crate is full', 1400);
       return false;
     }
+    if (n < asked) this.hud.toast('The crate is full', 1400);
     this.audio.select();
     return true;
   }

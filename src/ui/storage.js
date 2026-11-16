@@ -241,7 +241,7 @@ export function mountStorage(body, game) {
         i.textContent = it.badge;
         b.appendChild(i);
       }
-      if (touch) bindHold(b, { name: it.name, max: it.n, verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n), done: () => paint() });
+      if (touch) bindHold(b, { name: it.name, max: carriedCount(game, it), verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n), done: () => paint() });
       else b.onclick = () => {
         sel = it.key;
         paint();
@@ -252,18 +252,19 @@ export function mountStorage(body, game) {
 
     const current = list.find((it) => it.key === sel);
     if (!touch && current) {
+      const total = carriedCount(game, current);
       const row = document.createElement('div');
       row.className = 'bag-acts';
       const all = document.createElement('button');
       all.type = 'button';
       all.className = 'bag-act';
-      all.textContent = current.n > 1 ? 'Store all' : 'Store';
+      all.textContent = total > 1 ? 'Store all' : 'Store';
       all.onclick = () => {
-        game.storeInCrate(current.k, current.id, current.n);
+        game.storeInCrate(current.k, current.id, total);
         paint();
       };
       row.appendChild(all);
-      if (current.n > 1) {
+      if (total > 1) {
         const one = document.createElement('button');
         one.type = 'button';
         one.className = 'bag-act';
@@ -302,7 +303,7 @@ export function mountStorage(body, game) {
         if (touch) {
           bindHold(b, {
             name: labelOf(s),
-            max: s.n,
+            max: game.progress.data.storage[s.src]?.n || s.n,
             verb: 'Take',
             run: (n) => game.takeFromCrate(s.src, n),
             done: () => paint(),
@@ -317,18 +318,19 @@ export function mountStorage(body, game) {
     right.appendChild(hold);
     const picked = slot != null ? cells[slot] : null;
     if (!touch && picked) {
+      const storedN = game.progress.data.storage[picked.src]?.n || picked.n;
       const row = document.createElement('div');
       row.className = 'bag-acts';
       const all = document.createElement('button');
       all.type = 'button';
       all.className = 'bag-act';
-      all.textContent = picked.n > 1 ? 'Take all' : 'Take';
+      all.textContent = storedN > 1 ? 'Take all' : 'Take';
       all.onclick = () => {
-        game.takeFromCrate(picked.src, picked.n);
+        game.takeFromCrate(picked.src, storedN);
         paint();
       };
       row.appendChild(all);
-      if (picked.n > 1) {
+      if (storedN > 1) {
         const one = document.createElement('button');
         one.type = 'button';
         one.className = 'bag-act';
@@ -353,6 +355,13 @@ export function mountStorage(body, game) {
     clearPending();
     closeAsk();
   };
+}
+
+function carriedCount(game, it) {
+  if (it.k === 'good') return game.progress.good(it.id);
+  if (it.k === 'part') return game.progress.count(it.id);
+  if (it.k === 'potion') return game.items.find((i) => i.id === it.id)?.count | 0;
+  return it.n;
 }
 
 function collect(game) {

@@ -7,6 +7,7 @@ import { readJson, savesFrozen } from './saveio.js';
 import { huntSavePayload, stripDebugGrantedInPlace } from '../debug/transient.js';
 import {
   BAG_SLOTS,
+  MAX_STACK,
   bagSlotsFrom,
   roomForCount,
   stackSlots,
@@ -311,9 +312,10 @@ export class Progress {
 
   toggleWear(id) {
     const g = gearById(id);
-    if (!g || !this.crafted(id)) return;
+    if (!g || !this.crafted(id)) return false;
     const off = this.worn(id);
-    if (!off && !this.meetsReq(g)) return;
+    if (!off && !this.meetsReq(g)) return false;
+    if (g.slot === 'quiver' && off && !this.quiverFitsBag()) return false;
     if (g.type === 'armor') this.data.armor[g.slot] = off ? null : id;
     else this.data.weapon = off ? null : id;
     this.save();
@@ -324,6 +326,7 @@ export class Progress {
         this.refillQuiver();
       }
     }
+    return true;
   }
 
   /**
@@ -334,7 +337,7 @@ export class Progress {
     if (!id || id === 'knife' || !this.crafted(id) || this.storedGear(id)) return false;
     const g = gearById(id);
     if (!g) return false;
-    if (this.worn(id)) this.toggleWear(id);
+    if (this.worn(id) && !this.toggleWear(id)) return false;
     delete this.data.crafted[id];
     this.save();
     return true;
@@ -739,19 +742,32 @@ export class Progress {
     return n;
   }
 
+  /**
+   * True when every loaded arrow can return to the bag without passing 40 slots.
+   * `extraSlots` covers a quiver that is about to leave the bag, freeing its slot.
+   */
+  quiverFitsBag(extraSlots = 0) {
+    const load = this.data.quiverLoad;
+    if (!load?.id || !(load.n > 0)) return true;
+    const free = Math.max(0, BAG_SLOTS - this.bagSlotsUsed()) + (extraSlots | 0);
+    return roomForCount(this.good(load.id), free) >= load.n;
+  }
+
   /** Put the chosen arrow into the quiver, up to 99, pulling from the bag. */
   refillQuiver() {
-    if (this._filling || !this.data.armor?.quiver) return;
+    if (this._filling || !this.data.armor?.quiver) return true;
     this._filling = true;
     try {
       const type = this.data.ammo;
-      if (!type || !ARROW_TYPES.includes(type)) return;
+      if (!type || !ARROW_TYPES.includes(type)) return true;
       const load = this.data.quiverLoad;
       const before = load.n;
       const ammoBefore = this.data.ammo;
       if (load.id && load.id !== type && load.n > 0) {
+        if (this.roomFor('good', load.id) < load.n) return false;
         this.data.goods[load.id] = this.good(load.id) + load.n;
         load.n = 0;
+        load.id = null;
       }
       load.id = type;
       this.data.ammo = type;
@@ -759,36 +775,50 @@ export class Progress {
       const take = Math.min(room, this.good(type));
       if (take > 0) {
         this.data.goods[type] = this.good(type) - take;
+        if (!this.data.goods[type]) delete this.data.goods[type];
         load.n += take;
       }
       if (load.n !== before || ammoBefore !== type) this.save();
+      return true;
     } finally {
       this._filling = false;
     }
   }
 
-  /** Empty the quiver back into the bag. The chosen arrow type stays selected. */
+  /** Empty the quiver back into the bag. Arrows that do not fit stay loaded. */
   dumpQuiver() {
     this._filling = true;
     const load = this.data.quiverLoad;
-    if (load?.id && load.n > 0) this.data.goods[load.id] = this.good(load.id) + load.n;
-    this.data.quiverLoad = { id: null, n: 0 };
+    if (load?.id && load.n > 0) {
+      const back = Math.min(load.n, this.roomFor('good', load.id));
+      if (back > 0) this.data.goods[load.id] = this.good(load.id) + back;
+      load.n -= back;
+      if (load.n <= 0) {
+        load.n = 0;
+        load.id = null;
+      }
+    }
     this._filling = false;
     this.save();
+    return !(this.data.quiverLoad.n > 0);
   }
 
   /** Choose which arrow the quiver draws. The same choice again clears it. */
   setAmmo(id) {
-    if (!ARROW_TYPES.includes(id)) return;
+    if (!ARROW_TYPES.includes(id)) return false;
     if (this.data.ammo === id) {
+      if (!this.quiverFitsBag()) return false;
       this.dumpQuiver();
       this.data.ammo = null;
       this.save();
-      return;
+      return true;
     }
+    const load = this.data.quiverLoad;
+    if (load?.id && load.id !== id && load.n > 0 && this.roomFor('good', load.id) < load.n) return false;
     this.data.ammo = id;
     this.refillQuiver();
     this.save();
+    return true;
   }
 
   hasArrow() {
@@ -817,6 +847,19 @@ export class Progress {
 
   storageUsed() {
     return this.data.storage.reduce((n, s) => n + storageStackSlots(s), 0);
+  }
+
+  /** How many of this stack the crate can still take. Gear is 1 or 0. */
+  roomInStorage(k, id, n = 1) {
+    n = n | 0;
+    if (n < 1) return 0;
+    if (k === 'gear') return this.canFitStorage(k, id, 1) ? 1 : 0;
+    const have = this.data.storage.find((s) => s && s.k === k && s.id === id);
+    if (!have && !this.data.storage.some((s) => !s)) return 0;
+    const current = have?.n | 0;
+    const partial = current % MAX_STACK === 0 ? 0 : MAX_STACK - (current % MAX_STACK);
+    const free = Math.max(0, STORAGE_SLOTS - this.storageUsed());
+    return Math.min(n, partial + free * MAX_STACK);
   }
 
   canFitStorage(k, id, n = 1) {

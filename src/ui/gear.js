@@ -1,6 +1,7 @@
 import { GEAR, SLOT_LABEL, TIER_LABEL, gearById, setById } from '../data/catalog.js';
 import { STYLE_LABEL } from '../data/skills.js';
 import { ARROW_TYPES, GOODS, QUIVER_MAX } from '../data/gathering.js';
+import { INVENTORY_FULL } from '../systems/stacks.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
 const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
@@ -306,7 +307,7 @@ export function mountGear(body, game) {
       tag.textContent = on ? 'Clear' : 'Select';
       item.append(info, tag);
       item.onclick = () => {
-        pr.setAmmo(id);
+        if (pr.setAmmo(id) === false) game.hud.toast(INVENTORY_FULL, 1400);
         openSlot = null;
         paint();
       };
