@@ -1,7 +1,7 @@
 /**
  * The guild master signs into the ledger. That account does not enter the hunt.
- * Moderators are hunters who can also open /admin.html. The admins table is the lock.
- * This email only chooses the hunt redirect. Keep it the same as ADMIN_EMAIL in the ledger.
+ * Moderators hunt like everyone else. Their extra tool is World Creator.
+ * The admins table is the lock. This email only chooses the hunt redirect.
  */
 
 export const ADMIN_EMAIL = 'monstergateonline@gmail.com';
@@ -12,6 +12,14 @@ export function isAdminEmail(email) {
 
 export function isAdminAccount(session) {
   return !!session && session.kind === 'email' && isAdminEmail(session.email);
+}
+
+export function readStaffRole(value) {
+  return String(value || '').trim().toLowerCase() === 'moderator' ? 'moderator' : '';
+}
+
+export function canCreateWorld(staffRole) {
+  return readStaffRole(staffRole) === 'moderator';
 }
 
 function basePath() {

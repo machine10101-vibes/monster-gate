@@ -6,6 +6,8 @@
  * guild record was connected can still be opened on this browser.
  */
 
+import { readStaffRole } from '../admin/gate.js';
+
 const BOOK_KEY = 'monster-gate-accounts-v1';
 const SESSION_KEY = 'monster-gate-account-session';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -412,10 +414,12 @@ export async function syncEmailHunt(session, progress, gate = { open: true }) {
     }
     : null;
   const { reconcileHunt } = await import('./cloud.js');
-  return reconcileHunt(progress, remote, () => {
+  const staff = readStaffRole(res.json?.staff);
+  const result = await reconcileHunt(progress, remote, () => {
     if (!gate.open) return Promise.resolve({ abandoned: true });
     return pushEmailHunt(session, progress.data);
   });
+  return { ...result, staff };
 }
 
 export async function pushEmailHunt(session, data, keepalive = false) {

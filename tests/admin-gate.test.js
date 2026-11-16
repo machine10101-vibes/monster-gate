@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { adminHref, gameHref, isAdminAccount } from '../src/admin/gate.js';
+import { adminHref, canCreateWorld, gameHref, isAdminAccount, readStaffRole } from '../src/admin/gate.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -55,7 +55,14 @@ test('the guild master is sent to the ledger before a hunt can start', () => {
   assert.match(adminMain, /documentElement\.classList\.add\('ledger'\)/);
   assert.match(adminMain, /dataset.promote/);
   assert.match(adminMain, /changeStaff/);
-  assert.doesNotMatch(adminMain, /isAdminAccount/);
+  assert.match(adminMain, /isAdminAccount/);
+  assert.match(adminMain, /location\.replace\(gameHref\(\)\)/);
+  assert.match(src('../src/ui/hud.js'), /canCreateWorld\(game\.staffRole\)/);
+  assert.match(src('../src/ui/hud.js'), /World Creator/);
+  assert.match(src('../src/ui/hud.js'), /if \(canCreateWorld\(game\.staffRole\)\)/);
+  assert.match(hunter, /staffKind/);
+  assert.match(hunter, /role === "moderator"/);
+  assert.match(hunter, /staff,/);
   assert.match(css, /html\.ledger/);
   assert.match(css, /overflow-y:\s*auto/);
   assert.match(css, /touch-action:\s*pan-y/);
@@ -72,4 +79,9 @@ test('the guild master is sent to the ledger before a hunt can start', () => {
   assert.equal(isAdminAccount({ kind: 'email', email: 'bram@hunt.test' }), false);
   assert.equal(isAdminAccount({ kind: 'guest', email: 'monstergateonline@gmail.com' }), false);
   assert.equal(isAdminAccount(null), false);
+  assert.equal(readStaffRole('moderator'), 'moderator');
+  assert.equal(readStaffRole('master'), '');
+  assert.equal(canCreateWorld('moderator'), true);
+  assert.equal(canCreateWorld(''), false);
+  assert.equal(canCreateWorld('master'), false);
 });

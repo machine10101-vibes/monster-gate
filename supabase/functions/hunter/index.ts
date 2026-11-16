@@ -52,17 +52,24 @@ async function accountUser(accessToken: unknown): Promise<{ id: string; email: s
   return { id, email };
 }
 
-async function keepsLedger(admin: Admin, email: string): Promise<boolean> {
+async function staffKind(admin: Admin, email: string): Promise<"master" | "moderator" | ""> {
   const { data, error } = await admin.from("admins").select("email, role").eq("email", email).maybeSingle();
-  if (error || !data) return false;
+  if (error || !data) return "";
   const role = String(data.role || "master").trim().toLowerCase();
-  return email === ADMIN_EMAIL || role === "master" || role === "";
+  if (email === ADMIN_EMAIL || role === "master" || role === "") return "master";
+  if (role === "moderator") return "moderator";
+  return "";
+}
+
+async function keepsLedger(admin: Admin, email: string): Promise<boolean> {
+  return (await staffKind(admin, email)) === "master";
 }
 
 async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise<Response> {
   const user = await accountUser(body.accessToken);
   if (user instanceof Response) return user;
-  if (await keepsLedger(admin, user.email)) return json({ progress: null, revision: 0, savedAt: 0 });
+  const staff = await staffKind(admin, user.email);
+  if (staff === "master") return json({ progress: null, revision: 0, savedAt: 0, staff: "master" });
   const { data, error } = await admin
     .from("hunter_accounts")
     .select("progress, revision")
@@ -70,11 +77,12 @@ async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise
     .maybeSingle();
   if (error) return json({ error: "The guild record could not be opened." }, 503);
   const row = data as { progress?: Record<string, unknown>; revision?: number | string } | null;
-  if (!row?.progress) return json({ progress: null, revision: 0, savedAt: 0 });
+  if (!row?.progress) return json({ progress: null, revision: 0, savedAt: 0, staff });
   return json({
     progress: row.progress,
     revision: Number(row.revision) || 0,
     savedAt: Number(row.progress.savedAt) || 0,
+    staff,
   });
 }
 
