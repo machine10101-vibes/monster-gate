@@ -2,6 +2,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
 const MAX_BODY = 4096;
+const ADMIN_EMAIL = "monstergateonline@gmail.com";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(body: unknown, status = 200): Response {
@@ -15,6 +16,8 @@ type Admin = {
   from: (table: string) => any;
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
 };
+
+type Staff = { id: string; email: string; role: "master" | "moderator" };
 
 async function accountUser(accessToken: unknown): Promise<{ id: string; email: string } | Response> {
   if (typeof accessToken !== "string" || accessToken.length < 20 || accessToken.length > 8192) {
@@ -34,23 +37,65 @@ async function accountUser(accessToken: unknown): Promise<{ id: string; email: s
   return { id, email };
 }
 
-async function guildMaster(admin: Admin, accessToken: unknown): Promise<{ id: string; email: string } | Response> {
+function staffRole(email: string, role: unknown): "master" | "moderator" {
+  if (email === ADMIN_EMAIL) return "master";
+  return String(role || "").trim().toLowerCase() === "moderator" ? "moderator" : "master";
+}
+
+async function guildStaff(admin: Admin, accessToken: unknown): Promise<Staff | Response> {
   const user = await accountUser(accessToken);
   if (user instanceof Response) return user;
-  const { data, error } = await admin.from("admins").select("email").eq("email", user.email).maybeSingle();
+  const { data, error } = await admin.from("admins").select("email, role").eq("email", user.email).maybeSingle();
   if (error) return json({ error: "The ledger could not be opened." }, 503);
   if (!data) return json({ error: "This gate is for the guild master." }, 403);
+  return { id: user.id, email: user.email, role: staffRole(user.email, data.role) };
+}
+
+async function guildMaster(admin: Admin, accessToken: unknown): Promise<Staff | Response> {
+  const user = await guildStaff(admin, accessToken);
+  if (user instanceof Response) return user;
+  if (user.role !== "master") return json({ error: "Only the guild master can change staff." }, 403);
   return user;
 }
 
-async function overview(admin: Admin): Promise<Response> {
+function hunterId(raw: unknown): string {
+  const value = String(raw || "").trim();
+  const id = value.startsWith("acct:") ? value.slice(5) : value;
+  return UUID_RE.test(id) ? id : "";
+}
+
+async function overview(admin: Admin, role: "master" | "moderator"): Promise<Response> {
   const accounts = await admin.rpc("admin_account_facts");
   const wallets = await admin.rpc("admin_wallet_facts");
-  if (accounts.error || wallets.error) return json({ error: "The ledger could not be opened." }, 503);
+  const staff = await admin.from("admins").select("email, role");
+  if (accounts.error || wallets.error || staff.error) return json({ error: "The ledger could not be opened." }, 503);
   return json({
     accounts: Array.isArray(accounts.data) ? accounts.data : [],
     wallets: Array.isArray(wallets.data) ? wallets.data : [],
+    staff: Array.isArray(staff.data) ? staff.data : [],
+    role,
   });
+}
+
+async function changeStaff(admin: Admin, userId: string, role: "moderator" | ""): Promise<Response> {
+  const { data: hunt, error } = await admin.from("hunter_accounts").select("user_id, email").eq("user_id", userId).maybeSingle();
+  if (error) return json({ error: "The ledger could not be opened." }, 503);
+  if (!hunt) return json({ error: "That hunter is not on the record." }, 404);
+  const email = String(hunt.email || "").trim().toLowerCase();
+  if (!email || email === ADMIN_EMAIL) return json({ error: "The guild master cannot be changed here." }, 400);
+  const { data: existing, error: readError } = await admin.from("admins").select("email, role").eq("email", email).maybeSingle();
+  if (readError) return json({ error: "The ledger could not be opened." }, 503);
+  if (existing && staffRole(email, existing.role) === "master") {
+    return json({ error: "The guild master cannot be changed here." }, 400);
+  }
+  if (role === "moderator") {
+    const { error: writeError } = await admin.from("admins").upsert({ email, role: "moderator" }, { onConflict: "email" });
+    if (writeError) return json({ error: "The staff list could not be saved." }, 503);
+  } else {
+    const { error: writeError } = await admin.from("admins").delete().eq("email", email).eq("role", "moderator");
+    if (writeError) return json({ error: "The staff list could not be saved." }, 503);
+  }
+  return overview(admin, "master");
 }
 
 export default {
@@ -77,10 +122,19 @@ export default {
     } catch {
       return json({ error: "The request was not understood." }, 400);
     }
-    if (body.op !== "overview") return json({ error: "The request was not understood." }, 400);
     const admin = ctx.supabaseAdmin as unknown as Admin;
-    const user = await guildMaster(admin, body.accessToken);
-    if (user instanceof Response) return user;
-    return overview(admin);
+    if (body.op === "overview") {
+      const user = await guildStaff(admin, body.accessToken);
+      if (user instanceof Response) return user;
+      return overview(admin, user.role);
+    }
+    if (body.op === "promote" || body.op === "demote") {
+      const user = await guildMaster(admin, body.accessToken);
+      if (user instanceof Response) return user;
+      const userId = hunterId(body.userId);
+      if (!userId) return json({ error: "That hunter is not on the record." }, 400);
+      return changeStaff(admin, userId, body.op === "promote" ? "moderator" : "");
+    }
+    return json({ error: "The request was not understood." }, 400);
   }),
 };

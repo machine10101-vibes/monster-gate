@@ -309,11 +309,14 @@ function playerFrom(row, kind) {
   const email = kind === 'account' ? String(row.email || '').trim().toLowerCase() : '';
   const address = kind === 'wallet' ? String(row.address || '') : '';
   const id = kind === 'account' ? `acct:${row.user_id}` : `wallet:${address}`;
+  const userId = kind === 'account' ? String(row.user_id || '') : '';
   const updatedAt = stamp(row.updated_at || row.updatedAt) || Math.max(0, ...characters.map((c) => c.playedAt), stamp(progress?.savedAt));
   const createdAt = stamp(row.created_at || row.createdAt);
   return {
     id,
+    userId,
     kind,
+    role: '',
     name: lead?.name || (email || shortAddress(address) || 'Hunter'),
     email,
     address,
@@ -344,12 +347,32 @@ function shortAddress(address) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-export function buildLedger({ accounts = [], wallets = [] } = {}, now = Date.now()) {
+function staffRows(staff) {
+  const rows = [];
+  const seen = new Set();
+  for (const row of Array.isArray(staff) ? staff : []) {
+    const email = String(row?.email || '').trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    const role = String(row?.role || '').trim().toLowerCase() === 'moderator' ? 'moderator' : 'master';
+    rows.push({ email, role });
+  }
+  rows.sort((a, b) => a.email.localeCompare(b.email));
+  return rows;
+}
+
+export function buildLedger({ accounts = [], wallets = [], staff = [] } = {}, now = Date.now()) {
+  const staffList = staffRows(staff);
+  const masters = new Set(staffList.filter((row) => row.role === 'master').map((row) => row.email));
+  const roles = new Map(staffList.map((row) => [row.email, row.role]));
   const players = [];
   for (const row of accounts) {
     if (!row || !UUID_RE.test(String(row.user_id || ''))) continue;
-    if (isAdminEmail(row.email)) continue;
-    players.push(playerFrom(row, 'account'));
+    const email = String(row.email || '').trim().toLowerCase();
+    if (isAdminEmail(email) || masters.has(email)) continue;
+    const player = playerFrom(row, 'account');
+    player.role = roles.get(player.email) || '';
+    players.push(player);
   }
   for (const row of wallets) {
     const address = String(row?.address || '');
@@ -364,6 +387,7 @@ export function buildLedger({ accounts = [], wallets = [] } = {}, now = Date.now
       wallets: wallets.length,
       players: players.length,
     },
+    staff: staffList,
     players,
   };
 }
@@ -550,6 +574,7 @@ export function present(ledger, ui = {}) {
     view: derive(filtered, now),
     players: filtered,
     total: players.length,
+    staff: Array.isArray(ledger?.staff) ? ledger.staff : [],
     selected: players.find((player) => player.id === ui.selected) || null,
   };
 }

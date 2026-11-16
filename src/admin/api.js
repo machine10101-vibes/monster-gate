@@ -1,6 +1,6 @@
 /**
  * Opens the guild ledger. The publishable key only names the project.
- * The guild master's access token rides in the body, and the function checks the admins table.
+ * The signed-in access token rides in the body, and the function checks the admins table.
  */
 
 import { buildLedger } from '../../supabase/functions/_shared/ledger.js';
@@ -37,7 +37,18 @@ function fail(code, message) {
   return err;
 }
 
-export async function loadLedger(session) {
+function packLedger(json) {
+  if (!Array.isArray(json.accounts) || !Array.isArray(json.wallets)) return null;
+  const ledger = buildLedger({
+    accounts: json.accounts,
+    wallets: json.wallets,
+    staff: json.staff,
+  });
+  ledger.role = json.role === 'moderator' ? 'moderator' : 'master';
+  return ledger;
+}
+
+async function postAdmin(session, body) {
   const cfg = await loadCloudConfig();
   if (!cfg.url || !cfg.key) throw fail('unavailable', 'Supabase is not connected to this site yet.');
   if (!session?.accessToken && !session?.refreshToken) {
@@ -54,7 +65,7 @@ export async function loadLedger(session) {
         apikey: cfg.key,
         authorization: `Bearer ${cfg.key}`,
       },
-      body: JSON.stringify({ op: 'overview', accessToken }),
+      body: JSON.stringify({ ...body, accessToken }),
     });
   } catch {
     throw fail('unavailable', 'The ledger could not be reached.');
@@ -62,8 +73,16 @@ export async function loadLedger(session) {
   const json = await res.json().catch(() => ({}));
   if (res.status === 401) throw fail('denied', json.error || 'Sign in again.');
   if (res.status === 403) throw fail('denied', json.error || 'This gate is for the guild master.');
-  if (!res.ok || !Array.isArray(json.accounts) || !Array.isArray(json.wallets)) {
-    throw fail('fail', json.error || 'The ledger could not be opened.');
-  }
-  return buildLedger({ accounts: json.accounts, wallets: json.wallets });
+  if (!res.ok) throw fail('fail', json.error || 'The ledger could not be opened.');
+  const ledger = packLedger(json);
+  if (!ledger) throw fail('fail', json.error || 'The ledger could not be opened.');
+  return ledger;
+}
+
+export async function loadLedger(session) {
+  return postAdmin(session, { op: 'overview' });
+}
+
+export async function changeStaff(session, op, userId) {
+  return postAdmin(session, { op, userId });
 }
