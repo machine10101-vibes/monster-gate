@@ -1,5 +1,12 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
+import {
+  ACCOUNT_SESSION_TAKEN_STATUS,
+  decideSession,
+  readAccountSession,
+  takenBody,
+  writeAccountSession,
+} from "../_shared/accountSession.js";
 
 const MAX_BODY = 4096;
 const ADMIN_EMAIL = "monstergateonline@gmail.com";
@@ -51,6 +58,21 @@ async function guildStaff(admin: Admin, accessToken: unknown): Promise<Staff | R
   return { id: user.id, email: user.email, role: staffRole(user.email, data.role) };
 }
 
+async function seatStaff(admin: Admin, body: Record<string, unknown>): Promise<(Staff & { sessionId: string }) | Response> {
+  const user = await guildStaff(admin, body.accessToken);
+  if (user instanceof Response) return user;
+  const row = await readAccountSession(admin, user.id);
+  if (row.error) return json({ error: "The ledger could not be opened." }, 503);
+  const decided = decideSession(row.sessionId, body.sessionId);
+  if (decided.taken) return json(takenBody(), ACCOUNT_SESSION_TAKEN_STATUS);
+  const sessionId = decided.sessionId || crypto.randomUUID();
+  if (decided.adopt) {
+    const error = await writeAccountSession(admin, user.id, sessionId);
+    if (error) return json({ error: "The ledger could not be opened." }, 503);
+  }
+  return { ...user, sessionId };
+}
+
 async function guildMaster(admin: Admin, accessToken: unknown): Promise<Staff | Response> {
   const user = await guildStaff(admin, accessToken);
   if (user instanceof Response) return user;
@@ -64,7 +86,7 @@ function hunterId(raw: unknown): string {
   return UUID_RE.test(id) ? id : "";
 }
 
-async function overview(admin: Admin, role: "master" | "moderator"): Promise<Response> {
+async function overview(admin: Admin, role: "master" | "moderator", sessionId = ""): Promise<Response> {
   const accounts = await admin.rpc("admin_account_facts");
   const wallets = await admin.rpc("admin_wallet_facts");
   const staff = await admin.from("admins").select("email, role");
@@ -74,6 +96,7 @@ async function overview(admin: Admin, role: "master" | "moderator"): Promise<Res
     wallets: Array.isArray(wallets.data) ? wallets.data : [],
     staff: Array.isArray(staff.data) ? staff.data : [],
     role,
+    sessionId,
   });
 }
 
@@ -124,14 +147,15 @@ export default {
     }
     const admin = ctx.supabaseAdmin as unknown as Admin;
     if (body.op === "overview") {
-      const user = await guildStaff(admin, body.accessToken);
+      const user = await seatStaff(admin, body);
       if (user instanceof Response) return user;
       if (user.role !== "master") return json({ error: "This gate is for the guild master." }, 403);
-      return overview(admin, user.role);
+      return overview(admin, user.role, user.sessionId);
     }
     if (body.op === "promote" || body.op === "demote") {
-      const user = await guildMaster(admin, body.accessToken);
+      const user = await seatStaff(admin, body);
       if (user instanceof Response) return user;
+      if (user.role !== "master") return json({ error: "Only the guild master can change staff." }, 403);
       const userId = hunterId(body.userId);
       if (!userId) return json({ error: "That hunter is not on the record." }, 400);
       return changeStaff(admin, userId, body.op === "promote" ? "moderator" : "");

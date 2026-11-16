@@ -27,7 +27,10 @@ test('MG-AUTH-1 hunter function no longer writes wallet-keyed hunters', () => {
   assert.match(hunter, /RETIRED_HUNTER_STATUS/);
   assert.match(hunter, /account-load/);
   assert.match(hunter, /account-save/);
+  assert.match(hunter, /account-claim/);
+  assert.match(hunter, /account-check/);
   assert.match(hunter, /hunter_accounts/);
+  assert.match(hunter, /accountSession/);
   assert.match(hunter, /save_account_hunt/);
   assert.doesNotMatch(hunter, /hunter_sessions/);
   assert.doesNotMatch(hunter, /from\("hunters"\)/);

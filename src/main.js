@@ -78,7 +78,18 @@ import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
-import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
+import {
+  accountAddress,
+  checkDevice,
+  clearAccount,
+  consumeTakenNotice,
+  createAccount,
+  legacyUserId,
+  markTakenNotice,
+  readAccount,
+  SESSION_TAKEN,
+  signInAccount,
+} from './wallet/account.js';
 import { adminHref, isAdminAccount } from './admin/gate.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
@@ -91,6 +102,7 @@ import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
+const DEVICE_CHECK_MS = 4000;
 const sendingToLedger = typeof location !== 'undefined' && isAdminAccount(readAccount());
 if (sendingToLedger) location.replace(adminHref());
 const loadingScreen = !sendingToLedger && typeof document !== 'undefined' ? mountLoading() : null;
@@ -259,6 +271,7 @@ class Game {
     this.cloudConflict = false;
     this.cloudGate = null;
     this.autosaveTimer = 0;
+    this.deviceTimer = 0;
     this.autosaveMs = CLOUD_AUTOSAVE_MS;
     this.cloudFailAt = 0;
     this.cloudSavedAt = 0;
@@ -438,6 +451,11 @@ class Game {
       clearSession();
     }
     this.refreshWalletUi();
+    const taken = consumeTakenNotice();
+    if (taken && !this.wallet) {
+      const status = document.getElementById('wallet-status');
+      if (status) status.textContent = taken;
+    }
     this.applyQuality();
     if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
@@ -496,6 +514,10 @@ class Game {
 
   onPushed(result) {
     if (!result) return;
+    if (result.taken) {
+      this.dropTakenAccount(result.message);
+      return;
+    }
     if (result.error) {
       this.cloudReachable = false;
       this.noteCloudFailure();
@@ -574,11 +596,45 @@ class Game {
     this.autosaveTimer = setInterval(() => {
       this.autosaveCloud();
     }, this.autosaveMs);
+    this.startDeviceWatch();
   }
 
   stopAutosave() {
     if (this.autosaveTimer) clearInterval(this.autosaveTimer);
     this.autosaveTimer = 0;
+    this.stopDeviceWatch();
+  }
+
+  startDeviceWatch() {
+    this.stopDeviceWatch();
+    if (this.wallet?.kind !== 'email' || !this.wallet.accessToken) return;
+    this.deviceTimer = setInterval(() => {
+      this.watchDevice();
+    }, DEVICE_CHECK_MS);
+  }
+
+  stopDeviceWatch() {
+    if (this.deviceTimer) clearInterval(this.deviceTimer);
+    this.deviceTimer = 0;
+  }
+
+  async watchDevice() {
+    if (!this.wallet || this.wallet.kind !== 'email' || this.cloudSyncing) return;
+    try {
+      await checkDevice(this.wallet);
+    } catch (err) {
+      if (err?.code === 'taken') this.dropTakenAccount(err.message);
+    }
+  }
+
+  dropTakenAccount(message) {
+    if (this.cloudGate) this.cloudGate.open = false;
+    this.stopAutosave();
+    this.stopDeviceWatch();
+    markTakenNotice(message || SESSION_TAKEN);
+    clearAccount();
+    clearCloudToken();
+    location.reload();
   }
 
   /** Write the roster, hunts included, to the guild record. */
@@ -634,7 +690,11 @@ class Game {
         try {
           result = await syncHunt(session, this.roster, gate);
           if (result?.state !== 'error') break;
-        } catch {
+        } catch (err) {
+          if (err?.code === 'taken') {
+            this.dropTakenAccount(err.message);
+            return;
+          }
           result = { state: 'error', replaced: false };
         }
         if (attempt === 0 && gate.open && this.wallet === session) {
@@ -1083,6 +1143,7 @@ class Game {
     }
     if (this.cloudGate) this.cloudGate.open = false;
     this.stopAutosave();
+    this.stopDeviceWatch();
     clearSession();
     clearAccount();
     clearCloudToken();

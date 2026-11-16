@@ -3,7 +3,7 @@ import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import '../ui/theme.css';
 import './admin.css';
-import { clearAccount, readAccount, signInAccount } from '../wallet/account.js';
+import { checkDevice, clearAccount, readAccount, signInAccount } from '../wallet/account.js';
 import { adminHref, gameHref, isAdminAccount } from './gate.js';
 import { changeStaff, loadLedger } from './api.js';
 import { present } from '../../supabase/functions/_shared/ledger.js';
@@ -36,6 +36,7 @@ const state = {
 
 let session = null;
 let timer = 0;
+let seatTimer = 0;
 let painting = false;
 
 const $ = (id) => document.getElementById(id);
@@ -103,7 +104,7 @@ async function refresh() {
     }
   } catch (err) {
     state.error = err.message || 'The ledger could not be opened.';
-    if (err.code === 'denied') {
+    if (err.code === 'denied' || err.code === 'taken') {
       const email = session?.email || '';
       clearAccount();
       session = null;
@@ -276,11 +277,30 @@ function onKey(event) {
   }
 }
 
+async function watchSeat() {
+  if (!session) return;
+  try {
+    await checkDevice(session);
+  } catch (err) {
+    if (err.code !== 'taken') return;
+    const email = session.email || '';
+    clearAccount();
+    session = null;
+    state.ledger = null;
+    showGate(err.message);
+    if (email && $('email')) $('email').value = email;
+  }
+}
+
 function arm() {
   clearInterval(timer);
+  clearInterval(seatTimer);
   timer = setInterval(() => {
     if (!state.hold && document.visibilityState === 'visible') refresh();
   }, 30000);
+  seatTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') watchSeat();
+  }, 4000);
 }
 
 async function boot() {

@@ -6,6 +6,13 @@ import {
   RETIRED_HUNTER_STATUS,
   isRetiredHunterOp,
 } from "../_shared/retiredHunter.js";
+import {
+  ACCOUNT_SESSION_TAKEN_STATUS,
+  decideSession,
+  readAccountSession,
+  takenBody,
+  writeAccountSession,
+} from "../_shared/accountSession.js";
 
 const MAX_BODY = 300_000;
 const MAX_PROGRESS = 262144;
@@ -65,11 +72,48 @@ async function keepsLedger(admin: Admin, email: string): Promise<boolean> {
   return (await staffKind(admin, email)) === "master";
 }
 
-async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+async function seatAccount(
+  admin: Admin,
+  body: Record<string, unknown>,
+  claim: boolean,
+): Promise<{ id: string; email: string; sessionId: string } | Response> {
   const user = await accountUser(body.accessToken);
   if (user instanceof Response) return user;
+  if (claim) {
+    const sessionId = crypto.randomUUID();
+    const error = await writeAccountSession(admin, user.id, sessionId);
+    if (error) return json({ error: "The guild record could not be opened." }, 503);
+    return { ...user, sessionId };
+  }
+  const row = await readAccountSession(admin, user.id);
+  if (row.error) return json({ error: "The guild record could not be opened." }, 503);
+  const decided = decideSession(row.sessionId, body.sessionId);
+  if (decided.taken) return json(takenBody(), ACCOUNT_SESSION_TAKEN_STATUS);
+  const sessionId = decided.sessionId || crypto.randomUUID();
+  if (decided.adopt) {
+    const error = await writeAccountSession(admin, user.id, sessionId);
+    if (error) return json({ error: "The guild record could not be opened." }, 503);
+  }
+  return { ...user, sessionId };
+}
+
+async function accountClaim(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const seat = await seatAccount(admin, body, true);
+  if (seat instanceof Response) return seat;
+  return json({ sessionId: seat.sessionId });
+}
+
+async function accountCheck(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const seat = await seatAccount(admin, body, false);
+  if (seat instanceof Response) return seat;
+  return json({ sessionId: seat.sessionId });
+}
+
+async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const user = await seatAccount(admin, body, false);
+  if (user instanceof Response) return user;
   const staff = await staffKind(admin, user.email);
-  if (staff === "master") return json({ progress: null, revision: 0, savedAt: 0, staff: "master" });
+  if (staff === "master") return json({ progress: null, revision: 0, savedAt: 0, staff: "master", sessionId: user.sessionId });
   const { data, error } = await admin
     .from("hunter_accounts")
     .select("progress, revision")
@@ -77,17 +121,18 @@ async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise
     .maybeSingle();
   if (error) return json({ error: "The guild record could not be opened." }, 503);
   const row = data as { progress?: Record<string, unknown>; revision?: number | string } | null;
-  if (!row?.progress) return json({ progress: null, revision: 0, savedAt: 0, staff });
+  if (!row?.progress) return json({ progress: null, revision: 0, savedAt: 0, staff, sessionId: user.sessionId });
   return json({
     progress: row.progress,
     revision: Number(row.revision) || 0,
     savedAt: Number(row.progress.savedAt) || 0,
     staff,
+    sessionId: user.sessionId,
   });
 }
 
 async function accountSave(admin: Admin, body: Record<string, unknown>): Promise<Response> {
-  const user = await accountUser(body.accessToken);
+  const user = await seatAccount(admin, body, false);
   if (user instanceof Response) return user;
   if (await keepsLedger(admin, user.email)) {
     return json({ error: "This account keeps the ledger. It does not enter the hunt." }, 403);
@@ -120,7 +165,7 @@ async function accountSave(admin: Admin, body: Record<string, unknown>): Promise
       savedAt,
     }, 409);
   }
-  return json({ revision, savedAt, progress: merged });
+  return json({ revision, savedAt, progress: merged, sessionId: user.sessionId });
 }
 
 function retiredHunter(): Response {
@@ -151,6 +196,8 @@ export default {
     }
     if (isRetiredHunterOp(body.op)) return retiredHunter();
     const admin = ctx.supabaseAdmin as unknown as Admin;
+    if (body.op === "account-claim") return accountClaim(admin, body);
+    if (body.op === "account-check") return accountCheck(admin, body);
     if (body.op === "account-load") return accountLoad(admin, body);
     if (body.op === "account-save") return accountSave(admin, body);
     return json({ error: "The request was not understood." }, 400);
