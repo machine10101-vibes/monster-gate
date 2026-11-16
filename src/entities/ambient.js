@@ -147,7 +147,9 @@ export class NPC {
     else m.armR.rotation.z *= 0.9;
     this.near = d < NPC_TALK_RANGE;
     const [sx, sy, vis] = this.game.screenOf(this.x, this.y + this.height + 0.4, this.z, true);
-    this.game.hud.plate(this.id, `${this.def.name}<small>${this.def.title}</small>`);
+    const mark = this.game.journal?.markFor?.(this.def.id) || '';
+    const bang = mark ? `<i class="q-bang ${mark}" aria-hidden="true">!</i>` : '';
+    this.game.hud.plate(this.id, `${this.def.name}<small>${this.def.title}</small>${bang}`);
     this.game.hud.placePlate(this.id, sx, sy, vis && d < 16, { dist: d });
   }
 
