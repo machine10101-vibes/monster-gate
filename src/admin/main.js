@@ -10,6 +10,8 @@ import { present } from '../../supabase/functions/_shared/ledger.js';
 import { chipsHtml, drawerHtml, leadIndex, stageHtml, toolsNote, windowsHtml } from './view.js';
 import { decorateAllFrames } from '../ui/theme.js';
 
+if (typeof document !== 'undefined') document.documentElement.classList.add('ledger');
+
 const TABS = ['ledger', 'hunters', 'coffers', 'bestiary', 'paths'];
 const WINDOWS = ['all', '1', '7', '30'];
 const state = {
@@ -96,9 +98,11 @@ async function refresh() {
   } catch (err) {
     state.error = err.message || 'The ledger could not be opened.';
     if (err.code === 'denied') {
+      const email = session?.email || '';
       clearAccount();
       session = null;
       showGate(state.error);
+      if (email && $('email')) $('email').value = email;
       painting = false;
       return;
     }

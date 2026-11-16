@@ -21,15 +21,17 @@ html, body {
 }
 
 button, input { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; touch-action: manipulation; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi); outline-offset: 2px; }
 .hidden { display: none !important; }
 
 .gate {
   min-height: 100%;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px 16px;
+  align-content: start;
+  padding: calc(24px + var(--safe-t)) 16px calc(24px + var(--safe-b));
   background:
     radial-gradient(ellipse at 50% 42%, rgba(194, 123, 255, 0.16), transparent 46%),
     radial-gradient(ellipse at 50% 80%, rgba(231, 197, 106, 0.08), transparent 42%),
@@ -57,10 +59,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 .gate-card form { text-align: left; }
 .gate-card .start {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   margin-top: 4px;
   padding: 12px 8px;
   font-size: 10px;
+  touch-action: manipulation;
 }
 .back {
   display: inline-block;
@@ -87,6 +90,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
   background: #0e1014;
   border: 2px solid var(--mg-line);
   border-radius: 2px;
+  touch-action: manipulation;
 }
 .account-error {
   min-height: 1.2em;
@@ -98,10 +102,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 
 .shell {
   min-height: 100%;
+  min-height: 100dvh;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto;
   gap: 8px;
-  padding: 10px 12px calc(10px + var(--safe-b));
+  padding: calc(10px + var(--safe-t)) 12px calc(10px + var(--safe-b));
   background:
     radial-gradient(90% 40% at 50% 0%, rgba(231, 197, 106, 0.08), transparent 60%),
     #070d16;
@@ -210,7 +215,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
   gap: 8px;
 }
 .board.open { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
-.stage { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.stage {
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 .cards {
   display: grid;
@@ -309,7 +322,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 .day u.flat { height: 0; min-height: 0; }
 .day span { font-family: var(--font-px); font-size: 7px; color: var(--mg-muted); }
 
-.table-wrap { overflow: auto; max-height: calc(100vh - 210px); }
+.table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 210px);
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--mg-line); vertical-align: top; }
 th button {
@@ -331,6 +349,8 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
 .drawer {
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 10px 12px 14px;
 }
 .drawer header, .char-tabs { display: flex; gap: 6px; align-items: flex-start; }
@@ -391,17 +411,57 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
 @media (max-width: 980px) {
   .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .board.open, .split, .work { grid-template-columns: 1fr; }
-  .work { grid-template-rows: auto minmax(0, 1fr); }
+  .work { grid-template-rows: auto auto; }
   .rail { flex-direction: row; flex-wrap: wrap; align-self: start; overflow: visible; }
-  .rail button { flex: 1 1 30%; min-width: 0; white-space: nowrap; text-align: center; padding: 8px 6px; letter-spacing: 0; }
+  .rail button { flex: 1 1 30%; min-height: 44px; min-width: 0; white-space: nowrap; text-align: center; padding: 8px 6px; letter-spacing: 0; }
   .rail kbd { display: inline; margin: 0 6px 0 0; }
   .note { margin-left: 0; }
-  .table-wrap { max-height: none; }
+  .table-wrap { max-height: none; overflow: visible; }
   .tools input { max-width: none; }
+  .stage, .drawer {
+    overflow: visible;
+    max-height: none;
+  }
 }
 
 @media (max-width: 640px) {
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-height: 560px) {
+  .gate {
+    place-items: start center;
+  }
+}
+
+/* Hunt theme.css locks html/body/#app so the 3D title cannot move.
+   The ledger is a document. Finger-drag has to pan it. */
+html.ledger,
+html.ledger body {
+  height: auto;
+  min-height: 100%;
+  min-height: 100dvh;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+html.ledger #app {
+  position: static;
+  inset: auto;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+html.ledger .gate,
+html.ledger .shell {
+  touch-action: pan-y;
 }
 
 @media (prefers-reduced-motion: reduce) {
