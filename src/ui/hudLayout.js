@@ -11,7 +11,7 @@ export const MENU_INSET = 4;
 export const CLOCK_GAP = 8;
 export const CLOCK_W = 78;
 export const CLOCK_H = 34;
-export const QUEST_MAX_W = 340;
+export const QUEST_MAX_W = 240;
 export const TOUCH_ATTACK_W = 84;
 
 export const HUD_VIEWPORTS = [
@@ -306,10 +306,10 @@ export function hudRects(vp, { questOpen = false } = {}) {
   const mm = 142 * mmScale;
   const minimap = rect('minimap', 8, 6, mm, mm);
 
-  const questCap = Math.min(QUEST_MAX_W, Math.floor(w * 0.45), w - menu.colW - (mm + 28));
-  const questMax = Math.max(96, questCap);
-  const questW = questOpen ? questMax : 96;
-  const questH = questOpen ? Math.min(160, Math.max(92, Math.floor(h * 0.32))) : 28;
+  const questCap = Math.min(QUEST_MAX_W, Math.floor(w * 0.36), w - menu.colW - (mm + 28));
+  const questMax = Math.max(72, questCap);
+  const questW = questOpen ? questMax : 72;
+  const questH = questOpen ? Math.min(120, Math.max(72, Math.floor(h * 0.26))) : 22;
   const quest = rect('quest', 8 + mm + 8, 6, questW, questH);
 
   const hotScale = touch ? 0.86 : 1;

@@ -172,23 +172,25 @@ kbd {
 }
 
 #quest {
-  min-width: 158px;
-  padding: 8px 10px 7px;
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
+  padding: 1px 2px;
   background: var(--panel);
   border: 2px solid var(--panel-edge);
   border-radius: 4px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   font-size: var(--hud-body);
-  line-height: 1.25;
+  line-height: 1.2;
   color: #f4f7fb;
   text-shadow: var(--hud-shadow);
 }
 #quest .q-title {
   font-family: var(--font-px);
-  font-size: var(--hud-title);
+  font-size: 8px;
   color: #ffe27a;
-  margin-bottom: 6px;
-  letter-spacing: 0.5px;
+  margin-bottom: 0;
+  letter-spacing: 0.4px;
   text-shadow: var(--hud-shadow);
 }
 #quest .q-body {
@@ -774,8 +776,8 @@ body.touch #top-left {
   left: calc(var(--ui) * 118px + 14px + var(--safe-l));
 }
 body.touch #quest {
-  min-width: 128px;
-  padding: 6px 8px;
+  min-width: 0;
+  padding: 1px 2px;
 }
 body.touch #menu-buttons {
   top: calc(6px + var(--safe-t));
@@ -4434,6 +4436,10 @@ body.touch #dialog { z-index: 74; }
   border-radius: 4px;
   pointer-events: auto;
   line-height: 1.2;
+}
+#world-status[hidden],
+#world-status[data-state="online"] {
+  display: none;
 }
 #world-status b {
   font-family: var(--font-px);
