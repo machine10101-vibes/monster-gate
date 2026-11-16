@@ -475,38 +475,77 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
   .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .board.open, .split, .work { grid-template-columns: minmax(0, 1fr); }
   .work { grid-template-rows: auto auto; }
-  .rail { flex-direction: row; flex-wrap: wrap; align-self: start; overflow: visible; }
-  .rail button { flex: 1 1 30%; min-height: 44px; min-width: 0; white-space: normal; text-align: center; padding: 8px 6px; letter-spacing: 0; }
-  .rail kbd { display: inline; margin: 0 6px 0 0; }
-  .note { margin-left: 0; overflow-wrap: anywhere; }
+  .top {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .brand,
   .who {
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
+    min-width: 0;
     max-width: 100%;
+    margin-right: 0;
+  }
+  .who {
+    flex: none;
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .top .mini { width: 100%; min-width: 0; }
+  .tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .tools input,
+  .seg-row,
+  .chips,
+  .note {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+  .note { overflow-wrap: anywhere; }
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-self: stretch;
+    overflow: visible;
+  }
+  .rail button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+    padding: 8px 6px;
+    letter-spacing: 0;
+  }
+  .rail kbd { display: inline; margin: 0 6px 0 0; }
   .table-wrap {
     max-height: none;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: visible;
   }
-  .tools input { max-width: none; min-width: 0; }
   .stage, .drawer {
     overflow: visible;
     overflow-x: hidden;
     max-height: none;
   }
-  .hunters, .hunters tbody, .hunters tr, .hunters th, .hunters td {
+  .char-tabs { flex-wrap: wrap; }
+  .hunters,
+  .hunters tbody,
+  .hunters tr,
+  .hunters th,
+  .hunters td {
     display: block;
     width: 100%;
     max-width: 100%;
   }
-  .hunters thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-  }
+  .hunters thead { display: none; }
   .hunters tr {
     margin: 0 0 8px;
     padding: 8px;
@@ -515,18 +554,23 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
   }
   .hunters td {
     display: grid;
-    grid-template-columns: 7.5em minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 6.5em minmax(0, 1fr);
+    gap: 4px 8px;
     border: 0;
     padding: 4px 0;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
   .hunters td::before {
     content: attr(data-label);
+    grid-column: 1;
     font-family: var(--font-px);
     font-size: 8px;
     letter-spacing: 0.4px;
     color: var(--mg-gold-dim);
+  }
+  .hunters td > * {
+    grid-column: 2;
+    min-width: 0;
   }
 }
 

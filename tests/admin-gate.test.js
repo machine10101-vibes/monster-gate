@@ -69,6 +69,11 @@ test('the guild master is sent to the ledger before a hunt can start', () => {
   assert.match(css, /touch-action:\s*manipulation/);
   assert.match(css, /\.hunters td::before/);
   assert.match(css, /overflow-wrap:\s*anywhere/);
+  assert.match(css, /@media \(max-width: 980px\) \{[\s\S]*\.tools \{[\s\S]*display:\s*grid/);
+  assert.match(css, /@media \(max-width: 980px\) \{[\s\S]*\.rail \{[\s\S]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(css, /\.hunters thead \{ display: none/);
+  assert.match(css, /\.hunters td > \* \{[\s\S]*grid-column:\s*2/);
+  assert.match(css, /\.tools input,[\s\S]*\.seg-row,[\s\S]*\.chips,[\s\S]*\.note \{[\s\S]*width:\s*100%/);
   assert.doesNotMatch(css, /\.table-wrap \{[^}]*overflow:\s*visible/);
   assert.match(migrationRole, /role in \('master', 'moderator'\)/);
   assert.match(src('../src/admin/view.js'), /Make moderator/);
