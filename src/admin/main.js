@@ -4,8 +4,8 @@ import '@fontsource/pixelify-sans/600.css';
 import '../ui/theme.css';
 import './admin.css';
 import { clearAccount, readAccount, signInAccount } from '../wallet/account.js';
-import { adminHref, gameHref, isAdminAccount } from './gate.js';
-import { loadLedger } from './api.js';
+import { adminHref, gameHref } from './gate.js';
+import { changeStaff, loadLedger } from './api.js';
 import { present } from '../../supabase/functions/_shared/ledger.js';
 import { chipsHtml, drawerHtml, leadIndex, stageHtml, toolsNote, windowsHtml } from './view.js';
 import { decorateAllFrames } from '../ui/theme.js';
@@ -30,6 +30,8 @@ const state = {
   char: 0,
   hold: false,
   ledger: null,
+  role: '',
+  canPromote: false,
 };
 
 let session = null;
@@ -57,7 +59,9 @@ function paint() {
   $('windows').innerHTML = windowsHtml(state);
   $('chips').innerHTML = chipsHtml(state);
   $('note').textContent = view ? toolsNote(view) : '';
-  $('who').textContent = session?.email || '';
+  $('who').textContent = session?.email
+    ? (state.role === 'moderator' ? `${session.email} · moderator` : session.email)
+    : '';
   document.querySelectorAll('#rail button').forEach((button) => {
     button.classList.toggle('on', button.dataset.tab === state.tab);
   });
@@ -91,6 +95,8 @@ async function refresh() {
   painting = true;
   try {
     state.ledger = await loadLedger(session);
+    state.role = state.ledger.role === 'moderator' ? 'moderator' : 'master';
+    state.canPromote = state.role === 'master';
     state.error = '';
     if (state.selected && !state.ledger.players.some((player) => player.id === state.selected)) {
       state.selected = '';
@@ -188,6 +194,33 @@ function onClick(event) {
   if (button.dataset.char != null) state.char = Number(button.dataset.char) || 0;
   if (button.dataset.clear) clearFilter(button.dataset.clear);
   if (button.dataset.copy) navigator.clipboard?.writeText(button.dataset.copy).catch(() => {});
+  if (button.dataset.promote) {
+    setStaff('promote', button.dataset.promote);
+    return;
+  }
+  if (button.dataset.demote) {
+    setStaff('demote', button.dataset.demote);
+    return;
+  }
+  paint();
+}
+
+async function setStaff(op, id) {
+  if (!session || !state.canPromote) return;
+  const player = state.ledger?.players?.find((row) => row.id === id);
+  const label = player?.name || 'this hunter';
+  const ok = op === 'promote'
+    ? window.confirm(`Make ${label} a moderator? They keep hunting and can open the ledger.`)
+    : window.confirm(`Remove moderator from ${label}?`);
+  if (!ok) return;
+  try {
+    state.ledger = await changeStaff(session, op, player?.userId || id);
+    state.role = state.ledger.role === 'moderator' ? 'moderator' : 'master';
+    state.canPromote = state.role === 'master';
+    state.error = '';
+  } catch (err) {
+    state.error = err.message || 'The staff list could not be saved.';
+  }
   paint();
 }
 
@@ -254,12 +287,10 @@ async function boot() {
   $('back').href = gameHref();
   decorateAllFrames($('gate'));
   const seated = readAccount();
-  if (isAdminAccount(seated)) {
+  if (seated?.kind === 'email') {
     session = seated;
     showApp();
     await refresh();
-  } else if (seated?.kind === 'email') {
-    showGate('This gate is for the guild master. The signed-in hunter can return to the hunt.');
   }
   arm();
 }
@@ -272,11 +303,6 @@ $('login').addEventListener('submit', async (event) => {
   submit.disabled = true;
   try {
     const next = await signInAccount($('email').value, $('password').value);
-    if (!isAdminAccount(next)) {
-      clearAccount();
-      error.textContent = 'This gate is for the guild master.';
-      return;
-    }
     session = next;
     $('password').value = '';
     showApp();
@@ -304,6 +330,8 @@ $('signout').addEventListener('click', () => {
   session = null;
   state.ledger = null;
   state.selected = '';
+  state.role = '';
+  state.canPromote = false;
   showGate('');
 });
 document.addEventListener('visibilitychange', () => {

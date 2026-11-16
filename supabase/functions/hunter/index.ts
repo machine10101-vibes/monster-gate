@@ -9,6 +9,7 @@ import {
 
 const MAX_BODY = 300_000;
 const MAX_PROGRESS = 262144;
+const ADMIN_EMAIL = "monstergateonline@gmail.com";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
@@ -52,9 +53,10 @@ async function accountUser(accessToken: unknown): Promise<{ id: string; email: s
 }
 
 async function keepsLedger(admin: Admin, email: string): Promise<boolean> {
-  const { data, error } = await admin.from("admins").select("email").eq("email", email).maybeSingle();
+  const { data, error } = await admin.from("admins").select("email, role").eq("email", email).maybeSingle();
   if (error || !data) return false;
-  return true;
+  const role = String(data.role || "master").trim().toLowerCase();
+  return email === ADMIN_EMAIL || role === "master" || role === "";
 }
 
 async function accountLoad(admin: Admin, body: Record<string, unknown>): Promise<Response> {

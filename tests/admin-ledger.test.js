@@ -170,6 +170,29 @@ test('filters, sort, and the screen escape hunter names', () => {
   assert.doesNotMatch(html, /A<b>/);
   assert.match(drawer, /A&lt;b&gt;/);
   assert.match(html, /Warrior/);
+  assert.match(html, /data-label="Hunter"/);
+  assert.match(html, /class="hunters"/);
   assert.equal(esc('<>&"\''), '&lt;&gt;&amp;&quot;&#39;');
   assert.equal(player.email, 'bram@hunt.test');
+  assert.equal(player.userId, BRAM);
+
+  const promote = drawerHtml(screen, { char: 0, canPromote: true });
+  assert.match(promote, /Make moderator/);
+  assert.match(promote, /data-promote=/);
+  assert.doesNotMatch(drawerHtml(screen, { char: 0, canPromote: false }), /Make moderator/);
+
+  const staffed = buildLedger({
+    accounts: [{
+      user_id: BRAM,
+      email: 'bram@hunt.test',
+      updated_at: new Date(NOW).toISOString(),
+      progress: { roster: { chars: [{ id: 'c1', name: 'Bram', hunt: { gold: 1 } }] } },
+    }],
+    staff: [{ email: 'bram@hunt.test', role: 'moderator' }],
+  }, NOW);
+  assert.equal(staffed.players[0].role, 'moderator');
+  assert.equal(staffed.staff[0].role, 'moderator');
+  const demote = drawerHtml(present(staffed, { now: NOW, selected: staffed.players[0].id }), { char: 0, canPromote: true });
+  assert.match(demote, /Remove moderator/);
+  assert.match(stageHtml(present(staffed, { now: NOW }), { tab: 'ledger', canPromote: true }), /Moderators/);
 });

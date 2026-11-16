@@ -148,7 +148,32 @@ function ledgerTab(model, ui) {
     <div class="split">
       ${sheet('Realms', 'Where a hunter stands', barList(view.realms.filter((row) => row.n), 'n', 'data-realm', ui.realm))}
       ${sheet('Latest writing', 'Open a hunter', `<div class="recents">${rows}</div>`)}
-    </div>`;
+    </div>
+    ${staffSheet(model, ui)}`;
+}
+
+function staffBadge(player) {
+  return player?.role === 'moderator' ? '<span class="badge">Moderator</span>' : '';
+}
+
+function staffSheet(model, ui) {
+  if (!ui.canPromote) return '';
+  const mods = (model.staff || []).filter((row) => row.role === 'moderator');
+  if (!mods.length) {
+    return sheet('Moderators', 'Staff', '<p class="empty">No moderators yet. Open a hunter and tap Make moderator.</p>');
+  }
+  const rows = mods.map((row) => {
+    const player = model.players.find((item) => item.email === row.email);
+    if (player) {
+      return `<button type="button" class="recent${player.id === model.selected?.id ? ' on' : ''}" data-player="${esc(player.id)}">
+        <b>${esc(player.name)}</b>
+        <span>${esc(row.email)}</span>
+        <em>Moderator</em>
+      </button>`;
+    }
+    return `<div class="recent"><b>${esc(row.email)}</b><span>Moderator</span></div>`;
+  }).join('');
+  return sheet('Moderators', 'Staff', `<div class="recents">${rows}</div>`);
 }
 
 function sortHead(label, key, ui) {
@@ -161,19 +186,19 @@ function huntersTab(model, ui) {
   const rows = model.players.slice(0, RENDER_CAP);
   const body = rows.length
     ? rows.map((player) => `<tr class="${player.id === model.selected?.id ? 'on' : ''}" data-player="${esc(player.id)}">
-        <td><b>${esc(player.name)}</b><small>${esc(player.sub)}</small></td>
-        <td>${esc(player.className)}${player.pathName ? `<small>${esc(player.pathName)}</small>` : ''}</td>
-        <td>${player.level ? esc(String(player.level)) : '—'}${player.rankLetter ? `<small>${esc(player.rankLetter)}</small>` : ''}</td>
-        <td>${esc(formatCount(player.gold))}</td>
-        <td>${esc(formatCount(player.kills))}</td>
-        <td>${esc(ago(player.updatedAt, model.now))}</td>
+        <td data-label="Hunter"><b>${esc(player.name)}</b><small>${esc(player.sub)}</small>${staffBadge(player)}</td>
+        <td data-label="Path">${esc(player.className)}${player.pathName ? `<small>${esc(player.pathName)}</small>` : ''}</td>
+        <td data-label="Lv">${player.level ? esc(String(player.level)) : '—'}${player.rankLetter ? `<small>${esc(player.rankLetter)}</small>` : ''}</td>
+        <td data-label="Gold">${esc(formatCount(player.gold))}</td>
+        <td data-label="Slain">${esc(formatCount(player.kills))}</td>
+        <td data-label="Wrote">${esc(ago(player.updatedAt, model.now))}</td>
       </tr>`).join('')
     : '<tr><td colspan="6" class="empty">No hunters in this slice.</td></tr>';
   const more = model.players.length > RENDER_CAP
     ? `<p class="more">Showing the first ${RENDER_CAP}. Narrow the slice to see the rest.</p>`
     : '';
   return `<div class="table-wrap mg-frame">
-    <table>
+    <table class="hunters">
       <thead><tr>
         ${sortHead('Hunter', 'name', ui)}
         ${sortHead('Path', 'class', ui)}
@@ -271,15 +296,22 @@ export function drawerHtml(model, ui) {
   const retired = player.retired.length
     ? `<p class="retired">${player.retired.length} retired: ${esc(player.retired.map((item) => item.name).join(', '))}</p>`
     : '';
+  const staffAction = ui.canPromote && player.kind === 'account' && player.email
+    ? player.role === 'moderator'
+      ? `<button type="button" class="act warn" data-demote="${esc(player.id)}">Remove moderator</button>`
+      : `<button type="button" class="act" data-promote="${esc(player.id)}">Make moderator</button>`
+    : '';
   return `<aside class="drawer mg-frame" aria-label="Hunter">
     <header>
       <div>
         <b>${esc(player.name)}</b>
         <small>${esc(player.sub)}</small>
+        ${staffBadge(player)}
       </div>
       <button type="button" class="icon" data-clear="player" aria-label="Close">×</button>
     </header>
     ${player.email ? `<button type="button" class="copy" data-copy="${esc(player.email)}">Copy email</button>` : ''}
+    ${staffAction}
     ${tabs ? `<div class="char-tabs">${tabs}</div>` : ''}
     ${body}
     ${retired}

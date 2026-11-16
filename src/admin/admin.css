@@ -103,10 +103,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 .shell {
   min-height: 100%;
   min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   display: grid;
   grid-template-rows: auto auto auto 1fr auto;
   gap: 8px;
-  padding: calc(10px + var(--safe-t)) 12px calc(10px + var(--safe-b));
+  padding: calc(10px + var(--safe-t)) calc(12px + var(--safe-r)) calc(10px + var(--safe-b)) calc(12px + var(--safe-l));
   background:
     radial-gradient(90% 40% at 50% 0%, rgba(231, 197, 106, 0.08), transparent 60%),
     #070d16;
@@ -133,7 +136,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 }
 .brand b em { font-style: normal; color: #c27bff; }
 .brand span, .who, .keys { color: var(--mg-muted); font-size: 13px; }
-.who { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who {
+  margin-right: auto;
+  min-width: 0;
+  flex: 1 1 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .top .mini, .seg, .chip, .icon {
   font-family: var(--font-px);
   font-size: 8px;
@@ -175,7 +185,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 }
 
 .work {
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
@@ -209,14 +221,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 }
 
 .board {
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 .board.open { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
 .stage {
+  min-width: 0;
   min-height: 0;
+  width: 100%;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -232,8 +248,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 }
 .card {
   position: relative;
+  min-width: 0;
   text-align: left;
   padding: 10px;
+  overflow-wrap: anywhere;
   background: var(--mg-tex), #0b1524;
   border: 2px solid var(--mg-gold);
   border-radius: 2px;
@@ -252,11 +270,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
   font-family: var(--font-px);
   font-size: 12px;
   color: var(--mg-gold-title);
+  overflow-wrap: anywhere;
 }
 .card small, .recent span, .recent em, td small, .brand span { color: var(--mg-muted); }
 
-.split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.sheet { padding: 10px 12px 12px; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; min-width: 0; }
+.sheet { padding: 10px 12px 12px; min-width: 0; overflow-wrap: anywhere; }
 .sheet header { margin-bottom: 8px; }
 .sheet h2, .drawer h3 {
   margin: 2px 0 0;
@@ -271,10 +290,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 .bar, .beast, .recent {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   width: 100%;
+  min-width: 0;
   min-height: 32px;
   padding: 6px 8px;
   overflow: hidden;
@@ -282,6 +302,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
   background: #101c2e;
   border: 2px solid var(--mg-line);
   border-radius: 2px;
+}
+.bar span, .beast b, .recent b, .recent span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .bar.on, .beast.on, .recent.on, tr.on { border-color: var(--mg-gold-hi); background: #15263c; }
 .bar i, .beast i {
@@ -299,9 +323,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
   align-items: flex-end;
   gap: 4px;
   height: 96px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .day {
-  flex: 1;
+  flex: 1 0 18px;
+  min-width: 18px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -324,11 +354,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--mg-gold-hi)
 
 .table-wrap {
   overflow: auto;
+  max-width: 100%;
   max-height: calc(100vh - 210px);
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; max-width: 100%; border-collapse: collapse; }
 th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--mg-line); vertical-align: top; }
 th button {
   padding: 0;
@@ -347,8 +378,10 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
 .empty { padding: 8px 2px; }
 
 .drawer {
+  min-width: 0;
   min-height: 0;
   overflow: auto;
+  overflow-wrap: anywhere;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   padding: 10px 12px 14px;
@@ -375,8 +408,37 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
 }
 .char-tab.on { border-color: var(--mg-gold-hi); color: var(--mg-gold-bright); }
 .facts { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
-.facts div { display: grid; grid-template-columns: 72px 1fr; gap: 8px; }
-.facts dd { margin: 0; }
+.facts div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-px);
+  font-size: 7px;
+  letter-spacing: 0.4px;
+  color: #c27bff;
+  border: 1px solid #c27bff;
+  border-radius: 2px;
+}
+.act {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+  min-height: 44px;
+  padding: 10px 8px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  letter-spacing: 0.4px;
+  color: var(--mg-gold-title);
+  background: linear-gradient(var(--mg-quiet-hi), var(--mg-quiet-lo));
+  border: 2px solid var(--mg-gold);
+  border-radius: 2px;
+}
+.act.warn {
+  color: #ffb4b4;
+  border-color: #8a3a44;
+}
 .skills { display: grid; gap: 4px; }
 .skill {
   position: relative;
@@ -399,7 +461,8 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
 .skill span, .skill b { position: relative; z-index: 1; }
 .skill b { font-variant-numeric: tabular-nums; color: var(--mg-gold-bright); }
 .slain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-.slain li { display: flex; justify-content: space-between; gap: 8px; }
+.slain li { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.slain span { min-width: 0; overflow-wrap: anywhere; }
 
 .keys { flex-wrap: wrap; gap: 10px; font-size: 12px; }
 .keys kbd {
@@ -410,17 +473,60 @@ tr:hover { background: rgba(231, 197, 106, 0.06); }
 
 @media (max-width: 980px) {
   .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .board.open, .split, .work { grid-template-columns: 1fr; }
+  .board.open, .split, .work { grid-template-columns: minmax(0, 1fr); }
   .work { grid-template-rows: auto auto; }
   .rail { flex-direction: row; flex-wrap: wrap; align-self: start; overflow: visible; }
-  .rail button { flex: 1 1 30%; min-height: 44px; min-width: 0; white-space: nowrap; text-align: center; padding: 8px 6px; letter-spacing: 0; }
+  .rail button { flex: 1 1 30%; min-height: 44px; min-width: 0; white-space: normal; text-align: center; padding: 8px 6px; letter-spacing: 0; }
   .rail kbd { display: inline; margin: 0 6px 0 0; }
-  .note { margin-left: 0; }
-  .table-wrap { max-height: none; overflow: visible; }
-  .tools input { max-width: none; }
+  .note { margin-left: 0; overflow-wrap: anywhere; }
+  .who {
+    flex: 1 1 100%;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .table-wrap {
+    max-height: none;
+    overflow: hidden;
+  }
+  .tools input { max-width: none; min-width: 0; }
   .stage, .drawer {
     overflow: visible;
+    overflow-x: hidden;
     max-height: none;
+  }
+  .hunters, .hunters tbody, .hunters tr, .hunters th, .hunters td {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+  .hunters thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .hunters tr {
+    margin: 0 0 8px;
+    padding: 8px;
+    border: 2px solid var(--mg-line);
+    background: #101c2e;
+  }
+  .hunters td {
+    display: grid;
+    grid-template-columns: 7.5em minmax(0, 1fr);
+    gap: 8px;
+    border: 0;
+    padding: 4px 0;
+    overflow-wrap: anywhere;
+  }
+  .hunters td::before {
+    content: attr(data-label);
+    font-family: var(--font-px);
+    font-size: 8px;
+    letter-spacing: 0.4px;
+    color: var(--mg-gold-dim);
   }
 }
 
@@ -441,9 +547,11 @@ html.ledger body {
   height: auto;
   min-height: 100%;
   min-height: 100dvh;
+  max-width: 100%;
   max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
+  overflow-wrap: anywhere;
   overscroll-behavior: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
