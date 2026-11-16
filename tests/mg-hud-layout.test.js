@@ -158,14 +158,14 @@ test('MG-UI-16 expanded quest stays in frame at 844x390 and 1280x800', () => {
     { name: 'laptop', w: 1280, h: 800, touch: false },
   ]) {
     const rects = hudRects(vp, { questOpen: true });
-    const cap = Math.min(QUEST_MAX_W, Math.floor(vp.w * 0.45));
+    const cap = Math.min(QUEST_MAX_W, Math.floor(vp.w * 0.36));
     assert.ok(rects.quest.w <= cap + 0.01, `${vp.name} width ${rects.quest.w}`);
-    assert.ok(rects.quest.w >= 96, `${vp.name} min ${rects.quest.w}`);
+    assert.ok(rects.quest.w >= 72, `${vp.name} min ${rects.quest.w}`);
     assert.ok(rects.quest.x + rects.quest.w <= vp.w - rects.menu.w, `${vp.name} inside viewport`);
     assert.equal(overlap(rects.quest, rects.minimap), false, vp.name);
   }
   const theme = src('../src/ui/theme.css');
-  assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(340px,\s*45vw/);
+  assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(240px,\s*36vw/);
   assert.match(theme, /overflow-wrap:\s*anywhere/);
 });
 

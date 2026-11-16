@@ -857,29 +857,30 @@ html.panel-open #dialog {
 
 #quest {
   min-width: 0;
+  width: max-content;
   padding: 0;
   pointer-events: auto;
 }
 #quest.open {
-  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 48px));
-  width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
-  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
-  max-height: min(42vh, calc(100dvh - var(--safe-t) - 24px));
+  min-width: min(160px, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 48px));
+  width: min(240px, 36vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
+  max-width: min(240px, 36vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
+  max-height: min(32vh, calc(100dvh - var(--safe-t) - 24px));
   overflow-x: hidden;
   overflow-y: auto;
 }
 body.touch #quest.open {
-  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
-  width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
-  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  min-width: min(160px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  width: min(240px, 36vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  max-width: min(240px, 36vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
 }
 #top-left:has(#quest.open) {
-  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 48px));
-  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
+  min-width: min(160px, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 48px));
+  max-width: min(240px, 36vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
 }
 body.touch #top-left:has(#quest.open) {
-  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
-  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  min-width: min(160px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
+  max-width: min(240px, 36vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
 }
 #quest.open .q-track {
   max-height: inherit;
@@ -908,10 +909,10 @@ body.touch #top-left:has(#quest.open) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
   margin: 0;
-  padding: 6px 10px;
+  padding: 3px 6px;
   background: transparent;
   border: 0;
   color: inherit;
@@ -921,16 +922,18 @@ body.touch #top-left:has(#quest.open) {
 }
 #quest .q-title {
   margin: 0;
+  font-size: 8px;
+  letter-spacing: 0.4px;
 }
 #quest .q-arrow {
-  font-size: 11px;
+  font-size: 8px;
   line-height: 1;
   color: var(--mg-gold-hi);
 }
 #quest:not(.open) .q-track { display: none; }
 #quest.open .q-arrow { transform: rotate(180deg); }
 #quest .q-track {
-  padding: 0 10px 8px;
+  padding: 0 6px 6px;
 }
 
 .build-id {
@@ -1039,6 +1042,12 @@ body:has(#hud:not(.hidden)) .build-id { display: none; }
 #world-status b {
   color: var(--mg-gold-bright);
   font-size: clamp(9px, 0.45vw + 8px, 13px);
+}
+#world-status[data-state="online"],
+#world-status[hidden],
+#world-status-slot:has(#world-status[data-state="online"]),
+#world-status-slot:has(#world-status[hidden]) {
+  display: none;
 }
 #world-status[data-state="online"] b { color: var(--mg-gold-hi); }
 #world-status[data-state="error"] b { color: #ffb4b4; }

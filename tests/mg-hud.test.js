@@ -160,8 +160,19 @@ test('MG-UI-MMO-4 online counter shares a row with fullscreen and sound', () => 
   const html = src('index.html');
   assert.match(html, /class="hud-status-row"/);
   assert.match(html, /id="world-status-slot"/);
-  assert.match(html, /hud-status-row[\s\S]*btn-fs[\s\S]*btn-snd/);
+  assert.match(html, /id="world-mode-pill"/);
+  assert.match(html, /hud-status-row[\s\S]*world-mode-pill[\s\S]*btn-fs[\s\S]*btn-snd/);
   assert.match(src('src/net/worldView.js'), /world-status-slot/);
+});
+
+test('MG-UI-MMO-5 live Online chip hides; the right-side mode pill stays', () => {
+  const view = src('src/net/worldView.js');
+  const theme = src('src/ui/theme.css');
+  assert.match(view, /this\.ui\.status\.hidden = st === STATUS\.online/);
+  assert.match(theme, /#world-status\[data-state="online"\]/);
+  assert.match(theme, /#world-status-slot:has\(#world-status\[data-state="online"\]\)/);
+  assert.match(src('index.html'), /id="world-mode-pill"/);
+  assert.doesNotMatch(theme, /#world-mode-pill\[data-mode="online"\][\s\S]{0,80}display:\s*none/);
 });
 
 test('MG-UI-11 oasis landing is labeled Oasis and the water bed tint varies', () => {
@@ -204,19 +215,23 @@ test('MG-UI-14 character select panel stays absolutely placed in the viewport', 
   assert.match(theme, /#charselect \.cs-panel,[\s\S]*max-width:\s*calc\(100vw/);
 });
 
-test('MG-UI-15 expanded quest dropdown has a 220px min-width clamped to the viewport', () => {
+test('MG-UI-15 expanded quest dropdown has a 160px min-width clamped to the viewport', () => {
   const theme = src('src/ui/theme.css');
-  assert.match(theme, /#quest\.open \{[\s\S]*min-width:\s*min\(220px/);
-  assert.match(theme, /body\.touch #quest\.open \{[\s\S]*min-width:\s*min\(220px/);
+  assert.match(theme, /#quest\.open \{[\s\S]*min-width:\s*min\(160px/);
+  assert.match(theme, /body\.touch #quest\.open \{[\s\S]*min-width:\s*min\(160px/);
 });
 
 test('MG-UI-16 expanded quest wraps inside a viewport-clamped frame', () => {
   const theme = src('src/ui/theme.css');
-  assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(340px,\s*45vw/);
-  assert.match(theme, /#quest\.open \{[\s\S]*max-height:\s*min\(42vh/);
+  const style = src('src/style.css');
+  assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(240px,\s*36vw/);
+  assert.match(theme, /#quest\.open \{[\s\S]*max-height:\s*min\(32vh/);
   assert.match(theme, /#quest\.open \.q-body \{[\s\S]*overflow-wrap:\s*anywhere/);
   assert.match(theme, /#quest\.open #q-text \{[\s\S]*text-overflow:\s*unset/);
   assert.doesNotMatch(theme, /#quest\.open \.q-body \{[\s\S]*white-space:\s*nowrap/);
+  assert.match(theme, /#quest \.q-head \{[\s\S]*padding:\s*3px 6px/);
+  assert.match(theme, /#quest \.q-title \{[\s\S]*font-size:\s*8px/);
+  assert.match(style, /#quest \{[\s\S]*min-width:\s*0/);
 });
 
 test('MG-UI-17 action cluster keeps a gap from the menu column', () => {

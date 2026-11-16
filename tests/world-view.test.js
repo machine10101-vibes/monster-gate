@@ -539,6 +539,41 @@ test('auth reject latches Sign in panel and ignores later reconnecting (MG-MMO-3
   assert.equal(bare.errorCode(), 'auth');
 });
 
+test('paintHud hides the center Online chip once World 1 is live', () => {
+  const view = new WorldView(stubGame(), { spawnRemote: stubRemote, search: '?mmo=1' });
+  const status = {
+    dataset: {},
+    hidden: false,
+    innerHTML: '',
+    querySelector() { return null; },
+  };
+  view.ui = {
+    status,
+    chat: {
+      classList: { toggle() {} },
+      dataset: {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+    },
+  };
+  view.status = STATUS.connecting;
+  view.paintHud();
+  assert.equal(status.hidden, false);
+  assert.equal(status.dataset.state, STATUS.connecting);
+  assert.match(status.innerHTML, /Connecting/);
+
+  view.status = STATUS.online;
+  view.online = 1;
+  view.paintHud();
+  assert.equal(status.hidden, true);
+  assert.equal(status.dataset.state, STATUS.online);
+
+  view.status = STATUS.error;
+  view.paintHud();
+  assert.equal(status.hidden, false);
+  assert.match(status.innerHTML, /Error/);
+});
+
 test('world wire errors stay online, do not paint, and snap a far hunter to spawn', () => {
   assert.equal(isWorldWireError('teleport'), 'teleport');
   assert.equal(isWorldWireError({ status: 'online', detail: 'That move was too far.' }), 'teleport');

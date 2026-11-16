@@ -1390,6 +1390,7 @@ export class WorldView {
     const canRetry = (st === STATUS.offline || st === STATUS.reconnecting)
       && this.errorCode() !== 'name_taken';
     this.ui.status.dataset.state = st;
+    this.ui.status.hidden = st === STATUS.online;
     const note = typeof this.detail === 'string' ? this.detail : '';
     this.ui.status.innerHTML = `<b>${label}</b>${note ? `<small>${escapeHtml(note)}</small>` : ''}${
       canRetry ? '<button type="button" class="wc-retry">Reconnect</button>' : ''
