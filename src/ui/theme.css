@@ -861,9 +861,9 @@ html.panel-open #dialog {
   pointer-events: auto;
 }
 #quest.open {
-  min-width: min(220px, calc(100vw - var(--menu-col-w) - 48px));
-  width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 32px));
-  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 32px));
+  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 48px));
+  width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
+  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
   max-height: min(42vh, calc(100dvh - var(--safe-t) - 24px));
   overflow-x: hidden;
   overflow-y: auto;
@@ -874,8 +874,8 @@ body.touch #quest.open {
   max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
 }
 #top-left:has(#quest.open) {
-  min-width: min(220px, calc(100vw - var(--menu-col-w) - 48px));
-  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 32px));
+  min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 48px));
+  max-width: min(340px, 45vw, calc(100vw - var(--menu-col-w) - 142px * var(--ui) - 32px));
 }
 body.touch #top-left:has(#quest.open) {
   min-width: min(220px, calc(100vw - var(--menu-col-w) - 142px * 0.78 - 28px));
@@ -1150,8 +1150,11 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
   background-color: var(--mg-navy);
 }
 #hints {
-  right: var(--hud-action-right);
-  bottom: calc(var(--hud-clear-bottom, 190px) + 8px + var(--safe-b));
+  left: 50%;
+  right: auto;
+  bottom: calc(max(var(--hud-clear-bottom, 190px), 196px * var(--ui, 1)) + 16px + var(--safe-b));
+  transform: translateX(-50%) scale(var(--ui));
+  transform-origin: bottom center;
 }
 
 body.touch #hud-corner-right,
@@ -1267,7 +1270,7 @@ body.mmo-view #top-left {
   }
 }
 
-/* Chat: above the minimap on desktop; inboard of the stick on phones. */
+/* Chat: bottom left on desktop; inboard of the stick on phones. */
 #world-chat {
   display: flex;
   flex-direction: column-reverse;

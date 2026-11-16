@@ -107,6 +107,7 @@ export const HUD_SAFE_IDS = [
   'world-mode-pill',
   'world-chat',
   'cast-buttons',
+  'hints',
 ];
 
 /** Keep labels out of the band just above the hearts / hotbar fade. */
@@ -303,17 +304,13 @@ export function hudRects(vp, { questOpen = false } = {}) {
 
   const mmScale = touch ? 0.78 : 1;
   const mm = 142 * mmScale;
-  const minimap = touch
-    ? rect('minimap', 8, 6, mm, mm)
-    : rect('minimap', 8, h - 8 - mm, mm, mm);
+  const minimap = rect('minimap', 8, 6, mm, mm);
 
-  const questCap = Math.min(QUEST_MAX_W, Math.floor(w * 0.45), w - menu.colW - (touch ? mm + 28 : 32));
+  const questCap = Math.min(QUEST_MAX_W, Math.floor(w * 0.45), w - menu.colW - (mm + 28));
   const questMax = Math.max(96, questCap);
   const questW = questOpen ? questMax : 96;
   const questH = questOpen ? Math.min(160, Math.max(92, Math.floor(h * 0.32))) : 28;
-  const quest = touch
-    ? rect('quest', 8 + mm + 8, 6, questW, questH)
-    : rect('quest', 8, 8, questW, questH);
+  const quest = rect('quest', 8 + mm + 8, 6, questW, questH);
 
   const hotScale = touch ? 0.86 : 1;
   const clusterW = 520 * hotScale;
@@ -344,7 +341,7 @@ export function hudRects(vp, { questOpen = false } = {}) {
   } else if (touch) {
     chat = rect('chat', 8, 6 + mm + 12, chatW, chatH);
   } else {
-    chat = rect('chat', 8, h - 8 - mm - 12 - chatH, chatW, chatH);
+    chat = rect('chat', 8, h - 8 - chatH, chatW, chatH);
   }
 
   const clockRight = MENU_INSET + menu.colW + CLOCK_GAP;

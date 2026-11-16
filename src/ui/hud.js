@@ -25,6 +25,7 @@ import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
 import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
+import { canCreateWorld } from '../admin/gate.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -582,6 +583,10 @@ export class HUD {
   }
 
   openPanel(name, game) {
+    if (name === 'world' && !canCreateWorld(game.staffRole)) {
+      this.toast('World Creator is for moderators.', 1800);
+      return;
+    }
     this.runCleanup();
     this.panelId = name;
     const card = this.el.panel.querySelector('.panel-card');
@@ -798,13 +803,16 @@ export class HUD {
       title.textContent = name === 'menu' ? 'Menu' : 'Settings';
       const jumps = document.createElement('div');
       jumps.className = 'set-jumps';
-      for (const [id, label, sub] of [
+      const jumpsList = [
         ['tome', 'Teleportation Tome', 'Travel to a remembered place'],
         ['friends', 'Friends', 'Friends list and party'],
         ['gear', 'Character', 'Equipped and unequipped'],
         ['bag', 'Inventory', 'Bag, tools and goods'],
-        ['world', 'World Creator', '100-tile map'],
-      ]) {
+      ];
+      if (canCreateWorld(game.staffRole)) {
+        jumpsList.push(['world', 'World Creator', '100-tile map']);
+      }
+      for (const [id, label, sub] of jumpsList) {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'set-jump';

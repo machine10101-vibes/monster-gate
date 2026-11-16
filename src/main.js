@@ -263,6 +263,7 @@ class Game {
     this.cloudFailAt = 0;
     this.cloudSavedAt = 0;
     this.cloudReachable = false;
+    this.staffRole = '';
     this.saveAcc = 0;
     this.accountWatch = false;
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
@@ -645,6 +646,10 @@ class Game {
     }
     if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
     this.cloudState = result?.abandoned ? 'off' : (result?.state || 'error');
+    this.staffRole = result?.staff === 'moderator' ? 'moderator' : '';
+    if (this.hud && (this.hud.panelId === 'settings' || this.hud.panelId === 'menu')) {
+      this.hud.openPanel(this.hud.panelId, this);
+    }
     if (result?.replaced) this.walletNote = 'loaded';
     if (this.cloudState === 'on') {
       this.cloudReachable = true;
@@ -885,6 +890,7 @@ class Game {
     this.cloudSyncing = false;
     this.cloudConflict = false;
     this.cloudReachable = false;
+    this.staffRole = '';
     this.progress.onCloud = null;
     this.stopAutosave();
     this.roster = new Roster(this.wallet.address, 'Guest');
@@ -1088,6 +1094,7 @@ class Game {
     this.walletNote = '';
     this.cloudState = 'off';
     this.cloudReachable = false;
+    this.staffRole = '';
     this.cloudSavedAt = 0;
     if (leaveWorld) {
       location.reload();

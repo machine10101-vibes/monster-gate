@@ -4,7 +4,7 @@ import '@fontsource/pixelify-sans/600.css';
 import '../ui/theme.css';
 import './admin.css';
 import { clearAccount, readAccount, signInAccount } from '../wallet/account.js';
-import { adminHref, gameHref } from './gate.js';
+import { adminHref, gameHref, isAdminAccount } from './gate.js';
 import { changeStaff, loadLedger } from './api.js';
 import { present } from '../../supabase/functions/_shared/ledger.js';
 import { chipsHtml, drawerHtml, leadIndex, stageHtml, toolsNote, windowsHtml } from './view.js';
@@ -287,10 +287,13 @@ async function boot() {
   $('back').href = gameHref();
   decorateAllFrames($('gate'));
   const seated = readAccount();
-  if (seated?.kind === 'email') {
+  if (isAdminAccount(seated)) {
     session = seated;
     showApp();
     await refresh();
+  } else if (seated?.kind === 'email') {
+    location.replace(gameHref());
+    return;
   }
   arm();
 }
@@ -303,6 +306,10 @@ $('login').addEventListener('submit', async (event) => {
   submit.disabled = true;
   try {
     const next = await signInAccount($('email').value, $('password').value);
+    if (!isAdminAccount(next)) {
+      location.replace(gameHref());
+      return;
+    }
     session = next;
     $('password').value = '';
     showApp();

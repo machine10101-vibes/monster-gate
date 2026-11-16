@@ -58,6 +58,7 @@ test('HUD rects do not collide at 844x390, 390x844, 1280x800, 1920x1080', () => 
     assert.deepEqual(hits, [], vp.name);
     assert.ok(rects.menu.x + rects.menu.w <= vp.w + 0.01, vp.name);
     assert.ok(rects.menu.y >= 0, vp.name);
+    assert.ok(rects.minimap.y <= 8, `${vp.name} minimap top`);
     if (vp.touch) {
       assert.ok(rects.bubbles, vp.name);
       const gap = rects.menu.x - (rects.bubbles.x + rects.bubbles.w);
@@ -166,4 +167,17 @@ test('MG-UI-16 expanded quest stays in frame at 844x390 and 1280x800', () => {
   const theme = src('../src/ui/theme.css');
   assert.match(theme, /#quest\.open \{[\s\S]*max-width:\s*min\(340px,\s*45vw/);
   assert.match(theme, /overflow-wrap:\s*anywhere/);
+});
+
+test('desktop minimap sits top-left and click hints sit above the hotbar', () => {
+  const style = src('../src/style.css');
+  const theme = src('../src/ui/theme.css');
+  assert.match(style, /#bottom-left \{[\s\S]*top: calc\(8px \+ var\(--safe-t\)\)/);
+  assert.match(style, /#hints \{[\s\S]*left: 50%/);
+  assert.match(style, /#hints \{[\s\S]*translateX\(-50%\)/);
+  assert.match(theme, /#hints \{[\s\S]*left: 50%/);
+  const desktop = hudRects({ name: 'desktop', w: 1920, h: 1080, touch: false });
+  assert.ok(desktop.minimap.y <= 8);
+  assert.ok(desktop.minimap.x <= 8);
+  assert.ok(desktop.quest.x >= desktop.minimap.x + desktop.minimap.w);
 });

@@ -126,6 +126,7 @@ export default {
     if (body.op === "overview") {
       const user = await guildStaff(admin, body.accessToken);
       if (user instanceof Response) return user;
+      if (user.role !== "master") return json({ error: "This gate is for the guild master." }, 403);
       return overview(admin, user.role);
     }
     if (body.op === "promote" || body.op === "demote") {
