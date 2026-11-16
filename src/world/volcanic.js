@@ -57,7 +57,9 @@ export const VOLCANIC_SPECS = {
     rim: { n: true, w: true },
     cone: { cx: 58, cz: 56, r: 44, top: 17, crater: 10 },
     knolls: [[116, 112, 8, 3.2], [118, 36, 7, 2.6], [30, 116, 8, 2.8]],
-    lava: [[108, 88, 6], [28, 100, 5.5]],
+    lava: [[108, 88, 6], [120, 36, 5.5]],
+    // South shoulder of the cone, past the old height-9 wall and clear of the crater.
+    lair: { cx: 58, cz: 72 },
     roads: [[[143, 72], [112, 84], [84, 108], [72, 143]]],
     dress: { ash: 24, thorns: 14, blooms: 24, spires: 8, rocks: 30, boulders: 12, mounds: 16, vents: 6, logs: 4, bones: 3 },
   },
@@ -83,13 +85,21 @@ export function volcanicFeature(h, x, z, spec) {
     const wob = 1 + 0.08 * Math.sin(a * 3 + 1.1) + 0.05 * Math.sin(a * 7);
     const d = Math.hypot(z - cz, x - cx) / wob;
     if (d < r) {
-      const t = 1 - d / r;
-      const body = lerp(h, top, Math.pow(t, 1.15));
+      const flank = (dist) => {
+        const t = 1 - dist / r;
+        return lerp(h, top, Math.pow(Math.max(0, t), 1.15));
+      };
+      // The lip used to jump to top+0.4, four units above the flank. That ring
+      // is a cliff. The bowl climbs back to the flank the hunter is already on.
+      const rimH = Math.max(h, flank(crater));
       if (d < crater) {
-        if (d < crater * 0.62) return { h: top - 3.6, kind: K_LAVA };
-        return { h: lerp(top - 3.6, top + 0.4, (d - crater * 0.62) / (crater * 0.38)), kind: 0 };
+        const floor = rimH - 2.4;
+        const band = crater * 0.55;
+        if (d < crater - band) return { h: floor, kind: K_LAVA };
+        const u = (d - (crater - band)) / band;
+        return { h: lerp(floor, rimH, u), kind: 0, climb: true };
       }
-      return { h: Math.max(h, body), kind: 0 };
+      return { h: Math.max(h, flank(d)), kind: 0, climb: true };
     }
   }
   if (spec.lava) {
@@ -103,6 +113,40 @@ export function volcanicFeature(h, x, z, spec) {
     }
   }
   return null;
+}
+
+/**
+ * Half-step the cone after heights are rounded and roads are stamped.
+ * Only the slope is lowered, and only toward land a hunter can already stand on.
+ * Lava and the tile's rim walls are left where they are, so the pit stays a pit
+ * and the north and west peaks stay sealed.
+ */
+export function gradeCinderCone(H, climb) {
+  const MAX = 0.5;
+  let changed = true;
+  let guard = 0;
+  while (changed && guard++ < W) {
+    changed = false;
+    for (let z = 1; z < W - 1; z++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = z * W + x;
+        if (!climb[i]) continue;
+        let floor = H[i];
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dz) continue;
+            const j = (z + dz) * W + (x + dx);
+            if (!climb[j] && H[j] >= 8.6) continue;
+            floor = Math.min(floor, H[j] + MAX);
+          }
+        }
+        if (floor < H[i] - 0.001) {
+          H[i] = floor;
+          changed = true;
+        }
+      }
+    }
+  }
 }
 
 function localSlope(H, x, z) {
@@ -250,6 +294,7 @@ export function dressVolcanic(world, land, spec) {
     const i = lz * W + lx;
     const h = data.H[i];
     const t = data.top[i];
+    if (spec.lair && Math.hypot(lx - spec.lair.cx, lz - spec.lair.cz) < 8) return false;
     return !data.pathMask[i] && h >= lo && h <= hi && t !== TILE.LAVA && !reserved(lx, lz);
   };
   const scatter = (count, tag, tries, fn) => {
@@ -275,11 +320,22 @@ export function dressVolcanic(world, land, spec) {
       place(V.rocks[k % V.rocks.length], Math.round(lx + Math.cos(a) * r * 1.25), Math.round(lz + Math.sin(a) * r * 1.25), a, 0.8 + (k % 3) * 0.25, { r: 1, collide: 0.5, occ: 0.8 });
     }
   }
+  if (spec.lair) {
+    const L = spec.lair;
+    const x = land.x0 + L.cx + 0.5;
+    const z = land.z0 + L.cz + 0.5;
+    // The nest sits on the slope itself. A moat or a ring of solid spires here
+    // was the wall that stopped the climb short of Volcanum.
+    world.volcanumLair = { x, z, r: 8 };
+    world.lightSpots.push({ x, y: world.heightAt(x, z) + 4, z, color: 0xff6a1a });
+    world.lightSpots.push({ x: x + 4, y: world.heightAt(x, z) + 2, z: z + 3, color: 0xff5a12 });
+  }
   if (spec.cone) {
     const { cx, cz, crater } = spec.cone;
     const x = land.x0 + cx + 0.5;
     const z = land.z0 + cz + 0.5;
-    world.circle(x, z, crater * 0.58);
+    // The lava cells close the pit. A disk out to the old lip was a fence on the shoulder.
+    world.circle(x, z, crater * 0.42);
     world.occupy(x, z, crater * 1.6);
     world.lightSpots.push({ x, y: world.heightAt(x, z) + 3, z, color: 0xff7a24 });
     world.lightSpots.push({ x: x + 6, y: world.heightAt(x, z) + 3, z: z + 4, color: 0xff5a14 });

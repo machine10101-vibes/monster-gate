@@ -758,7 +758,8 @@ export class Player {
       const pierce = (it.style === 'crossbow' && mods.pierce) || it.proj === 'crescent';
       if (it.proj) {
         const sp = it.proj === 'gloom' ? 12 : it.proj === 'bolt' ? 16 : 18;
-        g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * sp, vz: f.z * sp, dmg, life: it.proj === 'gloom' ? 2.6 : 1.5, r: 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
+        const lava = it.proj === 'lavabolt';
+        g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * (lava ? sp * 0.72 : sp), vz: f.z * (lava ? sp * 0.72 : sp), vy: lava ? 4.2 : 0, gravity: lava ? 14 : 0, dmg, life: it.proj === 'gloom' ? 2.6 : lava ? 1.8 : 1.5, r: lava ? 0.58 : 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
         g.audio.tone(it.proj === 'gloom' ? 260 : focus ? 720 : 620, 0.14, 'sawtooth', 0.08, -200);
       } else {
         if (!g.progress.drawArrow()) return;
@@ -1354,9 +1355,9 @@ export class Player {
 }
 
 /** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
-const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow', 'raptorcrossbow', 'buccaneergun']);
+const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow', 'volccrossbow', 'raptorcrossbow', 'buccaneergun']);
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer', 'tigerclaws', 'tigerspear', 'raptorsaber', 'raptorscythe', 'piratecutlass', 'piratedual', 'piratecleaver', 'cursedblade']);
+const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'volcsword', 'volcgreatsword', 'volcdual', 'volchammer', 'volcspear', 'volcscythe', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer', 'tigerclaws', 'tigerspear', 'raptorsaber', 'raptorscythe', 'piratecutlass', 'piratedual', 'piratecleaver', 'cursedblade']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -1374,6 +1375,12 @@ const TRAIL_SPEC = {
   darkhammer: { b: [0, 0, 0.8], t: [0, 0, 1.45], col: 0xc78bff, hot: 0xe6c8ff },
   budgespear: { b: [0, 0, 1.6], t: [0, 0, 2.2], col: 0xb8ff8a, hot: 0xfff09a },
   darkspear: { b: [0, 0, 1.6], t: [0, 0, 2.25], col: 0xc78bff, hot: 0xe6c8ff },
+  volcsword: { b: [0, 0, 0.35], t: [-0.15, 0, 1.4], col: 0xff6a12, hot: 0xffe08a },
+  volcgreatsword: { b: [0, 0, 0.5], t: [-0.2, 0, 1.85], col: 0xff6a12, hot: 0xffe08a },
+  volcdual: { b: [0, 0, 0.25], t: [-0.2, 0, 0.95], col: 0xff6a12, hot: 0xffe08a },
+  volchammer: { b: [0, 0, 0.8], t: [0, 0, 1.5], col: 0xff6a12, hot: 0xffe08a },
+  volcspear: { b: [0, 0, 1.6], t: [0, 0, 2.3], col: 0xff6a12, hot: 0xffe08a },
+  volcscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0xff6a12, hot: 0xffe08a },
   yetisword: { b: [0, 0, 0.35], t: [-0.1, 0, 1.4], col: 0x9fdcff, hot: 0xf2fbff },
   yetigreatsword: { b: [0, 0, 0.5], t: [-0.1, 0, 1.85], col: 0x9fdcff, hot: 0xf2fbff },
   yetidual: { b: [0, 0, 0.25], t: [-0.1, 0, 0.98], col: 0x9fdcff, hot: 0xf2fbff },

@@ -1,0 +1,21 @@
+/** Shared colours for Volcanum and everything forged from its parts. */
+export const VOLC = {
+  scaleLo: 0x101014,
+  scale: 0x1c1c22,
+  scaleHi: 0x3a3a44,
+  belly: 0x2a140c,
+  bellyDark: 0x140c08,
+  blade: 0x2a2a32,
+  bladeDark: 0x141418,
+  edge: 0xffe08a,
+  claw: 0xd8d4cc,
+  eye: 0xff6a12,
+  pupil: 0x1a0804,
+  mouth: 0x1a0804,
+  mouthGlow: 0xff5a12,
+  membrane: 0x3a2068,
+  membraneHi: 0x7a4cb0,
+  glow: 0xff5a12,
+  glowHi: 0xffe08a,
+  trim: 0xff8a24,
+};

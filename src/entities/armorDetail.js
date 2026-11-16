@@ -1,6 +1,7 @@
 import { hash3, jitter, shade } from '../engine/voxel.js';
 import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
+import { VOLC } from '../data/volcanum.js';
 import { YETI } from '../data/yeti.js';
 import { SOFT_PALETTES } from './armorSoft.js';
 import { METALS } from '../data/metals.js';
@@ -12,6 +13,7 @@ const METAL = {
   budgeset: { a: BUDGE.horn, b: BUDGE.hornDark, g: BUDGE.belly, gd: BUDGE.bellyDark, glow: null, hot: BUDGE.vein, edge: BUDGE.claw, base: BUDGE.scale },
   yetiset: { a: YETI.iceHi, b: YETI.ice, g: YETI.leather, gd: YETI.leatherLo, glow: YETI.glow, hot: YETI.glowHi, edge: YETI.furWhite, base: 0x95b6d3 },
   darksyceset: { a: DARK.blade, b: DARK.bladeDark, g: DARK.trim, gd: DARK.bladeDark, glow: DARK.glow, hot: DARK.glowHi, edge: DARK.edge, base: DARK.scale },
+  volcanumset: { a: VOLC.scaleHi, b: VOLC.scale, g: VOLC.trim, gd: VOLC.bellyDark, glow: VOLC.glow, hot: VOLC.glowHi, edge: VOLC.edge, base: VOLC.scale },
 };
 
 /** Per-piece detail layers painted after the base painters: relief, stitching, plates and emblems. */
