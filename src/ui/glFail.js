@@ -15,6 +15,8 @@ export const GL_FAIL_TIPS = [
 export const GL_FAIL_RETRY = 'Retry';
 export const GL_FAIL_TRYING = 'Trying again…';
 export const GL_FAIL_STILL = "Still couldn't start 3D. Check the tips above.";
+/** MG-UI-41: keep the disabled Trying again… state on screen at least this long. */
+export const GL_FAIL_RETRY_MS = 600;
 
 export function shouldForceNoGL({ search, win } = {}) {
   const w = win || (typeof window !== 'undefined' ? window : null);
@@ -206,6 +208,22 @@ function paintPanel(panel, opts = {}, doc = null) {
   }
 }
 
+function retryMinMs(opts = {}) {
+  const n = Number(opts.retryMinMs);
+  return Number.isFinite(n) ? Math.max(0, n) : GL_FAIL_RETRY_MS;
+}
+
+function afterRetryMin(startedAt, opts, fn) {
+  const nowFn = opts.now || Date.now;
+  const wait = opts.setTimeout || ((cb, ms) => setTimeout(cb, ms));
+  const remain = Math.max(0, retryMinMs(opts) - (nowFn() - startedAt));
+  if (remain <= 0) {
+    fn();
+    return;
+  }
+  wait(fn, remain);
+}
+
 function bindRetry(doc, panel, opts = {}) {
   const retry = doc.getElementById('gl-fail-retry') || panel.querySelector?.('#gl-fail-retry');
   if (!retry) return;
@@ -213,21 +231,26 @@ function bindRetry(doc, panel, opts = {}) {
   const onSuccess = opts.onSuccess || opts.reload || (() => {
     if (typeof location !== 'undefined') location.reload();
   });
-  retry.onclick = (ev) => {
+  const runRetry = (ev) => {
     ev?.preventDefault?.();
+    ev?.stopPropagation?.();
     if (retry.disabled) return;
     const attempts = (Number(panel.dataset?.tries || panel.tries) || 0) + 1;
     if (panel.dataset) panel.dataset.tries = String(attempts);
     else panel.tries = attempts;
     paintTrying(retry, panel, doc);
+    const startedAt = (opts.now || Date.now)();
     const finish = (result) => {
-      if (result?.ok) {
-        hideGlFailPanel(doc);
-        onSuccess(result);
-        return;
-      }
-      paintStillFailed(retry, panel, attempts, doc);
-      opts.onFail?.(result, attempts);
+      afterRetryMin(startedAt, opts, () => {
+        if (!retry.disabled) return;
+        if (result?.ok) {
+          hideGlFailPanel(doc);
+          onSuccess(result);
+          return;
+        }
+        paintStillFailed(retry, panel, attempts, doc);
+        opts.onFail?.(result, attempts);
+      });
     };
     let out;
     try {
@@ -242,6 +265,11 @@ function bindRetry(doc, panel, opts = {}) {
     }
     finish(out);
   };
+  if (retry._mgRetry) retry.removeEventListener?.('pointerup', retry._mgRetry);
+  retry._mgRetry = runRetry;
+  retry.onclick = runRetry;
+  retry.onpointerup = runRetry;
+  retry.addEventListener?.('pointerup', runRetry);
 }
 
 function paintTrying(retry, panel, doc) {
@@ -324,6 +352,7 @@ if (typeof window !== 'undefined') {
     armContextLost,
     shouldForceNoGL,
     GL_RESTORE_MS,
+    GL_FAIL_RETRY_MS,
     GL_FAIL_TITLE,
     GL_FAIL_TRYING,
     GL_FAIL_STILL,

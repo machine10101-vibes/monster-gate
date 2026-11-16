@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { BUILD_ID } from '../src/ui/buildId.js';
 import {
   GL_FAIL_RETRY,
+  GL_FAIL_RETRY_MS,
   GL_FAIL_STILL,
   GL_FAIL_TIPS,
   GL_FAIL_TITLE,
@@ -180,7 +181,9 @@ test('showGlFailPanel paints the loading fallback', () => {
   assert.equal(doc.status.hidden, true);
 });
 
-test('Retry shows Trying again then a still-failed line with the attempt count', () => {
+test('MG-UI-41: Retry keeps Trying again for 600ms even if the probe fails instantly', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  assert.equal(GL_FAIL_RETRY_MS, 600);
   const doc = fakeDoc();
   let during = null;
   showGlFailPanel(doc, {
@@ -193,6 +196,13 @@ test('Retry shows Trying again then a still-failed line with the attempt count',
   assert.equal(during.text, GL_FAIL_TRYING);
   assert.equal(during.disabled, true);
   assert.equal(during.status, GL_FAIL_TRYING);
+  assert.equal(doc.btn.disabled, true);
+  assert.equal(doc.btn.textContent, GL_FAIL_TRYING);
+  t.mock.timers.tick(599);
+  assert.equal(doc.btn.disabled, true);
+  assert.equal(doc.btn.textContent, GL_FAIL_TRYING);
+  assert.equal(doc.status.textContent, GL_FAIL_TRYING);
+  t.mock.timers.tick(1);
   assert.equal(doc.btn.disabled, false);
   assert.equal(doc.btn.textContent, GL_FAIL_RETRY);
   assert.equal(doc.status.hidden, false);
@@ -200,12 +210,14 @@ test('Retry shows Trying again then a still-failed line with the attempt count',
   assert.match(doc.status.textContent, /Still couldn't start 3D/);
   assert.match(doc.status.textContent, /Try 1/);
   doc.btn.onclick({ preventDefault() {} });
+  t.mock.timers.tick(GL_FAIL_RETRY_MS);
   assert.equal(doc.status.textContent, glFailStatusLine(2));
   assert.match(doc.status.textContent, /Try 2/);
   assert.equal(GL_FAIL_STILL, "Still couldn't start 3D. Check the tips above.");
 });
 
-test('Retry success hides the panel and continues boot', () => {
+test('Retry success waits out the 600ms minimum then continues boot', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const doc = fakeDoc();
   let boots = 0;
   showGlFailPanel(doc, {
@@ -213,11 +225,34 @@ test('Retry success hides the panel and continues boot', () => {
     onSuccess: () => { boots += 1; },
   });
   doc.btn.onclick({ preventDefault() {} });
+  assert.equal(boots, 0);
+  assert.equal(doc.btn.textContent, GL_FAIL_TRYING);
+  assert.equal(doc.btn.disabled, true);
+  t.mock.timers.tick(599);
+  assert.equal(boots, 0);
+  assert.equal(doc.panel.hidden, false);
+  t.mock.timers.tick(1);
   assert.equal(boots, 1);
   assert.equal(doc.panel.hidden, true);
   assert.equal(doc.loading.classList.contains('gl-failed'), false);
   hideGlFailPanel(doc);
   assert.equal(doc.panel.hidden, true);
+});
+
+test('Retry fires from a pointerup tap as well as click', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const doc = fakeDoc();
+  showGlFailPanel(doc, { probe: () => ({ ok: false, reason: 'force' }) });
+  assert.equal(typeof doc.btn.onpointerup, 'function');
+  doc.btn.onpointerup({ preventDefault() {}, stopPropagation() {}, pointerType: 'touch' });
+  assert.equal(doc.btn.textContent, GL_FAIL_TRYING);
+  assert.equal(doc.btn.disabled, true);
+  t.mock.timers.tick(GL_FAIL_RETRY_MS);
+  assert.equal(doc.status.textContent, glFailStatusLine(1));
+  doc.btn.onpointerup({ preventDefault() {}, stopPropagation() {}, pointerType: 'touch' });
+  doc.btn.onclick({ preventDefault() {}, stopPropagation() {} });
+  t.mock.timers.tick(GL_FAIL_RETRY_MS);
+  assert.equal(doc.status.textContent, glFailStatusLine(2));
 });
 
 test('context lost waits ~5s and is cancelled if WebGL restores', () => {
@@ -266,6 +301,12 @@ test('loading markup, Retry, and Game boot all wire the WebGL fallback', () => {
   assert.match(html, /id="gl-fail-retry"[^>]*>Retry/);
   assert.match(html, /id="gl-fail-status"/);
   assert.match(html, /id="gl-fail-build"/);
+  const theme = src('../src/ui/theme.css');
+  assert.match(theme, /#gl-fail(?:-retry)?[^{]*\{[\s\S]*touch-action:\s*manipulation/);
+  assert.match(theme, /#gl-fail \.start[\s\S]*min-height:\s*48px/);
+  assert.match(theme, /#loading\.gl-failed > :not\(#gl-fail\) \{[\s\S]*pointer-events:\s*none/);
+  assert.match(src('../src/ui/glFail.js'), /onpointerup/);
+  assert.match(src('../src/ui/glFail.js'), /GL_FAIL_RETRY_MS/);
   assert.match(html, /hardware acceleration/);
   assert.match(main, /showBootGlFail/);
   assert.match(main, /showGlFailIfNeeded/);
