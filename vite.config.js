@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -70,6 +70,7 @@ function shortSha() {
   }
 }
 
+const rootDir = dirname(fileURLToPath(import.meta.url));
 const supabase = resolveSupabaseConfig();
 
 export default defineConfig({
@@ -84,6 +85,9 @@ export default defineConfig({
   build: {
     target: 'es2020',
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      input: [resolve(rootDir, 'index.html'), resolve(rootDir, 'admin.html')],
+    },
   },
   server: { port: 5173 },
 });

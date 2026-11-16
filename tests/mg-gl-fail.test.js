@@ -319,7 +319,7 @@ test('loading markup, Retry, and Game boot all wire the WebGL fallback', () => {
   const earlyAt = main.indexOf('showGlFailIfNeeded({');
   const bridgeAt = main.lastIndexOf('runLegacySaveBridge');
   assert.ok(mountAt >= 0 && earlyAt > mountAt && bridgeAt > earlyAt);
-  assert.match(main, /if \(!glDeadAtBoot\)/);
+  assert.match(main, /if \(!sendingToLedger && !glDeadAtBoot\)/);
   assert.doesNotMatch(main, /localStorage\.(removeItem|clear)/);
   assert.doesNotMatch(boot, /saveio|savebridge/);
 });
