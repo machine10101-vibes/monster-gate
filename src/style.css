@@ -938,6 +938,25 @@ body.touch #top-right {
   margin-top: 2px;
   text-shadow: var(--hud-shadow);
 }
+.nameplate .q-bang {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2px);
+  transform: translate(-50%, 0);
+  font-family: var(--font-px);
+  font-size: clamp(14px, 1.1vw + 12px, 22px);
+  line-height: 1;
+  font-style: normal;
+  pointer-events: none;
+  text-shadow: 0 2px 0 #000, -1px -1px 0 #000, 1px 1px 0 #000, 0 0 10px currentColor;
+  animation: q-bang-bob 1.15s ease-in-out infinite;
+}
+.nameplate .q-bang.offer { color: #ffe27a; }
+.nameplate .q-bang.step { color: #6ee58a; }
+@keyframes q-bang-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -5px; }
+}
 .nameplate.mon {
   font-size: var(--plate-sub);
 }

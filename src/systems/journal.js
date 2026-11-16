@@ -1,4 +1,4 @@
-import { QUESTS, QUEST_POINTS_TOTAL, questById } from '../data/quests.js';
+import { QUESTS, QUEST_MARK_OFFER, QUEST_MARK_STEP, QUEST_POINTS_TOTAL, questById, questGiverNpc } from '../data/quests.js';
 
 const ACTIVITY_CAP = 32;
 
@@ -155,6 +155,38 @@ export class Journal {
       }
     }
     return null;
+  }
+
+  /** First available quest this NPC is offering (gold !). */
+  offerFor(npcId) {
+    if (!npcId) return null;
+    for (const q of QUESTS) {
+      if (this.status(q.id) === 'available' && questGiverNpc(q) === npcId) return q;
+    }
+    return null;
+  }
+
+  /**
+   * Nameplate bang: gold `offer` for a quest this NPC is handing out,
+   * green `step` for a talk objective already in progress.
+   */
+  markFor(npcId) {
+    if (!npcId) return '';
+    let offer = false;
+    for (const q of QUESTS) {
+      const st = this.status(q.id);
+      if (st === 'active') {
+        const row = this.row(q.id);
+        const step = q.steps[row.step];
+        if (step?.kind === 'talk' && step.npc === npcId) {
+          if ((row.step | 0) > 0) return QUEST_MARK_STEP;
+          offer = true;
+        }
+      } else if (st === 'available' && questGiverNpc(q) === npcId) {
+        offer = true;
+      }
+    }
+    return offer ? QUEST_MARK_OFFER : '';
   }
 
   finishTalk(questId, choiceId) {

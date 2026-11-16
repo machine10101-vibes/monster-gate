@@ -2847,7 +2847,15 @@ class Game {
     }
     const near = this.ambient.npcs.find((n) => n.near);
     if (!near) return;
-    const script = this.journal.scriptFor(near.def.id);
+    let script = this.journal.scriptFor(near.def.id);
+    if (!script) {
+      const offer = this.journal.offerFor(near.def.id);
+      if (offer) {
+        const started = this.journal.start(offer.id, true);
+        if (started) this.applyJournal(started);
+        script = this.journal.scriptFor(near.def.id);
+      }
+    }
     if (near.def.service === 'alchemy' && !script) {
       this.openAlchemy();
       return;

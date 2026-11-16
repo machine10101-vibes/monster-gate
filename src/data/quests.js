@@ -549,6 +549,27 @@ export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
 
 export const QUEST_POINTS_TOTAL = QUESTS.reduce((n, q) => n + q.points, 0);
 
+/** Display-name → NPC def id. Used when a quest lists a giver but no giverNpc. */
+export const QUEST_GIVER_NPC = {
+  Mira: 'guild',
+  Bram: 'smith',
+  Lira: 'alchemist',
+  'Old Tobin': 'farmer',
+  Pip: 'child',
+};
+
+export const QUEST_MARK_OFFER = 'offer';
+export const QUEST_MARK_STEP = 'step';
+
 export function questById(id) {
   return QUEST_BY_ID[id] || null;
+}
+
+/** NPC id the gold ! sits on while this quest is available / first talk. */
+export function questGiverNpc(q) {
+  if (!q) return '';
+  if (q.giverNpc) return q.giverNpc;
+  if (q.giver && QUEST_GIVER_NPC[q.giver]) return QUEST_GIVER_NPC[q.giver];
+  const talk = (q.steps || []).find((s) => s.kind === 'talk');
+  return talk?.npc || '';
 }
