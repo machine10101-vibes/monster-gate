@@ -24,6 +24,7 @@ const STYLES = {
   icicle: { c1: 0x9fdcff, size: 1.5, trail: [0xbfeaff, 0.22, 0.28], sparks: ICE, rate: 34, arrow: { tip: 0xe6f9ff, fletch: 0x8fd4ff, thick: 1.15 } },
   iceboulder: { core: 0xe6f9ff, c1: 0x7fd0ff, size: 3.2, trail: [0x9fdcff, 0.7, 0.4], sparks: ICE, rate: 70, coreSize: 0.78, shard: true },
   icebreath: { core: 0xffffff, c1: 0xaee4ff, size: 2.6, trail: [0xcdeeff, 0.5, 0.26], sparks: ICE, rate: 60, coreSize: 0.34 },
+  lavabolt: { core: 0xfff0c0, c1: 0xff5a12, size: 2.8, trail: [0xff6a1a, 0.7, 0.32], sparks: FIRE, rate: 70, smoke: true, smokeCol: 0x3a2418, light: 0xff6a12, coreSize: 0.42 },
   orb: { core: 0xf3d6ff, c1: 0xb04dff, size: 2.1, trail: [0xb04dff, 0.36, 0.3], sparks: VOID, rate: 45, coreSize: 0.28 },
   gloom: { core: 0xf0c8ff, c1: 0x7a34e0, size: 2.7, trail: [0x6a2cc8, 0.5, 0.45], sparks: VOID, rate: 55, smoke: true, smokeCol: 0x2a1c44, coreSize: 0.32, homing: true },
   crescent: { core: 0xe9e4ff, c1: 0xb25cff, size: 2.2, trail: [0xb25cff, 0.6, 0.3], sparks: VOID, rate: 50, coreSize: 0 },
@@ -180,6 +181,13 @@ export function endProjectile(game, p, ground) {
       break;
     case 'stone':
       game.fx.dust(x, y, z, 4, 1, 0xb8b0a0);
+      break;
+    case 'lavabolt':
+      vfx.glow(x, y, z, 0xffe08a, 1.3, 0.14, { grow: 0.5 });
+      vfx.glow(x, y, z, 0xff5a12, 2.1, 0.28, { grow: 0.45, gain: 0.65 });
+      vfx.sparks(x, y, z, FIRE, 10, 5, 0.08, 0.4, 5);
+      vfx.ring(x, y, z, { axis: 'cam', color: 0xff8a24, r0: 0.1, r1: 0.9, life: 0.22, thick: 0.14 });
+      if (ground) vfx.scorch(x, z, 0.85, 0x140c08, 0.4, 3);
       break;
     default:
       if (ground) vfx.sparks(x, Math.max(y, 0), z, [0xfff2d0, 0xd9c9a0], 3, 2, 0.05, 0.25, 8);

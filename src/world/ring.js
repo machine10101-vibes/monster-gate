@@ -4,7 +4,7 @@ import { W, ZONE } from './terrain.js';
 import { TILES } from './tiles.js';
 import { ARCTIC_SPECS, arcticFeature, paintArcticCell, frostGoldmead, dressArctic } from './arctic.js';
 import { JUNGLE_SPECS, jungleFeature, paintJungleCell, dressJungle, finishJungle } from './jungle.js';
-import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount } from './volcanic.js';
+import { K_LAVA, VOLCANIC_SPECS, gradeWalkableHill, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount } from './volcanic.js';
 import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert, openLongacreSouth, openDunesEast } from './desert.js';
 import { buildHouse } from './models.js';
 
@@ -542,6 +542,7 @@ function makeTile(spec, edges) {
       stampLane(H, kind, mask, farm.lane);
     }
   }
+  if (spec.lair) gradeWalkableHill(H, (i) => kind[i] === K_LAVA);
 
   const zone = new Uint8Array(W * W);
   const top = new Uint8Array(W * W);

@@ -134,15 +134,39 @@ export class World {
     if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
     const land = this.landAt(x, z);
     if (!land || land.role !== 'ring') return false;
+    if (h <= 0.45) return false;
+    // The lava pool's hill keeps climbing past the usual mountain cap. Lava stays closed.
+    // The whole skirt is walkable, including the west face that used to sit inside the rim cutoff.
+    if (land.kind === 'cinderfall') {
+      if (h >= 16.5) return false;
+      const lx = Math.floor(x) - land.x0;
+      const lz = Math.floor(z) - land.z0;
+      return land.data.top[lz * W + lx] !== TILE.LAVA;
+    }
     // Rim peaks are already above walking height. A pass cut through one stays open,
     // including Harefield's north gate into Ashen Road (tile 34) and the volcanic block.
-    return h < 8.6 && h > 0.45;
+    if (h < 8.6) return true;
+    return false;
+  }
+
+  /** True when this cell is painted lava. Shoulders may overhang it; the body center may not. */
+  lavaAt(x, z) {
+    const land = this.landAt(x, z);
+    if (!land?.data?.top) return false;
+    const lx = Math.floor(x) - land.x0;
+    const lz = Math.floor(z) - land.z0;
+    if (lx < 0 || lz < 0 || lx >= W || lz >= W) return false;
+    return land.data.top[lz * W + lx] === TILE.LAVA;
   }
 
   /** can a body walk from height `fromY` to (x,z)? */
   canStep(x, z, fromY) {
     const h = this.heightAt(x, z);
-    return h - fromY <= 1.01 && h < 9 && this.playable(x, z);
+    if (h - fromY > 1.01) return false;
+    if (!this.playable(x, z)) return false;
+    if (h < 9) return true;
+    const land = this.landAt(x, z);
+    return land?.kind === 'cinderfall' && h < 16.5;
   }
 
   /* ---------------------------- colliders ---------------------------- */
