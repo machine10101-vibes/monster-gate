@@ -4,7 +4,7 @@ import { W, ZONE } from './terrain.js';
 import { TILES } from './tiles.js';
 import { ARCTIC_SPECS, arcticFeature, paintArcticCell, frostGoldmead, dressArctic } from './arctic.js';
 import { JUNGLE_SPECS, jungleFeature, paintJungleCell, dressJungle, finishJungle } from './jungle.js';
-import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount } from './volcanic.js';
+import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount, gradeCinderCone } from './volcanic.js';
 import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert, openLongacreSouth, openDunesEast } from './desert.js';
 import { buildHouse } from './models.js';
 
@@ -490,6 +490,7 @@ function makeTile(spec, edges) {
   const H = new Float32Array(W * W);
   const kind = new Uint8Array(W * W);
   const mask = new Float32Array(W * W);
+  const climb = new Uint8Array(W * W);
   for (let z = 0; z < W; z++) {
     for (let x = 0; x < W; x++) {
       let h = spec.base + noiseAt(x, z, spec.seed, spec.amp) + knollAt(x, z, spec.knolls);
@@ -506,6 +507,7 @@ function makeTile(spec, edges) {
         if (feat) {
           h = feat.h;
           kind[z * W + x] = feat.kind;
+          if (feat.climb) climb[z * W + x] = 1;
         }
       }
       H[z * W + x] = h;
@@ -522,6 +524,7 @@ function makeTile(spec, edges) {
     }
   }
   for (const road of spec.roads) stampRoad(H, kind, mask, road, edges);
+  if (spec.cone) gradeCinderCone(H, climb);
   for (let z = 0; z < W; z++) {
     for (let x = 0; x < W; x++) {
       if (onBorder(x, z, edges)) continue;
@@ -621,7 +624,7 @@ function makeTile(spec, edges) {
     }
   }
   reslope(H, slope);
-  return { H, zone, top, tint, pathMask: mask, slope, forest };
+  return { H, zone, top, tint, pathMask: mask, slope, forest, climb };
 }
 
 function specEdges(kind, oak, south, made) {

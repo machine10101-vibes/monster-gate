@@ -134,15 +134,31 @@ export class World {
     if (this.south && x >= W - 22 && x < W && lz >= 70 && lz <= 114 && h > 0.4 && h < 8.6) return true;
     const land = this.landAt(x, z);
     if (!land || land.role !== 'ring') return false;
-    // Rim peaks are already above walking height. A pass cut through one stays open,
-    // including Harefield's north gate into Ashen Road (tile 34) and the volcanic block.
-    return h < 8.6 && h > 0.45;
+    if (h <= 0.45) return false;
+    // Cinderfall's cone keeps climbing past the rim cap. The cap is what sealed
+    // the hillside at height 9. Lava in the crater stays closed, and so do the
+    // north and west rims, which are not part of the cone.
+    if (h >= 8.6) return this.onCinderSlope(land, x, z);
+    return true;
+  }
+
+  /** Cone cells marked climbable. Rim walls and the lava pit are not. */
+  onCinderSlope(land, x, z) {
+    const climb = land?.data?.climb;
+    if (!climb) return false;
+    const lx = Math.floor(x) - land.x0;
+    const lz = Math.floor(z) - land.z0;
+    if (lx < 0 || lz < 0 || lx >= W || lz >= W) return false;
+    return climb[lz * W + lx] === 1;
   }
 
   /** can a body walk from height `fromY` to (x,z)? */
   canStep(x, z, fromY) {
     const h = this.heightAt(x, z);
-    return h - fromY <= 1.01 && h < 9 && this.playable(x, z);
+    if (h - fromY > 1.01) return false;
+    if (!this.playable(x, z)) return false;
+    if (h < 9) return true;
+    return this.onCinderSlope(this.landAt(x, z), x, z);
   }
 
   /* ---------------------------- colliders ---------------------------- */
