@@ -255,7 +255,7 @@ export function flushCloud() {
     .then((result) => {
       job.onDone?.(result);
     })
-    .catch(() => {
-      job.onDone?.({ error: true });
+    .catch((err) => {
+      job.onDone?.({ error: true, taken: err?.code === 'taken', message: err?.message });
     });
 }

@@ -144,7 +144,9 @@ export async function loginWithKlever() {
   const session = sessionFromWallet(res.json, res.json.email);
   if (!session) throw fail('rejected', 'Klever sign-in failed.');
   session.kleverAddress = proof.address;
-  return saveAccount(session);
+  const seated = saveAccount(session);
+  const { claimDevice } = await import('./account.js');
+  return claimDevice(seated);
 }
 
 export async function linkKleverWallet(session) {

@@ -4,7 +4,7 @@
  */
 
 import { buildLedger } from '../../supabase/functions/_shared/ledger.js';
-import { saveAccount } from '../wallet/account.js';
+import { saveAccount, SESSION_TAKEN } from '../wallet/account.js';
 import { loadCloudConfig } from '../wallet/cloud.js';
 
 async function freshToken(session, cfg) {
@@ -65,13 +65,18 @@ async function postAdmin(session, body) {
         apikey: cfg.key,
         authorization: `Bearer ${cfg.key}`,
       },
-      body: JSON.stringify({ ...body, accessToken }),
+      body: JSON.stringify({ ...body, accessToken, sessionId: session.sessionId || '' }),
     });
   } catch {
     throw fail('unavailable', 'The ledger could not be reached.');
   }
   const json = await res.json().catch(() => ({}));
+  if (typeof json.sessionId === 'string' && json.sessionId) {
+    session.sessionId = json.sessionId;
+    saveAccount(session);
+  }
   if (res.status === 401) throw fail('denied', json.error || 'Sign in again.');
+  if (res.status === 409 && json.taken) throw fail('taken', json.error || SESSION_TAKEN);
   if (res.status === 403) throw fail('denied', json.error || 'This gate is for the guild master.');
   if (!res.ok) throw fail('fail', json.error || 'The ledger could not be opened.');
   const ledger = packLedger(json);

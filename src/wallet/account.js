@@ -7,6 +7,7 @@
  */
 
 import { readStaffRole } from '../admin/gate.js';
+import { ACCOUNT_SESSION_TAKEN } from '../../supabase/functions/_shared/accountSession.js';
 
 const BOOK_KEY = 'monster-gate-accounts-v1';
 const SESSION_KEY = 'monster-gate-account-session';
@@ -20,6 +21,8 @@ const MAX_ITERS = 600_000;
 
 export const CLOUD_UNAVAILABLE = "Couldn't reach the account service. Check your connection and try again.";
 export const CLOUD_UNAVAILABLE_RETRY = 'Retry';
+export const SESSION_TAKEN = ACCOUNT_SESSION_TAKEN;
+const TAKEN_KEY = 'monster-gate-taken-notice';
 
 function fail(code, message) {
   const err = new Error(message);
@@ -127,6 +130,7 @@ export function saveAccount(session) {
     clean.refreshToken = typeof session.refreshToken === 'string' ? session.refreshToken : '';
     clean.expiresAt = session.expiresAt || '';
   }
+  if (UUID_RE.test(session.sessionId || '')) clean.sessionId = session.sessionId;
   const text = JSON.stringify(clean);
   for (const store of [sessionStorage, localStorage]) {
     try {
@@ -294,7 +298,7 @@ async function signInRemote(cfg, email, password) {
   }
   const session = sessionFromAuth(parsed.json, email);
   if (!session) throw fail('rejected', 'That email or password was not accepted.');
-  return session;
+  return claimDevice(session);
 }
 
 async function cloudConfig() {
@@ -387,16 +391,91 @@ async function freshSession(session) {
   return adoptSession(session, await refreshOnce(session, cfg));
 }
 
+function rememberSessionId(session, json) {
+  const id = typeof json?.sessionId === 'string' ? json.sessionId.trim() : '';
+  if (!UUID_RE.test(id) || !session) return session;
+  if (session.sessionId === id) return session;
+  session.sessionId = id;
+  saveAccount(session);
+  return session;
+}
+
+function throwIfTaken(res) {
+  if (res?.status === 409 && res.json?.taken) throw fail('taken', res.json.error || SESSION_TAKEN);
+}
+
+async function revokeOtherSessions(session, cfg) {
+  if (!cfg?.url || !cfg?.key || !session?.accessToken) return;
+  try {
+    await fetch(`${cfg.url}/auth/v1/logout?scope=others`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: cfg.key,
+        authorization: `Bearer ${session.accessToken}`,
+      },
+    });
+  } catch {
+    /* the seat on account_sessions is what drops the other browser */
+  }
+}
+
 async function accountOp(session, body, keepalive = false) {
   const { guildPost } = await import('./cloud.js');
   const current = await freshSession(session);
   if (!current?.accessToken) return { state: 'off' };
-  let res = await guildPost({ ...body, accessToken: current.accessToken }, keepalive);
+  const payload = { ...body, accessToken: current.accessToken };
+  if (current.sessionId) payload.sessionId = current.sessionId;
+  let res = await guildPost(payload, keepalive);
   if (res?.status === 401 && session.refreshToken) {
     const again = adoptSession(session, await refreshSession(session, await cloudConfig()));
-    res = await guildPost({ ...body, accessToken: again.accessToken }, keepalive);
+    const retry = { ...body, accessToken: again.accessToken };
+    if (again.sessionId) retry.sessionId = again.sessionId;
+    res = await guildPost(retry, keepalive);
   }
+  rememberSessionId(session, res?.json);
+  throwIfTaken(res);
   return res;
+}
+
+/** A new sign-in takes the seat and the other device is dropped. */
+export async function claimDevice(session) {
+  if (!session?.accessToken) return session;
+  const res = await accountOp(session, { op: 'account-claim' });
+  if (res?.state === 'off') return session;
+  if (!res || res.status !== 200 || !res.json?.sessionId) {
+    throw fail('unavailable', 'The account could not be opened.');
+  }
+  rememberSessionId(session, res.json);
+  await revokeOtherSessions(session, await cloudConfig());
+  return session;
+}
+
+/** True when this browser still holds the seat. Throws `taken` if another device signed in. */
+export async function checkDevice(session) {
+  if (!session?.accessToken) return session;
+  const res = await accountOp(session, { op: 'account-check' });
+  if (res?.state === 'off') return session;
+  if (!res || res.status !== 200) throw fail('unavailable', res?.json?.error || 'The account could not be opened.');
+  return session;
+}
+
+export function markTakenNotice(message) {
+  try {
+    sessionStorage.setItem(TAKEN_KEY, String(message || SESSION_TAKEN));
+  } catch {
+    /* private mode */
+  }
+}
+
+export function consumeTakenNotice() {
+  try {
+    const msg = sessionStorage.getItem(TAKEN_KEY) || '';
+    sessionStorage.removeItem(TAKEN_KEY);
+    return msg;
+  } catch {
+    return '';
+  }
 }
 
 /** Pull the hunt saved to this email account and fold it into the local roster. */
@@ -405,7 +484,7 @@ export async function syncEmailHunt(session, progress, gate = { open: true }) {
   if (!cfg.url || !cfg.key || (!session.accessToken && !session.refreshToken)) return { state: 'error', replaced: false };
   const res = await accountOp(session, { op: 'account-load' });
   if (res?.state === 'off') return { state: 'off', replaced: false };
-  if (!res || res.status !== 200) throw new Error(res?.json?.error || 'The guild record could not be opened.');
+  if (!res || res.status !== 200) throw fail(res?.json?.taken ? 'taken' : 'unavailable', res?.json?.error || 'The guild record could not be opened.');
   const remote = res.json.progress
     ? {
       progress: res.json.progress,

@@ -38,6 +38,8 @@ test('the guild master is sent to the ledger before a hunt can start', () => {
   assert.match(admin, /admin_wallet_facts/);
   assert.match(admin, /This gate is for the guild master/);
   assert.match(admin, /body.op === "promote"/);
+  assert.match(admin, /seatStaff/);
+  assert.match(admin, /accountSession/);
   assert.match(admin, /body.op === "demote"/);
   assert.match(admin, /role: "moderator"/);
   assert.match(admin, /Only the guild master can change staff/);
