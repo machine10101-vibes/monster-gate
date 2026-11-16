@@ -136,7 +136,11 @@ export class MmoSocial {
       return;
     }
     if (type === 'error' && msg.code) {
-      this.emit('error', { code: msg.code, message: msg.message || errorMessage(msg.code) });
+      const code = String(msg.code);
+      if (code === 'rate' || code === 'teleport' || code === 'protocol' || code === 'chat' || code === 'auth') {
+        return;
+      }
+      this.emit('error', { code, message: msg.message || errorMessage(code) });
       return;
     }
     if (!SOCIAL_INBOUND.has(type) && type !== 'chat') return;

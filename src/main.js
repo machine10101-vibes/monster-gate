@@ -658,7 +658,6 @@ class Game {
     } else if (this.cloudState === 'error') this.startAutosave();
     this.paintCloudStatus();
     this.refreshWalletUi();
-    if (this.cloudState === 'error') return;
     if (shouldFreshMmoClient({
       search: typeof location !== 'undefined' ? location.search : '',
       signedIn: !!(session && session.kind !== 'guest'),

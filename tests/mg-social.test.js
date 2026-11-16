@@ -346,9 +346,14 @@ test('mmo adapter treats guests as auth and welcome.features as the cap list', a
   mmo.subscribe((_snap, evt) => persist.push(evt));
   mmo.onFrame({ v: 1, type: 'error', code: 'persist' });
   mmo.onFrame({ v: 1, type: 'error', code: 'name' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'teleport', message: 'That move was too far.' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'rate', message: 'Slow down.' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'protocol', message: 'Say hello first.' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'auth' });
   assert.equal(persist[0].code, 'persist');
   assert.equal(persist[0].message, "Couldn't save, try again");
   assert.equal(persist[1].message, 'No hunter by that name');
+  assert.equal(persist.length, 2, 'world move/hello rejects are not friends-and-party toasts');
   mmo.dispose();
 });
 
