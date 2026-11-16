@@ -42,6 +42,14 @@ test('the guild master is sent to the ledger before a hunt can start', () => {
   assert.match(page, /src\/admin\/main\.js/);
   assert.doesNotMatch(page, /src\/main\.js/);
   assert.match(src('../vite.config.js'), /admin\.html/);
+  const css = src('../src/admin/admin.css');
+  const adminMain = src('../src/admin/main.js');
+  assert.match(adminMain, /documentElement\.classList\.add\('ledger'\)/);
+  assert.match(css, /html\.ledger/);
+  assert.match(css, /overflow-y:\s*auto/);
+  assert.match(css, /touch-action:\s*pan-y/);
+  assert.match(css, /touch-action:\s*manipulation/);
+  assert.ok(adminMain.indexOf("import '../ui/theme.css'") < adminMain.indexOf("import './admin.css'"));
   assert.equal(adminHref(), '/admin.html');
   assert.equal(gameHref(), '/');
   assert.equal(isAdminAccount({ kind: 'email', email: 'monstergateonline@gmail.com' }), true);
