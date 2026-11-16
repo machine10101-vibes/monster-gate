@@ -11,10 +11,12 @@ import {
   GL_RESTORE_MS,
   armContextLost,
   glFailStatusLine,
+  glIsDeadAtBoot,
   hideGlFailPanel,
   isWebGLFailure,
   probeWebGL,
   shouldForceNoGL,
+  showGlFailIfNeeded,
   showGlFailPanel,
 } from '../src/ui/glFail.js';
 
@@ -122,6 +124,33 @@ test('shouldForceNoGL honors the nogl test hook', () => {
   assert.equal(shouldForceNoGL({ search: '' }), false);
   assert.equal(shouldForceNoGL({ search: '?nogl=1' }), true);
   assert.equal(shouldForceNoGL({ search: '', win: { __mgForceNoGL: true } }), true);
+});
+
+test('showGlFailPanel accepts an opts-only call without a document arg', () => {
+  const doc = fakeDoc();
+  const prev = globalThis.document;
+  globalThis.document = doc;
+  try {
+    const panel = showGlFailPanel({ probe: () => ({ ok: false }), buildId: 'abc1234' });
+    assert.equal(panel, doc.panel);
+    assert.equal(doc.build.textContent, 'abc1234');
+    assert.equal(doc.loading.classList.contains('gl-failed'), true);
+    assert.equal(doc.panel.hidden, false);
+  } finally {
+    globalThis.document = prev;
+  }
+});
+
+test('showGlFailIfNeeded paints immediately when nogl is on and skips when GL is healthy', () => {
+  const dead = fakeDoc();
+  assert.equal(glIsDeadAtBoot({ search: '?nogl=1', probe: () => ({ ok: false }) }), true);
+  assert.equal(showGlFailIfNeeded(dead, { search: '?nogl=1', probe: () => ({ ok: false }), buildId: 'dead' }), true);
+  assert.equal(dead.panel.hidden, false);
+  assert.equal(dead.build.textContent, 'dead');
+  const live = fakeDoc();
+  assert.equal(glIsDeadAtBoot({ search: '', win: {}, probe: () => ({ ok: true }) }), false);
+  assert.equal(showGlFailIfNeeded(live, { search: '', win: {}, probe: () => ({ ok: true }) }), false);
+  assert.equal(live.panel.hidden, true);
 });
 
 test('MG-UI-40: fallback panel shows the HUD build tag', () => {
@@ -239,9 +268,17 @@ test('loading markup, Retry, and Game boot all wire the WebGL fallback', () => {
   assert.match(html, /id="gl-fail-build"/);
   assert.match(html, /hardware acceleration/);
   assert.match(main, /showBootGlFail/);
+  assert.match(main, /showGlFailIfNeeded/);
+  assert.match(main, /glDeadAtBoot/);
+  assert.match(main, /resumeAfterGlFail/);
   assert.match(main, /defaultGlProbe/);
   assert.match(main, /armContextLost/);
-  assert.match(main, /onSuccess/);
+  assert.match(main, /onSuccess: resumeAfterGlFail/);
+  const mountAt = main.indexOf('const loadingScreen');
+  const earlyAt = main.indexOf('showGlFailIfNeeded({');
+  const bridgeAt = main.lastIndexOf('runLegacySaveBridge');
+  assert.ok(mountAt >= 0 && earlyAt > mountAt && bridgeAt > earlyAt);
+  assert.match(main, /if \(!glDeadAtBoot\)/);
   assert.doesNotMatch(main, /localStorage\.(removeItem|clear)/);
   assert.doesNotMatch(boot, /saveio|savebridge/);
 });

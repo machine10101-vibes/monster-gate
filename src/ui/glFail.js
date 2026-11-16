@@ -100,6 +100,15 @@ export function glFailStatusLine(attempts) {
   return `${GL_FAIL_STILL} Try ${n}.`;
 }
 
+function resolveDoc(docOrOpts, maybeOpts) {
+  if (docOrOpts && typeof docOrOpts.getElementById === 'function') {
+    return { doc: docOrOpts, opts: maybeOpts || {} };
+  }
+  const opts = (docOrOpts && typeof docOrOpts === 'object') ? { ...docOrOpts, ...(maybeOpts || {}) } : (maybeOpts || {});
+  const doc = typeof document !== 'undefined' ? document : null;
+  return { doc, opts };
+}
+
 export function hideGlFailPanel(doc = typeof document !== 'undefined' ? document : null) {
   if (!doc?.getElementById) return;
   const panel = doc.getElementById('gl-fail');
@@ -112,7 +121,26 @@ export function hideGlFailPanel(doc = typeof document !== 'undefined' ? document
   if (typeof window !== 'undefined') window.__mgGlFailShown = false;
 }
 
-export function showGlFailPanel(doc = typeof document !== 'undefined' ? document : null, opts = {}) {
+/** True when 3D cannot start, so boot can skip save-bridge and paint the fallback now. */
+export function glIsDeadAtBoot(opts = {}) {
+  if (shouldForceNoGL(opts)) return true;
+  const probe = opts.probe || defaultGlProbe;
+  try {
+    return !probe({ force: shouldForceNoGL(opts) })?.ok;
+  } catch {
+    return true;
+  }
+}
+
+/** Paint the fallback as soon as the loading screen exists, before Game or save-bridge. */
+export function showGlFailIfNeeded(docOrOpts, maybeOpts) {
+  const { doc, opts } = resolveDoc(docOrOpts, maybeOpts);
+  if (!glIsDeadAtBoot(opts)) return false;
+  return !!showGlFailPanel(doc, opts);
+}
+
+export function showGlFailPanel(docOrOpts, maybeOpts) {
+  const { doc, opts } = resolveDoc(docOrOpts, maybeOpts);
   if (!doc?.getElementById) return null;
   const loading = doc.getElementById('loading');
   let panel = doc.getElementById('gl-fail');
@@ -291,6 +319,8 @@ if (typeof window !== 'undefined') {
     probeWebGL,
     showGlFailPanel,
     hideGlFailPanel,
+    showGlFailIfNeeded,
+    glIsDeadAtBoot,
     armContextLost,
     shouldForceNoGL,
     GL_RESTORE_MS,

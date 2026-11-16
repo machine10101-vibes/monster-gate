@@ -57,6 +57,7 @@ import {
   isWebGLFailure,
   probeWebGL,
   shouldForceNoGL,
+  showGlFailIfNeeded,
   showGlFailPanel,
 } from './ui/glFail.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
@@ -90,6 +91,11 @@ import { INVENTORY_FULL } from './systems/stacks.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
 const loadingScreen = typeof document !== 'undefined' ? mountLoading() : null;
+/** Paint the WebGL fallback before Game/save-bridge so a hung hop cannot hide it. */
+const glDeadAtBoot = typeof document !== 'undefined' && showGlFailIfNeeded({
+  probe: defaultGlProbe,
+  onSuccess: resumeAfterGlFail,
+});
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
@@ -3566,16 +3572,18 @@ class Game {
   }
 }
 
+function resumeAfterGlFail() {
+  if (typeof window !== 'undefined' && window.__game && !window.__game.glFailed) {
+    location.reload();
+    return;
+  }
+  startGame();
+}
+
 function showBootGlFail() {
   showGlFailPanel({
     probe: defaultGlProbe,
-    onSuccess() {
-      if (typeof window !== 'undefined' && window.__game && !window.__game.glFailed) {
-        location.reload();
-        return;
-      }
-      startGame();
-    },
+    onSuccess: resumeAfterGlFail,
   });
 }
 
@@ -3639,12 +3647,14 @@ function startGame() {
   });
 }
 
-runLegacySaveBridge().then((result) => {
-  if (result === 'away') return;
-  startGame();
-}).catch((e) => {
-  console.warn('save bridge', e);
-  startGame();
-});
+if (!glDeadAtBoot) {
+  runLegacySaveBridge().then((result) => {
+    if (result === 'away') return;
+    startGame();
+  }).catch((e) => {
+    console.warn('save bridge', e);
+    startGame();
+  });
+}
 
 export { lerp, GUILD };
