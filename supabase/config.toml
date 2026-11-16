@@ -429,6 +429,14 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
+[functions.admin]
+enabled = true
+# The browser sends the publishable key as the bearer, same as the hunter function.
+# The guild master's access token is in the body, and the function checks the admins table.
+verify_jwt = false
+import_map = "./functions/admin/deno.json"
+entrypoint = "./functions/admin/index.ts"
+
 [functions.signup]
 enabled = true
 verify_jwt = false

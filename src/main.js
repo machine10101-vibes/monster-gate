@@ -79,6 +79,7 @@ import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
+import { adminHref, isAdminAccount } from './admin/gate.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
 import { UNLINKED_CODE, UNLINKED_HINT } from '../supabase/functions/_shared/linkAuth.js';
@@ -90,9 +91,11 @@ import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
-const loadingScreen = typeof document !== 'undefined' ? mountLoading() : null;
+const sendingToLedger = typeof location !== 'undefined' && isAdminAccount(readAccount());
+if (sendingToLedger) location.replace(adminHref());
+const loadingScreen = !sendingToLedger && typeof document !== 'undefined' ? mountLoading() : null;
 /** Paint the WebGL fallback before Game/save-bridge so a hung hop cannot hide it. */
-const glDeadAtBoot = typeof document !== 'undefined' && showGlFailIfNeeded({
+const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && showGlFailIfNeeded({
   probe: defaultGlProbe,
   onSuccess: resumeAfterGlFail,
 });
@@ -600,6 +603,10 @@ class Game {
   }
 
   async applyWallet(session) {
+    if (isAdminAccount(session)) {
+      location.replace(adminHref());
+      return;
+    }
     if (this.cloudSyncing && this.wallet === session) return;
     if (this.cloudGate) this.cloudGate.open = false;
     const gate = { open: true };
@@ -1045,6 +1052,10 @@ class Game {
       const session = mode === 'create'
         ? await createAccount(email, password, confirm)
         : await signInAccount(email, password);
+      if (isAdminAccount(session)) {
+        location.replace(adminHref());
+        return;
+      }
       this.closeAccount();
       await this.applyWallet(session);
       this.watchAccount();
@@ -3588,6 +3599,10 @@ function showBootGlFail() {
 }
 
 function startGame() {
+  if (isAdminAccount(readAccount())) {
+    location.replace(adminHref());
+    return;
+  }
   const bootSearch = typeof location !== 'undefined' ? location.search : '';
   let pendingWorldAuth = false;
   if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
@@ -3647,7 +3662,7 @@ function startGame() {
   });
 }
 
-if (!glDeadAtBoot) {
+if (!sendingToLedger && !glDeadAtBoot) {
   runLegacySaveBridge().then((result) => {
     if (result === 'away') return;
     startGame();
