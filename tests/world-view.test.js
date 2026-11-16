@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   ANIM, AUTH_SIGNIN_BTN, AUTH_SIGNIN_TITLE, AUTH_SOLO_BTN, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S,
-  REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_VIEW,
-  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows, isAuthReject, planLogCull,
-  newestKeepIndex, normalizeChat, normalizePlayer, parseMmoFlags, wakeClock, worldView,
+  REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_SPAWN, WORLD_VIEW,
+  SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows, isAuthReject, isWorldWireError,
+  newestKeepIndex, normalizeChat, normalizePlayer, parseMmoFlags, planLogCull, wakeClock, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
 import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
@@ -167,9 +167,11 @@ test('WorldView snapshots spawn remotes, emit move/chat, and drop leavers', () =
   assert.equal(chats.at(-1).channel, 'zone');
   assert.equal(chats.at(-1).text, 'hi zone');
   view.emitMove();
+  assert.equal(moves.length, 0, 'moves wait for welcome so hello is first');
+  view.setStatus({ status: 'online', online: 9 });
+  view.emitMove();
   assert.equal(moves[0].x, 72);
   assert.equal(moves[0].held, 'blade');
-  view.setStatus({ status: 'online', online: 9 });
   assert.equal(view.status, STATUS.online);
   assert.equal(view.online, 9);
 });
@@ -535,4 +537,36 @@ test('auth reject latches Sign in panel and ignores later reconnecting (MG-MMO-3
   assert.equal(bare.authReject, true);
   assert.equal(bare.status, STATUS.error);
   assert.equal(bare.errorCode(), 'auth');
+});
+
+test('world wire errors stay online, do not paint, and snap a far hunter to spawn', () => {
+  assert.equal(isWorldWireError('teleport'), 'teleport');
+  assert.equal(isWorldWireError({ status: 'online', detail: 'That move was too far.' }), 'teleport');
+  assert.equal(isWorldWireError('Slow down.'), 'rate');
+  assert.equal(isWorldWireError({ code: 'protocol', message: 'Say hello first.' }), 'protocol');
+  assert.equal(isWorldWireError({ code: 'auth' }), '');
+  assert.equal(isWorldWireError({ code: 'name_taken' }), '');
+
+  const game = stubGame();
+  game.player.pos.x = 800;
+  game.player.pos.z = 800;
+  const snapped = [];
+  game.player.syncObj = () => snapped.push('sync');
+  game.snapCamera = () => snapped.push('cam');
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  view.live = true;
+  view.setStatus({ status: 'online', online: 1 });
+  view.setStatus({ status: 'online', detail: 'That move was too far.' });
+  assert.equal(view.status, STATUS.online);
+  assert.equal(view.detail, '');
+  assert.equal(game.player.pos.x, WORLD_SPAWN.x);
+  assert.equal(game.player.pos.z, WORLD_SPAWN.z);
+  assert.ok(snapped.includes('sync'));
+  assert.ok(snapped.includes('cam'));
+
+  game.player.pos.x = 12;
+  game.player.pos.z = 12;
+  view.setStatus({ status: 'online', detail: 'teleport' });
+  assert.equal(game.player.pos.x, 12, 'snaps only once');
+  assert.equal(view.status, STATUS.online);
 });

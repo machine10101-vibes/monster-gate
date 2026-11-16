@@ -390,6 +390,14 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   assert.match(main, /showWorldPicker/);
   assert.match(main, /__mgShowWorldPicker/);
   assert.match(main, /continueAfterAccount/);
+  const apply = main.indexOf('async applyWallet');
+  const fresh = main.indexOf('shouldFreshMmoClient', apply);
+  assert.ok(apply > 0 && fresh > apply);
+  assert.doesNotMatch(
+    main.slice(apply, fresh),
+    /if \(this\.cloudState === 'error'\) return;/,
+    'a guild-record miss must not trap the hunter on the title after sign-in',
+  );
   assert.match(main, /continueSignedInHunt[\s\S]*roster\.last/);
   assert.match(main, /this\.roster = new Roster\(session\.address/);
   assert.match(main, /pickWorldSolo[\s\S]*openCharacterSelect/);

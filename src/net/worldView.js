@@ -30,6 +30,41 @@ export const AUTH_SIGNIN_MSG = 'Guests stay solo.';
 export const AUTH_SIGNIN_BTN = 'Sign in';
 export const AUTH_SOLO_BTN = 'Play solo';
 
+/** Default World 1 spawn. Matches server/world.js spawnPose. */
+export const WORLD_SPAWN = { x: 72, y: 3.2, z: 72.5 };
+
+/** Move/chat/hello rejects from the world socket — not sign-in failures. */
+export const WORLD_WIRE_CODES = ['rate', 'teleport', 'protocol', 'chat'];
+
+function bagText(bag) {
+  if (bag == null || bag === '') return '';
+  if (typeof bag === 'string') return bag.trim();
+  if (typeof bag !== 'object') return '';
+  return String(bag.code || bag.message || (typeof bag.detail === 'string' ? bag.detail : '') || '').trim();
+}
+
+/** True when the world server rejected a move, chat, or hello — not an account error. */
+export function isWorldWireError(status, detail) {
+  const bags = [status, detail];
+  for (const bag of bags) {
+    if (bag == null || bag === '') continue;
+    if (typeof bag === 'object') {
+      const code = String(bag.code || '').trim().toLowerCase();
+      if (WORLD_WIRE_CODES.includes(code)) return code;
+      const nested = typeof bag.detail === 'object' && bag.detail ? isWorldWireError(null, bag.detail) : '';
+      if (nested) return nested;
+    }
+    const s = bagText(bag);
+    if (!s) continue;
+    const lower = s.toLowerCase();
+    if (WORLD_WIRE_CODES.includes(lower)) return lower;
+    if (/too far/i.test(s)) return 'teleport';
+    if (/slow down/i.test(s)) return 'rate';
+    if (/say hello/i.test(s) || /expected hello/i.test(s) || /need protocol/i.test(s)) return 'protocol';
+  }
+  return '';
+}
+
 /** True when the world server rejected the hunter for missing / bad auth. */
 export function isAuthReject(status, detail) {
   const bags = [status, detail];
@@ -437,6 +472,7 @@ export class WorldView {
     this.unsubs = [];
     this.wrapped = null;
     this.live = false;
+    this.spawnSnapped = false;
     this.collapsed = false;
     this.localHeld = null;
     this.localSay = '';
@@ -664,11 +700,23 @@ export class WorldView {
       this.latchAuthReject(extra);
       return;
     }
+    const wire = isWorldWireError(status, extra) || isWorldWireError(status, detail);
+    if (wire) {
+      if (wire === 'teleport') this.snapToWorldSpawn();
+      if (
+        this.status === STATUS.online
+        || this.status === STATUS.connecting
+        || this.status === STATUS.reconnecting
+      ) {
+        return;
+      }
+    }
     if (this.authReject && incoming !== STATUS.online) {
       this.syncAuthPanel();
       return;
     }
     if (this.authReject && incoming === STATUS.online) this.clearAuthLatch();
+    if (incoming === STATUS.connecting || incoming === STATUS.online) this.spawnSnapped = false;
     this.status = incoming;
     if (this.status === STATUS.waking) {
       this.wakeDetail = extra && typeof extra === 'object' ? extra : {};
@@ -1161,7 +1209,32 @@ export class WorldView {
     g.hud.layoutInteractPlates?.();
   }
 
+  /**
+   * World 1 persist is a different record than the solo hunt. A hunter who
+   * joins from the cave (or anywhere past 40u) gets `teleport` on every move
+   * until they stand at the world spawn. Drop them at Oakhollow once.
+   */
+  snapToWorldSpawn() {
+    if (this.spawnSnapped || !this.live) return;
+    const p = this.game?.player;
+    if (!p?.pos) return;
+    const dist = Math.hypot(p.pos.x - WORLD_SPAWN.x, p.pos.z - WORLD_SPAWN.z);
+    if (dist <= 40) return;
+    this.spawnSnapped = true;
+    const y = this.game?.world?.heightAt?.(WORLD_SPAWN.x, WORLD_SPAWN.z);
+    const nextY = Number.isFinite(y) ? y : WORLD_SPAWN.y;
+    if (typeof p.pos.set === 'function') p.pos.set(WORLD_SPAWN.x, nextY, WORLD_SPAWN.z);
+    else {
+      p.pos.x = WORLD_SPAWN.x;
+      p.pos.y = nextY;
+      p.pos.z = WORLD_SPAWN.z;
+    }
+    p.syncObj?.();
+    this.game?.snapCamera?.();
+  }
+
   emitMove() {
+    if (this.status !== STATUS.online) return;
     const p = this.game?.player;
     if (!p?.pos) return;
     const pose = {
