@@ -139,6 +139,7 @@ export class MmoClient {
     if (msg.type === 'welcome') {
       this.you = msg.you || null;
       this.setStatus({ status: 'online', online: msg.online });
+      if (msg.pose) this.view?.noteServerPose?.(msg.pose);
     } else if (msg.type === 'snapshot') {
       this.view?.applySnapshot?.(msg.players || [], { online: msg.online, zone: msg.zone });
       if (msg.online != null) this.view?.setOnlineCount?.(msg.online);
@@ -161,6 +162,7 @@ export class MmoClient {
       anim: pose.anim, move: pose.move,
       held: pose.held, sheath: pose.sheath,
       look: pose.look, armor: pose.armor, zone: pose.zone,
+      ...(pose.resume ? { resume: true } : {}),
     }));
   }
 

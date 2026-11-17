@@ -148,6 +148,7 @@ export function readMove(msg) {
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
     zone: cleanZone(msg.zone),
+    resume: msg.resume === true,
   };
 }
 

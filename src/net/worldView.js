@@ -474,6 +474,9 @@ export class WorldView {
     this.live = false;
     this.spawnSnapped = false;
     this.portalHop = false;
+    this.resumeHome = null;
+    this.resumeSent = false;
+    this.serverPose = null;
     this.collapsed = false;
     this.localHeld = null;
     this.localSay = '';
@@ -717,6 +720,7 @@ export class WorldView {
       return;
     }
     if (this.authReject && incoming === STATUS.online) this.clearAuthLatch();
+    if (incoming === STATUS.connecting) this.resumeSent = false;
     if (incoming === STATUS.connecting || incoming === STATUS.online) this.spawnSnapped = false;
     this.status = incoming;
     if (this.status === STATUS.waking) {
@@ -1216,10 +1220,66 @@ export class WorldView {
   }
 
   /**
-   * World 1 persist is a different record than the solo hunt. A hunter who
-   * joins from the cave (or anywhere past 40u) gets `teleport` on every move
-   * until they stand at the world spawn. Drop them at Oakhollow once.
-   * A tome hop is not that join: leave the hunter where the tome put them.
+   * Where this hunter should stand on login.
+   * A saved spot away from Oakhollow wins. When the hunt record was pulled
+   * back to the village, the world server's last accepted place is used.
+   */
+  returnPose(hunter) {
+    const hx = Number(hunter?.x);
+    const hz = Number(hunter?.z);
+    const savedOk = Number.isFinite(hx) && Number.isFinite(hz);
+    const savedFar = savedOk && Math.hypot(hx - WORLD_SPAWN.x, hz - WORLD_SPAWN.z) > 40;
+    const server = this.serverPose;
+    const serverFar = !!(server && Math.hypot(server.x - WORLD_SPAWN.x, server.z - WORLD_SPAWN.z) > 40);
+    if (savedFar) return { x: hx, z: hz, yaw: Number(hunter.yaw) || 0 };
+    if (serverFar) return { x: server.x, z: server.z, yaw: server.yaw || 0 };
+    if (savedOk) return { x: hx, z: hz, yaw: Number(hunter.yaw) || 0 };
+    if (server) return { x: server.x, z: server.z, yaw: server.yaw || 0 };
+    return null;
+  }
+
+  /** The hunt saved a place. The next join move is that place, not a teleport. */
+  grantResume(home) {
+    const x = Number(home?.x);
+    const z = Number(home?.z);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    this.resumeHome = { x, z };
+    this.resumeSent = false;
+    this.spawnSnapped = false;
+  }
+
+  /**
+   * Welcome carries the world server's last accepted place. Use it when the
+   * hunt record is still the village default. A far hunt record stays put.
+   */
+  noteServerPose(pose) {
+    const x = Number(pose?.x);
+    const z = Number(pose?.z);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+    this.serverPose = { x, y: Number(pose.y), z, yaw: Number(pose.yaw) || 0 };
+    const game = this.game;
+    const player = game?.player;
+    if (!game?.started || !player?.pos) return;
+    const hunter = game.progress?.data?.hunter;
+    if (hunter?.realm === 'cave' || hunter?.realm === 'rift') return;
+    const spot = this.returnPose(hunter);
+    if (!spot) return;
+    const distSpawn = Math.hypot(player.pos.x - WORLD_SPAWN.x, player.pos.z - WORLD_SPAWN.z);
+    const distSpot = Math.hypot(player.pos.x - spot.x, player.pos.z - spot.z);
+    if (distSpot > 4 && distSpawn <= 40 && typeof game.placeReturned === 'function') {
+      game.placeReturned(spot.x, spot.z, spot.yaw);
+      return;
+    }
+    if (distSpawn > 40) {
+      this.grantResume({ x: player.pos.x, z: player.pos.z });
+      return;
+    }
+    this.grantResume(spot);
+  }
+
+  /**
+   * A rejected join used to drop every far hunter on Oakhollow. A resume
+   * and a tome hop are the places they meant to stand. Leave them there.
    */
   snapToWorldSpawn() {
     if (this.spawnSnapped || !this.live) return;
@@ -1230,6 +1290,8 @@ export class WorldView {
     }
     const p = this.game?.player;
     if (!p?.pos) return;
+    const home = this.resumeHome;
+    if (home && Math.hypot(p.pos.x - home.x, p.pos.z - home.z) <= 12) return;
     const dist = Math.hypot(p.pos.x - WORLD_SPAWN.x, p.pos.z - WORLD_SPAWN.z);
     if (dist <= 40) return;
     this.spawnSnapped = true;
@@ -1262,6 +1324,10 @@ export class WorldView {
       armor: localArmor(this.game),
       zone: zoneOf(this.game),
     };
+    if (this.resumeHome && !this.resumeSent) {
+      pose.resume = true;
+      this.resumeSent = true;
+    }
     this._onLocalMove?.(pose);
     this.emit({ type: 'move', ...pose });
   }

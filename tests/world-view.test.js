@@ -606,6 +606,46 @@ test('world wire errors stay online, do not paint, and snap a far hunter to spaw
   assert.equal(view.status, STATUS.online);
 });
 
+test('logging back in keeps the last place instead of the starter village', () => {
+  const game = stubGame();
+  game.started = true;
+  game.player.pos.x = -230;
+  game.player.pos.z = -500;
+  game.placeReturned = (x, z) => {
+    game.player.pos.x = x;
+    game.player.pos.z = z;
+  };
+  game.progress = { data: { hunter: { x: -230, z: -500, yaw: 0.4, realm: 'over' } } };
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  view.live = true;
+  view.setStatus({ status: 'online', online: 1 });
+  view.grantResume({ x: -230, z: -500 });
+  view.setStatus({ status: 'online', detail: 'That move was too far.' });
+  assert.equal(game.player.pos.x, -230);
+  assert.equal(game.player.pos.z, -500);
+
+  const moves = [];
+  view.onLocalMove((pose) => moves.push(pose));
+  view.emitMove();
+  assert.equal(moves[0].resume, true);
+  view.emitMove();
+  assert.equal(moves[1].resume, undefined);
+
+  game.player.pos.x = WORLD_SPAWN.x;
+  game.player.pos.z = WORLD_SPAWN.z;
+  game.progress.data.hunter = { x: WORLD_SPAWN.x, z: WORLD_SPAWN.z, yaw: 0, realm: 'over' };
+  view.noteServerPose({ x: -244, y: 4, z: 380, yaw: 1 });
+  assert.equal(game.player.pos.x, -244);
+  assert.equal(game.player.pos.z, 380);
+
+  game.player.pos.x = -100;
+  game.player.pos.z = 40;
+  game.progress.data.hunter = { x: -100, z: 40, yaw: 0, realm: 'over' };
+  view.noteServerPose({ x: WORLD_SPAWN.x, y: 3, z: WORLD_SPAWN.z, yaw: 0 });
+  assert.equal(game.player.pos.x, -100);
+  assert.equal(game.player.pos.z, 40);
+});
+
 test('a tome hop is not pulled back to the starter town', () => {
   const game = stubGame();
   game.player.pos.x = -244;

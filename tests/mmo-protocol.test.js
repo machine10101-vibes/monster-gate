@@ -43,6 +43,25 @@ test('speed is clamped and teleports are rejected', () => {
   assert.ok(dash.pose.x > 72);
 });
 
+test('the first move may resume the hunter wherever they logged out', () => {
+  const prev = { x: 72, y: 3, z: 72.5, yaw: 0, move: 0, anim: 0, held: 'blade', sheath: null, look: null, armor: {}, zone: 'Oakhollow', movedAt: 0 };
+  const back = applyMove(prev, { ...prev, x: -230, y: 12, z: -500, yaw: 1.2, zone: 'Cinderfall', resume: true }, 1100);
+  assert.equal(back.teleport, false);
+  assert.equal(back.pose.x, -230);
+  assert.equal(back.pose.z, -500);
+  assert.equal(back.pose.resumeUsed, true);
+  const again = applyMove(back.pose, { ...back.pose, x: 400, z: 400, resume: true }, 2200);
+  assert.equal(again.teleport, true);
+  assert.equal(again.pose.x, -230);
+  const walked = applyMove(prev, { ...prev, x: 74, z: 73 }, 1100);
+  const late = applyMove(walked.pose, { ...walked.pose, x: -230, z: -500, resume: true }, 2200);
+  assert.equal(late.teleport, true);
+  assert.equal(late.pose.x, 74);
+  const read = readMove({ type: 'move', v: 1, x: -230, z: -500, resume: true });
+  assert.equal(read.resume, true);
+  assert.equal(readMove({ type: 'move', v: 1, x: 72, z: 72 }).resume, false);
+});
+
 test('a tome landing is accepted past the speed cap and outside the old town box', () => {
   const prev = { x: 72, y: 3, z: 72, yaw: 0, move: 0, anim: 0, held: 'blade', sheath: null, look: null, armor: {}, zone: 'Oakhollow', movedAt: 1000 };
   const shore = applyMove(prev, { ...prev, x: -244, y: 2, z: 386.8, zone: 'Dunes' }, 1100);

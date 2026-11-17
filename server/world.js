@@ -145,6 +145,7 @@ export class World {
       protocol: PROTOCOL,
       tickHz: TICK_HZ,
       you: { id: session.id, name: session.name, guest: !!ident.guest },
+      pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
