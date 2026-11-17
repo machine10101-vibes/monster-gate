@@ -1303,25 +1303,37 @@ class Game {
     });
   }
 
+  /** Stand the hunter on a saved spot and tell World 1 that spot is a resume, not a teleport. */
+  placeReturned(x, z, yaw) {
+    const y = this.world.heightAt(x, z);
+    const nextY = Number.isFinite(y) ? y : this.player.pos.y;
+    this.player.pos.set(x, nextY, z);
+    if (Number.isFinite(yaw)) {
+      this.player.yaw = yaw;
+      this.cam.yaw = yaw;
+      this.cam.targetYaw = yaw;
+    }
+    this.player.syncObj();
+    this.worldView?.grantResume?.({ x, z });
+  }
+
   restoreHunter() {
     const h = this.progress.data.hunter;
     if (!h) return false;
     this.rank = h.rank;
     if (h.quest?.text) this.quest = { text: h.quest.text, n: h.quest.n, total: h.quest.total };
-    if (h.realm === 'cave' && this.world.cave) enterCave(this);
-    else if (h.realm === 'rift' && this.world.waygate) {
+    if (h.realm === 'cave' && this.world.cave) {
+      enterCave(this);
+      this.worldView?.grantResume?.({ x: this.player.pos.x, z: this.player.pos.z });
+    } else if (h.realm === 'rift' && this.world.waygate) {
       const o = this.world.rift?.outside || this.world.waygate;
-      const y = this.world.heightAt(o.x, o.z);
-      this.player.pos.set(o.x, y, o.z);
-      this.player.syncObj();
-    }
-    else if (this.world.playable(h.x, h.z)) {
-      const y = this.world.heightAt(h.x, h.z);
-      this.player.pos.set(h.x, y, h.z);
-      this.player.yaw = h.yaw;
-      this.cam.yaw = h.yaw;
-      this.cam.targetYaw = h.yaw;
-      this.player.syncObj();
+      this.placeReturned(o.x, o.z, this.player.yaw);
+    } else {
+      const spot = this.worldView?.returnPose?.(h);
+      const x = spot ? spot.x : h.x;
+      const z = spot ? spot.z : h.z;
+      const yaw = spot && Number.isFinite(spot.yaw) ? spot.yaw : h.yaw;
+      if (Number.isFinite(x) && Number.isFinite(z)) this.placeReturned(x, z, yaw);
     }
     this.syncVitals();
     const p = this.player;
