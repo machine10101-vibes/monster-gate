@@ -30,16 +30,52 @@ export function addressFromPublicKey(publicKey) {
  * Hash the extension and the Klever Wallet app actually sign.
  * The prefix keeps a login signature from ever being a transaction.
  */
+function preparedHash(body, length) {
+  const prefix = new TextEncoder().encode(PREFIX);
+  const digits = new TextEncoder().encode(String(length));
+  const bytes = new Uint8Array(prefix.length + digits.length + body.length);
+  bytes.set(prefix, 0);
+  bytes.set(digits, prefix.length);
+  bytes.set(body, prefix.length + digits.length);
+  return keccak_256(bytes);
+}
+
+/** Klever's prepare_message uses the UTF-8 byte length, then keccak256. */
 export function kleverMessageHash(message) {
   const body = new TextEncoder().encode(String(message));
-  const prefix = new TextEncoder().encode(PREFIX);
-  // Klever's prepare_message uses the UTF-8 byte length, then keccak256.
-  const length = new TextEncoder().encode(String(body.length));
-  const bytes = new Uint8Array(prefix.length + length.length + body.length);
-  bytes.set(prefix, 0);
-  bytes.set(length, prefix.length);
-  bytes.set(body, prefix.length + length.length);
-  return keccak_256(bytes);
+  return preparedHash(body, body.length);
+}
+
+/**
+ * The extension popup URI-encodes the message before showing it, then decodes
+ * it again before signing. A build that signs the encoded text is the same
+ * login: the encoding is a pure function of the message the hunter saw.
+ */
+function signedTexts(message) {
+  const text = String(message);
+  const texts = [text];
+  if (text.includes('\n')) texts.push(text.replace(/\n/g, '\r\n'));
+  const encoded = encodeURIComponent(text);
+  if (encoded !== text) texts.push(encoded);
+  try {
+    const decoded = decodeURIComponent(text);
+    if (!texts.includes(decoded)) texts.push(decoded);
+  } catch {
+    /* the message is not URI-encoded */
+  }
+  return texts;
+}
+
+function accepts(compact, pub, text) {
+  const body = new TextEncoder().encode(text);
+  try {
+    if (ed.verify(compact, preparedHash(body, body.length), pub)) return true;
+    // The extension's own validator uses the JavaScript string length.
+    if (text.length !== body.length && ed.verify(compact, preparedHash(body, text.length), pub)) return true;
+    return ed.verify(compact, body, pub);
+  } catch {
+    return false;
+  }
 }
 
 export function signatureBytes(signature) {
@@ -65,12 +101,5 @@ export function verifyKleverSignature(message, signature, address) {
   const sig = signatureBytes(signature);
   if (!pub || sig.length < 64) return false;
   const compact = sig.length === 64 ? sig : sig.slice(0, 64);
-  const hash = kleverMessageHash(message);
-  try {
-    if (ed.verify(compact, hash, pub)) return true;
-    // Some wallets sign the raw text. Accept that only if it still matches this address.
-    return ed.verify(compact, new TextEncoder().encode(String(message)), pub);
-  } catch {
-    return false;
-  }
+  return signedTexts(message).some((text) => accepts(compact, pub, text));
 }

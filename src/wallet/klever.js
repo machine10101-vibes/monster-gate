@@ -8,7 +8,7 @@ export const KLEVER_EXTENSION = 'https://chromewebstore.google.com/detail/klever
 export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=finance.klever.bitcoin.wallet';
 export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-crypto/id1615064243';
 
-const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{20,}$/;
+const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
 
 export function isMobile() {
   const ua = navigator.userAgent || '';
@@ -53,15 +53,17 @@ function signatureSlices(value) {
   } else if (Array.isArray(value) && value.length >= 64 && value.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
     bytes = Uint8Array.from(value);
   } else if (typeof value === 'string') {
-    const raw = value.trim().replace(/^0x/i, '');
+    const raw = value.trim().replace(/^0x/i, '').replace(/\s+/g, '');
     if (!raw || raw.length > 400) return [];
     if (/^[0-9a-fA-F]+$/.test(raw) && raw.length % 2 === 0) {
       const out = new Uint8Array(raw.length / 2);
       for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(raw.slice(i * 2, i * 2 + 2), 16);
       bytes = out;
     } else {
+      const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
       try {
-        const bin = atob(raw);
+        const bin = atob(padded);
         if (bin.length >= 64 && bin.length <= 160) {
           const out = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
@@ -109,9 +111,7 @@ export function signatureCandidates(signed, depth = 0, out = []) {
     if (typeof signed.toBase64 === 'function') {
       try { signatureCandidates(signed.toBase64(), depth + 1, out); } catch { /* ignore */ }
     }
-    for (const key of ['signature', 'sig', 'hex', 'result', 'bytes', 'data', 'message', 'signedMessage', 'payload']) {
-      if (Object.prototype.hasOwnProperty.call(signed, key)) signatureCandidates(signed[key], depth + 1, out);
-    }
+    for (const key of Object.keys(signed)) signatureCandidates(signed[key], depth + 1, out);
   }
   return out;
 }
@@ -186,28 +186,40 @@ function legacySignMessage(message) {
   });
 }
 
-async function requestSignature(kw, message) {
+async function requestSignature(kw, message, address) {
+  const accepted = (signed) => matchingSignature(signatureCandidates(signed), message, address);
+  // The Chrome extension's signMessage returns the hex signature. Ask it first
+  // on desktop so an older bridge cannot answer with the message text.
+  if (!isMobile() && typeof kw?.signMessage === 'function') {
+    const signed = await kw.signMessage(message);
+    if (accepted(signed) || signatureCandidates(signed).length) return signed;
+  }
   const legacy = legacySignMessage(message);
   if (legacy) {
     try {
       const signed = await legacy;
-      if (signatureCandidates(signed).length) return signed;
+      if (accepted(signed)) return signed;
     } catch (err) {
       if (err?.code === 'rejected') throw err;
     }
   }
   const bridge = window.__kleverBrowser__?.bridge;
   if (typeof bridge === 'function') {
-    const signed = await bridge({
-      type: 'SIGN_IN_MESSAGE',
-      network: 'KLV',
-      chainId: '38',
-      data: message,
-      url: location.href,
-    });
-    if (signatureCandidates(signed).length || typeof kw?.signMessage !== 'function') return signed;
+    try {
+      const signed = await bridge({
+        type: 'SIGN_IN_MESSAGE',
+        network: 'KLV',
+        chainId: '38',
+        data: message,
+        url: location.href,
+      });
+      if (accepted(signed)) return signed;
+    } catch (err) {
+      if (err?.code === 'rejected') throw err;
+    }
   }
-  return kw.signMessage(message);
+  if (typeof kw?.signMessage === 'function') return kw.signMessage(message);
+  return null;
 }
 
 export function waitForProvider(ms = 2000) {
@@ -236,11 +248,29 @@ export function connectMethod(kw, hub = typeof window !== 'undefined' ? window.k
   return '';
 }
 
+function addressText(value) {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = addressText(item);
+      if (ADDRESS_RE.test(text)) return text;
+    }
+    return '';
+  }
+  if (value && typeof value === 'object' && typeof value.address === 'string') return value.address.trim();
+  return '';
+}
+
 export function addressFromWallet(kw, returned) {
-  const fromReturn = typeof returned === 'string' ? returned : returned?.address;
-  const fromGetter = typeof kw?.getWalletAddress === 'function' ? kw.getWalletAddress() : '';
-  for (const value of [fromReturn, fromGetter, kw?.address]) {
-    if (ADDRESS_RE.test(value || '')) return value;
+  let fromGetter = '';
+  try {
+    if (typeof kw?.getWalletAddress === 'function') fromGetter = kw.getWalletAddress();
+  } catch {
+    fromGetter = '';
+  }
+  for (const value of [returned, fromGetter, kw?.address]) {
+    const text = addressText(value);
+    if (ADDRESS_RE.test(text)) return text;
   }
   return '';
 }
@@ -303,6 +333,11 @@ export async function connectWallet() {
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
   holdPageStill();
+  // The extension signs with kleverWeb.address. Put the nonce's address there
+  // so the popup cannot sign a different account than the one in the message.
+  if (kw && typeof address === 'string') {
+    try { kw.address = address; } catch { /* a frozen provider keeps its own account */ }
+  }
   const message = signedMessage({
     purpose,
     address,
@@ -312,7 +347,7 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   let signed;
   try {
     if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-    signed = await requestSignature(kw, message);
+    signed = await requestSignature(kw, message, address);
   } catch (err) {
     if (err?.code === 'rejected') throw err;
     throw fail('rejected', mobile ? 'The Klever app closed the sign-in request.' : 'The Klever extension closed the sign-in request.');

@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import * as ed from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha2.js';
 import { addressFromWallet, connectMethod, signatureCandidates } from '../src/wallet/klever.js';
-import { verifyKleverSignature } from '../src/wallet/verify.js';
+import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
+
+ed.hashes.sha512 = sha512;
 
 const FORUM_MESSAGE = 'test';
 const FORUM_SIGNATURE = 'a74fe44a023fecc6bfdc39e9161ef2e83102990ade9ee731184fae59aea60487b8d5b65fbf8a4bd26b9b90f42a19973f2a2413642d59e42537e3bdc44ec9b70f';
@@ -15,8 +19,10 @@ test('the extension Confirm popup is connect, and older wallets use initialize',
   assert.equal(connectMethod({ initialize() {} }, { initialize() {} }), 'hub');
   assert.equal(connectMethod({ initialize() {} }), 'initialize');
   assert.equal(connectMethod({}), '');
-  assert.equal(addressFromWallet({ address: 'klv1qpzry9x8gf2tvdw0s3jn' }), 'klv1qpzry9x8gf2tvdw0s3jn');
-  assert.equal(addressFromWallet({ getWalletAddress: () => 'short' }, 'klv1qpzry9x8gf2tvdw0s3jn'), 'klv1qpzry9x8gf2tvdw0s3jn');
+  assert.equal(addressFromWallet({ address: FORUM_ADDRESS }), FORUM_ADDRESS);
+  assert.equal(addressFromWallet({ getWalletAddress: () => 'short' }, FORUM_ADDRESS), FORUM_ADDRESS);
+  assert.equal(addressFromWallet({}, [FORUM_ADDRESS]), FORUM_ADDRESS);
+  assert.equal(addressFromWallet({ address: 'klv1qpzry9x8gf2tvdw0s3jn' }), '');
   assert.equal(addressFromWallet({}), '');
 });
 
@@ -32,6 +38,24 @@ test('a signature KleverScan accepted verifies for that address', () => {
   );
 });
 
+test('a signature of the popup-encoded message still proves the login text', () => {
+  const secret = new Uint8Array(32).fill(4);
+  const address = addressFromPublicKey(ed.getPublicKey(secret));
+  const message = [
+    'Monster Gate wants you to connect this Klever wallet to your account.',
+    'This does not send any coins.',
+    `Address: ${address}`,
+    'Nonce: abababababababababababababababab',
+    'Issued: 2026-11-17T15:24:00.000Z',
+  ].join('\n');
+  const encoded = encodeURIComponent(message);
+  const signature = [...ed.sign(kleverMessageHash(encoded), secret)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  assert.equal(verifyKleverSignature(message, signature, address), true);
+  assert.equal(verifyKleverSignature(message, signature, FORUM_ADDRESS), false);
+  const plain = [...ed.sign(kleverMessageHash(message), secret)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  assert.equal(verifyKleverSignature(message, plain, address), true);
+});
+
 test('the wallet response uses the signature, not the echoed message', () => {
   const message = 'Monster Gate wants you to connect this Klever wallet to your account.\nThis does not send any coins.';
   const bytes = [];
@@ -41,6 +65,10 @@ test('the wallet response uses the signature, not the echoed message', () => {
   assert.deepEqual(signatureCandidates({ data: { message, signature: bytes } }), [FORUM_SIGNATURE]);
   const b64 = Buffer.from(Uint8Array.from(bytes)).toString('base64');
   assert.deepEqual(signatureCandidates(b64), [FORUM_SIGNATURE]);
+  assert.deepEqual(signatureCandidates(FORUM_SIGNATURE), [FORUM_SIGNATURE]);
+  assert.deepEqual(signatureCandidates({ Signature: [FORUM_SIGNATURE], message }), [FORUM_SIGNATURE]);
+  const url = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  assert.deepEqual(signatureCandidates(url), [FORUM_SIGNATURE]);
   assert.deepEqual(signatureCandidates({ toHex: () => FORUM_SIGNATURE, message }), [FORUM_SIGNATURE]);
   assert.equal(src('../src/wallet/klever.js').includes('data.data?.message ??'), false);
 });
