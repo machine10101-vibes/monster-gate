@@ -1,3 +1,5 @@
+import { trackPanelPointers } from '../ui/panelGesture.js';
+
 /** 180° of yaw per full-width one-finger swipe on touch / coarse pointers. */
 export const LOOK_SWIPE_RAD = Math.PI;
 export const MOUSE_LOOK_GAIN = 0.006;
@@ -37,6 +39,7 @@ export class Input {
 
     this.detectTouch();
     this.bind();
+    trackPanelPointers(typeof window !== 'undefined' ? window : null);
   }
 
   detectTouch() {
@@ -261,6 +264,8 @@ export class Input {
         } else this.press(act);
       };
       const up = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         b.classList.remove('active');
         if (act === 'shield') this.shieldBtn = false;
         if (act === 'attack') this.attackHeld = false;

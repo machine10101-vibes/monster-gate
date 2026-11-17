@@ -9,6 +9,7 @@ import {
 import {
   ACCOUNT_SESSION_TAKEN_STATUS,
   decideSession,
+  othersLogoutRequest,
   readAccountSession,
   takenBody,
   writeAccountSession,
@@ -97,9 +98,22 @@ async function seatAccount(
   return { ...user, sessionId };
 }
 
+async function revokeOtherAuthSessions(accessToken: unknown): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const req = othersLogoutRequest(url, accessToken, key);
+  if (!req) return;
+  try {
+    await fetch(req.url, req.init);
+  } catch {
+    /* the seat still drops the other browser on its next check */
+  }
+}
+
 async function accountClaim(admin: Admin, body: Record<string, unknown>): Promise<Response> {
   const seat = await seatAccount(admin, body, true);
   if (seat instanceof Response) return seat;
+  await revokeOtherAuthSessions(body.accessToken);
   return json({ sessionId: seat.sessionId });
 }
 

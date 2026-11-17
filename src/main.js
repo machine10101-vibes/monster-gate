@@ -103,7 +103,7 @@ import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
-const DEVICE_CHECK_MS = 4000;
+const DEVICE_CHECK_MS = 2000;
 const sendingToLedger = typeof location !== 'undefined' && isAdminAccount(readAccount());
 if (sendingToLedger) location.replace(adminHref());
 const loadingScreen = !sendingToLedger && typeof document !== 'undefined' ? mountLoading() : null;
@@ -606,6 +606,8 @@ class Game {
   startDeviceWatch() {
     this.stopDeviceWatch();
     if (this.wallet?.kind !== 'email' || !this.wallet.accessToken) return;
+    this.deviceCheckAt = 0;
+    this.watchDevice();
     this.deviceTimer = setInterval(() => {
       this.watchDevice();
     }, DEVICE_CHECK_MS);
@@ -617,11 +619,18 @@ class Game {
   }
 
   async watchDevice() {
-    if (!this.wallet || this.wallet.kind !== 'email' || this.cloudSyncing) return;
+    if (this.deviceChecking) return;
+    if (!this.wallet || this.wallet.kind !== 'email' || !this.wallet.accessToken) return;
+    this.deviceChecking = true;
+    this.deviceCheckAt = Date.now();
     try {
       await checkDevice(this.wallet);
     } catch (err) {
-      if (err?.code === 'taken') this.dropTakenAccount(err.message);
+      if (err?.code === 'taken' || err?.code === 'rejected') {
+        this.dropTakenAccount(err.code === 'taken' ? err.message : SESSION_TAKEN);
+      }
+    } finally {
+      this.deviceChecking = false;
     }
   }
 
@@ -669,6 +678,7 @@ class Game {
     this.wallet = session;
     this.cloudConflict = false;
     this.stopAutosave();
+    this.startDeviceWatch();
     this.progress.onCloud = null;
     this.character = null;
     this.charSelect.close();
@@ -1384,8 +1394,9 @@ class Game {
       if (document.hidden) {
         this.captureHunter();
         flushCloud();
-      }
+      } else this.watchDevice();
     });
+    window.addEventListener('focus', () => this.watchDevice());
     window.addEventListener('pagehide', () => {
       this.captureHunter();
       flushCloud();
@@ -3505,6 +3516,7 @@ class Game {
   /* ------------------------------ loop ------------------------------ */
   loop(now) {
     requestAnimationFrame(this.loop);
+    if (!this.walletBusy && this.wallet?.accessToken && Date.now() - (this.deviceCheckAt || 0) >= DEVICE_CHECK_MS) this.watchDevice();
     if (this.walletBusy) {
       this.last = now;
       return;
