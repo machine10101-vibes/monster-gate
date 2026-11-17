@@ -12,6 +12,7 @@ import {
 } from '../systems/roster.js';
 import { CampStage } from '../world/camp.js';
 import { shortAddress } from '../wallet/klever.js';
+import { lastWorldMode, paintCampWorld, rememberWorldMode, worldPickerState, worldServerConfigured } from '../net/worldPlay.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const $ = (id) => document.getElementById(id);
@@ -46,6 +47,7 @@ export class CharacterSelect {
     this.hourWas = null;
     this.noteTimer = 0;
     this.plates = new Map();
+    this.world = 'offline';
     this.root = $('charselect');
     this.bind();
   }
@@ -75,7 +77,10 @@ export class CharacterSelect {
       g.paintCloudStatus?.();
       this.filter = '';
       $('cs-search').value = '';
+      this.world = this.preferredWorld();
       this.refresh();
+      this.paintWorld();
+      g.refreshWorldHealth?.();
     } catch (err) {
       this.note(err?.message || 'The camp could not be opened.', true, true);
       throw err;
@@ -137,7 +142,10 @@ export class CharacterSelect {
     const c = this.roster.get(this.selectedId);
     const listMode = this.mode === 'list';
     $('cs-name').textContent = c?.name || '';
-    $('cs-enter').disabled = !c || !listMode;
+    const enter = $('cs-enter');
+    enter.disabled = !c || !listMode;
+    const guest = this.game.wallet?.kind === 'guest';
+    enter.textContent = this.world === 'online' ? (guest ? 'Sign in for World 1' : 'Enter World 1') : 'Enter Solo';
     $('cs-delete').disabled = !c;
     $('cs-restore').disabled = !this.roster.canRestore();
     $('cs-create').disabled = this.roster.full;
@@ -279,10 +287,44 @@ export class CharacterSelect {
     if (!hold) this.noteTimer = setTimeout(() => n.classList.remove('show'), 2800);
   }
 
+  preferredWorld() {
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (!worldServerConfigured(search)) return 'offline';
+    const last = lastWorldMode();
+    if (last === 'online' || last === 'offline') return last;
+    return this.game.wallet?.kind === 'guest' ? 'offline' : 'online';
+  }
+
+  chooseWorld(world) {
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (world === 'online' && !worldServerConfigured(search)) {
+      this.note('World 1 is not open yet.', true);
+      return;
+    }
+    this.world = world === 'online' ? 'online' : 'offline';
+    rememberWorldMode(this.world);
+    this.paintWorld();
+    this.syncChrome();
+  }
+
+  paintWorld() {
+    const g = this.game;
+    const search = typeof location !== 'undefined' ? location.search : '';
+    const state = worldPickerState({
+      search,
+      last: this.world,
+      health: g.worldHealth,
+      joining: false,
+      signedIn: true,
+      force: true,
+    });
+    paintCampWorld($('cs-world'), state, { guest: g.wallet?.kind === 'guest' });
+  }
+
   enter() {
     if (!this.active || this.mode !== 'list') return;
     const c = this.roster.get(this.selectedId);
-    if (c) this.game.enterWorld(c);
+    if (c) this.game.enterFromCamp(c);
   }
 
   back() {
@@ -460,6 +502,8 @@ export class CharacterSelect {
   bind() {
     if (!this.root) return;
     $('cs-enter').addEventListener('click', () => this.enter());
+    $('cs-world1')?.addEventListener('click', () => this.chooseWorld('online'));
+    $('cs-solo')?.addEventListener('click', () => this.chooseWorld('offline'));
     $('cs-back').addEventListener('click', () => this.back());
     $('cs-create').addEventListener('click', () => this.showForm());
     $('cs-delete').addEventListener('click', () => this.askDelete());
