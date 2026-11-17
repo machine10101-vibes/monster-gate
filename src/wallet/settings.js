@@ -44,7 +44,7 @@ export function mountWalletSettings(body, game) {
     if (isMockWallet()) {
       copy.textContent = `Tester mock wallet ${shortAddress(mockAddress())} is session-only. It never creates an account.`;
     } else {
-      copy.textContent = 'Connect the Klever extension, then sign a short message. One wallet per account.';
+      copy.textContent = 'The Klever extension asks you to connect, then to sign a message. This does not send any coins. One wallet per account.';
     }
     if (address) {
       who.textContent = `Linked ${shortAddress(address)}`;
@@ -66,9 +66,9 @@ export function mountWalletSettings(body, game) {
         busy = true;
         connect.disabled = true;
         err.textContent = '';
-        who.textContent = 'Confirm the signature in the Klever extension…';
+        who.textContent = 'Confirm the connection in Klever, then sign. This does not send any coins.';
         try {
-          await linkKleverWallet(game.wallet);
+          game.wallet = await linkKleverWallet(game.wallet);
           address = game.wallet.kleverAddress || '';
           game.hud?.toast?.('Klever wallet linked.', 2400);
           paint();

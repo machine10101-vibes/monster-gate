@@ -36,6 +36,9 @@ function fail(code, message) {
 
 function signatureText(signed, depth = 0) {
   if (signed == null || depth > 4) return '';
+  if (signed instanceof Uint8Array) {
+    return [...signed].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
   if (typeof signed === 'string') {
     const trimmed = signed.trim();
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -152,15 +155,50 @@ export function waitForProvider(ms = 2000) {
   });
 }
 
-async function connectProvider(kw, mobile) {
-  try {
-    if (window.kleverHub && typeof window.kleverHub.initialize === 'function') await window.kleverHub.initialize();
-    else if (typeof kw.initialize === 'function') await kw.initialize();
-  } catch {
-    /* A wallet that is already connected rejects a second initialize. */
+/** The extension Confirm popup is `connect`. Older builds use `initialize` for the same step. */
+export function connectMethod(kw, hub = typeof window !== 'undefined' ? window.kleverHub : null) {
+  if (kw && typeof kw.connect === 'function') return 'connect';
+  if (hub && typeof hub.initialize === 'function') return 'hub';
+  if (kw && typeof kw.initialize === 'function') return 'initialize';
+  return '';
+}
+
+export function addressFromWallet(kw, returned) {
+  const fromReturn = typeof returned === 'string' ? returned : returned?.address;
+  const fromGetter = typeof kw?.getWalletAddress === 'function' ? kw.getWalletAddress() : '';
+  for (const value of [fromReturn, fromGetter, kw?.address]) {
+    if (ADDRESS_RE.test(value || '')) return value;
   }
-  const address = typeof kw.getWalletAddress === 'function' ? kw.getWalletAddress() : kw.address;
-  if (!ADDRESS_RE.test(address || '')) {
+  return '';
+}
+
+function connectionClosed(err) {
+  if (err?.code === 'rejected') return true;
+  const text = `${err?.message || ''} ${err?.code || ''}`.toLowerCase();
+  return /reject|declin|cancel|denied|closed/.test(text);
+}
+
+async function connectProvider(kw, mobile) {
+  let address = addressFromWallet(kw);
+  if (!address) {
+    const method = connectMethod(kw);
+    let returned;
+    try {
+      if (method === 'connect') returned = await kw.connect();
+      else if (method === 'hub') returned = await window.kleverHub.initialize();
+      else if (method === 'initialize') returned = await kw.initialize();
+    } catch (err) {
+      if (connectionClosed(err)) {
+        throw fail(
+          'rejected',
+          mobile ? 'The Klever app closed the connection.' : 'The Klever extension closed the connection.',
+        );
+      }
+      /* A wallet that is already connected rejects a second initialize. */
+    }
+    address = addressFromWallet(kw, returned);
+  }
+  if (!address) {
     throw fail(
       'no-account',
       mobile

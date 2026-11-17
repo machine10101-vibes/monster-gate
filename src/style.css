@@ -3581,6 +3581,21 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   pointer-events: none;
 }
 .cs-enter.hidden { display: none !important; }
+.cs-klever {
+  pointer-events: auto;
+  max-width: 86vw;
+  padding: 6px 12px;
+  font-family: var(--font-px);
+  font-size: 10px;
+  color: #ffe7a0;
+  background: #1a1408;
+  border: 2px solid #7a5d27;
+  border-radius: 4px;
+  cursor: pointer;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.65);
+}
+.cs-klever:disabled { cursor: default; opacity: 0.92; }
+.cs-klever:focus-visible { outline: 2px solid #7ef6ff; outline-offset: 2px; }
 .cs-world {
   display: flex;
   gap: 8px;
@@ -3817,7 +3832,7 @@ body.selecting #damage-layer { display: none; }
     left: 10px;
     right: 10px;
     width: auto;
-    bottom: 176px;
+    bottom: 208px;
     height: min(38vh, 330px);
   }
   .cs-form { bottom: 10px; height: min(62vh, 560px); }
@@ -3827,13 +3842,13 @@ body.selecting #damage-layer { display: none; }
   .cs-btn.big { min-width: 0; width: 188px; font-size: 13px; padding: 14px 6px; }
   .cs-world-btn { min-width: 0; width: 108px; padding: 6px 8px; font-size: 10px; }
   .cs-toggle { display: none; }
-  .cs-note { bottom: 210px; }
+  .cs-note { bottom: 242px; }
   .cs-plate b { font-size: 10px; }
   .cs-plate.selected b { font-size: 12px; }
 }
 @media (max-height: 470px) and (min-aspect-ratio: 5/4) {
   .cs-top { display: none; }
-  .cs-panel { top: 38px; bottom: 118px; width: clamp(236px, 30vw, 300px); right: 10px; }
+  .cs-panel { top: 38px; bottom: 146px; width: clamp(236px, 30vw, 300px); right: 10px; }
   .cs-form { bottom: 10px; }
   .cs-back { left: 10px; bottom: 10px; padding: 10px 12px; min-width: 0; }
   .cs-enter { bottom: 10px; gap: 6px; }
@@ -3843,7 +3858,7 @@ body.selecting #damage-layer { display: none; }
   .cs-toggle span { display: none; }
   .cs-row { padding: 5px 8px; }
   .cs-emblem { width: 30px; height: 30px; }
-  .cs-note { bottom: 140px; }
+  .cs-note { bottom: 168px; }
   .cs-form { padding: 10px; }
   .cs-label { margin: 6px 0 4px; }
   .cs-blurb { min-height: 0; font-size: 13px; }

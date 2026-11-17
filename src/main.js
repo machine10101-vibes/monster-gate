@@ -95,7 +95,7 @@ import {
 } from './wallet/account.js';
 import { adminHref, isAdminAccount } from './admin/gate.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
-import { loginWithKlever } from './wallet/link.js';
+import { linkKleverWallet, loginWithKlever } from './wallet/link.js';
 import { UNLINKED_CODE, UNLINKED_HINT } from '../supabase/functions/_shared/linkAuth.js';
 import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
@@ -1298,15 +1298,24 @@ class Game {
   }
 
   showWalletUnlinked() {
-    const panel = document.getElementById('wallet-unlinked');
-    const status = document.getElementById('wallet-status');
-    const text = document.getElementById('wallet-unlinked-text');
-    if (text) text.textContent = UNLINKED_HINT;
-    panel?.classList.remove('hidden');
-    document.getElementById('account-choices')?.classList.add('hidden');
-    document.getElementById('wallet-help')?.classList.add('hidden');
-    if (status) status.textContent = '';
-    document.getElementById('wallet-unlinked-email')?.focus();
+    showUnlinkedNotice();
+  }
+
+  /** Attach the Klever extension or app to the signed-in email account. */
+  async linkCampWallet() {
+    if (this.wallet?.kind !== 'email' || this.wallet.kleverAddress || this.walletBusy) return;
+    this.walletBusy = true;
+    this.charSelect?.paintKlever?.('Confirm in Klever…');
+    try {
+      this.wallet = await linkKleverWallet(this.wallet);
+      this.hud?.toast?.('Klever wallet linked.', 2400);
+      this.charSelect?.paintKlever?.();
+    } catch (err) {
+      this.charSelect?.note?.(err.message || 'The wallet could not be linked.', true);
+      this.charSelect?.paintKlever?.();
+    } finally {
+      this.walletBusy = false;
+    }
   }
 
   captureHunter() {
@@ -3789,6 +3798,18 @@ let bootAsGuest = false;
 let pendingWallet = null;
 let shellBusy = false;
 
+function showUnlinkedNotice() {
+  const panel = document.getElementById('wallet-unlinked');
+  const text = document.getElementById('wallet-unlinked-text');
+  if (text) text.textContent = UNLINKED_HINT;
+  panel?.classList.remove('hidden');
+  document.getElementById('account-choices')?.classList.add('hidden');
+  document.getElementById('wallet-help')?.classList.add('hidden');
+  const status = document.getElementById('wallet-status');
+  if (status) status.textContent = '';
+  document.getElementById('wallet-unlinked-email')?.focus();
+}
+
 function showAccountForm(mode) {
   const panel = document.getElementById('account-panel');
   if (!panel) return;
@@ -3895,8 +3916,8 @@ async function shellKlever() {
   }
   shellBusy = true;
   markPrompt();
-  document.getElementById('account-choices')?.classList.add('hidden');
   hideAccountForm();
+  document.getElementById('account-choices')?.classList.add('hidden');
   if (sign) sign.disabled = true;
   if (status) {
     status.textContent = isMobile()
@@ -3913,9 +3934,13 @@ async function shellKlever() {
     bootHunt();
   } catch (err) {
     const help = document.getElementById('wallet-help');
-    if (help && (err.code === 'mobile-app' || err.code === 'extension')) showWalletHelp(help, err.code);
-    if (status) status.textContent = err.message || 'Klever sign-in failed.';
-    document.getElementById('account-choices')?.classList.remove('hidden');
+    if (err.code === UNLINKED_CODE) {
+      showUnlinkedNotice();
+    } else {
+      if (help && (err.code === 'mobile-app' || err.code === 'extension')) showWalletHelp(help, err.code);
+      if (status) status.textContent = err.message || 'Klever sign-in failed.';
+      document.getElementById('account-choices')?.classList.remove('hidden');
+    }
   } finally {
     shellBusy = false;
     if (sign) sign.disabled = false;
