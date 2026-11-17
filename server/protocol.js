@@ -208,6 +208,7 @@ export function readMove(msg) {
     armor: cleanArmor(msg.armor),
     zone: cleanZone(msg.zone),
     hp: Number.isFinite(Number(msg.hp)) ? clampNum(msg.hp, 0, 200, 20) : undefined,
+    resume: msg.resume === true,
   };
 }
 

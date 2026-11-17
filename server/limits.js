@@ -57,6 +57,25 @@ export function applyMove(prev, next, nowMs) {
   const dx = next.x - prev.x;
   const dz = next.z - prev.z;
   const dist = Math.hypot(dx, dz);
+  if (dist > TELEPORT_MAX && next.resume === true && !prev.resumeUsed) {
+    return {
+      pose: {
+        ...prev,
+        x: next.x,
+        y: next.y,
+        z: next.z,
+        yaw: next.yaw,
+        move: next.move,
+        anim: next.anim,
+        sheath: next.sheath,
+        zone: next.zone || prev.zone,
+        movedAt: nowMs,
+        resumeUsed: true,
+      },
+      clamped: false,
+      teleport: false,
+    };
+  }
   if (dist > TELEPORT_MAX) {
     if (!isPortalLanding(next.x, next.z)) {
       return { pose: { ...prev }, clamped: false, teleport: true };
@@ -73,6 +92,7 @@ export function applyMove(prev, next, nowMs) {
         sheath: next.sheath,
         zone: next.zone || prev.zone,
         movedAt: nowMs,
+        resumeUsed: true,
       },
       clamped: false,
       teleport: false,
@@ -101,6 +121,7 @@ export function applyMove(prev, next, nowMs) {
       // held, look, and armor stay on prev — the server owns appearance.
       zone: next.zone || prev.zone,
       movedAt: nowMs,
+      resumeUsed: true,
     },
     clamped,
     teleport: false,
