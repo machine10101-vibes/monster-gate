@@ -121,6 +121,33 @@ export function volcanicFeature(h, x, z, spec) {
  * Lava and the tile's rim walls are left where they are, so the pit stays a pit
  * and the north and west peaks stay sealed.
  */
+/**
+ * A flat shelf on the south shoulder, clear of the crater spires.
+ * The cone slope used to swallow the dragon into the hillside.
+ */
+export function seatVolcanum(H, climb, kind, spec) {
+  if (!spec?.lair) return;
+  const { cx, cz } = spec.lair;
+  const i0 = cz * W + cx;
+  if (!climb[i0]) return;
+  const pad = H[i0];
+  const R = 4.5;
+  for (let dz = -5; dz <= 5; dz++) {
+    for (let dx = -5; dx <= 5; dx++) {
+      const u = Math.hypot(dx, dz) / R;
+      if (u > 1) continue;
+      const x = cx + dx;
+      const z = cz + dz;
+      if (x < 1 || z < 1 || x >= W - 1 || z >= W - 1) continue;
+      const i = z * W + x;
+      if (kind[i] === K_LAVA) continue;
+      const blend = u < 0.62 ? 0 : (u - 0.62) / 0.38;
+      H[i] = Math.round(lerp(pad, H[i], blend) * 2) / 2;
+      if (blend < 0.85) climb[i] = 1;
+    }
+  }
+}
+
 export function gradeCinderCone(H, climb) {
   const MAX = 0.5;
   let changed = true;
@@ -341,7 +368,10 @@ export function dressVolcanic(world, land, spec) {
     world.lightSpots.push({ x: x + 6, y: world.heightAt(x, z) + 3, z: z + 4, color: 0xff5a14 });
     for (let k = 0; k < 14; k++) {
       const a = (k / 14) * TAU;
-      place(V.obsidianSpires[k % 3], Math.round(cx + Math.cos(a) * crater * 1.5), Math.round(cz + Math.sin(a) * crater * 1.5), a, 0.9 + (k % 4) * 0.2, { r: 2, collide: 0.9, occ: 2 });
+      const px = Math.round(cx + Math.cos(a) * crater * 1.5);
+      const pz = Math.round(cz + Math.sin(a) * crater * 1.5);
+      if (spec.lair && Math.hypot(px - spec.lair.cx, pz - spec.lair.cz) < 6) continue;
+      place(V.obsidianSpires[k % 3], px, pz, a, 0.9 + (k % 4) * 0.2, { r: 2, collide: 0.9, occ: 2 });
     }
   }
 

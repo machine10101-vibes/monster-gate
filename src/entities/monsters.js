@@ -454,7 +454,8 @@ export class Monster {
     const w = this.game.world;
     if (!w.playable(x, z)) return false;
     const h = w.heightAt(x, z);
-    if (h - this.y > 1.01 || h < WATER_Y - 0.1 || h > 9) return false;
+    if (h - this.y > 1.01 || h < WATER_Y - 0.1) return false;
+    if (h > 9 && !w.onCinderSlope?.(w.landAt(x, z), x, z)) return false;
     const zn = w.zoneAt(x, z);
     if (zn === ZONE.TOWN || zn === ZONE.MINE || w.onDock(x, z, 0.4)) return false;
     return true;
@@ -2003,12 +2004,19 @@ export class Spawner {
     const g = this.game;
     const lair = g.world?.volcanumLair;
     if (!lair || g.world?.realm !== 'over') return;
+    if (g.monsters.some((m) => !m.dead && m.type === 'volcanum')) {
+      this.volcanumHad = true;
+      this.volcanumT = 0;
+      return;
+    }
+    const dist = Math.hypot(lair.x - g.player.pos.x, lair.z - g.player.pos.z);
+    if (dist > 260) return;
+    const respawn = !!this.volcanumHad;
     this.volcanumT = (this.volcanumT || 0) + 1;
-    if (this.volcanumT < 90) return;
-    if (g.monsters.some((m) => !m.dead && m.type === 'volcanum')) return;
-    if (Math.hypot(lair.x - g.player.pos.x, lair.z - g.player.pos.z) < 28) return;
+    if (respawn && (this.volcanumT < 90 || dist < 28)) return;
+    this.volcanumHad = true;
     this.volcanumT = 0;
-    const m = this.spawn('volcanum', lair.x, lair.z);
+    const m = this.spawn('volcanum', lair.x, lair.z, respawn);
     m.home = { x: lair.x, z: lair.z };
   }
 

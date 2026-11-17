@@ -157,12 +157,21 @@ function paintBody() {
     blob(B, cx, cy, cz, rx, ry, rz, (x, y, z, d, dx, dy, dz) => (dz > 0.4 ? bellyRing(x, y, z) : plate(x, y, z, seed)), seed, 0.14);
   }
 
-  for (let z = 6; z <= 40; z += 4) {
+  for (let z = 6; z <= 40; z += 2) {
     const top = topY(B, cx, z);
     if (top < 0) continue;
-    const h = z > 32 ? 7 : 12;
-    shard(B, cx, top, z, h, 0.28, 2);
-    shard(B, cx - 1, top - 1, z, Math.max(4, h - 3), 0.4, 1);
+    const tall = z % 4 === 2;
+    const h = z > 32 ? (tall ? 8 : 5) : (tall ? 13 : 7);
+    shard(B, cx, top, z, h, 0.28, tall ? 2 : 1);
+    if (tall) shard(B, cx - 1, top - 1, z, Math.max(4, h - 4), 0.4, 1);
+  }
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 8; i++) {
+      const z = 12 + i * 3;
+      const x = cx + s * (5 + (i % 3));
+      const y = 8 + (i % 2);
+      stroke(B, x, y, z, x + s * 2, y + 3, z - 1, 1, (t) => (t > 0.45 ? C.glowHi : C.glow), 0.4, true);
+    }
   }
   for (const s of [-1, 1]) {
     stroke(B, cx + s * 6.2, 16, 24, cx + s * 10, 24, 18, 2, (t, x, y, z) => cryst(0.35 + t * 0.65, x, y, z), 0.45, (t) => t > 0.72);
@@ -227,14 +236,16 @@ function paintHead() {
 
   for (const s of [-1, 1]) {
     const ex = (k) => cx + s * k - (s < 0 ? 1 : 0);
-    for (let row = 0; row < 2; row++)
-      for (let col = 0; col < 2; col++) {
-        const x = ex(4 + col);
-        const y = 13 + row;
+    for (let row = 0; row < 3; row++)
+      for (let col = 0; col < 3; col++) {
+        const x = ex(3 + col);
+        const y = 12 + row;
         const fz = frontZ(H, x, y);
         if (fz < 0) continue;
-        H.set(x, y, fz, row === 0 && col === 0 ? C.glowHi : C.glow, true);
-        H.set(x, y, fz - 1, C.s0);
+        const hot = row === 1 && col === 1;
+        H.set(x, y, fz, hot ? C.glowHi : C.glow, true);
+        if (fz + 1 < H.sz) H.set(x, y, fz + 1, hot ? C.glowHi : C.glow, true);
+        H.set(x, y, Math.max(0, fz - 1), C.s0);
       }
     stroke(H, cx + s * 2, 18, 14, cx + s * 6, 32, 2, 2, (t, x, y, z) => cryst(0.2 + t * 0.8, x, y, z), 0.5, (t) => t > 0.62);
     stroke(H, cx + s * 4, 17, 12, cx + s * 9, 28, 0, 2, (t, x, y, z) => cryst(0.1 + t * 0.75, x, y, z), 0.55, (t) => t > 0.7);
@@ -406,7 +417,13 @@ function paintWings() {
   };
   put3(0, LEAD0, 8, 18, 4, 0.2);
   put3(8, 18, WRIST_X, WRIST_Z, 3, 0);
-  put3(WRIST_X, WRIST_Z, 48, 28, 3, 0.7);
+  put3(WRIST_X, WRIST_Z, 48, 28, 4, 0.65);
+  for (let k = 0; k < 5; k++) {
+    const x = WRIST_X + 2 + k * 5;
+    const z = Math.round(leading(x));
+    const h = 3 + (k % 2);
+    for (let n = 0; n < h; n++) put(x - n, 4 + n, z - n, cryst(n / h, x, n, z), n > h - 2);
+  }
   put3(WRIST_X, WRIST_Z, 41, 12, 2, 0.5);
   put3(WRIST_X, WRIST_Z, 31, 3, 2, 0.5);
   put3(WRIST_X, WRIST_Z, 20, -2, 2, 0.5);
@@ -495,15 +512,15 @@ function paintBreath() {
   const ember = new THREE.MeshBasicMaterial({ color: 0xff7a22 });
   const mats = [hot, lava, ember];
   const rng = new RNG(909);
-  for (let i = 0; i < 70; i++) {
-    const t = i / 69;
-    const s = (0.04 + rng.range(0, 0.055)) * (1.15 - t * 0.7);
+  for (let i = 0; i < 120; i++) {
+    const t = i / 119;
+    const s = (0.045 + rng.range(0, 0.07)) * (1.25 - t * 0.55);
     const cube = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), mats[i % 3]);
-    const spread = 0.03 + t * t * 0.42;
+    const spread = 0.04 + t * t * 0.62;
     cube.position.set(
       rng.range(-spread, spread),
-      rng.range(-spread * 0.85, spread * 0.55) - t * 0.08,
-      0.05 + t * 1.7 + rng.range(-0.04, 0.04),
+      rng.range(-spread * 0.7, spread * 0.7) - t * 0.05,
+      0.04 + t * 2.55 + rng.range(-0.05, 0.05),
     );
     cube.rotation.set(rng.range(0, 0.8), rng.range(0, 0.8), rng.range(0, 0.8));
     g.add(cube);
