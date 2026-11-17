@@ -3581,6 +3581,39 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   pointer-events: none;
 }
 .cs-enter.hidden { display: none !important; }
+.cs-world {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+.cs-world-btn {
+  pointer-events: auto;
+  min-width: 132px;
+  padding: 8px 12px;
+  font-family: var(--font-px);
+  font-size: 11px;
+  color: #e8fbff;
+  background: linear-gradient(#2a3348, #161b28);
+  border: 2px solid #3b3d44;
+  border-radius: 4px;
+  cursor: pointer;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.65);
+}
+.cs-world-btn b { display: block; font-weight: 700; }
+.cs-world-btn small {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: #9aa3b8;
+  letter-spacing: 0;
+}
+.cs-world-btn.sel {
+  border-color: #ffd23f;
+  box-shadow: 0 0 0 1px rgba(255, 210, 63, 0.45);
+}
+.cs-world-btn:disabled { opacity: 0.45; cursor: default; }
+.cs-world-btn:focus-visible { outline: 2px solid #7ef6ff; outline-offset: 2px; }
 .cs-name {
   min-height: 22px;
   font-family: var(--font-px);
@@ -3784,7 +3817,7 @@ body.selecting #damage-layer { display: none; }
     left: 10px;
     right: 10px;
     width: auto;
-    bottom: 128px;
+    bottom: 176px;
     height: min(38vh, 330px);
   }
   .cs-form { bottom: 10px; height: min(62vh, 560px); }
@@ -3792,14 +3825,15 @@ body.selecting #damage-layer { display: none; }
   .cs-enter { bottom: 12px; gap: 6px; }
   .cs-name { font-size: 14px; min-height: 18px; }
   .cs-btn.big { min-width: 0; width: 188px; font-size: 13px; padding: 14px 6px; }
+  .cs-world-btn { min-width: 0; width: 108px; padding: 6px 8px; font-size: 10px; }
   .cs-toggle { display: none; }
-  .cs-note { bottom: 112px; }
+  .cs-note { bottom: 210px; }
   .cs-plate b { font-size: 10px; }
   .cs-plate.selected b { font-size: 12px; }
 }
 @media (max-height: 470px) and (min-aspect-ratio: 5/4) {
   .cs-top { display: none; }
-  .cs-panel { top: 38px; bottom: 66px; width: clamp(236px, 30vw, 300px); right: 10px; }
+  .cs-panel { top: 38px; bottom: 118px; width: clamp(236px, 30vw, 300px); right: 10px; }
   .cs-form { bottom: 10px; }
   .cs-back { left: 10px; bottom: 10px; padding: 10px 12px; min-width: 0; }
   .cs-enter { bottom: 10px; gap: 6px; }
@@ -3809,7 +3843,7 @@ body.selecting #damage-layer { display: none; }
   .cs-toggle span { display: none; }
   .cs-row { padding: 5px 8px; }
   .cs-emblem { width: 30px; height: 30px; }
-  .cs-note { bottom: 74px; }
+  .cs-note { bottom: 140px; }
   .cs-form { padding: 10px; }
   .cs-label { margin: 6px 0 4px; }
   .cs-blurb { min-height: 0; font-size: 13px; }

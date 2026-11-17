@@ -466,6 +466,46 @@ export function worldPickerState({
   };
 }
 
+/**
+ * What Enter does on the character camp once a hunter and a world are chosen.
+ * `play` stays on this page. The other results navigate or ask for a sign-in.
+ */
+export function campEnterPlan({ world = 'offline', signedIn = false, onlineNow = false, configured = false } = {}) {
+  if (world === 'online') {
+    if (!configured) return 'soon';
+    if (!signedIn) return 'signin';
+    if (!onlineNow) return 'join-online';
+    return 'play';
+  }
+  if (onlineNow) return 'leave-online';
+  return 'play';
+}
+
+/** World 1 / Solo on the character camp. The title picker stays hidden. */
+export function paintCampWorld(root, state, { guest = false } = {}) {
+  if (!root || !state) return state;
+  const onlineBtn = root.querySelector('#cs-world1');
+  const soloBtn = root.querySelector('#cs-solo');
+  const status = root.querySelector('#cs-world1-status');
+  const open = state.online.action === 'online';
+  if (onlineBtn) {
+    onlineBtn.disabled = !open;
+    onlineBtn.classList.toggle('sel', !!(state.online.selected && open));
+    onlineBtn.setAttribute('aria-pressed', state.online.selected && open ? 'true' : 'false');
+  }
+  if (status) {
+    if (!open) status.textContent = 'Not open yet';
+    else if (guest) status.textContent = 'Sign in to play online';
+    else status.textContent = state.online.status || 'Online';
+  }
+  if (soloBtn) {
+    soloBtn.disabled = false;
+    soloBtn.classList.toggle('sel', !!state.solo.selected);
+    soloBtn.setAttribute('aria-pressed', state.solo.selected ? 'true' : 'false');
+  }
+  return state;
+}
+
 export function paintWorldPicker(root, state) {
   if (!root || !state) return state;
   root.hidden = !state.show;

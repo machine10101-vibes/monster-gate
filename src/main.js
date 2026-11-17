@@ -27,6 +27,7 @@ import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import {
   consumeWorldAuth,
+  campEnterPlan,
   consumeWorldJoin,
   dropOnlineWithoutSession,
   enterOnlineWorld,
@@ -755,10 +756,6 @@ class Game {
 
   continueAfterAccount() {
     if (this.started) return;
-    if (shouldForceWorldPick()) {
-      this.showWorldPicker({ force: true });
-      return;
-    }
     const join = consumeWorldJoin();
     const signed = !!(this.wallet && this.wallet.kind !== 'guest');
     const next = worldJoinContinue({
@@ -770,16 +767,8 @@ class Game {
       this.continueSignedInHunt();
       return;
     }
-    if (next === 'select') {
-      this.openCharacterSelect();
-      return;
-    }
     if (next === 'signin') {
       this.openSocialSignIn();
-      return;
-    }
-    if (signed) {
-      this.showWorldPicker();
       return;
     }
     if (this.wallet) this.openCharacterSelect();
@@ -794,21 +783,11 @@ class Game {
     else this.openCharacterSelect();
   }
 
-  showWorldPicker({ force = false } = {}) {
+  showWorldPicker() {
     if (this.started) return;
-    this.worldPickOpen = true;
-    this.worldJoining = false;
+    this.hideWorldPicker();
     this.hideWorldAuth();
-    this.charSelect?.close?.();
-    document.getElementById('title')?.classList.remove('hidden');
-    document.getElementById('account-choices')?.classList.add('hidden');
-    const root = document.getElementById('world-picker');
-    if (root) {
-      root.hidden = false;
-      root.classList.remove('hidden');
-    }
-    this.paintWorldPickerUi({ force });
-    this.refreshWorldHealth();
+    if (this.wallet?.address && this.roster && !this.cloudSyncing) this.openCharacterSelect();
   }
 
   hideWorldPicker() {
@@ -842,10 +821,12 @@ class Game {
       if (gen !== this.worldHealthGen) return;
       this.worldHealth = health;
       if (this.worldPickOpen) this.paintWorldPickerUi();
+      if (this.charSelect?.active) this.charSelect.paintWorld();
     }).catch(() => {
       if (gen !== this.worldHealthGen) return;
       this.worldHealth = { live: false, label: 'Waking…', players: null };
       if (this.worldPickOpen) this.paintWorldPickerUi();
+      if (this.charSelect?.active) this.charSelect.paintWorld();
     });
   }
 
@@ -929,7 +910,7 @@ class Game {
       return;
     }
     if (!this.started && !isWorldOnline(search)) {
-      this.showWorldPicker();
+      this.openCharacterSelect();
       return;
     }
     enterOnlineWorld();
@@ -968,6 +949,44 @@ class Game {
 
   leaveCharacterSelect() {
     this.signOut(false);
+  }
+
+  /** Character camp: the chosen hunter and the chosen world, together. */
+  enterFromCamp(char) {
+    if (this.started || !char || !this.roster?.get(char.id)) return;
+    const search = typeof location !== 'undefined' ? location.search : '';
+    const signed = !!(this.wallet && this.wallet.kind !== 'guest' && hasWorldSessionToken());
+    const plan = campEnterPlan({
+      world: this.charSelect?.world === 'online' ? 'online' : 'offline',
+      signedIn: signed,
+      onlineNow: isWorldOnline(search),
+      configured: worldServerConfigured(search),
+    });
+    if (plan === 'soon') {
+      this.charSelect?.note?.('World 1 is not open yet.', true);
+      return;
+    }
+    if (plan === 'signin') {
+      rememberWorldMode('online');
+      this.charSelect?.close?.();
+      this.openSocialSignIn();
+      return;
+    }
+    if (plan === 'join-online') {
+      this.roster.played(char.id);
+      rememberWorldMode('online');
+      markWorldJoin('online');
+      enterOnlineWorld();
+      return;
+    }
+    if (plan === 'leave-online') {
+      this.roster.played(char.id);
+      rememberWorldMode('offline');
+      markWorldJoin('offline');
+      leaveOnlineWorld();
+      return;
+    }
+    this.enterWorld(char);
   }
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */

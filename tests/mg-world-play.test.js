@@ -31,6 +31,8 @@ import {
   mmoClientClosed,
   offlineSearch,
   onlineSearch,
+  campEnterPlan,
+  paintCampWorld,
   paintWorldModePill,
   paintWorldPicker,
   paintWorldPlayButton,
@@ -323,6 +325,48 @@ test('picker states: coming soon, health, joining, last pick, test hook', () => 
   assert.equal(shouldForceWorldPick({ search: '?worldpick=1' }), true);
   assert.equal(shouldForceWorldPick({ search: '' }), false);
   assert.equal(shouldForceWorldPick({ search: '', win: { __mgForceWorldPick: true } }), true);
+});
+
+test('character camp chooses the hunter and the world together', () => {
+  assert.equal(campEnterPlan({ world: 'online', signedIn: true, onlineNow: false, configured: true }), 'join-online');
+  assert.equal(campEnterPlan({ world: 'online', signedIn: true, onlineNow: true, configured: true }), 'play');
+  assert.equal(campEnterPlan({ world: 'online', signedIn: false, onlineNow: false, configured: true }), 'signin');
+  assert.equal(campEnterPlan({ world: 'online', signedIn: true, configured: false }), 'soon');
+  assert.equal(campEnterPlan({ world: 'offline', signedIn: true, onlineNow: true, configured: true }), 'leave-online');
+  assert.equal(campEnterPlan({ world: 'offline', signedIn: false, onlineNow: false }), 'play');
+
+  const root = {
+    nodes: {
+      '#cs-world1': { disabled: false, classList: { toggle() {} }, setAttribute() {} },
+      '#cs-world1-status': { textContent: '' },
+      '#cs-solo': { disabled: true, classList: { toggle() {} }, setAttribute() {} },
+    },
+    querySelector(sel) { return this.nodes[sel]; },
+  };
+  paintCampWorld(root, worldPickerState({
+    search: '',
+    env: { VITE_MMO_URL: 'wss://x' },
+    signedIn: true,
+    last: 'online',
+    health: { label: 'Online · 2', live: true, players: 2 },
+    force: true,
+  }), { guest: true });
+  assert.equal(root.nodes['#cs-world1'].disabled, false);
+  assert.equal(root.nodes['#cs-world1-status'].textContent, 'Sign in to play online');
+
+  const html = src('../index.html');
+  const camp = html.slice(html.indexOf('id="charselect"'), html.indexOf('id="cs-confirm"'));
+  assert.match(camp, /id="cs-world"/);
+  assert.match(camp, /id="cs-world1"/);
+  assert.match(camp, /id="cs-solo"/);
+  const main = src('../src/main.js');
+  const after = main.slice(main.indexOf('continueAfterAccount() {'), main.indexOf('continueSignedInHunt() {'));
+  assert.doesNotMatch(after, /showWorldPicker/);
+  assert.match(after, /openCharacterSelect/);
+  assert.match(main, /enterFromCamp/);
+  const show = main.slice(main.indexOf('showWorldPicker() {'), main.indexOf('hideWorldPicker() {'));
+  assert.match(show, /openCharacterSelect/);
+  assert.doesNotMatch(show, /getElementById\('world-picker'\)/);
 });
 
 test('healthz URL and parse: Online + count, or Waking when slow; fetch never throws', async () => {
