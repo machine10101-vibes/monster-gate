@@ -63,7 +63,8 @@ test('the hunt save keeps one total per item, with no count cap', () => {
   assert.equal(p.good('copper_ore'), 5000);
 });
 
-test('a full 28-slot bag rejects new stacks and leftover harvest', () => {
+test('a full 40-slot bag rejects new stacks and leftover harvest', () => {
+  assert.equal(BAG_SLOTS, 40);
   const ids = GOODS_ORDER.slice(0, BAG_SLOTS);
   assert.equal(ids.length, BAG_SLOTS);
   const goods = Object.fromEntries(ids.map((id) => [id, 1]));

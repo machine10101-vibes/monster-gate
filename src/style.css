@@ -2814,6 +2814,20 @@ body.touch .how {
   grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
   gap: 8px;
 }
+.bag-grid.slots {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.bag-grid.slots .bag-cell canvas {
+  width: 40px;
+  height: 40px;
+}
+.bag-cell.empty {
+  min-height: 48px;
+  background: #121418;
+  border-color: #2a2e36;
+  cursor: default;
+}
+.bag-cell.empty:disabled { opacity: 1; }
 .bag-detail {
   position: sticky;
   top: 8px;
@@ -3827,6 +3841,10 @@ body.touch .cat-actions { margin-top: 8px; }
 body.touch .bag-tabs { gap: 4px; margin-bottom: 6px; }
 body.touch .bag section { margin-bottom: 8px; }
 body.touch .bag-grid { gap: 6px; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+body.touch .bag-grid.slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+body.touch .bag-grid.slots .bag-cell,
+body.touch .bag-cell.empty { min-height: 40px; }
+body.touch .bag-grid.slots .bag-cell canvas { width: 32px; height: 32px; }
 body.touch .bag-cell { min-height: 0; padding: 4px; }
 body.touch .bag-cell canvas { width: 44px; height: 44px; }
 body.touch .bag-detail { gap: 4px; min-height: 0; padding: 8px; }
