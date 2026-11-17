@@ -2727,8 +2727,13 @@ class Game {
 
   travelTo(dest) {
     if (!this.started || !this.player || this.player.dead || !dest) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this.travelLock > now) return;
+    this.travelLock = now + 700;
+    this.worldView?.grantPortalHop?.();
     if (this.world.realm === 'cave' || this.world.realm === 'rift') restoreOverworld(this);
     this.gather?.cancel?.();
+    this.world.revealAround?.(dest.x, dest.z, 80);
     const y = this.world.heightAt(dest.x, dest.z);
     this.player.dead = false;
     this.player.pos.set(dest.x, y, dest.z);

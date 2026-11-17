@@ -11,7 +11,8 @@ export const PING_MS = 15_000;
 
 export const SPEED_MAX = 16;
 export const TELEPORT_MAX = 40;
-export const WORLD_MIN = -50;
+/** 10×10 tiles of 144, Oakhollow at tile (4, 5), plus a margin past the outer coast. */
+export const WORLD_MIN = -900;
 export const WORLD_MAX = 1490;
 
 export const MOVE_PER_SEC = 12;

@@ -1,3 +1,4 @@
+import { isPortalLanding } from '../src/data/portals.js';
 import { CHAT_PER_10S, CHAT_PER_SEC, MOVE_PER_SEC, SPEED_MAX, TELEPORT_MAX } from './protocol.js';
 
 /** Token bucket. `now` is ms. */
@@ -45,8 +46,29 @@ export function applyMove(prev, next, nowMs) {
   const dx = next.x - prev.x;
   const dz = next.z - prev.z;
   const dist = Math.hypot(dx, dz);
-  if (dist > TELEPORT_MAX) {
+  if (dist > TELEPORT_MAX && !isPortalLanding(next.x, next.z)) {
     return { pose: { ...prev, look: next.look || prev.look, armor: next.armor || prev.armor }, clamped: false, teleport: true };
+  }
+  if (dist > TELEPORT_MAX) {
+    return {
+      pose: {
+        ...prev,
+        x: next.x,
+        y: next.y,
+        z: next.z,
+        yaw: next.yaw,
+        move: next.move,
+        anim: next.anim,
+        held: next.held,
+        sheath: next.sheath,
+        look: next.look || prev.look,
+        armor: next.armor || prev.armor,
+        zone: next.zone || prev.zone,
+        movedAt: nowMs,
+      },
+      clamped: false,
+      teleport: false,
+    };
   }
   const maxDist = SPEED_MAX * dt + 1.5;
   let x = next.x;
