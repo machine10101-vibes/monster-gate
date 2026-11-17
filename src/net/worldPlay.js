@@ -341,6 +341,28 @@ export function dropOnlineWithoutSession(opts = {}) {
   return true;
 }
 
+/**
+ * Put World 1 on this page without a reload.
+ * The hunt is already running; the socket attaches in place.
+ * join=1 stays off so a later refresh does not skip the character camp.
+ */
+export function stageOnlineWorld(opts = {}) {
+  const loc = currentLoc(opts.loc);
+  const search = opts.search ?? loc.search ?? '';
+  if (!worldServerConfigured(search, opts.env)) return false;
+  rememberWorldMode('online', opts.storage);
+  const href = hrefWithSearch(onlineSearch(search, { join: false }), loc);
+  if (typeof loc.replaceState === 'function') loc.replaceState({}, '', href);
+  else if (typeof history !== 'undefined' && history.replaceState) {
+    try {
+      history.replaceState({}, '', href);
+    } catch {
+      /* the camp can still enter offline */
+    }
+  }
+  return true;
+}
+
 export function enterOnlineWorld(opts = {}) {
   const loc = currentLoc(opts.loc);
   const search = opts.search ?? loc.search ?? '';

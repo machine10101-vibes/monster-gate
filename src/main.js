@@ -46,6 +46,7 @@ import {
   shouldForceWorldPick,
   shouldFreshMmoClient,
   shouldMountOnline,
+  stageOnlineWorld,
   worldJoinContinue,
   worldPickerState,
   worldServerConfigured,
@@ -107,12 +108,10 @@ const CLOUD_AUTOSAVE_MS = 30000;
 const DEVICE_CHECK_MS = 2000;
 const sendingToLedger = typeof location !== 'undefined' && isAdminAccount(readAccount());
 if (sendingToLedger) location.replace(adminHref());
-const loadingScreen = !sendingToLedger && typeof document !== 'undefined' ? mountLoading() : null;
-/** Paint the WebGL fallback before Game/save-bridge so a hung hop cannot hide it. */
-const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && showGlFailIfNeeded({
-  probe: defaultGlProbe,
-  onSuccess: resumeAfterGlFail,
-});
+/** Mounted only after the hunter signs in, creates an account, or plays as a guest. */
+let loadingScreen = null;
+/** WebGL is checked inside startGame, once the hunt is actually starting. */
+const glDeadAtBoot = false;
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
@@ -443,7 +442,15 @@ class Game {
     this.bindUI();
     progress(0.98, 'Ready');
     const account = readAccount();
-    if (account?.kind === 'email') {
+    if (bootAsGuest) {
+      bootAsGuest = false;
+      this.playAsGuest();
+    } else if (pendingWallet) {
+      const session = pendingWallet;
+      pendingWallet = null;
+      await this.applyWallet(session);
+      this.watchAccount();
+    } else if (account?.kind === 'email') {
       await this.applyWallet(account);
       this.watchAccount();
     } else {
@@ -975,8 +982,8 @@ class Game {
     if (plan === 'join-online') {
       this.roster.played(char.id);
       rememberWorldMode('online');
-      markWorldJoin('online');
-      enterOnlineWorld();
+      this.joinWorldInPlace().catch((err) => console.warn('world view', err));
+      this.enterWorld(char);
       return;
     }
     if (plan === 'leave-online') {
@@ -987,6 +994,25 @@ class Game {
       return;
     }
     this.enterWorld(char);
+  }
+
+  /** World 1 from the camp. The page stays put, so the loading screen does not play again. */
+  async joinWorldInPlace() {
+    const search = typeof location !== 'undefined' ? location.search : '';
+    stageOnlineWorld({ search });
+    const live = typeof location !== 'undefined' ? location.search : '';
+    if (!isWorldOnline(live)) return false;
+    if (!this.worldView) {
+      const { init } = await import('./net/worldView.js');
+      this.worldView = await init(this.scene, { game: this, search: live });
+    }
+    this.worldView?.clearAuthLatch?.();
+    this.hideWorldAuth();
+    if (!this.mmo || this.mmo.closed) {
+      const { attachMmo } = await import('./net/mmo.js');
+      attachMmo(this, this.worldView, { search: live });
+    }
+    return true;
   }
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
@@ -1087,33 +1113,12 @@ class Game {
   }
 
   openAccount(mode) {
-    const panel = document.getElementById('account-panel');
-    const status = document.getElementById('wallet-status');
-    const confirm = document.getElementById('account-confirm');
-    const confirmLabel = document.getElementById('account-confirm-label');
-    const submit = document.getElementById('account-submit');
-    const password = document.getElementById('account-password');
-    const error = document.getElementById('account-error');
-    if (!panel) return;
+    if (!document.getElementById('account-panel')) return;
     this.hideWalletUnlinked();
     this.hideWorldPicker();
     this.hideWorldAuth();
-    panel.dataset.mode = mode;
-    panel.classList.remove('hidden');
-    confirm?.classList.toggle('hidden', mode !== 'create');
-    confirmLabel?.classList.toggle('hidden', mode !== 'create');
-    if (submit) submit.textContent = mode === 'create' ? 'Create account' : 'Sign in';
-    if (password) password.setAttribute('autocomplete', mode === 'create' ? 'new-password' : 'current-password');
-    document.getElementById('account-pass-hint')?.classList.toggle('hidden', mode !== 'create');
-    document.getElementById('account-retry')?.classList.add('hidden');
-    if (error) error.textContent = '';
-    if (status) {
-      status.textContent = mode === 'create'
-        ? 'Choose an email and a password of 8 to 72 characters. This account signs in on any device.'
-        : 'Sign in with the email and password for your account.';
-    }
+    showAccountForm(mode);
     this.refreshWalletUi();
-    document.getElementById('account-email')?.focus();
   }
 
   closeAccount() {
@@ -3779,13 +3784,198 @@ function startGame() {
   });
 }
 
+let huntStarted = false;
+let bootAsGuest = false;
+let pendingWallet = null;
+let shellBusy = false;
+
+function showAccountForm(mode) {
+  const panel = document.getElementById('account-panel');
+  if (!panel) return;
+  const confirm = document.getElementById('account-confirm');
+  const confirmLabel = document.getElementById('account-confirm-label');
+  const submit = document.getElementById('account-submit');
+  const password = document.getElementById('account-password');
+  const error = document.getElementById('account-error');
+  const status = document.getElementById('wallet-status');
+  panel.dataset.mode = mode;
+  panel.classList.remove('hidden');
+  document.getElementById('account-choices')?.classList.add('hidden');
+  confirm?.classList.toggle('hidden', mode !== 'create');
+  confirmLabel?.classList.toggle('hidden', mode !== 'create');
+  if (submit) submit.textContent = mode === 'create' ? 'Create account' : 'Sign in';
+  if (password) password.setAttribute('autocomplete', mode === 'create' ? 'new-password' : 'current-password');
+  document.getElementById('account-pass-hint')?.classList.toggle('hidden', mode !== 'create');
+  document.getElementById('account-retry')?.classList.add('hidden');
+  if (error) error.textContent = '';
+  if (status) {
+    status.textContent = mode === 'create'
+      ? 'Choose an email and a password of 8 to 72 characters. This account signs in on any device.'
+      : 'Sign in with the email and password for your account.';
+  }
+  document.getElementById('account-email')?.focus();
+}
+
+function hideAccountForm() {
+  const panel = document.getElementById('account-panel');
+  panel?.reset();
+  panel?.classList.add('hidden');
+  const error = document.getElementById('account-error');
+  if (error) error.textContent = '';
+  document.getElementById('account-retry')?.classList.add('hidden');
+  document.getElementById('account-choices')?.classList.remove('hidden');
+}
+
+/** The loading screen and the 3D world start here, after an account is in. */
+function bootHunt() {
+  if (huntStarted) return;
+  if (typeof window !== 'undefined' && window.__game) return;
+  huntStarted = true;
+  document.documentElement.classList.remove('at-login');
+  const loading = document.getElementById('loading');
+  loading?.classList.remove('hidden', 'fading');
+  loading?.removeAttribute('hidden');
+  loading?.setAttribute('aria-hidden', 'false');
+  document.getElementById('title')?.classList.add('hidden');
+  if (!loadingScreen && typeof document !== 'undefined') loadingScreen = mountLoading();
+  if (typeof document !== 'undefined' && showGlFailIfNeeded({
+    probe: defaultGlProbe,
+    onSuccess: resumeAfterGlFail,
+  })) return;
+  startGame();
+}
+
+async function shellAccountSubmit(event) {
+  if (typeof window !== 'undefined' && window.__game) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (shellBusy) return;
+  const panel = document.getElementById('account-panel');
+  const mode = panel?.dataset.mode || 'create';
+  const email = document.getElementById('account-email')?.value || '';
+  const password = document.getElementById('account-password')?.value || '';
+  const confirm = document.getElementById('account-confirm')?.value || '';
+  const error = document.getElementById('account-error');
+  const submit = document.getElementById('account-submit');
+  shellBusy = true;
+  if (submit) submit.disabled = true;
+  if (error) error.textContent = '';
+  document.getElementById('account-retry')?.classList.add('hidden');
+  try {
+    const session = mode === 'create'
+      ? await createAccount(email, password, confirm)
+      : await signInAccount(email, password);
+    if (isAdminAccount(session)) {
+      location.replace(adminHref());
+      return;
+    }
+    pendingWallet = session;
+    bootHunt();
+  } catch (err) {
+    if (error) error.textContent = err.message || 'The account could not be created.';
+    document.getElementById('account-retry')?.classList.toggle('hidden', err.code !== 'unavailable');
+  } finally {
+    shellBusy = false;
+    if (submit) submit.disabled = false;
+  }
+}
+
+async function shellKlever() {
+  if (typeof window !== 'undefined' && window.__game) return;
+  if (shellBusy) return;
+  const sign = document.getElementById('btn-wallet');
+  const status = document.getElementById('wallet-status');
+  if (isMobile() && !window.kleverWeb && !inKleverHandoff()) {
+    markPrompt();
+    if (sign) sign.disabled = true;
+    if (status) status.textContent = 'Opening Klever Wallet…';
+    launchKleverApp();
+    document.getElementById('account-choices')?.classList.add('hidden');
+    return;
+  }
+  shellBusy = true;
+  markPrompt();
+  document.getElementById('account-choices')?.classList.add('hidden');
+  hideAccountForm();
+  if (sign) sign.disabled = true;
+  if (status) {
+    status.textContent = isMobile()
+      ? 'Confirm the signature in the Klever Wallet app…'
+      : 'Confirm the signature in the Klever extension…';
+  }
+  try {
+    const session = await loginWithKlever();
+    if (isAdminAccount(session)) {
+      location.replace(adminHref());
+      return;
+    }
+    pendingWallet = session;
+    bootHunt();
+  } catch (err) {
+    const help = document.getElementById('wallet-help');
+    if (help && (err.code === 'mobile-app' || err.code === 'extension')) showWalletHelp(help, err.code);
+    if (status) status.textContent = err.message || 'Klever sign-in failed.';
+    document.getElementById('account-choices')?.classList.remove('hidden');
+  } finally {
+    shellBusy = false;
+    if (sign) sign.disabled = false;
+  }
+}
+
+/** Login is on screen. The game stays unloaded until they choose how to play. */
+function armLogin() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.add('at-login');
+  document.getElementById('load-video')?.pause?.();
+  const once = (id, fn) => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.gate) return;
+    el.dataset.gate = '1';
+    el.addEventListener('click', fn);
+  };
+  once('btn-guest', () => {
+    if (window.__game) return;
+    bootAsGuest = true;
+    bootHunt();
+  });
+  once('btn-account-create', () => {
+    if (window.__game) return;
+    showAccountForm('create');
+  });
+  once('btn-account-signin', () => {
+    if (window.__game) return;
+    showAccountForm('signin');
+  });
+  once('btn-wallet', () => {
+    if (window.__game) return;
+    shellKlever();
+  });
+  once('account-cancel', () => {
+    if (window.__game) return;
+    hideAccountForm();
+  });
+  once('account-retry', () => {
+    if (window.__game) return;
+    document.getElementById('account-panel')?.requestSubmit();
+  });
+  const form = document.getElementById('account-panel');
+  if (form && !form.dataset.gate) {
+    form.dataset.gate = '1';
+    form.addEventListener('submit', shellAccountSubmit);
+  }
+}
+
 if (!sendingToLedger && !glDeadAtBoot) {
+  const openGate = () => {
+    if (readAccount()?.kind === 'email') bootHunt();
+    else armLogin();
+  };
   runLegacySaveBridge().then((result) => {
     if (result === 'away') return;
-    startGame();
+    openGate();
   }).catch((e) => {
     console.warn('save bridge', e);
-    startGame();
+    openGate();
   });
 }
 
