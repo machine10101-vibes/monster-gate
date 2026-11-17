@@ -80,6 +80,7 @@ export class CharacterSelect {
       this.world = this.preferredWorld();
       this.refresh();
       this.paintWorld();
+      this.paintKlever();
       g.refreshWorldHealth?.();
     } catch (err) {
       this.note(err?.message || 'The camp could not be opened.', true, true);
@@ -307,6 +308,27 @@ export class CharacterSelect {
     this.syncChrome();
   }
 
+  paintKlever(pending) {
+    const btn = $('cs-klever');
+    if (!btn) return;
+    const email = this.game.wallet?.kind === 'email';
+    btn.classList.toggle('hidden', !email);
+    if (!email) return;
+    const address = this.game.wallet.kleverAddress || '';
+    if (pending) {
+      btn.disabled = true;
+      btn.textContent = pending;
+      return;
+    }
+    if (address) {
+      btn.disabled = true;
+      btn.textContent = `Klever ${shortAddress(address)}`;
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Connect Klever wallet';
+  }
+
   paintWorld() {
     const g = this.game;
     const search = typeof location !== 'undefined' ? location.search : '';
@@ -502,6 +524,7 @@ export class CharacterSelect {
   bind() {
     if (!this.root) return;
     $('cs-enter').addEventListener('click', () => this.enter());
+    $('cs-klever')?.addEventListener('click', () => this.game.linkCampWallet?.());
     $('cs-world1')?.addEventListener('click', () => this.chooseWorld('online'));
     $('cs-solo')?.addEventListener('click', () => this.chooseWorld('offline'));
     $('cs-back').addEventListener('click', () => this.back());

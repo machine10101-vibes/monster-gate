@@ -15,9 +15,9 @@ export const SAFE_LINE = 'This does not send any coins.';
 
 export const UNLINKED_CODE = 'unlinked';
 export const UNLINKED_MESSAGE =
-  'No account is linked to this wallet. Sign in with email, then connect your wallet in Account settings.';
+  'No account is linked to this wallet. Sign in with email, then press Connect Klever wallet on the character camp.';
 export const UNLINKED_HINT =
-  "This Klever wallet isn't linked yet. Your email account and progress are safe — sign in with email, then link the wallet in Account settings.";
+  "This Klever wallet isn't linked yet. Your email account and progress are safe — sign in with email, then press Connect Klever wallet on the character camp.";
 export const TAKEN_MESSAGE = 'That Klever wallet is already linked to another account.';
 export const LINKED_ALREADY_MESSAGE = 'This account already has a Klever wallet. Unlink it first.';
 export const REPLAY_MESSAGE = 'That signature was already used. Confirm a new one.';
