@@ -26,9 +26,10 @@ export function publicKeyFromAddress(address: string): Uint8Array | null {
 
 /** Hash the extension and the Klever Wallet app actually sign. */
 export function kleverMessageHash(message: string): Uint8Array {
-  const prefix = new TextEncoder().encode(PREFIX);
-  const length = new TextEncoder().encode(String(message.length));
   const body = new TextEncoder().encode(message);
+  const prefix = new TextEncoder().encode(PREFIX);
+  // Klever's prepare_message uses the UTF-8 byte length, then keccak256.
+  const length = new TextEncoder().encode(String(body.length));
   const bytes = new Uint8Array(prefix.length + length.length + body.length);
   bytes.set(prefix, 0);
   bytes.set(length, prefix.length);

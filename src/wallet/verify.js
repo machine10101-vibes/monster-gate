@@ -31,10 +31,10 @@ export function addressFromPublicKey(publicKey) {
  * The prefix keeps a login signature from ever being a transaction.
  */
 export function kleverMessageHash(message) {
-  const text = String(message);
+  const body = new TextEncoder().encode(String(message));
   const prefix = new TextEncoder().encode(PREFIX);
-  const length = new TextEncoder().encode(String(text.length));
-  const body = new TextEncoder().encode(text);
+  // Klever's prepare_message uses the UTF-8 byte length, then keccak256.
+  const length = new TextEncoder().encode(String(body.length));
   const bytes = new Uint8Array(prefix.length + length.length + body.length);
   bytes.set(prefix, 0);
   bytes.set(length, prefix.length);

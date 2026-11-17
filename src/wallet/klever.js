@@ -34,27 +34,92 @@ function fail(code, message) {
   return err;
 }
 
-function signatureText(signed, depth = 0) {
-  if (signed == null || depth > 4) return '';
-  if (signed instanceof Uint8Array) {
-    return [...signed].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  if (typeof signed === 'string') {
-    const trimmed = signed.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+function hexOf(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
+  return out;
+}
+
+function pushHex(out, hex) {
+  if (hex && hex.length === 128 && !out.includes(hex)) out.push(hex);
+}
+
+/** 64-byte slices that could be an Ed25519 signature. The message text is never one of these. */
+function signatureSlices(value) {
+  let bytes = null;
+  if (value instanceof Uint8Array) bytes = value;
+  else if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else if (Array.isArray(value) && value.length >= 64 && value.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+    bytes = Uint8Array.from(value);
+  } else if (typeof value === 'string') {
+    const raw = value.trim().replace(/^0x/i, '');
+    if (!raw || raw.length > 400) return [];
+    if (/^[0-9a-fA-F]+$/.test(raw) && raw.length % 2 === 0) {
+      const out = new Uint8Array(raw.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(raw.slice(i * 2, i * 2 + 2), 16);
+      bytes = out;
+    } else {
       try {
-        return signatureText(JSON.parse(trimmed), depth + 1);
+        const bin = atob(raw);
+        if (bin.length >= 64 && bin.length <= 160) {
+          const out = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+          bytes = out;
+        }
       } catch {
-        return trimmed;
+        return [];
       }
     }
-    return trimmed;
   }
-  if (Array.isArray(signed)) return signatureText(signed[0], depth + 1);
-  const nested = (typeof signed.data === 'string' && signed.data) || signed.data?.signature || '';
-  const value = signed.signature || signed.sig || signed.hex || signed.result || nested
-    || (typeof signed.toHex === 'function' ? signed.toHex() : '');
-  if (value && value !== signed) return signatureText(value, depth + 1);
+  if (!bytes || bytes.length < 64 || bytes.length > 160) return [];
+  const slices = [bytes.slice(0, 64)];
+  if (bytes.length > 64) slices.push(bytes.slice(-64));
+  return slices;
+}
+
+/**
+ * Every 64-byte signature in a wallet response.
+ * The Klever app echoes the message next to the signature. The message is not a signature.
+ */
+export function signatureCandidates(signed, depth = 0, out = []) {
+  if (signed == null || depth > 5) return out;
+  if (typeof signed === 'string') {
+    const trimmed = signed.trim();
+    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && trimmed.length < 8000) {
+      try {
+        signatureCandidates(JSON.parse(trimmed), depth + 1, out);
+        return out;
+      } catch {
+        /* a signature string, not JSON */
+      }
+    }
+  }
+  for (const slice of signatureSlices(signed)) pushHex(out, hexOf(slice));
+  if (Array.isArray(signed)) {
+    if (!signatureSlices(signed).length) {
+      for (const item of signed) signatureCandidates(item, depth + 1, out);
+    }
+    return out;
+  }
+  if (typeof signed === 'object' && !ArrayBuffer.isView(signed)) {
+    if (typeof signed.toHex === 'function') {
+      try { signatureCandidates(signed.toHex(), depth + 1, out); } catch { /* ignore */ }
+    }
+    if (typeof signed.toBase64 === 'function') {
+      try { signatureCandidates(signed.toBase64(), depth + 1, out); } catch { /* ignore */ }
+    }
+    for (const key of ['signature', 'sig', 'hex', 'result', 'bytes', 'data', 'message', 'signedMessage', 'payload']) {
+      if (Object.prototype.hasOwnProperty.call(signed, key)) signatureCandidates(signed[key], depth + 1, out);
+    }
+  }
+  return out;
+}
+
+function matchingSignature(candidates, message, address) {
+  for (const signature of candidates) {
+    if (verifyKleverSignature(message, signature, address)) return signature;
+  }
   return '';
 }
 
@@ -114,7 +179,7 @@ function legacySignMessage(message) {
     });
     events.addEventListener(event.id, (result) => {
       const data = result?.data;
-      if (data?.status === 'ACCEPTED') resolve(data.data?.message ?? data.data ?? data);
+      if (data?.status === 'ACCEPTED') resolve(data);
       else reject(fail('rejected', 'The Klever app closed the sign-in request.'));
     });
     wallet.handleTransaction(JSON.stringify(event));
@@ -123,16 +188,24 @@ function legacySignMessage(message) {
 
 async function requestSignature(kw, message) {
   const legacy = legacySignMessage(message);
-  if (legacy) return legacy;
+  if (legacy) {
+    try {
+      const signed = await legacy;
+      if (signatureCandidates(signed).length) return signed;
+    } catch (err) {
+      if (err?.code === 'rejected') throw err;
+    }
+  }
   const bridge = window.__kleverBrowser__?.bridge;
   if (typeof bridge === 'function') {
-    return bridge({
+    const signed = await bridge({
       type: 'SIGN_IN_MESSAGE',
       network: 'KLV',
       chainId: '38',
       data: message,
       url: location.href,
     });
+    if (signatureCandidates(signed).length || typeof kw?.signMessage !== 'function') return signed;
   }
   return kw.signMessage(message);
 }
@@ -246,19 +319,8 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   } finally {
     releasePageHold();
   }
-  const signature = signatureText(signed);
-  let ok = verifyKleverSignature(message, signature, address);
-  if (!ok && typeof kw.validateSignature === 'function') {
-    try {
-      const res = await kw.validateSignature(message, signature, address);
-      const signer = typeof res === 'object' ? res.signer || res.address : '';
-      ok = res === true || res?.isValid === true;
-      if (ok && signer && signer !== address) ok = false;
-    } catch {
-      ok = false;
-    }
-  }
-  if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
+  const signature = matchingSignature(signatureCandidates(signed), message, address);
+  if (!signature) throw fail('bad-signature', 'The signature does not match this Klever address.');
   return { address, message, signature, nonce };
 }
 
