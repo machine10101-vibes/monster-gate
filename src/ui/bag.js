@@ -22,6 +22,7 @@ function closeBagAsk() {
 }
 
 const TABS = [
+  ['bag', 'Bag'],
   ['carried', 'Hotbar'],
   ['tools', 'Tools'],
   ['goods', 'Gathered'],
@@ -29,15 +30,25 @@ const TABS = [
   ['parts', 'Parts'],
 ];
 
-/** The hunter's bag. Tabs keep each kind of item in one grid, with a detail card. */
+/** Goods, parts, and gear share one bag. Empty cells keep all 40 slots on screen. */
+function slotList(groups) {
+  const cells = [...groups.goods, ...groups.parts, ...groups.gear];
+  while (cells.length < BAG_SLOTS) cells.push(null);
+  return cells;
+}
+
+/** The hunter's bag. The Bag tab is 40 slots, with a detail card for the selection. */
 export function mountBag(body, game) {
-  let tab = 'carried';
+  let tab = 'bag';
   let sel = null;
 
   const paint = () => {
     closeBagAsk();
     const groups = collect(game);
-    if (!groups[tab].some((it) => it.key === sel)) sel = groups[tab][0]?.key || null;
+    groups.bag = slotList(groups);
+    const list = groups[tab];
+    const filled = list.filter(Boolean);
+    if (!filled.some((it) => it.key === sel)) sel = filled[0]?.key || null;
     body.innerHTML = '';
     const root = document.createElement('div');
     root.className = 'bag';
@@ -57,10 +68,11 @@ export function mountBag(body, game) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'bag-tab' + (id === tab ? ' on' : '');
-      b.textContent = `${label} ${groups[id].length}`;
+      const n = id === 'bag' ? game.progress.bagSlotsUsed() : groups[id].filter(Boolean).length;
+      b.textContent = `${label} ${n}`;
       b.onclick = () => {
         tab = id;
-        sel = groups[id][0]?.key || null;
+        sel = (groups[id] || []).find((it) => it)?.key || null;
         paint();
       };
       tabs.appendChild(b);
@@ -70,15 +82,24 @@ export function mountBag(body, game) {
     const stage = document.createElement('div');
     stage.className = 'bag-stage';
     const grid = document.createElement('div');
-    grid.className = 'bag-grid';
-    const list = groups[tab];
-    if (!list.length) {
+    grid.className = 'bag-grid' + (tab === 'bag' ? ' slots' : '');
+    if (!filled.length && tab !== 'bag') {
       const p = document.createElement('p');
       p.className = 'bag-empty';
       p.textContent = emptyText(tab);
       grid.appendChild(p);
     }
     for (const it of list) {
+      if (!it) {
+        const empty = document.createElement('button');
+        empty.type = 'button';
+        empty.className = 'bag-cell empty';
+        empty.disabled = true;
+        empty.tabIndex = -1;
+        empty.setAttribute('aria-label', 'Empty slot');
+        grid.appendChild(empty);
+        continue;
+      }
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'bag-cell' + (it.key === sel ? ' sel' : '') + (it.worn ? ' worn' : '');
@@ -106,7 +127,7 @@ export function mountBag(body, game) {
 
     const detail = document.createElement('aside');
     detail.className = 'bag-detail';
-    const current = list.find((it) => it.key === sel);
+    const current = filled.find((it) => it.key === sel);
     if (!current) {
       const p = document.createElement('span');
       p.textContent = emptyText(tab);
@@ -319,6 +340,7 @@ function heldStats(it) {
 }
 
 function emptyText(tab) {
+  if (tab === 'bag') return `The bag holds ${BAG_SLOTS} slots.`;
   if (tab === 'carried') return 'Weapons and supplies on your hotbar show up here.';
   if (tab === 'tools') return 'The tinderbox lights logs you have chopped.';
   if (tab === 'goods') return 'Ore, fish, and logs are kept here. Chop birch, oak, and maple west of town.';
