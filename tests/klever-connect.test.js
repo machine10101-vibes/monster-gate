@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
-import { addressFromWallet, connectMethod, signatureCandidates } from '../src/wallet/klever.js';
+import { addressFromWallet, connectMethod, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -71,6 +71,21 @@ test('the wallet response uses the signature, not the echoed message', () => {
   assert.deepEqual(signatureCandidates(url), [FORUM_SIGNATURE]);
   assert.deepEqual(signatureCandidates({ toHex: () => FORUM_SIGNATURE, message }), [FORUM_SIGNATURE]);
   assert.equal(src('../src/wallet/klever.js').includes('data.data?.message ??'), false);
+});
+
+test('one Klever prompt stays open until it is signed', () => {
+  const sheet = {
+    wallet: { handleTransaction() {} },
+    events: { createEvent() {}, addEventListener() {} },
+    bridge() {},
+  };
+  assert.equal(signaturePlan({ signMessage() {} }, sheet), 'sheet');
+  assert.equal(signaturePlan({ signMessage() {} }, {}), 'extension');
+  assert.equal(signaturePlan({}, { bridge() {} }), 'bridge');
+  assert.equal(signaturePlan({}, {}), '');
+  const srcText = src('../src/wallet/klever.js');
+  assert.equal(srcText.includes('kw.address = address'), false);
+  assert.equal(srcText.includes('activeElement.blur'), false);
 });
 
 test('an email account connects Klever from the character camp', () => {

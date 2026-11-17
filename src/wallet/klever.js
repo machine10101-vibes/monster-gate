@@ -186,40 +186,52 @@ function legacySignMessage(message) {
   });
 }
 
-async function requestSignature(kw, message, address) {
-  const accepted = (signed) => matchingSignature(signatureCandidates(signed), message, address);
-  // The Chrome extension's signMessage returns the hex signature. Ask it first
-  // on desktop so an older bridge cannot answer with the message text.
-  if (!isMobile() && typeof kw?.signMessage === 'function') {
-    const signed = await kw.signMessage(message);
-    if (accepted(signed) || signatureCandidates(signed).length) return signed;
+function pageWallet() {
+  if (typeof window === 'undefined') return {};
+  return {
+    wallet: window.kleverWallet,
+    events: window.kleverWalletEvents,
+    bridge: window.__kleverBrowser__?.bridge,
+  };
+}
+
+/**
+ * One signer, and only one. The in-app sheet stays up until Confirm. Opening
+ * signMessage while that sheet is up, or changing the page under the extension
+ * window, makes Klever close the signature before it can be signed.
+ */
+export function signaturePlan(kw, page = pageWallet()) {
+  const events = page.events;
+  if (
+    typeof page.wallet?.handleTransaction === 'function'
+    && typeof events?.createEvent === 'function'
+    && typeof events?.addEventListener === 'function'
+  ) return 'sheet';
+  if (typeof kw?.signMessage === 'function') return 'extension';
+  if (typeof page.bridge === 'function') return 'bridge';
+  return '';
+}
+
+async function requestSignature(kw, message) {
+  const plan = signaturePlan(kw);
+  if (plan === 'sheet') return legacySignMessage(message);
+  if (plan === 'extension') return kw.signMessage(message);
+  if (plan === 'bridge') {
+    return window.__kleverBrowser__.bridge({
+      type: 'SIGN_IN_MESSAGE',
+      network: 'KLV',
+      chainId: '38',
+      data: message,
+      url: location.href,
+    });
   }
-  const legacy = legacySignMessage(message);
-  if (legacy) {
-    try {
-      const signed = await legacy;
-      if (accepted(signed)) return signed;
-    } catch (err) {
-      if (err?.code === 'rejected') throw err;
-    }
-  }
-  const bridge = window.__kleverBrowser__?.bridge;
-  if (typeof bridge === 'function') {
-    try {
-      const signed = await bridge({
-        type: 'SIGN_IN_MESSAGE',
-        network: 'KLV',
-        chainId: '38',
-        data: message,
-        url: location.href,
-      });
-      if (accepted(signed)) return signed;
-    } catch (err) {
-      if (err?.code === 'rejected') throw err;
-    }
-  }
-  if (typeof kw?.signMessage === 'function') return kw.signMessage(message);
   return null;
+}
+
+function paintSettled() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
 }
 
 export function waitForProvider(ms = 2000) {
@@ -332,11 +344,14 @@ export async function connectWallet() {
  * checked against the address before it is sent. This never creates an account.
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
-  holdPageStill();
-  // The extension signs with kleverWeb.address. Put the nonce's address there
-  // so the popup cannot sign a different account than the one in the message.
-  if (kw && typeof address === 'string') {
-    try { kw.address = address; } catch { /* a frozen provider keeps its own account */ }
+  const plan = signaturePlan(kw);
+  // The in-app sheet closes if the page changes size. Lock the size and let that
+  // paint before the sheet opens. The extension's window is separate: locking the
+  // page under it closes that window, so the page stays as it is.
+  const lockPage = plan === 'sheet';
+  if (lockPage) {
+    holdPageStill();
+    await paintSettled();
   }
   const message = signedMessage({
     purpose,
@@ -346,16 +361,22 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   });
   let signed;
   try {
-    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-    signed = await requestSignature(kw, message, address);
+    signed = await requestSignature(kw, message);
   } catch (err) {
-    if (err?.code === 'rejected') throw err;
+    if (err?.code === 'rejected' || connectionClosed(err)) {
+      throw fail('rejected', 'The Klever window closed before it was signed. Press Connect Klever wallet and confirm in the window that stays open.');
+    }
     throw fail('rejected', mobile ? 'The Klever app closed the sign-in request.' : 'The Klever extension closed the sign-in request.');
   } finally {
-    releasePageHold();
+    if (lockPage) releasePageHold();
   }
   const signature = matchingSignature(signatureCandidates(signed), message, address);
-  if (!signature) throw fail('bad-signature', 'The signature does not match this Klever address.');
+  if (!signature) {
+    if (!signatureCandidates(signed).length) {
+      throw fail('rejected', 'The Klever window closed before it returned a signature. Press Connect Klever wallet and confirm in the window that stays open.');
+    }
+    throw fail('bad-signature', 'The signature does not match this Klever address.');
+  }
   return { address, message, signature, nonce };
 }
 
