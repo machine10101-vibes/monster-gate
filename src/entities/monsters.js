@@ -1406,40 +1406,44 @@ export class Monster {
         p.knees[i].rotation.x += (knee - p.knees[i].rotation.x) * lk;
       });
       const last = p.tail.length - 1;
+      const lavaCurl = [-0.62, -0.4, -0.22, -0.08, 0.12];
+      const lavaYaw = [-0.28, -0.46, -0.32, -0.12, 0];
       p.tail.forEach((sg, i) => {
         const sway = Math.sin(t * (winding || chargeK > 0 ? 6 : 2.6) - i * 0.8) * (0.2 + i * 0.06);
         let slash = 0;
         if (winding && this.atk === 'slash') slash = (this.t / 0.38) * 2.2 - 1.1;
         const follow = this.state === 'recover' && this.atk === 'slash' ? Math.max(0, 1 - this.t * 3) * 1.1 : 0;
-        sg.rotation.y = sway + (i === 0 ? (slash + follow) * 0.7 : (slash + follow) * 0.45) + clamp(-lat * 0.06, -0.5, 0.5) * (i + 1) * 0.3;
+        const yawRest = lava ? lavaYaw[i] ?? 0 : 0;
+        sg.rotation.y = yawRest + sway + (i === 0 ? (slash + follow) * 0.7 : (slash + follow) * 0.45) + clamp(-lat * 0.06, -0.5, 0.5) * (i + 1) * 0.3;
         const trail = flying ? (diving ? -0.18 : 0.1) : 0;
-        sg.rotation.x = (i === 0 ? -0.1 : i === last ? -0.05 : 0.04) + trail;
+        const rest = lava ? lavaCurl[i] ?? lavaCurl[lavaCurl.length - 1] : i === 0 ? -0.1 : i === last ? -0.05 : 0.04;
+        sg.rotation.x = rest + trail;
       });
       p.wings.forEach((w, i) => {
         const sgn = i === 0 ? -1 : 1;
-        let base = this.state === 'breath' ? 0.35 : winding ? 0.8 : 0.3;
-        let amp = this.state === 'breath' ? 0.22 : winding ? 0.2 : 0.55 + moving * 0.12;
-        let sweep = this.state === 'breath' ? 0.18 : winding ? 0.25 : 0.05;
-        let sweepAmp = winding || this.state === 'breath' ? 0 : 0.12;
+        let base = lava ? 1.05 : this.state === 'breath' ? 0.35 : winding ? 0.8 : 0.3;
+        let amp = lava ? 0.1 : this.state === 'breath' ? 0.22 : winding ? 0.2 : 0.55 + moving * 0.12;
+        let sweep = lava ? -0.12 : this.state === 'breath' ? 0.18 : winding ? 0.25 : 0.05;
+        let sweepAmp = lava ? 0.03 : winding || this.state === 'breath' ? 0 : 0.12;
         if (ascending) {
-          base = 0.12;
-          amp = 0.95;
+          base = lava ? 0.85 : 0.12;
+          amp = lava ? 0.35 : 0.95;
           sweep = 0.05;
         } else if (inAir) {
-          base = 0.2 + chargeK * 0.45;
-          amp = 0.72 - chargeK * 0.55;
+          base = lava ? 1.02 : 0.2 + chargeK * 0.45;
+          amp = lava ? 0.22 : 0.72 - chargeK * 0.55;
           sweep = 0.05;
         } else if (diving) {
-          base = 0.55 + dive * 0.7;
-          amp = 0.1;
-          sweep = 0.3 + dive * 0.45;
+          base = lava ? 1.15 : 0.55 + dive * 0.7;
+          amp = lava ? 0.08 : 0.1;
+          sweep = lava ? 0.12 : 0.3 + dive * 0.45;
           sweepAmp = 0;
         }
         w.rotation.z = sgn * (base + Math.sin(t * flapRate) * amp);
         w.rotation.y = sgn * (sweep - Math.cos(t * flapRate) * sweepAmp);
         const og = p.wingsOuter[i];
-        og.rotation.z = sgn * (Math.sin(t * flapRate - 1.1) * amp * 0.8 - (diving ? 0.5 : 0.12));
-        og.rotation.y = sgn * (-0.08 - Math.cos(t * flapRate - 1.1) * sweepAmp * 0.8 - (diving ? 0.3 : 0));
+        og.rotation.z = sgn * (lava ? 0.12 + Math.sin(t * flapRate - 1.1) * amp * 0.4 : Math.sin(t * flapRate - 1.1) * amp * 0.8 - (diving ? 0.5 : 0.12));
+        og.rotation.y = sgn * (lava ? -0.18 : -0.08 - Math.cos(t * flapRate - 1.1) * sweepAmp * 0.8 - (diving ? 0.3 : 0));
       });
       let headX = 0.08 + Math.sin(t * 1.6) * 0.04;
       let jawX = 0.05;
@@ -1487,6 +1491,7 @@ export class Monster {
         }
       }
       if (inAir && Math.random() < dt * 16) g.fx.emit(this.x + (Math.random() - 0.5) * 2.2, this.y + this.hover + 0.8, this.z + (Math.random() - 0.5) * 2.2, 0, -1.2, 0, [0x4c97e8, 0x9258e4][Math.random() < 0.5 ? 0 : 1], 0.08, 0.5, 0);
+      if (lava && p.breath) p.breath.visible = this.state === 'breath' || (winding && this.atk === 'breath') || chargeK > 0.25;
       headX += this.kick * 0.3;
       lean += this.kick * 0.2;
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);

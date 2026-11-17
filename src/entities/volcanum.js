@@ -3,35 +3,33 @@ import { VoxelModel, hash3, jitter, shade, mix, clamp, RNG } from '../engine/vox
 import { toonMaterial } from '../engine/materials.js';
 
 /**
- * Volcanum: the dragon of the volcanic wasteland. Obsidian-black plate split
- * by liquid-lava veins, purple wing membranes, purple-blue dorsal spines,
- * orange eyes and a mouth that pours lava. Built on the same rig as the
- * Darksycle Dragon so the flight, jaw and wing beats stay as detailed.
- * Matches the volcanic dragon reference: black body, lava chest and wing
- * bones, purple membranes, pale claws.
+ * Volcanum: a voxel lava dragon. Charcoal plate, a lava Y down the chest,
+ * orange rings on the neck, violet wing sails with glowing finger bones,
+ * purple crystal spines, and a mouth that pours a stream of fire cubes.
+ * Same rig as the Darksycle Dragon so the flight, jaw and wing beats stay.
  */
 const S = 0.05;
 
 const C = {
-  s0: 0x101014,
-  s1: 0x1a1a20,
-  s2: 0x282830,
-  s3: 0x3c3c46,
-  b0: 0x140e0c,
-  b1: 0x241610,
-  m0: 0x241448,
-  m1: 0x3a2068,
-  m2: 0x5a348c,
-  m3: 0x7a4cb0,
-  c0: 0x3a28a0,
-  c1: 0x5a40d0,
-  c2: 0x7a68ee,
-  c3: 0xc4b8ff,
-  glow: 0xff5a12,
-  glowHi: 0xffe08a,
+  s0: 0x0c0c10,
+  s1: 0x16161c,
+  s2: 0x24242c,
+  s3: 0x3a3a44,
+  b0: 0x100c0a,
+  b1: 0x1c1410,
+  m0: 0x3a1468,
+  m1: 0x54208c,
+  m2: 0x7438b8,
+  m3: 0x9a58d8,
+  c0: 0x3a28c8,
+  c1: 0x5c40ee,
+  c2: 0x9070ff,
+  c3: 0xe6dcff,
+  glow: 0xff4a08,
+  glowHi: 0xffd25a,
   claw: 0xc8c4bc,
   clawHi: 0xf4f0e8,
-  mouth: 0x1a0804,
+  mouth: 0x140604,
   mouthGlow: 0xff6a18,
   tooth: 0xe8e4dc,
 };
@@ -52,11 +50,10 @@ function meshFrom(model, ox, oy, oz, mat) {
 
 const plate = (x, y, z, seed = 3) => {
   const n = hash3(x >> 1, y >> 1, z >> 1, seed);
-  if (hash3(x, y, z, seed + 11) > 0.972) return hash3(x, z, y, seed) > 0.45 ? C.glowHi : C.glow;
-  let c = n > 0.84 ? C.s3 : n > 0.46 ? C.s2 : n > 0.12 ? C.s1 : C.s0;
-  if (z % 4 === 0) c = shade(c, 0.76);
-  else if (y % 3 === 0 && (x & 1) === 0) c = shade(c, 0.9);
-  return J(c, x, y, z, seed, 0.035);
+  let c = n > 0.82 ? C.s3 : n > 0.48 ? C.s2 : n > 0.16 ? C.s1 : C.s0;
+  if (z % 4 === 0) c = shade(c, 0.7);
+  else if (y % 3 === 0 && (x & 1) === 0) c = shade(c, 0.86);
+  return J(c, x, y, z, seed, 0.03);
 };
 
 /** Turn lava-coloured surface voxels into emissive cracks. */
@@ -140,7 +137,7 @@ function shard(M, x, y, z, h, lean = 0.6, wide = 2, side = 0) {
 const BO = { x: 14, y: 4, z: 21 };
 
 function paintBody() {
-  const B = new VoxelModel(30, 40, 58);
+  const B = new VoxelModel(30, 52, 58);
   const cx = 14;
   const body = (cy, ry, seed) => (x, y, z, d, dx, dy) => (dy < -0.42 ? belly(x, y, z) : plate(x, y, z, seed));
   blob(B, cx, 10, 9.5, 6.7, 5.9, 8.5, body(10, 5.8, 7), 7, 0.16);
@@ -160,58 +157,53 @@ function paintBody() {
     blob(B, cx, cy, cz, rx, ry, rz, (x, y, z, d, dx, dy, dz) => (dz > 0.4 ? bellyRing(x, y, z) : plate(x, y, z, seed)), seed, 0.14);
   }
 
-  for (let z = 4; z <= 43; z += 2) {
+  for (let z = 6; z <= 40; z += 4) {
     const top = topY(B, cx, z);
     if (top < 0) continue;
-    const h = z > 32 ? 3 : 4 + Math.round(1.4 * Math.sin(z * 0.45));
-    shard(B, cx, top, z, h, 0.65, z > 32 ? 1 : 2);
+    const h = z > 32 ? 7 : 12;
+    shard(B, cx, top, z, h, 0.28, 2);
+    shard(B, cx - 1, top - 1, z, Math.max(4, h - 3), 0.4, 1);
   }
   for (const s of [-1, 1]) {
-    stroke(B, cx + s * 7.4, 17, 26, cx + s * 11.5, 23, 20, 3, (t, x, y, z) => (t > 0.75 ? cryst(0.9, x, y, z) : plate(x, y, z, 31)), 0.66);
-    stroke(B, cx + s * 6, 12, 34, cx + s * 9.5, 14, 30, 2, (t, x, y, z) => plate(x, y, z, 32), 0.5);
+    stroke(B, cx + s * 6.2, 16, 24, cx + s * 10, 24, 18, 2, (t, x, y, z) => cryst(0.35 + t * 0.65, x, y, z), 0.45, (t) => t > 0.72);
   }
 
-  const cy0 = 10.5;
-  const coreAt = [];
-  for (let dy = -5; dy <= 5; dy++)
-    for (let dx = -4; dx <= 4; dx++) {
-      const r = (dx / 3.6) ** 2 + (dy / 4.6) ** 2;
-      if (r > 1) continue;
-      const x = cx + dx;
-      const y = Math.round(cy0 + dy);
-      const fz = frontZ(B, x, y);
-      if (fz < 0) continue;
-      coreAt.push([x, y, fz, r]);
-    }
-  for (const [x, y, fz, r] of coreAt) {
-    const col = r < 0.18 ? C.glowHi : r < 0.55 ? C.glow : C.c0;
-    B.set(x, y, fz, col, true);
-    if (r < 0.62) B.set(x, y, fz + 1, r < 0.25 ? C.glowHi : C.c1, true);
+  const skinGlow = (x, y, z, hot) => {
+    if (!B.has(x, y, z)) return;
+    const edge = !B.has(x + 1, y, z) || !B.has(x - 1, y, z) || !B.has(x, y + 1, z) || !B.has(x, y - 1, z) || !B.has(x, y, z + 1) || !B.has(x, y, z - 1);
+    if (!edge) return;
+    B.set(x, y, z, hot ? C.glowHi : C.glow, true);
+  };
+  for (let z = 10; z <= 34; z++) {
+    for (const dx of [0, -1]) skinGlow(cx + dx, 7, z, z % 4 === 0);
   }
-  const rng = new RNG(77);
-  for (let v = 0; v < 6; v++) {
-    let x = cx + rng.int(-2, 2);
-    let y = Math.round(cy0) + rng.int(-3, 3);
-    let dir = rng.int(0, 3);
-    for (let k = 0; k < 8; k++) {
-      const fz = frontZ(B, x, y);
-      if (fz >= 0 && !B.get(x, y, fz + 1)) B.set(x, y, fz, k < 3 ? C.glow : C.c0, true);
-      if (dir === 0) x += 1;
-      else if (dir === 1) x -= 1;
-      else if (dir === 2) y -= 1;
-      else y += rng.chance(0.5) ? 1 : -1;
-      if (rng.chance(0.4)) dir = rng.int(0, 3);
-    }
+  for (let y = 6; y <= 16; y++) {
+    const fz = frontZ(B, cx, y);
+    if (fz < 0) continue;
+    B.set(cx, y, fz, C.glowHi, true);
+    B.set(cx - 1, y, fz, C.glow, true);
+    if (fz > 0) B.set(cx, y, fz - 1, C.glow, true);
   }
   for (const s of [-1, 1]) {
-    for (let z = 13; z <= 27; z += 3) {
-      const x = cx + s * 7;
-      B.set(x, 9, z, C.glow, true);
+    for (let i = 0; i < 7; i++) {
+      const x = cx + s * (i + 1);
+      const y = 11 + i;
+      const fz = frontZ(B, x, y);
+      if (fz < 0) continue;
+      B.set(x, y, fz, i < 2 ? C.glowHi : C.glow, true);
     }
   }
-  stroke(B, cx, 8, 14, cx, 18, 38, 2, (t) => (t > 0.62 ? C.glowHi : C.glow), 0.25, true);
-  stroke(B, cx, 11, 16, cx, 22, 34, 1, () => C.glowHi, 0.35, true);
-  for (const s of [-1, 1]) stroke(B, cx + s * 2, 9, 18, cx + s * 4, 16, 32, 1, () => C.glow, 0.4, true);
+  for (const zc of [33, 37, 41]) {
+    for (let y = 8; y < 28; y++) {
+      for (let x = 4; x < 26; x++) {
+        if (!B.has(x, y, zc)) continue;
+        const edge = !B.has(x + 1, y, zc) || !B.has(x - 1, y, zc) || !B.has(x, y + 1, zc) || !B.has(x, y - 1, zc);
+        if (!edge) continue;
+        if (y > topY(B, x, zc) - 2) continue;
+        B.set(x, y, zc, Math.abs(x - cx) <= 1 ? C.glowHi : C.glow, true);
+      }
+    }
+  }
   ignite(B);
   return B;
 }
@@ -220,7 +212,7 @@ function paintBody() {
 const HO = { x: 15, y: 8, z: 10 };
 
 function paintHead() {
-  const H = new VoxelModel(32, 42, 44);
+  const H = new VoxelModel(32, 48, 44);
   const cx = 15;
   const skull = (seed) => (x, y, z, d, dx, dy) => (dy < -0.5 ? J(C.s0, x, y, z, seed, 0.03) : plate(x, y, z, seed));
   blob(H, cx, 13, 15, 7.6, 6.4, 8.4, skull(40), 40, 0.14);
@@ -236,52 +228,21 @@ function paintHead() {
   for (const s of [-1, 1]) {
     const ex = (k) => cx + s * k - (s < 0 ? 1 : 0);
     for (let row = 0; row < 2; row++)
-      for (let col = 0; col < 3; col++) {
-        const x = ex(3 + col);
-        const y = 14 + row;
+      for (let col = 0; col < 2; col++) {
+        const x = ex(4 + col);
+        const y = 13 + row;
         const fz = frontZ(H, x, y);
         if (fz < 0) continue;
-        const center = col === 1 && row === 0;
-        H.set(x, y, fz, center ? C.glowHi : col === 2 && row === 1 ? C.c0 : C.glow, true);
+        H.set(x, y, fz, row === 0 && col === 0 ? C.glowHi : C.glow, true);
+        H.set(x, y, fz - 1, C.s0);
       }
-    for (let k = 0; k < 4; k++) {
-      const x = ex(2 + k);
-      const fz = frontZ(H, x, 16);
-      if (fz >= 0) H.set(x, 16, fz, shade(C.s0, 0.8));
-    }
-
-    stroke(H, cx + s * 7, 15, 15, cx + s * 13, 18, 5, 3, (t, x, y, z) => (t > 0.8 ? cryst(0.5, x, y, z) : t < 0.25 ? C.glow : plate(x, y, z, 47)), 0.7, (t) => t < 0.25);
-    stroke(H, cx + s * 7.4, 11, 12, cx + s * 11.5, 7, 5, 2, (t, x, y, z) => plate(x, y, z, 48), 0.5);
-    stroke(H, cx + s * 7.2, 9, 18, cx + s * 10.5, 5, 13, 2, (t, x, y, z) => plate(x, y, z, 49), 0.5);
-
-    const beam = [
-      [cx + s * 2.4, 16, 16],
-      [cx + s * 5.2, 19, 9],
-      [cx + s * 8, 21, 3],
-      [cx + s * 10.2, 18, -1],
-    ];
-    for (let i = 0; i < beam.length - 1; i++) {
-      const a = beam[i];
-      const b = beam[i + 1];
-      stroke(H, a[0], a[1], a[2], b[0], b[1], b[2], 3 - Math.floor(i / 2), (t, x, y, z) => cryst((i + t) / 3, x, y, z), 0.3, (t) => i === 2 && t > 0.85);
-    }
-    const tines = [
-      [1, 0.35, 6, 3, 3.2],
-      [2, 0.4, 8, 3.2, 3.6],
-    ];
-    for (const [seg, u, tx, tz, len] of tines) {
-      const a = beam[seg];
-      const b = beam[seg + 1];
-      const px = a[0] + (b[0] - a[0]) * u;
-      const py = a[1] + (b[1] - a[1]) * u;
-      const pz = a[2] + (b[2] - a[2]) * u;
-      stroke(H, px, py, pz, px + s * (tx - 6) * 0.45, py + len, pz + tz * 0.6, 2, (t, x, y, z) => cryst(0.35 + t * 0.65, x, y, z), 0.5, (t) => t > 0.85);
-    }
-    stroke(H, cx + s * 1.4, 16, 10, cx + s * 3.2, 20, 2, 2, (t, x, y, z) => cryst(0.3 + t * 0.6, x, y, z), 0.5, (t) => t > 0.85);
+    stroke(H, cx + s * 2, 18, 14, cx + s * 6, 32, 2, 2, (t, x, y, z) => cryst(0.2 + t * 0.8, x, y, z), 0.5, (t) => t > 0.62);
+    stroke(H, cx + s * 4, 17, 12, cx + s * 9, 28, 0, 2, (t, x, y, z) => cryst(0.1 + t * 0.75, x, y, z), 0.55, (t) => t > 0.7);
+    stroke(H, cx + s * 0.4, 18, 8, cx + s * 1.2, 30, -2, 2, (t, x, y, z) => cryst(0.35 + t * 0.65, x, y, z), 0.45, (t) => t > 0.72);
   }
   for (let z = 6; z <= 14; z += 3) {
     const top = topY(H, cx, z);
-    if (top >= 0) shard(H, cx, top, z, 3, 0.8, 1);
+    if (top >= 0) shard(H, cx, top, z, 6, 0.7, 1);
   }
 
   for (const s of [-1, 1]) {
@@ -417,12 +378,11 @@ function paintWings() {
       const fine = hash3(x, 0, z, 72);
       let t = 0.18 + clamp(dBone / 7, 0, 1) * 0.5 + (patch - 0.5) * 0.55 + (fine - 0.5) * 0.14 + (1 - edge) * 0.08;
       t = clamp(t, 0, 0.999);
-      if (dBone < 0.9) {
-        put(x, 2, z, dBone < 0.4 ? C.glowHi : C.glow, true);
-        continue;
-      }
-      const col = [C.m0, C.m1, C.m2, C.m3][Math.floor(t * 4)];
-      put(x, 2, z, J(col, x, 0, z, 73, 0.03));
+      const hotEdge = dBone < 1.15 || z >= zl - 1 || z <= zt + 1;
+      const col = hotEdge
+        ? (dBone < 0.45 || z === zt || z === zl ? C.glowHi : C.glow)
+        : [C.m0, C.m1, C.m2, C.m3][Math.floor(t * 4)];
+      for (const y of hotEdge ? [2] : [1, 2, 3]) put(x, y, z, hotEdge ? col : J(col, x, y, z, 73, 0.04), hotEdge);
     }
   }
   const bone = (t, x, y, z) => {
@@ -502,37 +462,53 @@ function tailSeg(w, h, len, seed, spikeH) {
   return { model: T, cx, cy, len };
 }
 
-function tailFan() {
-  const len = 30;
-  const T = new VoxelModel(26, 28, len);
-  const cx = 13;
-  const cy = 11;
-  for (let z = len - 1; z >= len - 7; z--) {
-    const k = 0.5 - (len - 1 - z) * 0.03;
-    for (let y = 0; y < 24; y++)
-      for (let x = 0; x < 26; x++) {
-        const dx = (x + 0.5 - cx) / (2.6 * k + 1);
-        const dy = (y + 0.5 - cy) / (2.6 * k + 1);
-        if (dx * dx + dy * dy <= 1) T.set(x, y, z, dy < -0.4 ? belly(x, y, z) : plate(x, y, z, 80));
+function tailTip() {
+  const len = 18;
+  const T = new VoxelModel(14, 24, len);
+  const cx = 7;
+  const cy = 8;
+  for (let z = 0; z < len; z++) {
+    const k = 1 - z / (len + 2);
+    const rw = 3.2 * k + 0.6;
+    const rh = 3.2 * k + 0.6;
+    for (let y = 0; y < 18; y++)
+      for (let x = 0; x < 14; x++) {
+        const dx = (x + 0.5 - cx) / rw;
+        const dy = (y + 0.5 - cy) / rh;
+        if (dx * dx + dy * dy > 1) continue;
+        if (dy < -0.35 && Math.abs(dx) < 0.45) T.set(x, y, z, (z & 1) ? C.glowHi : C.glow, true);
+        else T.set(x, y, z, plate(x, y, z, 80));
       }
+    if (z % 3 === 1) {
+      const top = Math.round(cy + rh - 0.4);
+      shard(T, cx, top, z, 4 + Math.round((1 - k) * 2), 0.55, 1);
+    }
   }
-  const blades = [
-    [0, 0.0, 22, 3],
-    [1, 0.0, 17, 2],
-    [-1, 0.0, 17, 2],
-    [0, 1, 13, 2],
-    [0, -1, 11, 2],
-    [1, 0.7, 14, 2],
-    [-1, 0.7, 14, 2],
-    [1, -0.7, 9, 1],
-    [-1, -0.7, 9, 1],
-  ];
-  for (const [sx, sy, L, th] of blades) {
-    const dx = sx * 0.55;
-    const dy = sy * 0.6;
-    stroke(T, cx, cy, len - 7, cx + dx * L * 0.55, cy + dy * L * 0.55 , len - 7 - L, th, (t, x, y, z) => cryst(0.15 + t * 0.85, x, y, z), 0.7, (t) => t > 0.8);
+  return { model: T, cx, cy, len };
+}
+
+/** A stream of fire cubes pouring out of the open mouth. */
+function paintBreath() {
+  const g = new THREE.Group();
+  const hot = new THREE.MeshBasicMaterial({ color: C.glowHi });
+  const lava = new THREE.MeshBasicMaterial({ color: C.glow });
+  const ember = new THREE.MeshBasicMaterial({ color: 0xff7a22 });
+  const mats = [hot, lava, ember];
+  const rng = new RNG(909);
+  for (let i = 0; i < 70; i++) {
+    const t = i / 69;
+    const s = (0.04 + rng.range(0, 0.055)) * (1.15 - t * 0.7);
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), mats[i % 3]);
+    const spread = 0.03 + t * t * 0.42;
+    cube.position.set(
+      rng.range(-spread, spread),
+      rng.range(-spread * 0.85, spread * 0.55) - t * 0.08,
+      0.05 + t * 1.7 + rng.range(-0.04, 0.04),
+    );
+    cube.rotation.set(rng.range(0, 0.8), rng.range(0, 0.8), rng.range(0, 0.8));
+    g.add(cube);
   }
-  return { model: T, cx: 13, cy: 11, len };
+  return g;
 }
 
 /* --------------------------------- rig -------------------------------- */
@@ -553,7 +529,11 @@ export function buildVolcanumDragon() {
   const jaw = new THREE.Group();
   jaw.position.set(0, -1.4 * S, 4 * S);
   jaw.add(meshFrom(paintJaw(), 9, 4, 3, mat));
+  jaw.rotation.x = 0.95;
   head.add(jaw);
+  const breath = paintBreath();
+  breath.position.set(0, (9 - HO.y) * S, (34 - HO.z) * S);
+  head.add(breath);
 
   const { inner, outer } = paintWings();
   const wings = [];
@@ -570,8 +550,10 @@ export function buildVolcanumDragon() {
     om.scale.x = side;
     og.add(om);
     g.add(og);
-    og.rotation.z = side * -0.12;
-    g.rotation.z = side * 0.45;
+    og.rotation.z = side * 0.08;
+    og.rotation.y = side * -0.08;
+    g.rotation.y = side * -0.12;
+    g.rotation.z = side * 1.05;
     bodyG.add(g);
     wings.push(g);
     wingsOuter.push(og);
@@ -598,24 +580,28 @@ export function buildVolcanumDragon() {
     const shin = meshFrom(shins[k], w / 2, 16, 6, mat);
     knee.add(shin);
     hip.add(knee);
-    hip.rotation.x = k ? 0.45 : -0.55;
-    knee.rotation.x = k ? -0.7 : 0.85;
+    hip.rotation.x = k ? 1.05 : -1.15;
+    knee.rotation.x = k ? -1.45 : 1.55;
     bodyG.add(hip);
     legs.push(hip);
     knees.push(knee);
   });
 
   const tail = [];
-  const segs = [tailSeg(10, 10, 11, 30, 5), tailSeg(8, 8, 11, 31, 4), tailSeg(7, 7, 10, 32, 4), tailSeg(5, 5, 10, 33, 3), tailFan()];
+  const segs = [tailSeg(10, 10, 11, 30, 6), tailSeg(8, 8, 11, 31, 5), tailSeg(7, 7, 10, 32, 5), tailSeg(5, 5, 10, 33, 4), tailTip()];
   let parent = bodyG;
+  const curls = [-0.62, -0.4, -0.22, -0.08, 0.12];
+  const tailYaw = [-0.28, -0.46, -0.32, -0.12, 0];
   segs.forEach((s, i) => {
     const g = new THREE.Group();
     g.position.set(0, i === 0 ? (8 - BO.y) * S : 0, i === 0 ? (3 - BO.z) * S : -(segs[i - 1].len - 0.5) * S);
+    g.rotation.x = curls[i];
+    g.rotation.y = tailYaw[i];
     g.add(meshFrom(s.model, s.cx, s.cy, s.len, mat));
     parent.add(g);
     parent = g;
     tail.push(g);
   });
 
-  return { root, mat, parts: { body, bodyG, head, jaw, legs, knees, tail, wings, wingsOuter } };
+  return { root, mat, parts: { body, bodyG, head, jaw, breath, legs, knees, tail, wings, wingsOuter } };
 }
