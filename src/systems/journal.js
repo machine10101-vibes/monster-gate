@@ -132,17 +132,47 @@ export class Journal {
     if (!q || !st?.started || st.done) return null;
     const step = q.steps[st.step];
     if (!step) return null;
-    const total = step.kind === 'kill' ? step.count : step.kind === 'hold' ? 1 : 1;
+    if (step.kind === 'level') {
+      const need = step.level || 1;
+      const have = Math.min(need, this.skillLevel(step.skill));
+      return { text: step.objective, n: have, total: need, quest: q.name };
+    }
+    const total = step.kind === 'kill' ? step.count : 1;
     const n = step.kind === 'kill' ? Math.min(step.count, st.n || 0) : 0;
     return { text: step.objective, n, total, quest: q.name };
   }
 
-  /** The line under the minimap. The guild board shows when no story step is open. */
+  skillLevel(skill) {
+    const n = this.progress.level?.(skill);
+    return Number.isFinite(n) ? n : 1;
+  }
+
+  /** The line under the minimap. Story leads while it is open. After that, the skill grind closest to its next level leads. */
   tracker(board) {
+    let story = null;
+    let skill = null;
+    let best = -1;
     for (const q of QUESTS) {
       const obj = this.objective(q.id);
-      if (obj) return { text: obj.text, n: obj.n, total: obj.total };
+      if (!obj) continue;
+      const training = q.series === 'mining' || q.series === 'fishing';
+      if (!training) {
+        if (!story) story = obj;
+        continue;
+      }
+      const step = q.steps[this.row(q.id).step];
+      if (step?.kind === 'level') {
+        const frac = obj.total ? obj.n / obj.total : 0;
+        if (frac >= best) {
+          best = frac;
+          skill = obj;
+        }
+      } else if (!skill && best < 0) {
+        skill = obj;
+      }
     }
+    const shown = story || skill;
+    if (shown) return { text: shown.text, n: shown.n, total: shown.total };
     return { text: board.text, n: board.n, total: board.total };
   }
 
@@ -233,7 +263,7 @@ export class Journal {
     return events;
   }
 
-  /** Visits and items already in the bag. Safe to call every few seconds. */
+  /** Visits, skill levels, and items already in the bag. Safe to call every few seconds. */
   pulse(pos, spots) {
     const events = [];
     for (let guard = 0; guard < 4; guard++) {
@@ -252,10 +282,14 @@ export class Journal {
       if (!step) continue;
       if (step.kind === 'visit') {
         const spot = spots?.[step.spot];
-        if (!spot || !pos) continue;
-        if (Math.hypot(pos.x - spot.x, pos.z - spot.z) <= (step.radius || 12)) {
+        const list = Array.isArray(spot) ? spot : spot ? [spot] : [];
+        const reach = step.radius || 12;
+        if (pos && list.some((s) => s && Number.isFinite(s.x) && Number.isFinite(s.z) && Math.hypot(pos.x - s.x, pos.z - s.z) <= reach)) {
           return this.completeStep(q.id, step.journal);
         }
+      }
+      if (step.kind === 'level') {
+        if (this.skillLevel(step.skill) >= (step.level || 1)) return this.completeStep(q.id, step.journal);
       }
       if (step.kind === 'hold') {
         if (this.holds(step.goods)) return this.completeStep(q.id, step.journal);

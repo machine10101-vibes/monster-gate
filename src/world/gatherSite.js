@@ -72,6 +72,40 @@ export const ICE_HOLES = [
 ];
 const GLIMMER_TILE = 't7-3';
 
+/**
+ * Places the mining and fishing quests send a hunter.
+ * Seam lists are every rock of that metal, so standing at any of them counts.
+ * The pirate point matches the fishing pier in jungle.js (local x 104, z0 100, z1 141).
+ */
+export function trainingSpots() {
+  const origin = (kind) => {
+    const tile = TILES.find((t) => t.kind === kind);
+    return tile ? originOf(tile) : null;
+  };
+  const seams = (kind) => {
+    const o = origin(kind);
+    const zone = ZONE_MINES.find((z) => z.kind === kind);
+    if (!o || !zone) return [];
+    return zone.spots.map(([lx, lz]) => ({ x: o.x + lx, z: o.z + lz }));
+  };
+  const frost = origin('glimmerfrost');
+  const dunes = origin('pirateshore');
+  const span = 141 - 100;
+  const run = Math.max(1, Math.round(span / 8)) - 1;
+  const rod = FISH_SPOTS.find((s) => s.kind === 'rod');
+  const bank = RIVER_SPOTS.filter((s) => s.kind === 'rod');
+  const river = bank[Math.floor(bank.length / 2)] || RIVER_SPOTS[0];
+  return {
+    deepwell: { x: SAND_MINE.x, z: SAND_MINE.z },
+    cinderfall: seams('cinderfall'),
+    platinum: seams('glimmerfrost'),
+    icehole: frost ? { x: frost.x + ICE_HOLES[0].lx + 0.5, z: frost.z + ICE_HOLES[0].lz + 0.5 } : null,
+    lake: rod ? { x: rod.x, z: rod.z } : null,
+    river: river ? { x: river.standX, z: river.standZ } : null,
+    pirate: dunes ? { x: dunes.x + 104.5, z: dunes.z + 100 + run * 8 } : null,
+  };
+}
+
 /** Which way each fish model faces along its local x. The shrimp head is at +x, every fish head at -x. */
 const HEAD_DIR = { shrimp: 1 };
 
