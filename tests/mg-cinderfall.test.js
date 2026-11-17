@@ -83,6 +83,9 @@ test('a hunter can climb the Cinderfall cone past the old height wall', () => {
   const [nx, nz] = at(nest.cx, nest.cz);
   assert.equal(w.canStep(nx, nz, w.heightAt(nx, nz + 1)), true, 'the step onto Volcanum is sealed');
   assert.ok(w.heightAt(nx, nz) >= 9, `Volcanum is still below the old wall (${w.heightAt(nx, nz)})`);
+  const shelf = w.heightAt(nx, nz);
+  assert.ok(Math.abs(w.heightAt(nx + 2, nz) - shelf) <= 1, 'the perch is not a shelf');
+  assert.ok(Math.abs(w.heightAt(nx, nz + 2) - shelf) <= 1, 'the perch falls away under the dragon');
   const fromSouth = climb(w, ...at(58, 130), nx, nz);
   assert.ok(Math.hypot(fromSouth.x - nx, fromSouth.z - nz) < 3, `south climb stopped at ${(fromSouth.x - land.x0).toFixed(1)},${(fromSouth.z - land.z0).toFixed(1)} h=${fromSouth.max.toFixed(1)}`);
 

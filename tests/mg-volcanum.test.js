@@ -48,6 +48,16 @@ test('Volcanum drops forge a full weapon and armor set above dusk', () => {
   for (const id of SET_IDS) assert.ok(SETS.find((s) => s.id === id), id);
 });
 
+test('Volcanum stays on the Cinderfall shoulder once a hunter is near', () => {
+  const monsters = readFileSync(new URL('../src/entities/monsters.js', import.meta.url), 'utf8');
+  const ground = monsters.slice(monsters.indexOf('groundOk('), monsters.indexOf('moveBy('));
+  assert.match(ground, /onCinderSlope/);
+  const fill = monsters.slice(monsters.indexOf('fillVolcanum() {'), monsters.indexOf('fillWarden() {'));
+  assert.match(fill, /dist > 260/);
+  assert.match(fill, /volcanumHad/);
+  assert.match(fill, /lair\.x, lair\.z/);
+});
+
 test('Volcanum nests on the walkable south shoulder, not behind a lava wall', () => {
   const spec = VOLCANIC_SPECS.cinderfall;
   const L = spec.lair;
@@ -68,7 +78,7 @@ test('the dragon, his lava, and his forged gear all build', () => {
   assert.ok(dragon.root);
   assert.ok(dragon.parts.head && dragon.parts.jaw && dragon.parts.wings.length === 2);
   assert.ok(dragon.parts.wingsOuter.length === 2 && dragon.parts.legs.length === 4 && dragon.parts.tail.length >= 4);
-  assert.ok(dragon.parts.breath && dragon.parts.breath.children.length > 20);
+  assert.ok(dragon.parts.breath && dragon.parts.breath.children.length > 80, 'the breath is a stream of cubes');
   assert.ok(Math.abs(dragon.parts.wings[0].rotation.z) > 0.8, 'wings rest raised like the reference');
   assert.ok(dragon.parts.jaw.rotation.x > 0.6, 'the still render keeps the mouth open');
   const bolt = buildProjectileMesh({ kind: 'lavabolt' });
