@@ -1263,7 +1263,42 @@ body.touch #top-right {
   border-color: #d37a62;
   color: #ffe8df;
 }
-.playmap { position: relative; }
+.playmap { position: relative; overflow: hidden; }
+.playmap-dot {
+  position: absolute;
+  z-index: 3;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.playmap-dot::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: playmap-pulse 1.25s ease-out infinite;
+}
+.playmap-dot.you {
+  background: #2f8cff;
+  color: rgba(126, 194, 255, 0.95);
+  box-shadow: 0 0 0 1px #eaf4ff, 0 0 8px rgba(47, 140, 255, 0.85);
+}
+.playmap-dot.party {
+  background: #2ee06a;
+  color: rgba(141, 255, 180, 0.95);
+  box-shadow: 0 0 0 1px #e9ffe8, 0 0 8px rgba(46, 224, 106, 0.85);
+}
+@keyframes playmap-pulse {
+  0% { transform: scale(0.55); opacity: 0.95; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .playmap-dot::after { animation: none; opacity: 0.65; }
+}
 .bigmap {
   width: 100%;
   display: block;
