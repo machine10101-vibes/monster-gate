@@ -60,6 +60,125 @@ function isPartyRemote(r, partyOf) {
   return false;
 }
 
+const CAVE_BOX = { x0: 800, z0: 800, x1: 840, z1: 832 };
+
+function inCaveBox(x, z) {
+  return x >= CAVE_BOX.x0 && x < CAVE_BOX.x1 && z >= CAVE_BOX.z0 && z < CAVE_BOX.z1;
+}
+
+function addId(set, value) {
+  if (value == null) return;
+  const id = String(value);
+  if (id) set.add(id);
+}
+
+/**
+ * Party hunters to draw on the open map. The local hunter is omitted.
+ * On the overworld, cave coordinates stay off the chart. In the den, only
+ * the den is used. A live remote replaces a stale party coordinate.
+ */
+export function partyMapMarks(game) {
+  const social = game?.social;
+  const members = social?.party?.members;
+  if (!members?.length) return [];
+  const self = new Set();
+  addId(self, social.state?.self?.id);
+  addId(self, social.state?.self?.user_id);
+  addId(self, game.mmo?.you?.id);
+  addId(self, game.mmo?.you?.user_id);
+  addId(self, game.character?.id);
+  const selfName = String(game.character?.name || game.mmo?.you?.name || social.state?.self?.name || '').toLowerCase();
+  const realm = game.world?.realm || 'over';
+  const marks = [];
+  const fits = (x, z, zone) => {
+    const cave = inCaveBox(x, z);
+    if (realm === 'cave') return cave || zone === 'cave';
+    if (realm === 'rift') return zone === 'rift';
+    return !cave && zone !== 'rift' && zone !== 'cave';
+  };
+  for (const m of members) {
+    const id = String(m?.id || '');
+    const uid = String(m?.user_id || '');
+    const name = String(m?.name || '');
+    if (self.has(id) || (uid && self.has(uid))) continue;
+    if (selfName && name.toLowerCase() === selfName) continue;
+    const x = Number(m?.x);
+    const z = Number(m?.z);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) continue;
+    if (!fits(x, z, m?.zone)) continue;
+    marks.push({ id: id || name, name, x, z });
+  }
+  const remotes = game.remotes?.values ? game.remotes.values() : [];
+  for (const r of remotes) {
+    if (!r || r.ready === false) continue;
+    if (!social.isPartyMember?.(r.id, r.name)) continue;
+    const id = String(r.id || '');
+    if (self.has(id)) continue;
+    if (!Number.isFinite(r.x) || !Number.isFinite(r.z)) continue;
+    const remoteZone = realm === 'rift' ? 'rift' : '';
+    if (!fits(r.x, r.z, remoteZone)) continue;
+    const name = String(r.name || '');
+    const key = id || name;
+    const prev = marks.findIndex((m) => m.id === key || (name && m.name.toLowerCase() === name.toLowerCase()));
+    const next = { id: key, name: name || marks[prev]?.name || '', x: r.x, z: r.z };
+    if (prev >= 0) marks[prev] = next;
+    else marks.push(next);
+  }
+  return marks;
+}
+
+function placeMapDot(el, x, z, box) {
+  el.style.left = ((x - box.ox) / box.w * 100).toFixed(2) + '%';
+  el.style.top = ((z - box.oz) / box.h * 100).toFixed(2) + '%';
+}
+
+/** Pulsing dots for you and your party. Positions follow the hunt while the map is open. */
+function mountPlayMapDots(frame, game, box) {
+  const you = document.createElement('i');
+  you.className = 'playmap-dot you';
+  you.title = 'You';
+  you.setAttribute('aria-label', 'You');
+  frame.appendChild(you);
+  const mates = new Map();
+  let raf = 0;
+  let alive = true;
+  const tick = () => {
+    if (!alive) return;
+    const pos = game.player?.pos;
+    if (pos) placeMapDot(you, pos.x, pos.z, box);
+    const want = partyMapMarks(game);
+    const keep = new Set();
+    for (const m of want) {
+      const key = m.id || m.name;
+      keep.add(key);
+      let el = mates.get(key);
+      if (!el) {
+        el = document.createElement('i');
+        el.className = 'playmap-dot party';
+        el.title = m.name || 'Party';
+        el.setAttribute('aria-label', m.name || 'Party');
+        frame.appendChild(el);
+        mates.set(key, el);
+      }
+      placeMapDot(el, m.x, m.z, box);
+    }
+    for (const [key, el] of mates) {
+      if (keep.has(key)) continue;
+      el.remove();
+      mates.delete(key);
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => {
+    alive = false;
+    if (raf) cancelAnimationFrame(raf);
+    you.remove();
+    for (const el of mates.values()) el.remove();
+    mates.clear();
+  };
+}
+
 /** Area and city names for the map the player opens. */
 function landMapLabels(world) {
   const labels = [];
@@ -619,11 +738,8 @@ export class HUD {
       const ctx = c.getContext('2d');
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(src, 0, 0, c.width, c.height);
-      const p = game.player;
       const ox = inCave ? game.world.cave.origin.x : inRift ? game.world.rift.origin.x : (game.world.minimapOrigin?.x || 0);
       const oz = inCave ? game.world.cave.origin.z : inRift ? game.world.rift.origin.z : (game.world.minimapOrigin?.z || 0);
-      const mx = (p.pos.x - ox) * (c.width / src.width);
-      const mz = (p.pos.z - oz) * (c.height / src.height);
       if (!instanced) {
         ctx.fillStyle = '#c27bff';
         ctx.fillRect(GATE.x - ox - 3, GATE.z - oz - 3, 6, 6);
@@ -632,10 +748,6 @@ export class HUD {
         ctx.fillStyle = '#b25cff';
         ctx.fillRect(CAVE_MOUTH.x - ox - 3, CAVE_MOUTH.z - oz - 3, 6, 6);
       }
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(mx - 2, mz - 2, 4, 4);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(mx - 1, mz - 1, 2, 2);
       const frame = document.createElement('div');
       frame.className = 'playmap';
       frame.appendChild(c);
@@ -649,6 +761,7 @@ export class HUD {
         frame.appendChild(b);
       }
       body.appendChild(frame);
+      this.cleanup = mountPlayMapDots(frame, game, { ox, oz, w: src.width, h: src.height });
       if (!instanced) {
         if (game.world.waygate) {
           ctx.fillStyle = '#7ef6ff';
@@ -666,10 +779,10 @@ export class HUD {
         ctx.fillRect(LAKE.x - ox - 2, LAKE.z - oz - 2, 5, 5);
       }
       add(inCave
-        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
+        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. Blue dot: you. Green dots: your party.</p>'
         : inRift
-          ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
-          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
+          ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. Blue dot: you. Green dots: your party.</p>'
+          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. Blue dot: you. Green dots: your party.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);

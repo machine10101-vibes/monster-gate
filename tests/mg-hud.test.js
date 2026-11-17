@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
-import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
+import { bindPanelClose, minimapArrowAngle, partyMapMarks, stackNameplates } from '../src/ui/hud.js';
 import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, overlap, padHudSafeRects, plateAnchorRect, platesCollide } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
@@ -37,6 +37,51 @@ test('MG-UI-8: north-up arrow follows character yaw, not the camera', () => {
   assert.match(main, /drawMinimap\(this\.world, this\.player\.pos\.x, this\.player\.pos\.z, this\.player\.yaw/);
   assert.match(main, /drawMinimap\(this\.world, P\.pos\.x, P\.pos\.z, P\.yaw/);
   assert.doesNotMatch(main, /drawMinimap\([^)]*this\.cam\.yaw/);
+});
+
+test('the map marks you in blue and party hunters in green', () => {
+  const hud = src('src/ui/hud.js');
+  const style = src('src/style.css');
+  assert.match(hud, /playmap-dot you/);
+  assert.match(hud, /playmap-dot party/);
+  assert.match(hud, /Blue dot: you\. Green dots: your party\./);
+  assert.doesNotMatch(hud, /White dot: you/);
+  assert.match(style, /\.playmap-dot\.you[\s\S]*#2f8cff/);
+  assert.match(style, /\.playmap-dot\.party[\s\S]*#2ee06a/);
+  assert.match(style, /@keyframes playmap-pulse/);
+
+  const game = {
+    world: { realm: 'over' },
+    character: { id: 'char-ann', name: 'Ann' },
+    mmo: { you: { id: 'u_ann', name: 'Ann' } },
+    social: {
+      state: { self: { id: 'u_ann', name: 'Ann', user_id: 'ann' } },
+      party: {
+        members: [
+          { id: 'u_ann', name: 'Ann', x: 72, z: 72.5, zone: 'Oakhollow' },
+          { id: 'u_bea', name: 'Bea', x: -230, z: -500, zone: 'Cinderfall' },
+          { id: 'u_cal', name: 'Cal', x: 820, z: 810, zone: 'cave' },
+          { id: 'u_dee', name: 'Dee', zone: 'Southford' },
+        ],
+      },
+      isPartyMember(id, name) {
+        return this.party.members.some((m) => m.id === id || m.name === name);
+      },
+    },
+    remotes: new Map([
+      ['u_bea', { id: 'u_bea', name: 'Bea', x: -228, z: -498, ready: true }],
+      ['stray', { id: 'stray', name: 'Stray', x: 10, z: 10, ready: true }],
+    ]),
+  };
+  const marks = partyMapMarks(game);
+  assert.deepEqual(marks.map((m) => m.name), ['Bea']);
+  assert.equal(marks[0].x, -228);
+  assert.equal(marks[0].z, -498);
+
+  game.world.realm = 'cave';
+  const den = partyMapMarks(game);
+  assert.deepEqual(den.map((m) => m.name), ['Cal']);
+  assert.equal(den[0].x, 820);
 });
 
 test('minimap remotes use snapshot yaw/heading as the arrow angle', () => {
