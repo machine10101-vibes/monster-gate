@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
-import { addressFromWallet, connectMethod, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
+import { addressForSignature, addressFromWallet, connectMethod, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -79,13 +79,37 @@ test('one Klever prompt stays open until it is signed', () => {
     events: { createEvent() {}, addEventListener() {} },
     bridge() {},
   };
-  assert.equal(signaturePlan({ signMessage() {} }, sheet), 'sheet');
+  assert.equal(signaturePlan({ signMessage() {} }, sheet), 'extension');
+  assert.equal(signaturePlan({}, sheet), 'sheet');
   assert.equal(signaturePlan({ signMessage() {} }, {}), 'extension');
   assert.equal(signaturePlan({}, { bridge() {} }), 'bridge');
   assert.equal(signaturePlan({}, {}), '');
   const srcText = src('../src/wallet/klever.js');
-  assert.equal(srcText.includes('kw.address = address'), false);
+  assert.equal(srcText.includes('kw.address = address'), true);
   assert.equal(srcText.includes('activeElement.blur'), false);
+  assert.match(src('../src/wallet/link.js'), /wrong-account/);
+});
+
+test('a signature from the account Klever selected still proves that account', () => {
+  const named = new Uint8Array(32).fill(4);
+  const selected = new Uint8Array(32).fill(7);
+  const namedAddress = addressFromPublicKey(ed.getPublicKey(named));
+  const selectedAddress = addressFromPublicKey(ed.getPublicKey(selected));
+  const message = [
+    'Monster Gate wants you to connect this Klever wallet to your account.',
+    'This does not send any coins.',
+    `Address: ${namedAddress}`,
+    'Nonce: abababababababababababababababab',
+    'Issued: 2026-11-17T23:12:00.000Z',
+  ].join('\n');
+  const signature = Buffer.from(ed.sign(kleverMessageHash(message), selected)).toString('hex');
+  assert.equal(verifyKleverSignature(message, signature, namedAddress), false);
+  assert.equal(
+    addressForSignature([signature], message, [namedAddress, selectedAddress]),
+    selectedAddress,
+  );
+  const buried = `${'ab'.repeat(40)}${signature}`;
+  assert.deepEqual(signatureCandidates(buried), [buried.slice(0, 128), signature]);
 });
 
 test('an email account connects Klever from the character camp', () => {

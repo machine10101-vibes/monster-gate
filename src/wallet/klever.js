@@ -54,7 +54,7 @@ function signatureSlices(value) {
     bytes = Uint8Array.from(value);
   } else if (typeof value === 'string') {
     const raw = value.trim().replace(/^0x/i, '').replace(/\s+/g, '');
-    if (!raw || raw.length > 400) return [];
+    if (!raw || raw.length > 1200) return [];
     if (/^[0-9a-fA-F]+$/.test(raw) && raw.length % 2 === 0) {
       const out = new Uint8Array(raw.length / 2);
       for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(raw.slice(i * 2, i * 2 + 2), 16);
@@ -74,7 +74,7 @@ function signatureSlices(value) {
       }
     }
   }
-  if (!bytes || bytes.length < 64 || bytes.length > 160) return [];
+  if (!bytes || bytes.length < 64 || bytes.length > 512) return [];
   const slices = [bytes.slice(0, 64)];
   if (bytes.length > 64) slices.push(bytes.slice(-64));
   return slices;
@@ -123,6 +123,44 @@ function matchingSignature(candidates, message, address) {
   return '';
 }
 
+/** The address whose key produced one of these signatures of `message`. */
+export function addressForSignature(candidates, message, addresses) {
+  const seen = new Set();
+  for (const address of addresses) {
+    if (!address || seen.has(address) || !ADDRESS_RE.test(address)) continue;
+    seen.add(address);
+    if (matchingSignature(candidates, message, address)) return address;
+  }
+  return '';
+}
+
+function addressesIn(value, depth = 0, out = []) {
+  if (value == null || depth > 4 || out.length > 8) return out;
+  if (typeof value === 'string') {
+    const found = value.match(/klv1[02-9ac-hj-np-z]{58}/g);
+    if (found) {
+      for (const address of found) {
+        if (!out.includes(address)) out.push(address);
+      }
+    }
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+  const items = Array.isArray(value) ? value : Object.keys(value).map((key) => value[key]);
+  for (const item of items) addressesIn(item, depth + 1, out);
+  return out;
+}
+
+/** The popup signs whichever account is on the provider. Name that account before the prompt opens. */
+function pinAccount(kw, address) {
+  if (!kw || !ADDRESS_RE.test(address || '')) return;
+  try {
+    kw.address = address;
+  } catch {
+    /* a read-only provider still signs the account it already has */
+  }
+}
+
 /** True when this page already asked the wallet a moment ago. Stops a reload from asking again. */
 export function promptIsCooling() {
   try {
@@ -157,12 +195,11 @@ function releasePageHold() {
 }
 
 /**
- * The installed app's own signMessage opens a message sheet inside the browser
- * and leaves it up until Confirm. The newer page bridge opens a separate PIN
- * screen that the app dismisses as soon as fingerprint starts, so that bridge
- * is only used when the message sheet is not there.
+ * Older Klever builds have no signMessage. Their sheet takes a SIGN_MESSAGE
+ * request through handleTransaction. The bridge PIN is the last resort: the
+ * app dismisses it as soon as fingerprint starts.
  */
-function legacySignMessage(message) {
+function legacySignMessage(message, address) {
   const wallet = window.kleverWallet;
   const events = window.kleverWalletEvents;
   if (typeof wallet?.handleTransaction !== 'function') return null;
@@ -171,6 +208,7 @@ function legacySignMessage(message) {
     const event = events.createEvent({
       chain: 'KLEVER',
       type: 'SIGN_MESSAGE',
+      address,
       transactionInfo: {
         siteUrl: location.href,
         hostname: location.hostname,
@@ -196,26 +234,28 @@ function pageWallet() {
 }
 
 /**
- * One signer, and only one. The in-app sheet stays up until Confirm. Opening
- * signMessage while that sheet is up, or changing the page under the extension
- * window, makes Klever close the signature before it can be signed.
+ * One signer, and only one. signMessage returns a signature of the login text.
+ * The in-app sheet goes through handleTransaction, and Klever shows that as a
+ * transaction whose signature does not prove this message. The sheet is only
+ * used when the page has no signMessage. The page is not resized under the
+ * extension window, and a second prompt is never opened while the first is up.
  */
 export function signaturePlan(kw, page = pageWallet()) {
+  if (typeof kw?.signMessage === 'function') return 'extension';
   const events = page.events;
   if (
     typeof page.wallet?.handleTransaction === 'function'
     && typeof events?.createEvent === 'function'
     && typeof events?.addEventListener === 'function'
   ) return 'sheet';
-  if (typeof kw?.signMessage === 'function') return 'extension';
   if (typeof page.bridge === 'function') return 'bridge';
   return '';
 }
 
-async function requestSignature(kw, message) {
+async function requestSignature(kw, message, address) {
   const plan = signaturePlan(kw);
-  if (plan === 'sheet') return legacySignMessage(message);
-  if (plan === 'extension') return kw.signMessage(message);
+  if (plan === 'sheet') return legacySignMessage(message, address);
+  if (plan === 'extension') return kw.signMessage(message, address);
   if (plan === 'bridge') {
     return window.__kleverBrowser__.bridge({
       type: 'SIGN_IN_MESSAGE',
@@ -353,6 +393,7 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     holdPageStill();
     await paintSettled();
   }
+  pinAccount(kw, address);
   const message = signedMessage({
     purpose,
     address,
@@ -361,7 +402,7 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   });
   let signed;
   try {
-    signed = await requestSignature(kw, message);
+    signed = await requestSignature(kw, message, address);
   } catch (err) {
     if (err?.code === 'rejected' || connectionClosed(err)) {
       throw fail('rejected', 'The Klever window closed before it was signed. Press Connect Klever wallet and confirm in the window that stays open.');
@@ -370,25 +411,43 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   } finally {
     if (lockPage) releasePageHold();
   }
-  const signature = matchingSignature(signatureCandidates(signed), message, address);
-  if (!signature) {
-    if (!signatureCandidates(signed).length) {
-      throw fail('rejected', 'The Klever window closed before it returned a signature. Press Connect Klever wallet and confirm in the window that stays open.');
-    }
-    throw fail('bad-signature', 'The signature does not match this Klever address.');
+  const candidates = signatureCandidates(signed);
+  const matched = addressForSignature(candidates, message, [
+    address,
+    addressFromWallet(kw),
+    ...addressesIn(signed),
+  ]);
+  if (matched === address) {
+    return { address, message, signature: matchingSignature(candidates, message, address), nonce };
   }
-  return { address, message, signature, nonce };
+  if (matched) {
+    const err = fail('wrong-account', 'Confirm the Klever account one more time.');
+    err.address = matched;
+    throw err;
+  }
+  if (!candidates.length) {
+    throw fail('rejected', 'The Klever window closed before it returned a signature. Press Connect Klever wallet and confirm in the window that stays open.');
+  }
+  throw fail('bad-signature', 'The signature does not match this Klever address. In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
 }
 
 /**
  * Connects and signs a locally made nonce. Prefer loginWithKlever, which
  * uses a server nonce and refuses to create an account from the wallet.
  */
+function localNonce() {
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...nonceBytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function signIn() {
   const { kw, address, mobile } = await connectWallet();
-  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
-  const nonce = [...nonceBytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return signProof('login', nonce, address, kw, mobile);
+  try {
+    return await signProof('login', localNonce(), address, kw, mobile);
+  } catch (err) {
+    if (err?.code !== 'wrong-account' || !ADDRESS_RE.test(err.address || '')) throw err;
+    return signProof('login', localNonce(), err.address, kw, mobile);
+  }
 }
 
 function saveSession(session) {
