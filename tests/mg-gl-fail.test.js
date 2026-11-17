@@ -315,7 +315,7 @@ test('loading markup, Retry, and Game boot all wire the WebGL fallback', () => {
   assert.match(main, /defaultGlProbe/);
   assert.match(main, /armContextLost/);
   assert.match(main, /onSuccess: resumeAfterGlFail/);
-  const mountAt = main.indexOf('const loadingScreen');
+  const mountAt = main.indexOf('let loadingScreen');
   const earlyAt = main.indexOf('showGlFailIfNeeded({');
   const bridgeAt = main.lastIndexOf('runLegacySaveBridge');
   assert.ok(mountAt >= 0 && earlyAt > mountAt && bridgeAt > earlyAt);

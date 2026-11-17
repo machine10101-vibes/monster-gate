@@ -19,6 +19,7 @@ import {
   consumeWorldJoin,
   dropOnlineWithoutSession,
   enterOnlineWorld,
+  stageOnlineWorld,
   fetchWorldHealth,
   hasWorldSessionToken,
   healthzUrl,
@@ -206,6 +207,18 @@ test('enter / leave rewrite the URL without touching saves', () => {
   assert.equal(enterOnlineWorld({ search: same.search, env, storage: store, session: store, loc: same }), true);
   assert.equal(same.reloaded, true);
 
+  const staged = fakeLoc({ search: '?debug=1&ref=oak', pathname: '/', hash: '#t' });
+  const stagedStore = memoryStore();
+  assert.equal(stageOnlineWorld({ search: staged.search, env, storage: stagedStore, loc: staged }), true);
+  assert.equal(stagedStore.data[WORLD_MODE_KEY], 'online');
+  assert.equal(stagedStore.data[WORLD_JOIN_KEY], undefined);
+  assert.equal(staged.assigned, '');
+  assert.equal(staged.reloaded, undefined);
+  assert.match(staged.history, /mmo=1/);
+  assert.match(staged.history, /ref=oak/);
+  assert.doesNotMatch(staged.history, /join=1/);
+  assert.equal(isWorldOnline(staged.search), true);
+
   const leave = fakeLoc({ search: '?mmo=1&server=wss://x&mock=1', pathname: '/' });
   assert.equal(leaveOnlineWorld({ search: leave.search, storage: store, session: store, loc: leave }), true);
   assert.equal(store.data[WORLD_MODE_KEY], 'offline');
@@ -364,6 +377,16 @@ test('character camp chooses the hunter and the world together', () => {
   assert.doesNotMatch(after, /showWorldPicker/);
   assert.match(after, /openCharacterSelect/);
   assert.match(main, /enterFromCamp/);
+  const joining = main.slice(main.indexOf("if (plan === 'join-online')"), main.indexOf("if (plan === 'leave-online')"));
+  assert.match(joining, /joinWorldInPlace/);
+  assert.doesNotMatch(joining, /enterOnlineWorld/);
+  assert.match(main, /function armLogin/);
+  assert.match(main, /function bootHunt/);
+  const gate = main.slice(main.indexOf('if (!sendingToLedger && !glDeadAtBoot)'));
+  assert.match(gate, /bootHunt\(\)/);
+  assert.match(gate, /armLogin\(\)/);
+  assert.doesNotMatch(gate, /startGame\(\)/);
+  assert.match(html, /html\.at-login #loading\{display:none/);
   const show = main.slice(main.indexOf('showWorldPicker() {'), main.indexOf('hideWorldPicker() {'));
   assert.match(show, /openCharacterSelect/);
   assert.doesNotMatch(show, /getElementById\('world-picker'\)/);
