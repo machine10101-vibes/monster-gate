@@ -37,6 +37,7 @@ const state = {
 let session = null;
 let timer = 0;
 let seatTimer = 0;
+let seatChecking = false;
 let painting = false;
 
 const $ = (id) => document.getElementById(id);
@@ -278,17 +279,20 @@ function onKey(event) {
 }
 
 async function watchSeat() {
-  if (!session) return;
+  if (!session || seatChecking) return;
+  seatChecking = true;
   try {
     await checkDevice(session);
   } catch (err) {
-    if (err.code !== 'taken') return;
+    if (err.code !== 'taken' && err.code !== 'rejected') return;
     const email = session.email || '';
     clearAccount();
     session = null;
     state.ledger = null;
-    showGate(err.message);
+    showGate(err.code === 'taken' ? err.message : 'This account is signed in on another device.');
     if (email && $('email')) $('email').value = email;
+  } finally {
+    seatChecking = false;
   }
 }
 
@@ -299,8 +303,12 @@ function arm() {
     if (!state.hold && document.visibilityState === 'visible') refresh();
   }, 30000);
   seatTimer = setInterval(() => {
+    watchSeat();
+  }, 2000);
+  watchSeat();
+  document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') watchSeat();
-  }, 4000);
+  });
 }
 
 async function boot() {

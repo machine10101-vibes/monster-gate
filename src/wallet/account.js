@@ -7,7 +7,7 @@
  */
 
 import { readStaffRole } from '../admin/gate.js';
-import { ACCOUNT_SESSION_TAKEN } from '../../supabase/functions/_shared/accountSession.js';
+import { ACCOUNT_SESSION_TAKEN, othersLogoutRequest } from '../../supabase/functions/_shared/accountSession.js';
 
 const BOOK_KEY = 'monster-gate-accounts-v1';
 const SESSION_KEY = 'monster-gate-account-session';
@@ -212,7 +212,7 @@ function authHeaders(cfg) {
   };
 }
 
-function sessionFromAuth(json, email) {
+function sessionFromAuth(json, email, keep) {
   const session = json.session && typeof json.session === 'object' ? json.session : json;
   const accessToken = session.access_token;
   const user = json.user && typeof json.user === 'object' ? json.user : json;
@@ -228,6 +228,8 @@ function sessionFromAuth(json, email) {
     accessToken,
     refreshToken: session.refresh_token || '',
     expiresAt,
+    kleverAddress: keep?.kleverAddress || '',
+    sessionId: keep?.sessionId || '',
     at: Date.now(),
   });
 }
@@ -298,7 +300,12 @@ async function signInRemote(cfg, email, password) {
   }
   const session = sessionFromAuth(parsed.json, email);
   if (!session) throw fail('rejected', 'That email or password was not accepted.');
-  return claimDevice(session);
+  try {
+    return await claimDevice(session);
+  } catch (err) {
+    clearAccount();
+    throw err;
+  }
 }
 
 async function cloudConfig() {
@@ -351,8 +358,9 @@ async function refreshSession(session, cfg) {
     body: JSON.stringify({ refresh_token: session.refreshToken }),
   });
   const parsed = await authError(res);
-  if (!res.ok) throw fail('rejected', 'Sign in again.');
-  const next = sessionFromAuth(parsed.json, session.email);
+  if (res.status === 400 || res.status === 401 || res.status === 403) throw fail('rejected', 'Sign in again.');
+  if (!res.ok) throw fail('unavailable', 'The account service could not be reached.');
+  const next = sessionFromAuth(parsed.json, session.email, session);
   if (!next) throw fail('rejected', 'Sign in again.');
   return next;
 }
@@ -405,16 +413,10 @@ function throwIfTaken(res) {
 }
 
 async function revokeOtherSessions(session, cfg) {
-  if (!cfg?.url || !cfg?.key || !session?.accessToken) return;
+  const req = othersLogoutRequest(cfg?.url, session?.accessToken, cfg?.key);
+  if (!req) return;
   try {
-    await fetch(`${cfg.url}/auth/v1/logout?scope=others`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        apikey: cfg.key,
-        authorization: `Bearer ${session.accessToken}`,
-      },
-    });
+    await fetch(req.url, req.init);
   } catch {
     /* the seat on account_sessions is what drops the other browser */
   }

@@ -26,6 +26,7 @@ import { BUILD_ID } from './buildId.js';
 import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
 import { canCreateWorld } from '../admin/gate.js';
+import { guardFreshPanel } from './panelGesture.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -587,6 +588,7 @@ export class HUD {
       this.toast('World Creator is for moderators.', 1800);
       return;
     }
+    guardFreshPanel(this.el.panel);
     this.runCleanup();
     this.panelId = name;
     const card = this.el.panel.querySelector('.panel-card');

@@ -6,6 +6,7 @@ import {
   ACCOUNT_SESSION_TAKEN_STATUS,
   decideSession,
   readSessionId,
+  othersLogoutRequest,
   takenBody,
 } from '../supabase/functions/_shared/accountSession.js';
 
@@ -38,11 +39,20 @@ test('hunter claim overwrites the seat; load/save/check refuse the other device'
   assert.match(hunter, /account-check/);
   assert.match(hunter, /seatAccount/);
   assert.match(hunter, /takenBody/);
+  assert.match(hunter, /revokeOtherAuthSessions/);
+  assert.match(hunter, /othersLogoutRequest/);
   assert.match(account, /claimDevice/);
   assert.match(account, /checkDevice/);
   assert.match(account, /op: 'account-claim'/);
   assert.match(account, /throwIfTaken/);
-  assert.match(account, /logout\?scope=others/);
+  assert.match(account, /othersLogoutRequest/);
+  assert.match(account, /sessionId: keep\?\.sessionId/);
+  assert.match(src('../supabase/functions/_shared/accountSession.js'), /logout\?scope=others/);
+  const logout = othersLogoutRequest('https://abc.supabase.co/', 'a'.repeat(24), 'anon-key');
+  assert.equal(logout.url, 'https://abc.supabase.co/auth/v1/logout?scope=others');
+  assert.equal(logout.init.headers.authorization, `Bearer ${'a'.repeat(24)}`);
+  assert.equal(logout.init.method, 'POST');
+  assert.equal(othersLogoutRequest('https://abc.supabase.co', 'short', 'anon-key'), null);
   assert.match(account, /sessionId/);
   const save = account.indexOf('export async function pushEmailHunt');
   const conflict = account.indexOf('conflict: true', save);
@@ -51,12 +61,13 @@ test('hunter claim overwrites the seat; load/save/check refuse the other device'
   assert.match(main, /dropTakenAccount/);
   assert.match(main, /watchDevice/);
   assert.match(main, /consumeTakenNotice/);
-  assert.match(main, /err\?\.code === 'taken'/);
+  assert.match(main, /err\?\.code === 'taken' \|\| err\?\.code === 'rejected'/);
+  assert.match(main, /else this\.watchDevice\(\)/);
   assert.match(admin, /seatStaff/);
   assert.match(admin, /takenBody/);
   assert.match(adminApi, /json\.taken/);
   assert.match(adminMain, /watchSeat/);
-  assert.match(adminMain, /err\.code === 'taken'/);
+  assert.match(adminMain, /err\.code !== 'taken'/);
   assert.match(migration, /create table public.account_sessions/);
   assert.doesNotMatch(hunter, /hunter_sessions/);
 });

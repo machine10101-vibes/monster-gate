@@ -27,6 +27,25 @@ export function takenBody() {
   return { taken: true, error: ACCOUNT_SESSION_TAKEN };
 }
 
+/** Revoke every other Supabase Auth session for this sign-in. The current token stays. */
+export function othersLogoutRequest(url, accessToken, apiKey) {
+  const base = String(url || '').replace(/\/$/, '');
+  const token = typeof accessToken === 'string' ? accessToken : '';
+  const key = typeof apiKey === 'string' ? apiKey : '';
+  if (!base || token.length < 20 || !key) return null;
+  return {
+    url: `${base}/auth/v1/logout?scope=others`,
+    init: {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: key,
+        authorization: `Bearer ${token}`,
+      },
+    },
+  };
+}
+
 export async function readAccountSession(admin, userId) {
   const { data, error } = await admin
     .from('account_sessions')

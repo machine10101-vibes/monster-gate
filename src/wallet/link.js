@@ -1,5 +1,5 @@
 import { loadCloudConfig } from './cloud.js';
-import { saveAccount } from './account.js';
+import { clearAccount, saveAccount } from './account.js';
 import {
   connectWallet,
   isMobile,
@@ -146,7 +146,12 @@ export async function loginWithKlever() {
   session.kleverAddress = proof.address;
   const seated = saveAccount(session);
   const { claimDevice } = await import('./account.js');
-  return claimDevice(seated);
+  try {
+    return await claimDevice(seated);
+  } catch (err) {
+    clearAccount();
+    throw err;
+  }
 }
 
 export async function linkKleverWallet(session) {
