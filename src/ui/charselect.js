@@ -367,7 +367,9 @@ export class CharacterSelect {
       b.type = 'button';
       b.dataset.id = def.id;
       b.style.setProperty('--c', def.color);
-      b.append(el('span', 'cs-emblem', def.name.charAt(0)), el('b', null, def.name));
+      const paths = def.paths.map((p) => p.name).join(', ');
+      b.append(el('span', 'cs-emblem', def.name.charAt(0)), el('b', null, def.name), el('small', null, paths));
+      b.title = `${def.name}. ${paths}.`;
       b.addEventListener('click', () => {
         this.draft.classId = def.id;
         this.buildClasses();

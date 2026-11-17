@@ -88,6 +88,27 @@ export function skillMods(game) {
     mods.slowTime = 4.5;
   }
   if (has('overcharge')) mods.chain = Math.max(mods.chain, 0.4);
+  if (has('devotion')) {
+    mods.spell *= 1.12;
+    mods.mana += 8;
+    mods.hp += 4;
+  }
+  if (has('beacon')) mods.spell *= 1.08;
+  if (has('zeal')) {
+    mods.melee *= 1.16;
+    mods.hp += 6;
+    if (heldItem(game)?.style === 'twohand') mods.melee *= 1.1;
+  }
+  if (has('reckoning')) {
+    mods.melee *= 1.1;
+    mods.knock *= 1.18;
+  }
+  if (has('aegis')) {
+    mods.dr += p.shielding ? 0.16 : 0.07;
+    mods.hp += 8;
+    mods.blockDr += 0.05;
+  }
+  if (has('sanctuary')) mods.hp += 6;
   const rank = (id) => pr.attrRank(id);
   mods.hp += rank('vitality') * 4;
   mods.melee *= 1 + rank('might') * 0.06;
@@ -106,6 +127,10 @@ export function skillMods(game) {
   mods.slowMul = Math.max(0.25, mods.slowMul - pot * 0.03);
   mods.slowTime += pot * 0.4;
   mods.chain += pot * 0.04;
+  mods.mana += rank('faith') * 6;
+  mods.spell *= 1 + rank('grace') * 0.06;
+  mods.melee *= 1 + rank('valor') * 0.06;
+  mods.dr += rank('resolve') * 0.03;
   const gear = pr.gearBonus;
   mods.stamina += gear.stamina;
   mods.spell *= 1 + gear.spell;
@@ -132,6 +157,7 @@ export function skillMods(game) {
   mods.pierce = crossbow > 0;
   mods.crit += dual * 0.03 + longbow * 0.04 + tome * 0.03;
   mods.mana += staff * 4 + tome * 6;
+  if (pr.classId === 'paladin') mods.spell *= 1 + pr.weaponRank('smitearm') * 0.08;
   mods.speed *= Math.max(0.7, 1 - dual * 0.07) * Math.max(0.7, 1 - shortbow * 0.07) * Math.max(0.75, 1 - wand * 0.06);
   mods.haste = wand * 0.05;
   if (wand) mods.manaCost *= Math.max(0.75, 1 - wand * 0.05);
@@ -277,6 +303,24 @@ function effect(game, s) {
       return glacier(game, s);
     case 'thunderclap':
       return thunderclap(game, s);
+    case 'layhands':
+      return layHands(game, s);
+    case 'smite':
+      return smite(game, s);
+    case 'consecration':
+      return consecration(game, s);
+    case 'crusader':
+      return crusader(game, s);
+    case 'judgment':
+      return judgment(game, s);
+    case 'divinestorm':
+      return divineStorm(game, s);
+    case 'faithshield':
+      return faithShield(game, s);
+    case 'avengershield':
+      return avengerShield(game, s);
+    case 'divineprotection':
+      return divineProtection(game, s);
     default:
       return false;
   }
@@ -827,6 +871,173 @@ function thunderclap(game) {
   return true;
 }
 
+function holyHeal(game, amount) {
+  const p = game.player;
+  const n = scaleDmg(game, amount, 'spell');
+  const before = p.hp;
+  p.heal(n);
+  const got = Math.max(0, Math.round(p.hp - before));
+  if (got > 0) game.hud.floatText(...game.screenOf(p.pos.x, p.pos.y + 2.2, p.pos.z), '+' + got, 'gold');
+  return got;
+}
+
+function twoHanding(game) {
+  return heldItem(game)?.style === 'twohand';
+}
+
+function layHands(game, s) {
+  const p = game.player;
+  p.playCast('heal', 0.42);
+  const bonus = game.progress.hasSkill('beacon') ? 10 : 0;
+  holyHeal(game, s.power + bonus);
+  SKILLFX.layhands(game, p);
+  game.audio.tone(520, 0.18, 'sine', 0.1, 40);
+  return true;
+}
+
+function smite(game, s) {
+  const p = game.player;
+  p.playCast('smite', 0.36);
+  const f = p.facing;
+  game.spawnProjectile({
+    owner: 'player',
+    kind: 'holybolt',
+    skill: 'smite',
+    spell: true,
+    x: p.pos.x + f.x * 0.6,
+    y: p.pos.y + 1.25,
+    z: p.pos.z + f.z * 0.6,
+    vx: f.x * 18,
+    vz: f.z * 18,
+    dmg: s.power,
+    life: 1.15,
+    r: 0.42,
+  });
+  SKILLFX.smite(game, p);
+  game.audio.tone(680, 0.12, 'square', 0.08, 90);
+  return true;
+}
+
+function consecration(game, s) {
+  const p = game.player;
+  p.playCast('heal', 0.4);
+  const x = p.pos.x;
+  const z = p.pos.z;
+  const y = game.world.heightAt(x, z);
+  const mesh = new THREE.Group();
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(s.radius, 22),
+    new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.06;
+  const rim = new THREE.Mesh(
+    new THREE.RingGeometry(s.radius * 0.86, s.radius, 28),
+    new THREE.MeshBasicMaterial({ color: 0xfff6c4, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })
+  );
+  rim.rotation.x = -Math.PI / 2;
+  rim.position.y = 0.08;
+  mesh.add(disc, rim);
+  mesh.position.set(x, y, z);
+  game.scene.add(mesh);
+  const st = world(game);
+  const heal = (s.heal || 4) + (game.progress.hasSkill('beacon') ? 2 : 0);
+  st.clouds.push({ x, z, y, r: s.radius, t: s.dur, acc: 0, dps: s.dps, heal, holy: true, mesh });
+  if (st.clouds.length > 3) {
+    const old = st.clouds.shift();
+    dropCloud(game, old);
+  }
+  SKILLFX.consecration(game, p, s.radius);
+  game.audio.tone(440, 0.22, 'sine', 0.1, 20);
+  return true;
+}
+
+function crusader(game, s) {
+  const p = game.player;
+  p.playCast('cleave', 0.4);
+  const heavy = twoHanding(game);
+  const reckoning = game.progress.hasSkill('reckoning');
+  const power = s.power + (heavy ? 6 : 0) + (reckoning ? 4 : 0);
+  const n = coneHit(game, s.reach + (heavy ? 0.35 : 0), s.dot, power, s.knock + (reckoning ? 3 : 0), null, 'melee');
+  SKILLFX.crusader(game, p, s.reach + (heavy ? 0.35 : 0), heavy);
+  game.audio.tone(180, 0.14, 'sawtooth', 0.1, -70);
+  if (n) game.shake(heavy ? 0.22 : 0.14);
+  return true;
+}
+
+function judgment(game, s) {
+  const p = game.player;
+  p.playCast('smite', 0.38);
+  const heavy = twoHanding(game);
+  const reckoning = game.progress.hasSkill('reckoning');
+  const power = s.power + (heavy ? 8 : 0) + (reckoning ? 4 : 0);
+  const reach = s.reach + (heavy ? 0.4 : 0);
+  const n = coneHit(game, reach, s.dot, power, s.knock + (heavy ? 3 : 0), null, 'spell');
+  SKILLFX.judgment(game, p, reach, heavy);
+  game.audio.tone(240, 0.16, 'square', 0.1, -20);
+  if (n) game.shake(0.2);
+  return true;
+}
+
+function divineStorm(game, s) {
+  const p = game.player;
+  p.playCast('spin', 0.42);
+  const reach = s.radius + (twoHanding(game) ? 0.45 : 0);
+  const power = s.power + (game.progress.hasSkill('reckoning') ? 3 : 0);
+  const n = radiusHit(game, p.pos.x, p.pos.z, reach, power, 5, null, 'melee');
+  SKILLFX.divinestorm(game, p, reach);
+  game.audio.tone(300, 0.18, 'sawtooth', 0.09, -40);
+  if (n) game.shake(0.2);
+  return true;
+}
+
+function faithShield(game, s) {
+  const p = game.player;
+  p.playCast('guard', 0.36);
+  const dur = s.dur + (game.progress.hasSkill('sanctuary') ? 1 : 0);
+  p.faithT = Math.max(p.faithT || 0, dur);
+  p.faithDr = Math.max(p.faithDr || 0, 0.28);
+  holyHeal(game, s.power);
+  SKILLFX.faithshield(game, p, dur);
+  game.audio.tone(360, 0.16, 'sine', 0.09, 30);
+  return true;
+}
+
+function avengerShield(game, s) {
+  const p = game.player;
+  p.playCast('bash', 0.32);
+  const f = p.facing;
+  game.spawnProjectile({
+    owner: 'player',
+    kind: 'holyshield',
+    skill: 'avengershield',
+    spell: true,
+    x: p.pos.x + f.x * 0.7,
+    y: p.pos.y + 1.15,
+    z: p.pos.z + f.z * 0.7,
+    vx: f.x * 16,
+    vz: f.z * 16,
+    dmg: s.power,
+    life: 0.9,
+    r: 0.55,
+  });
+  SKILLFX.avengershield(game, p);
+  game.audio.tone(220, 0.12, 'square', 0.09, -30);
+  return true;
+}
+
+function divineProtection(game, s) {
+  const p = game.player;
+  p.playCast('guard', 0.4);
+  const dur = s.dur;
+  p.faithT = Math.max(p.faithT || 0, dur);
+  p.faithDr = Math.max(p.faithDr || 0, 0.4);
+  p.faithHeal = Math.max(p.faithHeal || 0, s.power + (game.progress.hasSkill('sanctuary') ? 2 : 0));
+  SKILLFX.divineprotection(game, p, dur);
+  game.audio.tone(280, 0.22, 'sine', 0.1, 10);
+  return true;
+}
+
 function applyPoison(game, mon, time, dps) {
   if (!mon || mon.dead) return;
   const mods = skillMods(game);
@@ -862,6 +1073,11 @@ export function skillOnHit(game, proj, mon) {
   if (id === 'fireball' || id === 'meteor') applyBurn(game, mon, 4);
   if (id === 'frostbolt') applySlow(game, mon, 3.5, 0.55);
   if (id === 'snipe') mon.afflict('mark', 6, game.progress.hasSkill('killshot') ? 0.7 : 0.4);
+  if (id === 'smite') {
+    const share = game.progress.hasSkill('beacon') ? 0.45 : 0.22;
+    holyHeal(game, Math.max(2, Math.round((proj.dmg || 8) * share)));
+  }
+  if (id === 'avengershield' && !mon.dead) mon.afflict('stun', game.progress.hasSkill('sanctuary') ? 1.7 : 1.15);
   const mods = skillMods(game);
   if (proj.spell && mods.burn) applyBurn(game, mon, 4);
   if (proj.spell && mods.slow) applySlow(game, mon, 3, 0.6);
@@ -1082,12 +1298,18 @@ export function updateSkillWorld(game, dt) {
     if (c.mesh) cloudFx(game, c, dt);
     if (c.acc >= 0.45) {
       c.acc = 0;
-      eachMonster(game, (mon) => {
-        if (Math.hypot(mon.x - c.x, mon.z - c.z) <= c.r + 0.2) {
-          applyPoison(game, mon, 1.3, c.dps);
-          mon.afflict('slow', 0.9, c.slow);
-        }
-      });
+      if (c.holy) {
+        radiusHit(game, c.x, c.z, c.r, c.dps, 2, null, 'spell');
+        const hunter = game.player;
+        if (hunter && !hunter.dead && Math.hypot(hunter.pos.x - c.x, hunter.pos.z - c.z) <= c.r + 0.35) holyHeal(game, c.heal || 0);
+      } else {
+        eachMonster(game, (mon) => {
+          if (Math.hypot(mon.x - c.x, mon.z - c.z) <= c.r + 0.2) {
+            applyPoison(game, mon, 1.3, c.dps);
+            mon.afflict('slow', 0.9, c.slow);
+          }
+        });
+      }
     }
     if (c.t <= 0) {
       dropCloud(game, c);
@@ -1181,20 +1403,23 @@ function cloudFx(game, c, dt) {
   const pulse = 0.5 + Math.sin(c.t * 5) * 0.5;
   c.mesh.children[0].material.opacity = 0.14 + pulse * 0.1;
   c.mesh.children[1].material.opacity = 0.35 + pulse * 0.25;
+  const holy = !!c.holy;
   if (Math.random() < dt * 9 * v.density) {
     const a = Math.random() * Math.PI * 2;
     const d = Math.sqrt(Math.random()) * c.r * 0.9;
-    v.glow(c.x + Math.cos(a) * d, c.y + 0.3 + Math.random() * 0.4, c.z + Math.sin(a) * d, Math.random() < 0.7 ? 0x6dce4a : 0x9a5ae0, 1.5 + Math.random(), 1.0, { vy: 0.5, vx: Math.cos(c.t) * 0.3, grow: 0.8, gain: 0.55 });
+    const col = holy ? (Math.random() < 0.6 ? 0xffe08a : 0xfff6c4) : (Math.random() < 0.7 ? 0x6dce4a : 0x9a5ae0);
+    v.glow(c.x + Math.cos(a) * d, c.y + 0.3 + Math.random() * 0.4, c.z + Math.sin(a) * d, col, 1.5 + Math.random(), 1.0, { vy: holy ? 0.9 : 0.5, vx: Math.cos(c.t) * 0.3, grow: 0.8, gain: 0.55 });
   }
   if (Math.random() < dt * 14 * v.density) {
     const a = Math.random() * Math.PI * 2;
     const d = Math.sqrt(Math.random()) * c.r;
-    v.spark(c.x + Math.cos(a) * d, c.y + 0.1, c.z + Math.sin(a) * d, 0, 0.9 + Math.random() * 0.9, 0, Math.random() < 0.5 ? 0xb8ff7a : 0xd7ffb0, 0.07, 1.1, -0.2, 0.3);
+    const spark = holy ? (Math.random() < 0.5 ? 0xfff6c4 : 0xffe08a) : (Math.random() < 0.5 ? 0xb8ff7a : 0xd7ffb0);
+    v.spark(c.x + Math.cos(a) * d, c.y + 0.1, c.z + Math.sin(a) * d, 0, 0.9 + Math.random() * 0.9, 0, spark, 0.07, 1.1, -0.2, 0.3);
   }
   if (Math.random() < dt * 5) {
     const a = Math.random() * Math.PI * 2;
     const d = Math.sqrt(Math.random()) * c.r;
-    game.fx.emit(c.x + Math.cos(a) * d, c.y + 0.2, c.z + Math.sin(a) * d, 0, 0.7, 0, 0x2f5a2a, 0.22, 1.1, -0.3);
+    game.fx.emit(c.x + Math.cos(a) * d, c.y + 0.2, c.z + Math.sin(a) * d, 0, 0.7, 0, holy ? 0xfff2c0 : 0x2f5a2a, 0.22, 1.1, -0.3);
   }
 }
 
