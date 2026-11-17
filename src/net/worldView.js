@@ -473,6 +473,7 @@ export class WorldView {
     this.wrapped = null;
     this.live = false;
     this.spawnSnapped = false;
+    this.portalHop = false;
     this.collapsed = false;
     this.localHeld = null;
     this.localSay = '';
@@ -1209,13 +1210,24 @@ export class WorldView {
     g.hud.layoutInteractPlates?.();
   }
 
+  /** The tome just moved the hunter. The next "too far" is that hop, not a bad join. */
+  grantPortalHop() {
+    this.portalHop = true;
+  }
+
   /**
    * World 1 persist is a different record than the solo hunt. A hunter who
    * joins from the cave (or anywhere past 40u) gets `teleport` on every move
    * until they stand at the world spawn. Drop them at Oakhollow once.
+   * A tome hop is not that join: leave the hunter where the tome put them.
    */
   snapToWorldSpawn() {
     if (this.spawnSnapped || !this.live) return;
+    if (this.portalHop) {
+      this.portalHop = false;
+      this.spawnSnapped = true;
+      return;
+    }
     const p = this.game?.player;
     if (!p?.pos) return;
     const dist = Math.hypot(p.pos.x - WORLD_SPAWN.x, p.pos.z - WORLD_SPAWN.z);

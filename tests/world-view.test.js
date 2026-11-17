@@ -605,3 +605,20 @@ test('world wire errors stay online, do not paint, and snap a far hunter to spaw
   assert.equal(game.player.pos.x, 12, 'snaps only once');
   assert.equal(view.status, STATUS.online);
 });
+
+test('a tome hop is not pulled back to the starter town', () => {
+  const game = stubGame();
+  game.player.pos.x = -244;
+  game.player.pos.z = 386.8;
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  view.live = true;
+  view.setStatus({ status: 'online', online: 1 });
+  view.grantPortalHop();
+  view.setStatus({ status: 'online', detail: 'That move was too far.' });
+  assert.equal(game.player.pos.x, -244);
+  assert.equal(game.player.pos.z, 386.8);
+  assert.equal(view.status, STATUS.online);
+  game.player.pos.x = -140;
+  view.setStatus({ status: 'online', detail: 'teleport' });
+  assert.equal(game.player.pos.x, -140);
+});
