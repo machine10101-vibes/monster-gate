@@ -46,6 +46,7 @@ const NPC_DEFS = [
       'Steel and leather, friend. That greatsword on your back has seen better days.',
       'Wraiths cannot take a hit from the hammer. Heavy swings, heavy knockback.',
       'Smelt the pit ore in the smithy beside us, then bring me the bars. Copper first, then iron, then steel from iron and coal. Monster parts work too. The forge turns them into weapons and armor.',
+      'When the pit is behind you, ask me about the next seam. Coal, mithril and adamite are in the Deepwell. Titanium is in the Cinderfall smoke. Platinum is on the ice. The pick goes all the way to 99.',
     ],
   },
   {
@@ -59,6 +60,7 @@ const NPC_DEFS = [
     lines: [
       'Bubbles, brews and things that glow. Mind the fumes.',
       'A healing draught mends the cuts. A spirit philter fills the bolt.',
+      'The lake is only the first water. Trout, the Silverrun, the pirate dock, the holes in the ice. Bring each fish back and I will name the next. The line goes all the way to 99.',
     ],
   },
   {

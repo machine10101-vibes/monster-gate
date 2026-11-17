@@ -74,7 +74,7 @@ import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, ski
 import { Catalog } from './ui/catalog.js';
 import { Gathering } from './systems/gather.js';
 import { GOODS } from './data/gathering.js';
-import { updateGatherSites } from './world/gatherSite.js';
+import { trainingSpots, updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
@@ -3604,6 +3604,7 @@ class Game {
           hellspire: this.world.demonKeep,
           dawnspire: this.world.holyKeep,
           warfield: this.world.warfield,
+          ...trainingSpots(),
         }));
       }
     }
