@@ -215,6 +215,8 @@ export function createPartyStore({ now = () => Date.now(), max = MAX_PARTY, ttl 
             hp: live?.hp ?? 20,
             max_hp: live?.maxHp ?? live?.max_hp ?? 20,
             zone: live?.zone || '',
+            x: Number.isFinite(live?.x) ? live.x : null,
+            z: Number.isFinite(live?.z) ? live.z : null,
             online: !!live,
           };
         }),

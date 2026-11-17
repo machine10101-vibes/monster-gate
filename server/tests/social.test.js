@@ -447,3 +447,25 @@ test('empty social target names return name and do not resolve to Hunter', async
   h.ws.close();
   await srv.close();
 });
+
+test('party state carries where each hunter is standing', async (t) => {
+  const clock = createClock();
+  const srv = await start(t, { now: clock.now, tickMs: 60_000 });
+  const a = await join(srv, 'ann', 'Ann');
+  const b = await join(srv, 'bea', 'Bea');
+  a.ws.send(encode('party_invite', { name: 'Bea' }));
+  clock.advance(300);
+  await waitUntil(() => b.msgs.some((m) => m.type === 'party_invite'));
+  b.ws.send(encode('party_accept', { invite_id: latest(b.msgs, 'party_invite').invite_id }));
+  clock.advance(300);
+  await waitUntil(() => latest(a.msgs, 'party_state')?.party?.members?.length === 2);
+  b.ws.send(encode('move', { x: -230, y: 8, z: -500, yaw: 0.2, resume: true, zone: 'Cinderfall' }));
+  clock.advance(300);
+  await waitUntil(() => latest(a.msgs, 'party_state')?.party?.members?.some((m) => m.name === 'Bea' && m.x === -230 && m.z === -500));
+  const bea = latest(a.msgs, 'party_state').party.members.find((m) => m.name === 'Bea');
+  assert.equal(bea.x, -230);
+  assert.equal(bea.z, -500);
+  const ann = latest(a.msgs, 'party_state').party.members.find((m) => m.name === 'Ann');
+  assert.equal(typeof ann.x, 'number');
+  assert.equal(typeof ann.z, 'number');
+});

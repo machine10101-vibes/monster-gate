@@ -325,6 +325,16 @@ export function createSocialRuntime(world, opts = {}) {
     }
   }
 
+  /** Share where a party is standing, at most a few times a second. */
+  function onPose(session) {
+    const party = parties.partyOf(session.id);
+    if (!party) return;
+    const t = world.now();
+    if (party.poseAt != null && t - party.poseAt < 800) return;
+    party.poseAt = t;
+    broadcastParty(party);
+  }
+
   function onLeave(session) {
     broadcastPresence(session, 'offline');
     const result = parties.leaveIfAny(session);
@@ -550,6 +560,7 @@ export function createSocialRuntime(world, opts = {}) {
     onJoin,
     onZone,
     onHp,
+    onPose,
     onLeave,
     handle,
     whisper,

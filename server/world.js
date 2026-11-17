@@ -360,6 +360,7 @@ export class World {
     if (zoneChanged) this.sendSnapshot(session);
     this.social.onZone(session, prevZone);
     this.social.onHp(session, prevHp);
+    this.social.onPose?.(session);
     this.persistPose(session);
   }
 
