@@ -53,3 +53,9 @@ export function arrivalOf(portal) {
     z: portal.z + Math.cos(yaw) * 2.8,
   };
 }
+
+/** True when a pose is standing on a tome destination (town return or a portal arch). */
+export function isPortalLanding(x, z, radius = 8) {
+  const spots = [TOWN_RETURN, ...PORTALS.flatMap((p) => [p, arrivalOf(p)])];
+  return spots.some((p) => Math.hypot(p.x - x, p.z - z) <= radius);
+}

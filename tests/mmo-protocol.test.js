@@ -43,6 +43,19 @@ test('speed is clamped and teleports are rejected', () => {
   assert.ok(dash.pose.x > 72);
 });
 
+test('a tome landing is accepted past the speed cap', () => {
+  const prev = { x: 72, y: 3, z: 72, yaw: 0, move: 0, anim: 0, held: 'blade', sheath: null, look: null, armor: {}, zone: 'Oakhollow', movedAt: 1000 };
+  const shore = applyMove(prev, { ...prev, x: -244, y: 2, z: 386.8, zone: 'Dunes', held: 'bow', look: { skin: 2 }, armor: { helm: 'x' } }, 1100);
+  assert.equal(shore.teleport, false);
+  assert.equal(shore.pose.x, -244);
+  assert.equal(shore.pose.z, 386.8);
+  assert.equal(shore.pose.held, 'blade');
+  assert.equal(shore.pose.armor.helm, undefined);
+  const stray = applyMove(shore.pose, { ...shore.pose, x: 400, z: 400 }, 2200);
+  assert.equal(stray.teleport, true);
+  assert.equal(stray.pose.x, -244);
+});
+
 test('move and chat rate limits', () => {
   let t = 0;
   const lim = createLimiter(() => t);

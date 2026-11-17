@@ -1,3 +1,4 @@
+import { isPortalLanding } from '../src/data/portals.js';
 import { CHAT_PER_10S, CHAT_PER_SEC, MOVE_PER_SEC, SPEED_MAX, TELEPORT_MAX } from './protocol.js';
 import { SOCIAL_PER_10S, SOCIAL_PER_SEC } from './friends.js';
 
@@ -57,7 +58,25 @@ export function applyMove(prev, next, nowMs) {
   const dz = next.z - prev.z;
   const dist = Math.hypot(dx, dz);
   if (dist > TELEPORT_MAX) {
-    return { pose: { ...prev }, clamped: false, teleport: true };
+    if (!isPortalLanding(next.x, next.z)) {
+      return { pose: { ...prev }, clamped: false, teleport: true };
+    }
+    return {
+      pose: {
+        ...prev,
+        x: next.x,
+        y: next.y,
+        z: next.z,
+        yaw: next.yaw,
+        move: next.move,
+        anim: next.anim,
+        sheath: next.sheath,
+        zone: next.zone || prev.zone,
+        movedAt: nowMs,
+      },
+      clamped: false,
+      teleport: false,
+    };
   }
   const maxDist = SPEED_MAX * dt + 1.5;
   let x = next.x;
