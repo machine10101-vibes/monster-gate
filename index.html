@@ -2,7 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <style>html,body{background:#070308}</style>
+    <style>html,body{background:#070308}html.at-login #loading{display:none!important}html.at-login #title{display:flex!important}</style>
+    <script>
+      (function () {
+        var raw = null;
+        try {
+          raw = sessionStorage.getItem('monster-gate-account-session')
+            || localStorage.getItem('monster-gate-account-session');
+        } catch (e) {}
+        var signed = false;
+        try { signed = !!(raw && JSON.parse(raw).kind === 'email'); } catch (e) {}
+        if (!signed) document.documentElement.classList.add('at-login');
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content"
@@ -28,8 +40,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-Cp5uzcqQ.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/account-zl48xWxe.js">
+    <script type="module" crossorigin src="/assets/index-BfFvfnPt.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/account-Cdg8BirS.js">
     <link rel="stylesheet" crossorigin href="/assets/account-DToipgfc.css">
     <link rel="stylesheet" crossorigin href="/assets/index-j_jQCkSQ.css">
   </head>
@@ -205,6 +217,11 @@
           </div>
         </div>
       </div>
+      <script>
+        if (document.documentElement.classList.contains('at-login')) {
+          document.getElementById('load-video')?.pause();
+        }
+      </script>
 
       <div id="title" class="hidden">
         <div class="title-inner mg-frame">
