@@ -137,15 +137,21 @@ test('a completed splash is not replayed on same-tab reload, but an interrupted 
   const firstUi = mountLoading(first, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
   assert.equal(first.map.loading.classList.contains('hidden'), false);
   assert.equal(values.get('mg-load-seen'), '1');
-  assert.equal(values.get('mg-boot'), '1', 'boot is marked in progress until the splash completes');
+  assert.equal(values.get('mg-load-in-progress'), '1', 'splash uses its own in-progress marker');
+  assert.equal(values.has('mg-boot'), false, 'game crash-recovery marker is independent');
   await firstUi.dismiss({ now: 4000, wait: () => 0 });
-  assert.equal(values.has('mg-boot'), false, 'successful completion clears only the in-progress marker');
+  assert.equal(values.has('mg-load-in-progress'), false, 'successful completion clears only the splash marker');
+  values.set('mg-boot', '1');
+  const gameReload = fakeDoc();
+  mountLoading(gameReload, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
+  assert.equal(gameReload.map.loading.classList.contains('hidden'), true, 'game boot marker must not replay the splash on internal reload');
+  values.delete('mg-boot');
 
   const repeat = fakeDoc();
   mountLoading(repeat, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
   assert.equal(repeat.map.loading.classList.contains('hidden'), true, 'auth/session reload skips the already completed splash');
 
-  values.set('mg-boot', '1');
+  values.set('mg-load-in-progress', '1');
   const interrupted = fakeDoc();
   mountLoading(interrupted, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
   assert.equal(interrupted.map.loading.classList.contains('hidden'), false, 'an interrupted boot still gets its recovery screen');
