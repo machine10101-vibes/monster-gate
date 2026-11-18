@@ -117,9 +117,16 @@ const BOOT_KEY = 'mg-boot';
 const RESUME_CHARACTER_KEY = 'mg-resume-character';
 const RESUME_CHARACTER_MAX_AGE = 15 * 60 * 1000;
 
+function resumeCharacterStores() {
+  const stores = [];
+  try { if (typeof localStorage !== 'undefined') stores.push(localStorage); } catch { /* optional */ }
+  try { if (typeof sessionStorage !== 'undefined') stores.push(sessionStorage); } catch { /* optional */ }
+  return stores;
+}
+
 function rememberResumeCharacter(id, address) {
   const record = JSON.stringify({ id: String(id), address: String(address || ''), at: Date.now() });
-  for (const store of [localStorage, sessionStorage]) {
+  for (const store of resumeCharacterStores()) {
     try {
       store.setItem(RESUME_CHARACTER_KEY, record);
     } catch {
@@ -129,7 +136,7 @@ function rememberResumeCharacter(id, address) {
 }
 
 function readResumeCharacter(address) {
-  for (const store of [localStorage, sessionStorage]) {
+  for (const store of resumeCharacterStores()) {
     try {
       const raw = store.getItem(RESUME_CHARACTER_KEY);
       if (!raw) continue;
@@ -152,7 +159,7 @@ function readResumeCharacter(address) {
 }
 
 function clearResumeCharacter() {
-  for (const store of [localStorage, sessionStorage]) {
+  for (const store of resumeCharacterStores()) {
     try {
       store.removeItem(RESUME_CHARACTER_KEY);
     } catch {
