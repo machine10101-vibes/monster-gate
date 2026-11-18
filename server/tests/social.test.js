@@ -108,7 +108,9 @@ test('friend request, accept, decline, remove, and presence', async (t) => {
   const a = await join(srv, 'ann', 'Ann');
   const b = await join(srv, 'bea', 'Bea');
 
-  a.ws.send(encode('friend_request', { name: 'Bea' }));
+  const requestAck=waitUntil(()=>a.msgs.some(m=>m.type==='social_result'&&m.ok&&m.pending));
+  a.ws.send(encode('friend_request', { name: 'Bea', request_id:'friend-request-1' }));
+  await requestAck;
   await waitUntil(() => b.msgs.some((m) => m.type === 'friend_request' && m.from?.user_id === ANN));
   await waitUntil(() => latest(a.msgs, 'friend_list')?.pending_out?.some((r) => r.user_id === BEA));
 
