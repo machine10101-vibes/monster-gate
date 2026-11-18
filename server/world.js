@@ -367,9 +367,9 @@ export class World {
 
   partyChat(session,msg) {
     if (!session.limiter.allowChat()) { send(session.ws,errorFrame('rate','Slow down.')); return; }
+    const { text } = readChat(msg);
     const party=this.social.parties.partyOf(session.id);
     if(!party){send(session.ws,errorFrame('not_in_party','You are not in a party.'));return;}
-    const text=msg.text;
     const frame={id:`c_${++this.chatSeq}`,channel:'party',from:{id:session.id,name:session.name},text,at:this.now()};
     for(const member of party.members){const target=this.players.get(member.id);if(target)send(target.ws,TYPES.chat,frame);}
   }
