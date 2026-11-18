@@ -262,8 +262,9 @@ async function handoffComplete(admin: Admin, body: Record<string, unknown>): Pro
   const linked = await linkedRow(admin, address);
   if (linked instanceof Response) return linked;
   if (!linked) return json({ error: UNLINKED_MESSAGE, code: UNLINKED_CODE, created: false }, 401);
-  const session = await mintSession(linked.email);
-  if (session instanceof Response) return session;
+  const minted = await mintSession(linked.email);
+  if (minted instanceof Response) return minted;
+  const session = { ...minted, email: linked.email, userId: linked.user_id, address };
   const { data: saved, error } = await admin.from("klever_handoffs")
     .update({ status: "complete", session, completed_at: new Date().toISOString() })
     .eq("id", id).eq("status", "pending").select("id").maybeSingle();
