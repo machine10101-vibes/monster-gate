@@ -253,18 +253,14 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     }
 
     const signature = signatureText(signed);
-    let ok = verifyKleverSignature(message, signature, address);
-    if (!ok && typeof kw.validateSignature === 'function') {
-      try {
-        const res = await kw.validateSignature(message, signature, address);
-        const signer = typeof res === 'object' ? res.signer || res.address : '';
-        ok = res === true || res?.isValid === true;
-        if (ok && signer && signer !== address) ok = false;
-      } catch {
-        ok = false;
-      }
+    if (!signature) {
+      throw fail('bad-signature', 'Klever returned an empty signature. Please try again.');
     }
-    if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
+    // Do not reject a wallet proof using a second, browser-side crypto
+    // implementation. The wallet endpoint verifies the exact message,
+    // signature, and address with the authoritative server verifier before
+    // it can link or authenticate an account. Keeping that check server-side
+    // avoids false negatives from SDK-specific signature representations.
     return { address, message, signature, nonce };
   } finally {
     releasePageHold();

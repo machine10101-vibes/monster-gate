@@ -57,6 +57,19 @@ test('Klever Connect Signature objects expose bytes and hex fields', () => {
   assert.equal(signatureText({ hex: expected }), expected);
 });
 
+test('Klever client forwards non-empty proof for authoritative server verification', () => {
+  const klever = src('../src/wallet/klever.js');
+  const start = klever.indexOf('export async function signProof');
+  const end = klever.indexOf('\n}\n', start);
+  const signProof = klever.slice(start, end);
+  assert.match(signProof, /if \(!signature\)/);
+  assert.doesNotMatch(signProof, /verifyKleverSignature\(message, signature, address\)/);
+  assert.match(signProof, /return \{ address, message, signature, nonce \}/);
+  const walletFn = src('../supabase/functions/wallet/index.ts');
+  assert.match(walletFn, /!verifyKleverSignature\(message, signature, address\)/);
+  assert.match(walletFn, /take_klever_nonce/);
+});
+
 test('Klever approval event extracts the signature, not the echoed message', () => {
   const signature = 'ab'.repeat(64);
   const event = {
