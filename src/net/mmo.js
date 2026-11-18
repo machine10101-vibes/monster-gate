@@ -189,7 +189,7 @@ export class MmoClient {
       x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw,
       anim: pose.anim, move: pose.move,
       held: pose.held, sheath: pose.sheath,
-      look: pose.look, armor: pose.armor, zone: pose.zone,
+      look: pose.look, armor: pose.armor, hp: pose.hp, max_hp: pose.max_hp, zone: pose.zone,
     }));
   }
 
