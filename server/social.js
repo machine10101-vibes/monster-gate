@@ -360,6 +360,7 @@ export function createSocialRuntime(world, opts = {}) {
         case 'party_kick': partyKick(session,msg); break;
         case 'party_promote': partyPromote(session,msg); break;
         case 'party_loot': partyLoot(session,msg); break;
+        case 'whisper': whisper(session,msg); break;
         default: return null;
       }
       sendResult(session,msg,true,{pending:type==='friend_request'||type==='party_invite'});
