@@ -15,6 +15,22 @@ export function rememberRotationRecovery(storage, characterId, orientation, now 
   }
 }
 
+/** Check whether boot is specifically resuming an Enter World rotation handoff. */
+export function isRotationRecoveryPending(storage, orientation, now = Date.now()) {
+  if (!storage?.getItem) return false;
+  try {
+    const record = JSON.parse(storage.getItem(KEY) || 'null');
+    const age = Number(now) - Number(record?.at);
+    return !!record?.characterId
+      && ['portrait', 'landscape'].includes(record.orientation)
+      && ['portrait', 'landscape'].includes(orientation)
+      && record.orientation !== orientation
+      && Number.isFinite(age) && age >= 0 && age <= ROTATION_RECOVERY_MAX_AGE_MS;
+  } catch {
+    return false;
+  }
+}
+
 /** Consume only a recent Enter World handoff that is followed by an orientation change. */
 export function consumeRotationRecovery(storage, orientation, now = Date.now()) {
   if (!storage?.getItem || !storage?.removeItem) return null;
