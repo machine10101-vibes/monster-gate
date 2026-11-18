@@ -389,7 +389,9 @@ test('social actions are rate limited and whispers and blocks work', async (t) =
   const a = await join(srv, 'ann', 'Ann');
   const b = await join(srv, 'bea', 'Bea');
 
-  a.ws.send(encode('whisper', { to: b.welcome.you.id, text: 'Meet at the well.' }));
+  const whisperAck=waitUntil(()=>a.msgs.some(m=>m.type==='social_result'&&m.request_id==='whisper-1'&&m.ok));
+  a.ws.send(encode('whisper', { to: b.welcome.you.id, text: 'Meet at the well.', request_id:'whisper-1' }));
+  await whisperAck;
   await waitUntil(() => b.msgs.some((m) => m.type === 'chat' && m.channel === 'whisper' && m.text === 'Meet at the well.'));
   await waitUntil(() => a.msgs.some((m) => m.type === 'chat' && m.channel === 'whisper' && m.to?.id === b.welcome.you.id));
 
