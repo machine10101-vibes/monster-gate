@@ -10,6 +10,9 @@ import {
   splitStacks,
   stackSlots,
   storageVisual,
+  STORAGE_MAX_STACK,
+  splitStorageStacks,
+  storageStackMax,
 } from '../src/systems/stacks.js';
 
 function hunt(over = {}) {
@@ -95,12 +98,39 @@ test('saves and the hunter function still store one total per item', () => {
   assert.doesNotMatch(hunter, /splitStacks/);
 });
 
-test('storage occupancy is also ceil(n/20) and 45 shows as three cells', () => {
+test('storage has three 40-slot pages and 99-item stacks, separate from the 20-item bag cap', () => {
+  assert.equal(STORAGE_SLOTS, 120);
+  assert.equal(STORAGE_MAX_STACK, 99);
+  assert.equal(storageStackMax('good'), 99);
+  assert.equal(storageStackMax('part'), 99);
+  assert.equal(storageStackMax('potion'), 20);
+  assert.deepEqual(splitStorageStacks(205), [99, 99, 7]);
+  assert.deepEqual(splitStorageStacks(45, storageStackMax('potion')), [20, 20, 5]);
+
   const p = hunt();
   assert.equal(p.putStorage('good', 'copper_ore', 45), true);
-  assert.equal(p.storageUsed(), 3);
+  assert.equal(p.storageUsed(), 1);
   const cells = storageVisual(p.data.storage, STORAGE_SLOTS).filter(Boolean);
-  assert.deepEqual(cells.map((c) => c.n), [20, 20, 5]);
+  assert.deepEqual(cells.map((c) => c.n), [45]);
   assert.equal(p.data.storage.filter(Boolean).length, 1);
-  assert.equal(p.data.storage.find((s) => s)?.n, 45);
+
+  const larger = hunt();
+  assert.equal(larger.putStorage('good', 'copper_ore', 160), true);
+  assert.equal(larger.storageUsed(), 2);
+  assert.deepEqual(larger.data.storage.filter(Boolean).map((s) => s.n), [99, 61]);
+  assert.equal(larger.pullStorage(0, 99).n, 99);
+  assert.equal(larger.data.storage[0], null);
+
+  const legacy = hunt({
+    storage: [{ k: 'good', id: 'copper_ore', n: 250 }, ...Array(29).fill(null)],
+  });
+  assert.equal(legacy.data.storage.length, 120);
+  assert.deepEqual(legacy.data.storage.filter(Boolean).map((s) => s.n), [99, 99, 52]);
+  assert.equal(legacy.storageUsed(), 3);
+
+  const full = hunt();
+  assert.equal(full.putStorage('good', 'copper_ore', 120 * 99), true);
+  assert.equal(full.storageUsed(), 120);
+  assert.equal(full.canFitStorage('good', 'copper_ore', 1), false);
+  assert.equal(full.canFitStorage('good', 'tin_ore', 1), false);
 });
