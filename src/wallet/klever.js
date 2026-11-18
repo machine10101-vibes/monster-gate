@@ -605,9 +605,14 @@ async function connectProvider(kw) {
 }
 
 export async function connectWallet() {
-  primeKleverConnect();
   const mobile = isMobile();
-  const kw = await waitForProvider(mobile ? (inKleverHandoff() ? 4000 : 900) : 2500);
+  // Keep the exact provider object that received the account prompt. Klever's
+  // in-app browser can replace window.kleverWeb while the native sheet is open.
+  // Re-reading it after that sheet can start a second account/signing request
+  // against a different provider instance and pair the signature with a stale
+  // address.
+  const primed = primeKleverConnect();
+  const kw = primed?.kw || await waitForProvider(mobile ? (inKleverHandoff() ? 4000 : 900) : 2500);
   if (!kw) {
     throw fail(
       mobile ? 'mobile-app' : 'extension',
