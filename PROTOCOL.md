@@ -31,7 +31,7 @@ Used on `snapshot`, `delta.upsert`, and as the body of `move`:
   "look": { "skin": 1, "hair": 1, "style": 0, "tunic": 0, "beard": false },
   "armor": { "helm": "iron", "chest": "iron" },
   "zone": "Oakhollow",
-  "hp": 20
+  "hp": 20, "max_hp": 20
 }
 ```
 
@@ -54,12 +54,12 @@ When `SUPABASE_URL` is set with `SUPABASE_ANON_KEY` (or JWKS at `/auth/v1/.well-
 About 10 Hz while hunting. Faster bursts are dropped (`error` `rate`). Speed above 16 u/s is clamped. A jump further than 40 units in one update is rejected (`error` `teleport`) and the last pose is kept.
 
 ```json
-{ "v": 1, "type": "move", "x": 74.1, "y": 3.2, "z": 70.4, "yaw": 1.2, "anim": 0, "move": 0.8, "held": "blade", "sheath": "blade", "look": {}, "armor": {}, "zone": "Oakhollow" }
+{ "v": 1, "type": "move", "x": 74.1, "y": 3.2, "z": 70.4, "yaw": 1.2, "anim": 0, "move": 0.8, "held": "blade", "sheath": "blade", "look": {}, "armor": {}, "hp": 18, "max_hp": 20, "zone": "Oakhollow" }
 ```
 
 ### chat
 
-`channel` is `world` (everyone), `zone` (same `zone` string), or `party` (current party only). Text is trimmed to 120 characters.
+`channel` is `world` (everyone), `zone` (same `zone` string), or `party` (current party only). Text is trimmed to 120 characters. `hp` and `max_hp` are self-reported presentation fields for party frames only; they are not authoritative combat state.
 
 ```json
 { "v": 1, "type": "chat", "channel": "world", "text": "Forge is hot." }
@@ -165,7 +165,7 @@ The migration is `supabase/migrations/20261118000000_friendships.sql`. Configure
 
 Client messages: `party_invite {id|name}`, `party_accept {invite_id}`, `party_decline {invite_id}`, `party_leave`, `party_kick {id}`, `party_promote {id}`, and `party_loot {loot}`.
 
-Server messages: `party_invite {invite_id,from,expires_at}` and `party_state {party}`. Parties contain at most four members; invitations expire after 60 seconds and require acceptance. The oldest remaining member becomes leader if the leader leaves. Loot mode is `round_robin` or `need_greed`.
+Server messages: `party_invite {invite_id,from,expires_at}` and `party_state {party}`. Parties contain at most four members; invitations expire after 60 seconds and require acceptance. The oldest remaining member becomes leader if the leader leaves. Loot mode is `round_robin` or `need_greed`. The current server stores and broadcasts the selected mode; actual drop assignment and need/greed roll resolution remain pending a server-authoritative loot-drop pipeline.
 
 ### Private messages
 
