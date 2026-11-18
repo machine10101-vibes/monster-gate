@@ -308,7 +308,9 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.doesNotMatch(main, /readResumeCharacter|rememberResumeCharacter|mg-resume-character/, 'a page restart must never auto-enter a saved hunter');
   assert.match(main, /clearSession\(\);/, 'fresh boot returns to the explicit login gate');
   assert.match(main, /if \(signed\) \{\s*this\.openCharacterSelect\(\);/, 'successful email sign-in opens character selection');
-  assert.match(main, /mountLoading/);\n  assert.match(main, /isRotationRecoveryPending/);\n  assert.match(main, /mountLoading\(document, \{ skip: rotationReload \}\)/);
+  assert.match(main, /mountLoading/);
+  assert.match(main, /isRotationRecoveryPending/);
+  assert.match(main, /mountLoading\(document, \{ skip: rotationReload \}\)/);
   assert.match(main, /await loadingScreen\.waitForVideo\(\)/);
   assert.ok(main.indexOf('await loadingScreen.waitForVideo()') < main.indexOf('game = new Game()'), 'the intro must finish before WebGL is initialized');
   assert.match(main, /loadingScreen\.dismiss/);
