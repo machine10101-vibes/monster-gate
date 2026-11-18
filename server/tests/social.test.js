@@ -431,6 +431,7 @@ test('guest sessions are refused for every friend_* action with auth', async (t)
     { v: 1, type: 'friend_decline', user_id: ANN },
     { v: 1, type: 'friend_remove', user_id: ANN },
     { v: 1, type: 'friend_list' },
+    { v: 1, type: 'whisper', to: 'u_bea', text: 'hello' },
   ]) {
     await assert.rejects(() => srv.world.social.handle(guest, msg), (err) => err.code === 'auth');
   }
