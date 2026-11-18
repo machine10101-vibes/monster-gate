@@ -68,6 +68,9 @@ test('the dragon, his lava, and his forged gear all build', () => {
   assert.ok(dragon.root);
   assert.ok(dragon.parts.head && dragon.parts.jaw && dragon.parts.wings.length === 2);
   assert.ok(dragon.parts.wingsOuter.length === 2 && dragon.parts.legs.length === 4 && dragon.parts.tail.length >= 4);
+  assert.ok(dragon.parts.breath && dragon.parts.breath.children.length > 20);
+  assert.ok(Math.abs(dragon.parts.wings[0].rotation.z) > 0.8, 'wings rest raised like the reference');
+  assert.ok(dragon.parts.jaw.rotation.x > 0.6, 'the still render keeps the mouth open');
   const bolt = buildProjectileMesh({ kind: 'lavabolt' });
   assert.ok(bolt);
   for (const id of HELD) assert.ok(buildWeaponVoxels(id), id);
