@@ -373,6 +373,24 @@ test('paintWorldPlayButton and the Online/Offline pill follow the same state', (
   assert.equal(live.dataset.mode, 'online');
 });
 
+test('character camp offers Choose world and Play solo', () => {
+  const html = src('../index.html');
+  const camp = src('../src/ui/charselect.js');
+  const main = src('../src/main.js');
+  assert.match(html, /id="cs-choose-world"[^>]*>Choose world/);
+  assert.match(html, /id="cs-play-solo"[^>]*>Play solo/);
+  assert.doesNotMatch(html, /id="cs-enter"/);
+  assert.match(html, /id="cs-worlds"/);
+  assert.match(html, /id="cs-world-1"[\s\S]*World 1/);
+  assert.doesNotMatch(html.slice(html.indexOf('id="cs-worlds"'), html.indexOf('id="cs-toggle"')), /Play solo/);
+  assert.match(camp, /chooseWorld\(\)/);
+  assert.match(camp, /playSolo\(\)/);
+  assert.match(camp, /pickWorld1\(\)/);
+  assert.match(main, /enterWorldOneHunt/);
+  assert.match(main, /enterSoloHunt/);
+  assert.match(main, /ensureOnlineClient/);
+});
+
 test('signing in from World 1 stays on World 1', () => {
   assert.equal(signedInWorldContinue({ join: 'online', search: '', hasToken: true }), 'enter-online');
   assert.equal(signedInWorldContinue({ join: 'online', search: '?mmo=1', hasToken: true }), 'select');

@@ -27,15 +27,19 @@ import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
 import {
   consumeWorldAuth,
   consumeWorldJoin,
+  disposeMmoClient,
   dropOnlineWithoutSession,
   enterOnlineWorld,
   fetchWorldHealth,
   hasWorldSessionToken,
   healthzUrl,
+  hrefWithSearch,
   isWorldOnline,
   lastWorldMode,
   leaveOnlineWorld,
   markWorldJoin,
+  offlineSearch,
+  onlineSearch,
   paintWorldModePill,
   paintWorldPicker,
   rememberWorldMode,
@@ -878,11 +882,76 @@ class Game {
       if (gen !== this.worldHealthGen) return;
       this.worldHealth = health;
       if (this.worldPickOpen) this.paintWorldPickerUi();
+      if (this.charSelect?.worldsOpen) this.charSelect.paintWorldMenu();
     }).catch(() => {
       if (gen !== this.worldHealthGen) return;
       this.worldHealth = { live: false, label: 'Waking…', players: null };
       if (this.worldPickOpen) this.paintWorldPickerUi();
+      if (this.charSelect?.worldsOpen) this.charSelect.paintWorldMenu();
     });
+  }
+
+  worldOneReady() {
+    return worldServerConfigured(typeof location !== 'undefined' ? location.search : '');
+  }
+
+  /** Drop a live World 1 socket without reloading, so the camp can start a solo hunt. */
+  leaveOnlineInPlace() {
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
+      try { history.replaceState({}, '', hrefWithSearch(offlineSearch(search), location)); } catch { /* ignore */ }
+    }
+    if (this.mmo) disposeMmoClient(this.mmo, this);
+    this.worldView?.dispose?.();
+    this.worldView = null;
+    const pill = typeof document !== 'undefined' ? document.getElementById('world-mode-pill') : null;
+    if (pill?.dataset) delete pill.dataset.connectionState;
+    paintWorldModePill(pill, { search: typeof location !== 'undefined' ? location.search : '' });
+  }
+
+  enterSoloHunt(char) {
+    if (this.started || !char) return;
+    rememberWorldMode('offline');
+    this.charSelect?.hideWorldMenu?.();
+    this.leaveOnlineInPlace();
+    this.enterWorld(char);
+  }
+
+  async ensureOnlineClient() {
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (!shouldMountOnline({ search })) return null;
+    const worldViewMod = await import('./net/worldView.js');
+    let view = this.worldView;
+    if (!view) view = await worldViewMod.init(this.scene, { game: this, search });
+    if (!this.mmo || this.mmo.closed) {
+      const { attachMmo } = await import('./net/mmo.js');
+      attachMmo(this, view, { search });
+    }
+    return view;
+  }
+
+  async enterWorldOneHunt(char) {
+    if (this.started || this.worldJoining || !char) return;
+    const search = typeof location !== 'undefined' ? location.search : '';
+    if (!worldServerConfigured(search)) {
+      this.charSelect?.note?.('World 1 is not open on this build.', true);
+      return;
+    }
+    if (!hasWorldSessionToken()) {
+      this.charSelect?.hideWorldMenu?.();
+      rememberWorldMode('online');
+      markWorldJoin('online');
+      this.openSocialSignIn();
+      return;
+    }
+    rememberWorldMode('online');
+    if (!isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
+      try { history.replaceState({}, '', hrefWithSearch(onlineSearch(search), location)); } catch { /* ignore */ }
+    }
+    this.hideWorldPicker();
+    this.charSelect?.hideWorldMenu?.();
+    await this.ensureOnlineClient();
+    this.enterWorld(char);
   }
 
   pickWorldOnline() {
@@ -1077,10 +1146,12 @@ class Game {
       return;
     }
     if (guest) {
-      panel?.classList.add('hidden');
+      if (!forming) {
+        panel?.classList.add('hidden');
+        status.textContent = 'Playing as guest. The hunt stays on this device.';
+      }
       help?.classList.add('hidden');
       swap.textContent = 'Leave guest hunt';
-      status.textContent = 'Playing as guest. The hunt stays on this device.';
       return;
     }
     panel?.classList.add('hidden');
@@ -1428,6 +1499,7 @@ class Game {
     document.getElementById('account-cancel')?.addEventListener('click', () => {
       this.closeAccount();
       this.refreshWalletUi();
+      if (this.charSelect?.active) document.getElementById('title')?.classList.add('hidden');
     });
     document.getElementById('account-retry')?.addEventListener('click', () => {
       document.getElementById('account-panel')?.requestSubmit();

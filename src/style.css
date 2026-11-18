@@ -3556,6 +3556,60 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   pointer-events: none;
 }
 .cs-enter.hidden { display: none !important; }
+.cs-enter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.cs-enter-actions .cs-btn.big { min-width: 168px; }
+.cs-worlds {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(6, 8, 14, 0.62);
+  pointer-events: auto;
+}
+.cs-worlds.hidden,
+.cs-worlds[hidden] { display: none; }
+.cs-worlds-box {
+  width: min(320px, 88vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: #11141f;
+  border: 2px solid var(--gold);
+  border-radius: 4px;
+}
+.cs-worlds-title {
+  margin: 0 0 4px;
+  font-family: var(--font-px);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-align: center;
+  color: #ffd23f;
+}
+.cs-world-list { display: flex; flex-direction: column; gap: 8px; }
+.cs-world {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.cs-world b { font-weight: normal; }
+.cs-world small {
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0;
+  color: #c5d0e0;
+}
+.cs-worlds-box > .cs-btn { width: 100%; }
 .cs-name {
   min-height: 22px;
   font-family: var(--font-px);
@@ -3778,6 +3832,9 @@ body.selecting #damage-layer { display: none; }
   .cs-form { bottom: 10px; height: min(62vh, 560px); }
   .cs-back { left: 10px; bottom: 12px; min-width: 0; padding: 10px 10px; font-size: 9px; }
   .cs-enter { bottom: 12px; gap: 4px; }
+  .cs-enter-actions { flex-direction: column; align-items: center; }
+  .cs-panel,
+  #charselect.single-character .cs-panel { bottom: 210px; }
   .cs-name { font-size: 12px; min-height: 16px; }
   .cs-save { margin: 0; font-size: 10px; }
   .cs-wallet-connect { padding: 8px 10px; font-size: 9px; }
@@ -3789,7 +3846,7 @@ body.selecting #damage-layer { display: none; }
   .cs-plate.selected b { font-size: 12px; }
 
   #charselect.single-character .cs-panel {
-    bottom: 156px;
+    bottom: 210px;
     height: 148px;
   }
   #charselect.single-character .cs-search,
@@ -3804,6 +3861,8 @@ body.selecting #damage-layer { display: none; }
   .cs-form { bottom: 10px; }
   .cs-back { left: 10px; bottom: 10px; padding: 10px 12px; min-width: 0; }
   .cs-enter { bottom: 10px; gap: 6px; }
+  .cs-enter-actions { gap: 6px; }
+  .cs-panel { bottom: 108px; }
   .cs-name { font-size: 13px; min-height: 16px; }
   .cs-btn.big { font-size: 12px; min-width: 170px; padding: 11px 18px; }
   .cs-toggle { right: 12px; bottom: 14px; }
