@@ -13,7 +13,7 @@ import {
   ProtocolError,
 } from './protocol.js';
 import { PersistErrorCodes } from './persistence/index.js';
-import { createSocialRuntime, WELCOME_FEATURES } from './social.js';
+import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
 
 function send(ws, type, extra) {
@@ -297,7 +297,7 @@ export class World {
       resumed: !!slot,
       you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
       pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
-      features: ident.guest ? ['party'] : WELCOME_FEATURES,
+      features: ident.guest ? ['party'] : this.social.features,
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
