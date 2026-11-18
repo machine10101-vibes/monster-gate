@@ -42,16 +42,18 @@ test('World 1 parties require acceptance, broadcast authoritative state, promote
   a.send(encode('party_invite', { name: 'Bea' }));
   const invite = await waitFor(b, m => m.type === 'party_invite');
   assert.equal(am.some(m => m.type === 'party_state'), false, 'invite does not silently add target');
+  const aParty = waitFor(a, m => m.type === 'party_state' && m.party?.members?.length === 2);
+  const bParty = waitFor(b, m => m.type === 'party_state' && m.party?.members?.length === 2);
   b.send(encode('party_accept', { invite_id: invite.invite_id }));
-  await waitFor(a, m => m.type === 'party_state' && m.party?.members?.length === 2);
-  await waitFor(b, m => m.type === 'party_state' && m.party?.members?.length === 2);
+  await Promise.all([aParty, bParty]);
   await new Promise(r => setTimeout(r, 30));
   const party = am.filter(m => m.type === 'party_state' && m.party).at(-1).party;
   const memberB = party.members.find(m => m.name === 'Bea');
   a.send(encode('party_promote', { id: memberB.id }));
   await waitFor(b, m => m.type === 'party_state' && m.party?.leader === memberB.id);
+  const leaderPartyCleared = waitFor(a, m => m.type === 'party_state' && m.party === null);
   b.send(encode('party_leave'));
-  await waitFor(a, m => m.type === 'party_state' && m.party === null);
+  await leaderPartyCleared;
   a.close(); b.close(); await srv.close();
 });
 
@@ -74,9 +76,10 @@ test('signed-in friends persist in social store and whispers are private', async
 
   a.send(encode('friend_request', { name: 'Bea' }));
   await waitFor(b, m => m.type === 'friend_request');
+  const aFriends = waitFor(a, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-bea'));
+  const bFriends = waitFor(b, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-ann'));
   b.send(encode('friend_accept', { user_id: 'id-ann' }));
-  await waitFor(a, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-bea'));
-  await waitFor(b, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-ann'));
+  await Promise.all([aFriends, bFriends]);
 
   a.send(encode('whisper', { to: 'u_id-bea', text: 'Meet at the gate.' }));
   const privateMsg = await waitFor(b, m => m.type === 'chat' && m.channel === 'whisper');
