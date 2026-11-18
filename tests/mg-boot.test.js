@@ -213,6 +213,14 @@ test('setLoadProgress clamps and writes the fill', () => {
   assert.equal(setLoadProgress(fill, text, -2, 'x'), 0);
 });
 
+test('world loading paints visible progress before expensive world setup', () => {
+  const main = src('src/main.js');
+  const load = main.slice(main.indexOf('  async load() {'), main.indexOf('\n  }', main.indexOf('  async load() {')));
+  assert.match(load, /progress\(0\.06, 'Preparing the world'\);[\s\S]*await new Promise\(\(resolve\) => requestAnimationFrame\(resolve\)\);[\s\S]*this\.world = new World/);
+  const world = src('src/world/world.js');
+  assert.match(world, /progress\(0\.1, 'Shaping the land'\)/);
+});
+
 test('MG-UI-20 loading stage fills the largest 3:2 box above the bar', () => {
   const theme = src('src/ui/theme.css');
   const stage = theme.slice(theme.indexOf('.load-stage {'), theme.indexOf('.load-glow'));
