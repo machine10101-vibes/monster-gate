@@ -297,7 +297,7 @@ export class World {
       resumed: !!slot,
       you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
       pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
-      features: WELCOME_FEATURES,
+      features: ident.guest ? ['party'] : WELCOME_FEATURES,
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
