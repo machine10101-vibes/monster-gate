@@ -8,6 +8,9 @@ import {
   ProtocolError,
 } from './protocol.js';
 import { openPersistence } from './store.js';
+import { createBucket } from './limits.js';
+import { createSupabaseSocialStore } from './social-store.js';
+import { SocialWorld } from './social-world.js';
 
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -44,6 +47,7 @@ export class World {
     this.chatSeq = 0;
     this.timer = null;
     this.dirty = new Set();
+    this.social = new SocialWorld(this, opts.socialStore || createSupabaseSocialStore(this.env));
   }
 
   start() {
@@ -68,6 +72,7 @@ export class World {
       helloAt: this.now(),
       last: this.now(),
       limiter: createLimiter(this.now),
+      socialLimiter: createBucket(4, 20, this.now),
       authed: false,
     };
     ws.on('message', (data) => {
@@ -104,6 +109,7 @@ export class World {
       else if (msg.type === TYPES.chat) this.chat(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
+      else if (await this.social.handle(session, msg)) return;
     } catch (err) {
       const code = err instanceof ProtocolError ? err.code : 'protocol';
       send(session.ws, errorFrame(code, err.message));
@@ -144,10 +150,14 @@ export class World {
     send(session.ws, TYPES.welcome, {
       protocol: PROTOCOL,
       tickHz: TICK_HZ,
-      you: { id: session.id, name: session.name, guest: !!ident.guest },
+      you: { id: session.id, name: session.name, guest: !!ident.guest, user_id: ident.guest ? undefined : ident.userId },
+      features: ['party', ...(this.social.store && !ident.guest ? ['friends', 'block'] : []), ...(!ident.guest ? ['whisper'] : [])],
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
+    void this.social.onJoin(session);
+    const party = this.social.partyFor(session);
+    if (party) this.social.broadcastParty(party);
   }
 
   move(session, msg) {
@@ -164,7 +174,10 @@ export class World {
     const zoneChanged = result.pose.zone !== session.zone;
     Object.assign(session, result.pose);
     this.dirty.add(session.id);
-    if (zoneChanged) this.sendSnapshot(session);
+    if (zoneChanged) {
+      this.sendSnapshot(session);
+      void this.social.onMove(session);
+    }
     this.persistPose(session);
   }
 
@@ -184,6 +197,12 @@ export class World {
     };
     for (const other of this.players.values()) {
       if (channel === 'zone' && other.zone !== session.zone) continue;
+      if (channel === 'zone' && other.zone !== session.zone) continue;
+      if (this.social.store && !session.guest && !other.guest) {
+        const hidden = await this.social.blocked(session.userId, other.userId).catch(() => false)
+          || await this.social.blocked(other.userId, session.userId).catch(() => false);
+        if (hidden) continue;
+      }
       send(other.ws, TYPES.chat, frame);
     }
   }
@@ -211,6 +230,7 @@ export class World {
     if (session.authed && session.id) {
       this.players.delete(session.id);
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
+      void this.social.onDrop(session);
       this.dirty.delete(session.id);
       for (const other of this.players.values()) {
         if (other.zone === session.zone) {
