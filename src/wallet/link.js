@@ -176,6 +176,72 @@ export async function loginWithKlever() {
   return claimDevice(seated);
 }
 
+
+const KLEVER_HANDOFF_KEY = 'monster-gate-klever-handoff';
+
+function randomHex(bytes = 32) {
+  return [...crypto.getRandomValues(new Uint8Array(bytes))]
+    .map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function startKleverHandoff() {
+  const id = crypto.randomUUID();
+  const pollToken = randomHex(32);
+  const res = await walletPost({ op: 'handoff_start', id, pollToken });
+  if (res.status !== 200) throw fail(res.json?.code || 'unavailable', res.json?.error || 'Could not start Klever sign-in.');
+  const handoff = { id, pollToken, createdAt: Date.now() };
+  try { localStorage.setItem(KLEVER_HANDOFF_KEY, JSON.stringify(handoff)); } catch { /* in-memory flow can still continue */ }
+  return handoff;
+}
+
+export async function readKleverHandoff() {
+  try {
+    const value = JSON.parse(localStorage.getItem(KLEVER_HANDOFF_KEY) || 'null');
+    if (!value || !/^[0-9a-f-]{36}$/i.test(value.id || '') || !/^[0-9a-f]{64}$/.test(value.pollToken || '')) return null;
+    if (Date.now() - Number(value.createdAt || 0) > 5 * 60 * 1000) {
+      localStorage.removeItem(KLEVER_HANDOFF_KEY);
+      return null;
+    }
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+export async function pollKleverHandoff(handoff) {
+  if (!handoff?.id || !handoff?.pollToken) throw fail('handoff-expired', 'The Klever sign-in request expired. Please try again.');
+  const res = await walletPost({ op: 'handoff_poll', id: handoff.id, pollToken: handoff.pollToken });
+  if (res.status !== 200) {
+    try { localStorage.removeItem(KLEVER_HANDOFF_KEY); } catch { /* ignore */ }
+    throw fail(res.json?.code || 'unavailable', res.json?.error || 'Could not check Klever sign-in.');
+  }
+  if (!res.json?.complete || !res.json?.session) return null;
+  try { localStorage.removeItem(KLEVER_HANDOFF_KEY); } catch { /* ignore */ }
+  const session = sessionFromWallet(res.json.session, res.json.session.email);
+  if (!session) throw fail('rejected', 'Klever sign-in completed, but the account session could not be restored.');
+  const seated = saveAccount(session);
+  const { claimDevice } = await import('./account.js');
+  return claimDevice(seated);
+}
+
+export async function completeKleverHandoff(id) {
+  const { kw, address, mobile } = await connectWallet();
+  const nonceResult = await walletPost({ op: 'handoff_nonce', id, address });
+  if (nonceResult.status !== 200 || !nonceResult.json?.nonce) {
+    throw fail(nonceResult.json?.code || 'handoff-expired', nonceResult.json?.error || 'This sign-in request expired. Return to your original browser and try again.');
+  }
+  const proof = await signProof('login', nonceResult.json.nonce, address, kw, mobile);
+  const res = await walletPost({
+    op: 'handoff_complete',
+    id,
+    address: proof.address,
+    message: proof.message,
+    signature: proof.signature,
+  });
+  if (res.status !== 200) throw fail(res.json?.code || 'rejected', res.json?.error || 'Klever sign-in could not be completed.');
+  return true;
+}
+
 export async function linkKleverWallet(session) {
   if (!session?.userId) throw fail('rejected', 'Sign in with email first.');
   const current = isMockWallet() ? session : await refreshAccountSession(session);
