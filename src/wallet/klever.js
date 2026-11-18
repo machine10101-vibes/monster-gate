@@ -586,10 +586,12 @@ export async function getKleverWebInstance(kw = typeof window === 'undefined' ? 
 
   if (!pendingKleverInitialization || pendingKleverInitialization.provider !== provider) {
     const pending = (async () => {
-      if (typeof provider.initialize !== 'function') {
-        throw fail('provider-init', 'The Klever Wallet browser did not expose initialize(). Refresh the page inside Klever Wallet and try again.');
+      if (typeof web.initialize !== 'function') {
+        throw fail('provider-init', 'The Klever SDK client could not initialize. Refresh the page inside Klever Wallet and try again.');
       }
-      await provider.initialize();
+      // Match the GRT client: initialize the imported SDK wrapper, not the
+      // raw window.kleverWeb injection. The wrapper owns the account manager.
+      await web.initialize({ timeout: 20_000, accountChangeCallback: () => undefined });
       initializedKleverProvider = provider;
     })();
     pendingKleverInitialization = { provider, promise: pending };
@@ -611,10 +613,11 @@ export async function getKleverWebInstance(kw = typeof window === 'undefined' ? 
  */
 export async function connectProvider(kw) {
   const client = await getKleverWebInstance(kw);
-  if (typeof client.getWalletAddress !== 'function') {
-    throw fail('no-account', 'Klever Wallet did not return an account. Refresh the page inside Klever Wallet and try again.');
+  if (typeof web.getWalletAddress !== 'function') {
+    throw fail('no-account', 'The Klever SDK did not return an account. Refresh the page inside Klever Wallet and try again.');
   }
-  const returned = await client.getWalletAddress();
+  // getWalletAddress may be asynchronous in the injected-wallet runtime.
+  const returned = await web.getWalletAddress();
   const address = klvAddress(returned) || providerAddress(client);
   if (!ADDRESS_RE.test(address)) {
     throw fail('no-account', 'Klever Wallet did not return a valid klv1 account. Select your account in Klever Wallet and try again.');
