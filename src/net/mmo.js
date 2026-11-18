@@ -101,6 +101,8 @@ export class MmoClient {
     this.authHold = false;
     this.rejectedToken = '';
     this.lastHelloToken = '';
+    this.socialRequestSeq = 0;
+    this.pendingSocial = new Map();
   }
 
   bind() {
@@ -160,6 +162,15 @@ export class MmoClient {
       return;
     }
     if (!msg || msg.v !== PROTOCOL) return;
+    if (msg.type === 'social_result') {
+      const pending = this.pendingSocial.get(String(msg.request_id || ''));
+      if (pending) {
+        clearTimeout(pending.timer);
+        this.pendingSocial.delete(String(msg.request_id));
+        pending.resolve({ ok: !!msg.ok, pending: !!msg.pending, code: msg.code || '', message: msg.message || '' });
+      }
+      return;
+    }
     if (msg.type === 'welcome') {
       this.you = msg.you || null;
       this.authHold = false;
@@ -252,9 +263,22 @@ export class MmoClient {
   }
 
   send(type, extra = {}) {
-    if (!this.ws || this.ws.readyState !== 1) return { ok: false, code: 'offline', message: 'World connection is not ready.' };
-    this.ws.send(encode(type, extra));
-    return { ok: true, pending: true };
+    if (!this.ws || this.ws.readyState !== 1) return Promise.resolve({ ok: false, code: 'offline', message: 'World connection is not ready.' });
+    const request_id = `social_${++this.socialRequestSeq}`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingSocial.delete(request_id);
+        resolve({ ok: false, code: 'timeout', message: 'The world server did not confirm that action.' });
+      }, 10_000);
+      this.pendingSocial.set(request_id, { resolve, timer });
+      try {
+        this.ws.send(encode(type, { ...extra, request_id }));
+      } catch {
+        clearTimeout(timer);
+        this.pendingSocial.delete(request_id);
+        resolve({ ok: false, code: 'offline', message: 'World connection was interrupted.' });
+      }
+    });
   }
 
   friendRequest(name) { return this.send('friend_request', { name }); }
@@ -327,6 +351,11 @@ export class MmoClient {
     clearTimeout(this.timer);
     this.stopPing();
     this.stopTokenWatch();
+    for (const [id, pending] of this.pendingSocial) {
+      clearTimeout(pending.timer);
+      pending.resolve({ ok: false, code: 'offline', message: 'World connection closed before the action was confirmed.' });
+      this.pendingSocial.delete(id);
+    }
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
       this.ws = null;
