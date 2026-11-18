@@ -1,6 +1,6 @@
 import { GEAR, MATERIAL_ORDER, MATERIALS } from '../data/catalog.js';
 import { GOODS, GOODS_ORDER } from '../data/gathering.js';
-import { STORAGE_SLOTS } from '../systems/progress.js';
+import { STORAGE_PAGE_SLOTS, STORAGE_SLOTS, STORAGE_TABS } from '../systems/progress.js';
 import { splitStacks, storageVisual } from '../systems/stacks.js';
 import { flushThumbs, renderThumb } from './catalog.js';
 
@@ -178,6 +178,7 @@ export function mountStorage(body, game) {
   let tab = 'goods';
   let sel = null;
   let slot = null;
+  let page = 0;
   const touch = isTouch();
 
   const paint = () => {
@@ -196,7 +197,7 @@ export function mountStorage(body, game) {
     help.className = 'stash-help';
     help.textContent = touch
       ? 'Tap an item to store all of it. Hold an item to store one, all, or a number you choose. Tap a stored stack to take it out, or hold it to choose how many.'
-      : 'Thirty slots, shared with this hunter. Choose something you are carrying and store it. Choose a stored stack to take it back.';
+      : 'Three pages of 40 slots, shared with this hunter. Choose something you are carrying and store it. Choose a stored stack to take it back.';
     root.appendChild(help);
 
     const cols = document.createElement('div');
@@ -283,9 +284,22 @@ export function mountStorage(body, game) {
     head.className = 'stash-count';
     head.textContent = `${game.progress.storageUsed()} / ${STORAGE_SLOTS} slots`;
     right.appendChild(head);
+    const pages = document.createElement('div');
+    pages.className = 'bag-tabs stash-pages';
+    for (let i = 0; i < STORAGE_TABS; i++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bag-tab' + (i === page ? ' on' : '');
+      const used = cells.slice(i * STORAGE_PAGE_SLOTS, (i + 1) * STORAGE_PAGE_SLOTS).filter(Boolean).length;
+      b.textContent = `Page ${i + 1} · ${used}/40`;
+      b.onclick = () => { page = i; slot = null; paint(); };
+      pages.appendChild(b);
+    }
+    right.appendChild(pages);
     const hold = document.createElement('div');
     hold.className = 'stash-slots';
-    cells.forEach((s, index) => {
+    cells.slice(page * STORAGE_PAGE_SLOTS, (page + 1) * STORAGE_PAGE_SLOTS).forEach((s, localIndex) => {
+      const index = page * STORAGE_PAGE_SLOTS + localIndex;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'stash-slot' + (s ? '' : ' empty') + (index === slot ? ' sel' : '');
