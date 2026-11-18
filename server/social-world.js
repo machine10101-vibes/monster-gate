@@ -85,23 +85,23 @@ export class SocialWorld {
     const type = m.type;
     if (type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type)) {
       const requestId = clean(m.request_id, 64);
-      if (s.guest || !this.store) { this.error(s, 'auth', 'Sign in to use friends, blocking, and ignoring.'); this.result(s,requestId,false,{code:'auth',message:'Sign in to use friends.'}); return true; }
-      if (!s.socialLimiter?.take()) { this.error(s, 'rate', 'Slow down.'); this.result(s,requestId,false,{code:'rate',message:'Slow down.'}); return true; }
+      if (s.guest || !this.store) { if(!requestId)this.error(s, 'auth', 'Sign in to use friends, blocking, and ignoring.'); this.result(s,requestId,false,{code:'auth',message:'Sign in to use friends.'}); return true; }
+      if (!s.socialLimiter?.take()) { if(!requestId)this.error(s, 'rate', 'Slow down.'); this.result(s,requestId,false,{code:'rate',message:'Slow down.'}); return true; }
       try { await this.friendAction(s, m); this.result(s,requestId,true,{pending:m.type==='friend_request'}); }
-      catch (e) { const code=e.code||'persist', message=e.message||'Could not save social change.'; this.error(s,code,message); this.result(s,requestId,false,{code,message}); }
+      catch (e) { const code=e.code||'persist', message=e.message||'Could not save social change.'; if(!requestId)this.error(s,code,message); this.result(s,requestId,false,{code,message}); }
       return true;
     }
     if (type.startsWith('party_')) {
       const requestId = clean(m.request_id, 64);
-      if (!s.socialLimiter?.take()) { this.error(s, 'rate', 'Slow down.'); this.result(s,requestId,false,{code:'rate',message:'Slow down.'}); return true; }
+      if (!s.socialLimiter?.take()) { if(!requestId)this.error(s, 'rate', 'Slow down.'); this.result(s,requestId,false,{code:'rate',message:'Slow down.'}); return true; }
       try { await this.partyAction(s, m); this.result(s,requestId,true,{pending:m.type==='party_invite'}); }
-      catch (e) { const code=e.code||'protocol', message=e.message||'Party action failed.'; this.error(s,code,message); this.result(s,requestId,false,{code,message}); }
+      catch (e) { const code=e.code||'protocol', message=e.message||'Party action failed.'; if(!requestId)this.error(s,code,message); this.result(s,requestId,false,{code,message}); }
       return true;
     }
     if (type === 'whisper') {
       const requestId = clean(m.request_id, 64);
-      if (s.guest) { this.error(s, 'auth', 'Sign in to whisper.'); this.result(s,requestId,false,{code:'auth',message:'Sign in to whisper.'}); return true; }
-      if (!s.limiter.allowChat()) { this.error(s, 'rate', 'Slow down.'); this.result(s,requestId,false,{code:'rate',message:'Slow down.'}); return true; }
+      if (s.guest) { if(!requestId)this.error(s, 'auth', 'Sign in to whisper.'); this.result(s,requestId,false,{code:'auth',message:'Sign in to whisper.'}); return true; }
+      if (!s.limiter.allowChat()) { if(!requestId)this.error(s, 'rate', 'Slow down.'); this.result(s,requestId,false,{code:'rate',message:'Slow down.'}); return true; }
       const ok = await this.whisper(s, m);
       this.result(s,requestId,ok,{code:ok?'':'whisper',message:ok?'':'Whisper target unavailable.'});
       return true;
@@ -231,8 +231,8 @@ export class SocialWorld {
   async whisper(s,m) {
     const target=this.findOnline(m.to);
     const text=clean(m.text,120);
-    if(!target || !text){this.error(s,'whisper','Whisper target unavailable.');return false;}
-    if((!s.guest && !target.guest) && (await this.blocked(s.userId,target.userId) || await this.blocked(target.userId,s.userId) || await this.ignored(target.userId,s.userId))){this.error(s,'whisper','Whisper target unavailable.');return false;}
+    if(!target || !text){return false;}
+    if((!s.guest && !target.guest) && (await this.blocked(s.userId,target.userId) || await this.blocked(target.userId,s.userId) || await this.ignored(target.userId,s.userId))){return false;}
     const frame={id:`c_${++this.world.chatSeq}`,channel:'whisper',from:{id:s.id,name:s.name},to:{id:target.id,name:target.name},text,at:this.world.now()};
     this.send(s,'chat',frame); this.send(target,'chat',frame);
     return true;
