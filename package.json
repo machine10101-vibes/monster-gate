@@ -20,6 +20,7 @@
   "dependencies": {
     "@fontsource/pixelify-sans": "^5.3.0",
     "@fontsource/press-start-2p": "^5.3.0",
+    "@klever/sdk-web": "^1.5.1",
     "@noble/ed25519": "^3.2.0",
     "@noble/hashes": "^2.4.0",
     "bech32": "^2.0.0",

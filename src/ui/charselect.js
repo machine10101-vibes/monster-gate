@@ -281,10 +281,15 @@ export class CharacterSelect {
       n.id = 'cs-note';
       this.root.append(n);
     }
+    clearTimeout(this.noteTimer);
+    if (!text) {
+      n.textContent = '';
+      n.classList.remove('show');
+      return;
+    }
     n.textContent = text;
     n.classList.toggle('bad', bad);
     n.classList.add('show');
-    clearTimeout(this.noteTimer);
     if (!hold) this.noteTimer = setTimeout(() => n.classList.remove('show'), 2800);
   }
 

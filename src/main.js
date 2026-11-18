@@ -1309,9 +1309,10 @@ class Game {
     try {
       this.wallet = await linkKleverWallet(this.wallet);
       this.hud?.toast?.('Klever wallet linked.', 2400);
+      this.charSelect?.note?.('');
       this.charSelect?.paintKlever?.();
     } catch (err) {
-      this.charSelect?.note?.(err.message || 'The wallet could not be linked.', true);
+      this.charSelect?.note?.(err.message || 'The wallet could not be linked.', true, true);
       this.charSelect?.paintKlever?.();
     } finally {
       this.walletBusy = false;

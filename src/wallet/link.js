@@ -105,14 +105,19 @@ async function signFor(purpose, session) {
     launchKleverApp();
     throw fail('mobile-app', 'Open this page in the Klever Wallet app. The app will ask you to sign.');
   }
-  const { kw, address, mobile } = await connectWallet();
-  const nonce = await requestNonce(purpose, address, session);
-  if (isMockWallet()) {
-    const issued = new Date().toISOString();
-    const message = signedMessage({ purpose, address, nonce: nonce.nonce, issued });
-    return { address, message, signature: mockSignatureFor(nonce.nonce), nonce: nonce.nonce };
-  }
-  return signProof(purpose, nonce.nonce, address, kw, mobile);
+  const connected = await connectWallet();
+  const { kw, mobile } = connected;
+  let address = connected.address;
+  const prove = async (next) => {
+    const nonce = await requestNonce(purpose, next, session);
+    if (isMockWallet()) {
+      const issued = new Date().toISOString();
+      const message = signedMessage({ purpose, address: next, nonce: nonce.nonce, issued });
+      return { address: next, message, signature: mockSignatureFor(nonce.nonce), nonce: nonce.nonce };
+    }
+    return signProof(purpose, nonce.nonce, next, kw, mobile);
+  };
+  return prove(address);
 }
 
 export async function loginWithKlever() {

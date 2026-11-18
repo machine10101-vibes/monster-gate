@@ -7,6 +7,8 @@ import { bech32 } from "bech32";
 ed.hashes.sha512 = sha512;
 
 const PREFIX = "\u0017Klever Signed Message:\n";
+// Older Klever builds sign the same line without the leading length byte.
+const LEGACY_PREFIX = "Klever Signed Message:\n";
 const LOGIN_LEAD = "Monster Gate wants you to sign in with your Klever wallet.";
 const LOGIN_SAFE = "This does not send any coins.";
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -24,16 +26,77 @@ export function publicKeyFromAddress(address: string): Uint8Array | null {
   }
 }
 
+function preparedBytes(body: Uint8Array, length: number, prefixText = PREFIX): Uint8Array {
+  const prefix = new TextEncoder().encode(prefixText);
+  const digits = new TextEncoder().encode(String(length));
+  const bytes = new Uint8Array(prefix.length + digits.length + body.length);
+  bytes.set(prefix, 0);
+  bytes.set(digits, prefix.length);
+  bytes.set(body, prefix.length + digits.length);
+  return bytes;
+}
+
+function preparedHash(body: Uint8Array, length: number): Uint8Array {
+  return keccak_256(preparedBytes(body, length));
+}
+
+function hexText(body: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < body.length; i++) out += body[i].toString(16).padStart(2, "0");
+  return out;
+}
+
 /** Hash the extension and the Klever Wallet app actually sign. */
 export function kleverMessageHash(message: string): Uint8Array {
-  const prefix = new TextEncoder().encode(PREFIX);
-  const length = new TextEncoder().encode(String(message.length));
   const body = new TextEncoder().encode(message);
-  const bytes = new Uint8Array(prefix.length + length.length + body.length);
-  bytes.set(prefix, 0);
-  bytes.set(length, prefix.length);
-  bytes.set(body, prefix.length + length.length);
-  return keccak_256(bytes);
+  return preparedHash(body, body.length);
+}
+
+/**
+ * The extension popup URI-encodes the message before showing it, then decodes
+ * it again before signing. A build that signs the encoded text is the same login.
+ */
+function signedTexts(message: string): string[] {
+  const texts = [message];
+  if (message.includes("\n")) texts.push(message.replace(/\n/g, "\r\n"));
+  const encoded = encodeURIComponent(message);
+  if (encoded !== message) texts.push(encoded);
+  try {
+    const decoded = decodeURIComponent(message);
+    if (!texts.includes(decoded)) texts.push(decoded);
+  } catch {
+    /* the message is not URI-encoded */
+  }
+  return texts;
+}
+
+function accepts(compact: Uint8Array, pub: Uint8Array, text: string): boolean {
+  const body = new TextEncoder().encode(text);
+  const prefixed = preparedBytes(body, body.length);
+  const prefix = new TextEncoder().encode(PREFIX);
+  const withPrefix = new Uint8Array(prefix.length + body.length);
+  withPrefix.set(prefix, 0);
+  withPrefix.set(body, prefix.length);
+  const hexBody = new TextEncoder().encode(hexText(body));
+  const payloads = [
+    preparedHash(body, body.length),
+    keccak_256(preparedBytes(body, body.length, LEGACY_PREFIX)),
+    body,
+    prefixed,
+    withPrefix,
+    keccak_256(withPrefix),
+    keccak_256(body),
+    preparedHash(hexBody, hexBody.length),
+    hexBody,
+  ];
+  if (text.length !== body.length) payloads.push(preparedHash(body, text.length));
+  return payloads.some((payload) => {
+    try {
+      return ed.verify(compact, payload, pub);
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function signatureBytes(signature: string): Uint8Array {
@@ -59,13 +122,7 @@ export function verifyKleverSignature(message: string, signature: string, addres
   const sig = signatureBytes(signature);
   if (!pub || sig.length < 64) return false;
   const compact = sig.length === 64 ? sig : sig.slice(0, 64);
-  const hash = kleverMessageHash(message);
-  try {
-    if (ed.verify(compact, hash, pub)) return true;
-    return ed.verify(compact, new TextEncoder().encode(message), pub);
-  } catch {
-    return false;
-  }
+  return signedTexts(message).some((text) => accepts(compact, pub, text));
 }
 
 /**
