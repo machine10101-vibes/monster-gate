@@ -230,6 +230,26 @@ test('MG-MMO-4: resetAuth and retry work once a new token is present', async () 
   client.dispose();
 });
 
+test('social actions resolve only after a matching server acknowledgement', async () => {
+  const view=stubView();
+  const client=new MmoClient({character:{name:'Ann'},wallet:{kind:'account'}},view,{
+    url:'ws://world.test',WebSocket:FakeSocket,token:'ann',guest:false,fetch:okFetch(),
+  });
+  client.connect();
+  await new Promise(r=>setTimeout(r,20));
+  const pending=client.friendRequest('Bea');
+  const sent=parseFrame(client.ws.sent.at(-1));
+  assert.equal(sent.type,'friend_request');
+  assert.ok(sent.request_id);
+  client.ws.push({v:1,type:'social_result',request_id:'not-this-request',ok:true});
+  let settled=false;pending.then(()=>{settled=true;});
+  await new Promise(r=>setTimeout(r,0));
+  assert.equal(settled,false);
+  client.ws.push({v:1,type:'social_result',request_id:sent.request_id,ok:true,pending:true});
+  assert.deepEqual(await pending,{ok:true,pending:true,code:'',message:''});
+  client.dispose();
+});
+
 test('healthzUrl uses the https form of a wss world URL', () => {
   assert.equal(healthzUrl('wss://world.example/'), 'https://world.example/healthz');
   assert.equal(healthzUrl('ws://localhost:8080/ws'), 'http://localhost:8080/healthz');

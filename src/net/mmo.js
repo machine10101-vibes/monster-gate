@@ -113,6 +113,8 @@ export class MmoClient {
     this.wakePoll = 0;
     this.wakeTick = 0;
     this.retryBound = false;
+    this.socialRequestSeq = 0;
+    this.pendingSocial = new Map();
   }
 
   bind() {
@@ -332,6 +334,11 @@ export class MmoClient {
   onFrame(raw) {
     const msg = parseFrame(raw);
     if (!msg) return;
+    if (msg.type === 'social_result') {
+      const pending=this.pendingSocial.get(String(msg.request_id||''));
+      if(pending){clearTimeout(pending.timer);this.pendingSocial.delete(String(msg.request_id));pending.resolve({ok:!!msg.ok,pending:!!msg.pending,code:msg.code||'',message:msg.message||''});}
+      return;
+    }
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
       this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
@@ -404,8 +411,14 @@ export class MmoClient {
   }
 
   send(type, extra = {}) {
-    if (!this.ws || this.ws.readyState !== 1 || !type) return;
-    this.ws.send(encode(type, extra));
+    if (!this.ws || this.ws.readyState !== 1 || !type) return Promise.resolve({ok:false,code:'offline',message:'World connection is not ready.'});
+    const request_id=`social_${++this.socialRequestSeq}`;
+    return new Promise(resolve=>{
+      const timer=setTimeout(()=>{this.pendingSocial.delete(request_id);resolve({ok:false,code:'timeout',message:'The world server did not confirm that action.'});},10000);
+      this.pendingSocial.set(request_id,{resolve,timer});
+      try{this.ws.send(encode(type,{...extra,request_id}));}
+      catch{clearTimeout(timer);this.pendingSocial.delete(request_id);resolve({ok:false,code:'offline',message:'World connection was interrupted.'});}
+    });
   }
 
   friendRequest(target) {
@@ -445,7 +458,7 @@ export class MmoClient {
       x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw,
       anim: pose.anim, move: pose.move,
       held: pose.held, sheath: pose.sheath,
-      look: pose.look, armor: pose.armor, zone: pose.zone,
+      look: pose.look, armor: pose.armor, hp: pose.hp, max_hp: pose.max_hp, zone: pose.zone,
     }));
   }
 
@@ -453,7 +466,8 @@ export class MmoClient {
     if (!this.ws || this.ws.readyState !== 1 || !msg) return;
     const text = String(msg.text || '').trim();
     if (!text) return;
-    this.ws.send(encode(TYPES.chat, { channel: msg.channel === 'zone' ? 'zone' : 'world', text }));
+    const channel=['world','zone','party'].includes(msg.channel)?msg.channel:'world';
+    this.ws.send(encode(TYPES.chat, { channel, text }));
   }
 
   fail() {
@@ -491,6 +505,7 @@ export class MmoClient {
     this.clearWake();
     this.stopPing();
     clearTimeout(this.timer);
+    for(const [id,pending] of this.pendingSocial){clearTimeout(pending.timer);pending.resolve({ok:false,code:'offline',message:'World connection closed before the action was confirmed.'});this.pendingSocial.delete(id);}
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
       this.ws = null;

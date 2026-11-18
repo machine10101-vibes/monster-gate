@@ -187,3 +187,28 @@ test('requireUserId on every friends method', async () => {
   await assert.rejects(() => db.removeFriend(USER, ''), (err) => err.code === PersistErrorCodes.INVALID);
   await db.close();
 });
+
+
+test('block and ignore relations persist independently and can be removed', async () => {
+  const db = persist();
+  await twoHunters(db);
+  assert.deepEqual(await db.listRelations(USER), []);
+  await db.setRelation(USER, USER_B, 'blocked');
+  assert.deepEqual(await db.listRelations(USER), [{ user_id: USER_B, status: 'blocked' }]);
+  await db.setRelation(USER, USER_B, 'ignored');
+  assert.deepEqual(await db.listRelations(USER), [{ user_id: USER_B, status: 'ignored' }]);
+  await db.setRelation(USER, USER_B, null);
+  assert.deepEqual(await db.listRelations(USER), []);
+  await db.close();
+});
+
+test('cancelFriend removes only the outgoing pending request', async () => {
+  const db = persist();
+  await twoHunters(db);
+  await db.requestFriend(USER, USER_B);
+  await db.cancelFriend(USER, USER_B);
+  assert.deepEqual(await db.listFriends(USER), { friends: [], pendingIn: [], pendingOut: [] });
+  assert.deepEqual(await db.listFriends(USER_B), { friends: [], pendingIn: [], pendingOut: [] });
+  await assert.rejects(() => db.cancelFriend(USER, USER_B), isCode(PersistErrorCodes.NOT_FOUND));
+  await db.close();
+});

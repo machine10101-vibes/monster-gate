@@ -287,9 +287,9 @@ test('social error codes map to friendly friends/party copy', () => {
 
 test('nameplate menu lists whisper and block only when welcome.features includes them', () => {
   const none = hunterMenuItems({ friends: true, party: true, whisper: false, block: false });
-  assert.deepEqual(none.map((i) => i.act), ['friend', 'party']);
+  assert.deepEqual(none.map((i) => i.act), ['friend', 'party', 'mute']);
   const all = hunterMenuItems({ friends: true, party: true, whisper: true, block: true });
-  assert.deepEqual(all.map((i) => i.act), ['friend', 'party', 'whisper', 'block']);
+  assert.deepEqual(all.map((i) => i.act), ['friend', 'party', 'mute', 'whisper', 'block', 'ignore']);
   const offline = hunterMenuItems({ whisper: true, block: true }, { offline: true });
   assert.deepEqual(offline.map((i) => i.act), ['friend', 'party']);
 });

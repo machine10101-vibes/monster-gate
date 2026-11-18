@@ -1,10 +1,6 @@
 /**
- * World-server social runtime: friends actions, presence, in-memory
- * parties, whispers, and in-memory block/ignore.
- *
- * Friends persist through server/persistence (listFriends, requestFriend,
- * acceptFriend, declineFriend, removeFriend). Parties stay in memory.
- * Block and ignore are process-local until the persistence API adds them.
+ * World-server social runtime: persistent friends/block/ignore, presence,
+ * in-memory parties, and private whispers.
  */
 
 import { TYPES, cleanTargetName, cleanText, ProtocolError } from './protocol.js';
@@ -17,10 +13,9 @@ export { FRIENDS_CAP, WELCOME_FEATURES, isUserId, SocialError } from './friends.
 export { INVITE_TTL_MS, MAX_PARTY } from './party.js';
 
 export const SOCIAL_TYPES = new Set([
-  'friend_request', 'friend_accept', 'friend_decline', 'friend_remove', 'friend_list',
+  'friend_request', 'friend_accept', 'friend_decline', 'friend_cancel', 'friend_remove', 'friend_list',
   'block', 'unblock', 'ignore', 'unignore',
-  'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'party_promote',
-  'whisper',
+  'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'party_promote', 'party_loot', 'whisper',
 ]);
 
 const BLOCK_CAP = 100;
@@ -28,13 +23,13 @@ const BLOCK_CAP = 100;
 export function createSocialRuntime(world, opts = {}) {
   const now = () => world.now();
   const persist = world.persist;
+  const friendFeatures = !!persist?.adapter && persist.adapter.kind === 'supabase';
   if (!persist?.listFriends || !persist?.requestFriend) {
     throw new Error('World persist must expose listFriends / requestFriend / acceptFriend / declineFriend / removeFriend (merge PR #60 friendships).');
   }
   const parties = opts.parties || createPartyStore({ now, max: opts.partyMax ?? MAX_PARTY, ttl: opts.inviteTtl ?? INVITE_TTL_MS });
-  /** @type {Map<string, Set<string>>} user_id -> blocked user_ids */
+  /** Account-keyed relations loaded from persistence. */
   const blocked = new Map();
-  /** @type {Map<string, Set<string>>} user_id -> ignored user_ids */
   const ignored = new Map();
   /** lowercase hunter name -> { userId, name } seen in this process */
   const names = new Map();
@@ -126,23 +121,16 @@ export function createSocialRuntime(world, opts = {}) {
     return live;
   }
 
-  function setOf(map, userId) {
-    let set = map.get(userId);
-    if (!set) {
-      set = new Set();
-      map.set(userId, set);
-    }
-    return set;
-  }
-
-  function isBlocked(a, b) {
-    if (!a || !b) return false;
-    return setOf(blocked, a).has(b) || setOf(blocked, b).has(a);
-  }
-
-  function isIgnoredBy(target, actor) {
-    if (!target || !actor) return false;
-    return setOf(ignored, target).has(actor);
+  function setOf(map, userId) { return map.get(userId) || new Set(); }
+  function isBlocked(a, b) { return !!a && !!b && (setOf(blocked,a).has(b) || setOf(blocked,b).has(a)); }
+  function isIgnoredBy(target, actor) { return !!target && !!actor && setOf(ignored,target).has(actor); }
+  async function loadRelations(userId) {
+    if (!persist.listRelations) return;
+    const rows = await persist.listRelations(userId) || [];
+    const nextBlocked=new Set(rows.filter(r=>r.status==='blocked').map(r=>r.user_id));
+    const nextIgnored=new Set(rows.filter(r=>r.status==='ignored').map(r=>r.user_id));
+    blocked.set(userId,nextBlocked);
+    ignored.set(userId,nextIgnored);
   }
 
   function blockedRows(userId) {
@@ -200,6 +188,7 @@ export function createSocialRuntime(world, opts = {}) {
 
   async function pushFriendList(session) {
     if (!session?.userId) return;
+    await loadRelations(session.userId);
     const body = await snapshot(session.userId);
     session.friendIds = new Set((body.friends || []).map((f) => f.user_id));
     sender(session, 'friend_list', body);
@@ -299,6 +288,7 @@ export function createSocialRuntime(world, opts = {}) {
     session.maxHp = session.maxHp ?? 20;
     if (session.userId) {
       try {
+        await loadRelations(session.userId);
         await pushFriendList(session);
         broadcastPresence(session, 'online');
       } catch (err) {
@@ -341,35 +331,46 @@ export function createSocialRuntime(world, opts = {}) {
     if (result) applyPartyChange(result, [session]);
   }
 
-  async function handle(session, msg) {
-    const type = msg.type;
-    if (type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore' || type === 'unignore') {
-      assertAuthed(session);
-    }
-    if (type !== 'friend_list' && type !== 'party_leave') {
-      if (session.limiter && !session.limiter.allowSocial()) {
-        throw new ProtocolError('rate', 'Slow down.');
-      }
-    }
+  function sendResult(session,msg,ok,extra={}) {
+    if(msg.request_id) sender(session,'social_result',{request_id:String(msg.request_id).slice(0,64),ok,...extra});
+  }
 
-    switch (type) {
-      case 'friend_request': return friendRequest(session, msg);
-      case 'friend_accept': return friendAccept(session, msg);
-      case 'friend_decline': return friendDecline(session, msg);
-      case 'friend_remove': return friendRemove(session, msg);
-      case 'friend_list': return pushFriendList(session);
-      case 'block': return setRelation(session, msg, 'block', true);
-      case 'unblock': return setRelation(session, msg, 'block', false);
-      case 'ignore': return setRelation(session, msg, 'ignore', true);
-      case 'unignore': return setRelation(session, msg, 'ignore', false);
-      case 'party_invite': return partyInvite(session, msg);
-      case 'party_accept': return partyAccept(session, msg);
-      case 'party_decline': return partyDecline(session, msg);
-      case 'party_leave': return partyLeave(session);
-      case 'party_kick': return partyKick(session, msg);
-      case 'party_promote': return partyPromote(session, msg);
-      case 'whisper': return whisper(session, msg);
-      default: return null;
+  async function handle(session, msg) {
+    const type=msg.type, requestId=msg.request_id;
+    try {
+      if (type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type)) assertAuthed(session);
+      if (type !== 'friend_list' && type !== 'party_leave' && session.limiter && !session.limiter.allowSocial()) {
+        throw new ProtocolError('rate','Slow down.');
+      }
+      switch (type) {
+        case 'friend_request': await friendRequest(session,msg); break;
+        case 'friend_accept': await friendAccept(session,msg); break;
+        case 'friend_decline': await friendDecline(session,msg); break;
+        case 'friend_cancel': await friendCancel(session,msg); break;
+        case 'friend_remove': await friendRemove(session,msg); break;
+        case 'friend_list': await pushFriendList(session); break;
+        case 'block': await setRelation(session,msg,'block',true); break;
+        case 'unblock': await setRelation(session,msg,'block',false); break;
+        case 'ignore': await setRelation(session,msg,'ignore',true); break;
+        case 'unignore': await setRelation(session,msg,'ignore',false); break;
+        case 'party_invite': partyInvite(session,msg); break;
+        case 'party_accept': partyAccept(session,msg); break;
+        case 'party_decline': partyDecline(session,msg); break;
+        case 'party_leave': partyLeave(session); break;
+        case 'party_kick': partyKick(session,msg); break;
+        case 'party_promote': partyPromote(session,msg); break;
+        case 'party_loot': partyLoot(session,msg); break;
+        case 'whisper': whisper(session,msg); break;
+        default: return null;
+      }
+      sendResult(session,msg,true,{pending:type==='friend_request'||type==='party_invite'});
+      return true;
+    } catch(err) {
+      const code=err?.code||'protocol',message=err?.message||'Social action failed.';
+      if(!requestId) sender(session,'error',{code,message});
+      sendResult(session,msg,false,{code,message});
+      if(requestId) return true;
+      throw err;
     }
   }
 
@@ -399,12 +400,12 @@ export function createSocialRuntime(world, opts = {}) {
       ? { userId: requireUserId(query) }
       : (findByName(query) ? { userId: findByName(query).userId } : null);
     if (preview?.userId === session.userId) throw new SocialError('self', 'That hunter is you.');
-    if (preview?.userId && isBlocked(session.userId, preview.userId)) throw new SocialError('blocked', 'Blocked.');
+    if (preview?.userId && (isBlocked(session.userId, preview.userId) || isIgnoredBy(preview.userId,session.userId))) throw new SocialError('blocked', 'Blocked.');
     await enforceFriendCap(session.userId, 1);
     const result = await callFriends(() => persist.requestFriend(session.userId, query));
     const otherId = result?.to?.userId || result?.from?.userId;
     const toId = result?.to?.userId === session.userId ? result?.from?.userId : result?.to?.userId;
-    if (toId && isBlocked(session.userId, toId)) {
+    if (toId && (isBlocked(session.userId, toId) || isIgnoredBy(toId,session.userId))) {
       await callFriends(() => persist.removeFriend(session.userId, toId)).catch(() => {});
       throw new SocialError('blocked', 'Blocked.');
     }
@@ -419,10 +420,18 @@ export function createSocialRuntime(world, opts = {}) {
   async function friendAccept(session, msg) {
     const fromId = requireUserId(msg.user_id || msg.id);
     if (fromId === session.userId) throw new SocialError('self', 'That hunter is you.');
-    if (isBlocked(session.userId, fromId)) throw new SocialError('blocked', 'Blocked.');
+    if (isBlocked(session.userId, fromId) || isIgnoredBy(session.userId,fromId)) throw new SocialError('blocked', 'Blocked.');
     await enforceFriendCap(session.userId, 1);
     await callFriends(() => persist.acceptFriend(session.userId, fromId));
     await afterFriendsChanged(session, fromId, { accepted: true });
+  }
+
+  async function friendCancel(session,msg) {
+    const otherId=requireUserId(msg.user_id||msg.id);
+    if (!persist.cancelFriend) throw new SocialError('protocol','Request cancellation is unavailable.');
+    await persist.cancelFriend(session.userId,otherId);
+    await pushFriendList(session);
+    await pushFriendListTo(otherId);
   }
 
   async function friendDecline(session, msg) {
@@ -444,11 +453,16 @@ export function createSocialRuntime(world, opts = {}) {
     const target = await resolveKnownHunter(resolveFriendTarget(msg));
     if (target.userId === session.userId) throw new SocialError('self', 'That hunter is you.');
     const map = kind === 'block' ? blocked : ignored;
-    const set = setOf(map, session.userId);
+    const set = new Set(setOf(map,session.userId));
+    const current = set.has(target.userId);
+    if (on && current) throw new SocialError('already', 'Already done.');
+    if (!on && !current) throw new SocialError('not_found', 'No hunter by that name.');
     if (on) {
-      if (set.has(target.userId)) throw new SocialError('already', 'Already done.');
       if (set.size >= BLOCK_CAP) throw new SocialError('full', 'That list is full.');
       set.add(target.userId);
+      if (!persist.setRelation) throw new SocialError('persist','Block and ignore storage is unavailable.');
+      await persist.setRelation(session.userId,target.userId,kind==='block'?'blocked':'ignored');
+      map.set(session.userId,set);
       if (kind === 'block') {
         try { await persist.removeFriend(session.userId, target.userId); } catch { /* not friends */ }
         if (session.friendIds) session.friendIds.delete(target.userId);
@@ -456,8 +470,9 @@ export function createSocialRuntime(world, opts = {}) {
         if (other?.friendIds) other.friendIds.delete(session.userId);
       }
     } else {
-      if (!set.has(target.userId)) throw new SocialError('not_found', 'No hunter by that name.');
       set.delete(target.userId);
+      await persist.setRelation(session.userId,target.userId,null);
+      map.set(session.userId,set);
     }
     await pushFriendList(session);
     if (on && kind === 'block') await pushFriendListTo(target.userId);
@@ -480,9 +495,7 @@ export function createSocialRuntime(world, opts = {}) {
     broadcastParty(party);
   }
 
-  function partyDecline(session, msg) {
-    parties.decline(session, msg.invite_id || msg.id);
-  }
+  function partyDecline(session, msg) { parties.decline(session, msg.invite_id || msg.id); }
 
   function partyLeave(session) {
     const result = parties.leave(session);
@@ -499,6 +512,15 @@ export function createSocialRuntime(world, opts = {}) {
   function partyPromote(session, msg) {
     const targetId = typeof msg.id === 'string' && msg.id ? msg.id : resolvePartyTarget(msg).id;
     const party = parties.promote(session, targetId);
+    broadcastParty(party);
+  }
+
+  function partyLoot(session,msg) {
+    const party=parties.partyOf(session.id);
+    if(!party)throw new SocialError('not_in_party','You are not in a party.');
+    if(party.leader!==session.id)throw new SocialError('not_leader','Only the leader can change loot mode.');
+    if(!['round_robin','need_greed'].includes(msg.loot))throw new SocialError('protocol','Unknown loot mode.');
+    party.loot=msg.loot;
     broadcastParty(party);
   }
 
@@ -541,6 +563,7 @@ export function createSocialRuntime(world, opts = {}) {
     };
     sender(session, TYPES.chat, frame);
     sender(target, TYPES.chat, frame);
+    return true;
   }
 
   function hidesChat(observer, speaker) {
@@ -555,9 +578,10 @@ export function createSocialRuntime(world, opts = {}) {
     ignored,
     names,
     directory,
-    features: WELCOME_FEATURES,
+    features: friendFeatures ? WELCOME_FEATURES : ['party'],
     SOCIAL_TYPES,
     onJoin,
+    loadRelations,
     onZone,
     onHp,
     onPose,

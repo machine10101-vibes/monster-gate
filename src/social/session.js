@@ -85,6 +85,7 @@ export class SocialSession {
   requestFriend(name) { return this.run('friend_request', name); }
   acceptFriend(id) { return this.run('friend_accept', id); }
   declineFriend(id) { return this.run('friend_decline', id); }
+  cancelFriend(id) { return this.run('friend_cancel', id); }
   removeFriend(id) { return this.run('friend_remove', id); }
   blockPlayer(id) { return this.run('block', id); }
   unblockPlayer(id) { return this.run('unblock', id); }
@@ -95,6 +96,7 @@ export class SocialSession {
   leaveParty() { return this.run('party_leave'); }
   kick(id) { return this.run('party_kick', id); }
   promote(id) { return this.run('party_promote', id); }
+  setLootMode(mode) { return this.run('party_loot', mode); }
   whisper(id, text) { return this.run('whisper', id, text); }
   refresh() { return this.run('friend_list'); }
 

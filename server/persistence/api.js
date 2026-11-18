@@ -129,6 +129,16 @@ export function createPersistence(options = {}) {
       return adapter.listFriends(requireUserId(userId));
     },
 
+    async listRelations(userId) {
+      if (typeof adapter.listRelations !== 'function') return [];
+      return adapter.listRelations(requireUserId(userId));
+    },
+
+    async setRelation(userId, targetUserId, status) {
+      if (typeof adapter.setRelation !== 'function') throw new Error('Social relations are not supported by this persistence adapter.');
+      return adapter.setRelation(requireUserId(userId), requireUserId(targetUserId), status);
+    },
+
     async requestFriend(fromUserId, toUserIdOrName) {
       requireUserId(fromUserId);
       return adapter.requestFriend(fromUserId, toUserIdOrName);
@@ -140,6 +150,11 @@ export function createPersistence(options = {}) {
 
     async declineFriend(userId, otherUserId) {
       return adapter.declineFriend(requireUserId(userId), requireUserId(otherUserId));
+    },
+
+    async cancelFriend(userId, otherUserId) {
+      if (typeof adapter.cancelFriend !== 'function') throw new Error('Friend request cancellation is not supported by this persistence adapter.');
+      return adapter.cancelFriend(requireUserId(userId), requireUserId(otherUserId));
     },
 
     async removeFriend(userId, otherUserId) {

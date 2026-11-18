@@ -5,6 +5,7 @@ const METHOD = {
   friend_request: 'friendRequest',
   friend_accept: 'friendAccept',
   friend_decline: 'friendDecline',
+  friend_cancel: 'friendCancel',
   friend_remove: 'friendRemove',
   friend_list: 'friendList',
   block: 'blockPlayer',
@@ -17,6 +18,7 @@ const METHOD = {
   party_leave: 'partyLeave',
   party_kick: 'partyKick',
   party_promote: 'partyPromote',
+  party_loot: 'partyLoot',
   whisper: 'sendWhisper',
 };
 
@@ -63,24 +65,7 @@ export class MmoSocial {
       this.unhooks.push(() => { if (this.hooked === client) client.onFrame = orig; });
     }
 
-    const onMsg = (ev) => this.onFrame(ev?.data);
-    const hookWs = (ws) => {
-      if (!ws || ws.__mgSocial) return;
-      ws.__mgSocial = true;
-      ws.addEventListener?.('message', onMsg);
-      this.unhooks.push(() => {
-        try { ws.removeEventListener?.('message', onMsg); } catch { /* closed */ }
-      });
-    };
-    if (client.ws) hookWs(client.ws);
-    if (typeof client.connect === 'function') {
-      const origConnect = client.connect.bind(client);
-      client.connect = (...args) => {
-        origConnect(...args);
-        if (client.ws) hookWs(client.ws);
-      };
-      this.unhooks.push(() => { if (this.hooked === client) client.connect = origConnect; });
-    }
+    // MmoClient owns its socket message listener; wrapping onFrame above taps each frame once.
 
     if (client.you) this.applyYou(client.you);
     this.emit('bind');
@@ -242,7 +227,7 @@ export class MmoSocial {
   }
 
   canSend(type) {
-    if (type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore') return this.caps.friends || this.caps.block;
+    if (type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type)) return this.caps.friends || this.caps.block;
     if (type.startsWith('party')) return this.caps.party;
     if (type === 'whisper') return this.caps.whisper;
     return false;
@@ -265,8 +250,7 @@ export class MmoSocial {
       }
       if (typeof client.send === 'function') {
         const payload = payloadOf(name, a, b);
-        client.send(name, payload);
-        return { ok: true };
+        return await Promise.resolve(client.send(name, payload));
       }
       if (client.ws && client.ws.readyState === 1) {
         const extra = payloadOf(name, a, b);
@@ -313,7 +297,7 @@ function applyFeatures(caps, feats) {
 }
 
 function guestNeedsAuth(type) {
-  return type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore' || type === 'whisper';
+  return type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type) || type === 'whisper';
 }
 
 function asList(rows) {
@@ -332,6 +316,8 @@ function payloadOf(type, a, b) {
   if (type === 'whisper') return { to: a, text: b };
   if (type === 'party_invite') return typeof a === 'string' && a.length <= 16 && !a.includes('_') ? { name: a } : { id: a };
   if (type === 'party_accept' || type === 'party_decline') return { invite_id: a };
+  if (type === 'party_loot') return { loot: a };
+  if (type === 'whisper') return { to: a, text: b };
   if (type === 'party_leave' || type === 'friend_list') return {};
   return { id: a, user_id: a };
 }

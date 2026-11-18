@@ -13,7 +13,7 @@ import {
   ProtocolError,
 } from './protocol.js';
 import { PersistErrorCodes } from './persistence/index.js';
-import { createSocialRuntime, WELCOME_FEATURES } from './social.js';
+import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
 
 function send(ws, type, extra) {
@@ -172,9 +172,10 @@ export class World {
         return;
       }
       if (msg.type === TYPES.move) this.move(session, msg);
-      else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.whisper(session, msg);
+      else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.handle(session,{...msg,type:'whisper'});
+      else if (msg.type === TYPES.chat && msg.channel === 'party') this.partyChat(session, msg);
       else if (msg.type === TYPES.chat) this.chat(session, msg);
-      else if (msg.type === TYPES.whisper) await this.social.whisper(session, { ...msg, to: msg.to });
+      else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
@@ -296,7 +297,7 @@ export class World {
       resumed: !!slot,
       you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
       pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
-      features: WELCOME_FEATURES,
+      features: ident.guest ? ['party'] : this.social.features,
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
@@ -362,6 +363,15 @@ export class World {
     this.social.onHp(session, prevHp);
     this.social.onPose?.(session);
     this.persistPose(session);
+  }
+
+  partyChat(session,msg) {
+    if (!session.limiter.allowChat()) { send(session.ws,errorFrame('rate','Slow down.')); return; }
+    const { text } = readChat(msg);
+    const party=this.social.parties.partyOf(session.id);
+    if(!party){send(session.ws,errorFrame('not_in_party','You are not in a party.'));return;}
+    const frame={id:`c_${++this.chatSeq}`,channel:'party',from:{id:session.id,name:session.name},text,at:this.now()};
+    for(const member of party.members){const target=this.players.get(member.id);if(target)send(target.ws,TYPES.chat,frame);}
   }
 
   chat(session, msg) {

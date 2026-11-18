@@ -128,6 +128,45 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
       return listFromRows(id, rows, (uid) => names.get(uid) ?? null);
     },
 
+    async listRelations(userId) {
+      const id = requireUserId(userId);
+      const { data, error } = await db.from('friendships')
+        .select('target_id,status')
+        .eq('requester_id', id)
+        .in('status', ['blocked','ignored']);
+      if (error) throw wrap(error, { table: 'friendships' });
+      return (data || []).map(row => ({ user_id: row.target_id, status: row.status }));
+    },
+
+    async setRelation(userId, targetUserId, status) {
+      const id = requireUserId(userId), target = requireUserId(targetUserId);
+      assertNotSelf(id, target);
+      if (status && !['blocked','ignored'].includes(status)) throw invalid('Unknown social relation.');
+      const existing = await db.from('friendships').select('requester_id,target_id,status')
+        .eq('requester_id', id).eq('target_id', target).in('status', ['blocked','ignored']).maybeSingle();
+      if (existing.error) throw wrap(existing.error, { table: 'friendships' });
+      if (!status) {
+        if (existing.data) {
+          const del = await db.from('friendships').delete().eq('requester_id', id).eq('target_id', target);
+          if (del.error) throw wrap(del.error, { table: 'friendships' });
+        }
+        return { ok:true, user_id:target, status:'' };
+      }
+      const body = { requester_id:id, target_id:target, status, updated_at:new Date().toISOString() };
+      if (existing.data) {
+        const upd = await db.from('friendships').update(body).eq('requester_id',id).eq('target_id',target);
+        if (upd.error) throw wrap(upd.error,{table:'friendships'});
+      } else {
+        const del = await db.from('friendships').delete()
+          .or(`and(requester_id.eq.${id},target_id.eq.${target}),and(requester_id.eq.${target},target_id.eq.${id})`)
+          .in('status',['pending','accepted']);
+        if (del.error) throw wrap(del.error,{table:'friendships'});
+        const ins = await db.from('friendships').insert(body);
+        if (ins.error) throw wrap(ins.error,{table:'friendships',userId:id,otherUserId:target});
+      }
+      return { ok:true, user_id:target, status };
+    },
+
     async requestFriend(fromUserId, toUserIdOrName) {
       const from = requireUserId(fromUserId);
       const to = await resolveHunter(db, toUserIdOrName);
@@ -152,6 +191,15 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
         friendPeer(row.requesterId, names.get(row.requesterId)),
         friendPeer(row.targetId, names.get(row.targetId)),
       );
+    },
+
+    async cancelFriend(userId, otherUserId) {
+      const id=requireUserId(userId), other=requireUserId(otherUserId);
+      assertNotSelf(id,other);
+      const existing=await findPairRow(db,id,other);
+      if(!existing || existing.status!=='pending' || existing.requesterId!==id)throw hunterNotFound(other);
+      await deletePair(db,existing);
+      return {ok:true,userId:id,otherUserId:other};
     },
 
     async declineFriend(userId, otherUserId) {
