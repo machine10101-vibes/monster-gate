@@ -191,7 +191,7 @@ export function normalizeChat(raw) {
   if (!raw) return null;
   const text = cleanText(raw.text);
   if (!text) return null;
-  const channel = raw.channel === 'zone' ? 'zone' : raw.channel === 'whisper' ? 'whisper' : 'world';
+  const channel = raw.channel === 'zone' ? 'zone' : raw.channel === 'whisper' ? 'whisper' : raw.channel === 'party' ? 'party' : 'world';
   const from = raw.from && typeof raw.from === 'object' ? raw.from : {};
   return {
     id: String(raw.id || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).slice(0, 48),
@@ -383,6 +383,7 @@ export class WorldView {
     this.search = opts.search ?? (typeof location !== 'undefined' ? location.search : '');
     this.actors = new Map();
     this.chat = [];
+    this.mutedPlayers = new Set();
     this.channel = 'world';
     this.status = STATUS.offline;
     this.detail = '';
@@ -590,6 +591,7 @@ export class WorldView {
   pushChat(raw) {
     const msg = normalizeChat(raw);
     if (!msg) return;
+    if (msg.channel !== 'whisper' && (this.mutedPlayers.has(String(msg.from.id)) || this.mutedPlayers.has(`name:${String(msg.from.name || '').toLowerCase()}`))) return;
     this.chat.push(msg);
     if (this.chat.length > 80) this.chat.shift();
     const row = this.actors.get(msg.from.id);
@@ -604,6 +606,18 @@ export class WorldView {
       this.armPinTimer();
     }
     this.paintChat();
+  }
+
+  toggleMutePlayer(id, name = '') {
+    const key=String(id || '') || `name:${String(name || '').toLowerCase()}`;
+    if(!key)return false;
+    const muted=this.mutedPlayers.has(key);
+    if(muted)this.mutedPlayers.delete(key);else this.mutedPlayers.add(key);
+    return !muted;
+  }
+
+  isPlayerMuted(id,name='') {
+    return this.mutedPlayers.has(String(id||'')) || this.mutedPlayers.has(`name:${String(name||'').toLowerCase()}`);
   }
 
   setStatus(status, detail = '') {
@@ -1010,6 +1024,8 @@ export class WorldView {
       sheath: p.sheathKind || null,
       look: localLook(this.game),
       armor: localArmor(this.game),
+      hp: Number.isFinite(p.hp) ? p.hp : 20,
+      max_hp: Number.isFinite(p.maxHp) ? p.maxHp : Number.isFinite(p.max_hp) ? p.max_hp : 20,
       zone: zoneOf(this.game),
     };
     this._onLocalMove?.(pose);
@@ -1020,11 +1036,22 @@ export class WorldView {
     const msg = cleanText(text);
     if (!msg) return false;
     const whisper = msg.match(/^\/w(?:hisper)?\s+(\S+)\s+(.+)$/i);
-    if (whisper && this.game?.social?.caps?.whisper) {
-      this.game.social.whisper(whisper[1], whisper[2]);
+    if (whisper || channel === 'whisper') {
+      if (!whisper) {
+        this.game?.hud?.toast?.('Use /w Hunter message to send a private message.', 2200);
+        return true;
+      }
+      if (!this.game?.social?.caps?.whisper) {
+        this.game?.hud?.toast?.('Private whispers are unavailable on this connection.', 2200);
+        return true;
+      }
+      Promise.resolve(this.game.social.whisper(whisper[1],whisper[2])).then(res=>{
+        if(res && !res.ok)this.game?.hud?.toast?.(res.message || 'Whisper could not be delivered.',2200);
+      }).catch(()=>this.game?.hud?.toast?.('Whisper could not be delivered.',2200));
       return true;
     }
-    const payload = { channel: channel === 'zone' ? 'zone' : 'world', text: msg };
+    const allowed=['world','zone','party'];
+    const payload = { channel: allowed.includes(channel) ? channel : 'world', text: msg };
     this._onChatSend?.(payload);
     this.emit({ type: 'chat', ...payload });
     return true;
@@ -1058,6 +1085,8 @@ export class WorldView {
         <div class="wc-tabs">
           <button type="button" data-ch="world">World</button>
           <button type="button" data-ch="zone">Zone</button>
+          <button type="button" data-ch="party">Party</button>
+          <button type="button" data-ch="whisper">Whisper</button>
         </div>
         <div class="wc-stack">
           <div class="wc-log" role="log" aria-live="polite"></div>
@@ -1090,7 +1119,7 @@ export class WorldView {
     });
     chat.querySelectorAll('.wc-tabs button').forEach((b) => {
       b.addEventListener('click', () => {
-        this.channel = b.dataset.ch === 'zone' ? 'zone' : 'world';
+        this.channel = ['world','zone','party','whisper'].includes(b.dataset.ch) ? b.dataset.ch : 'world';
         this.paintChat();
         this.ui.input?.focus();
       });
@@ -1172,8 +1201,10 @@ export class WorldView {
     if (!this.ui?.log) return;
     const zone = this.zone;
     const rows = this.chat.filter((m) => {
-      if (m.channel === 'whisper') return true;
+      if (this.channel === 'whisper') return m.channel === 'whisper';
+      if (m.channel === 'whisper') return false;
       if (this.channel === 'world') return m.channel === 'world';
+      if (this.channel === 'party') return m.channel === 'party';
       return m.channel === 'zone' && (!m.zone || !zone || m.zone === zone);
     });
     this.ui.log.innerHTML = rows.slice(-40).map((m) => {
@@ -1182,8 +1213,9 @@ export class WorldView {
       const pid = escapeHtml(m.from.id);
       const mine = m.from.id === 'you' || this.isLocalId(m.from.id);
       const tag = m.channel === 'whisper' ? '<i class="wc-wh">whisper</i> ' : '';
+      const stamp = Number.isFinite(Number(m.at)) ? new Date(Number(m.at)).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
       const cls = mine ? ' class="wc-you"' : '';
-      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
+      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text} <small class="wc-time">${escapeHtml(stamp)}</small></p>`;
     }).join('');
     this.ui.log.scrollTop = this.ui.log.scrollHeight;
     this.paintPin();
