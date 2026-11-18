@@ -3,7 +3,6 @@ import { withSupabase } from "@supabase/server";
 import { verifyKleverSignature } from "../hunter/verify.ts";
 import {
   ADDRESS_RE,
-  BAD_PROOF_MESSAGE,
   EXPIRED_MESSAGE,
   LINKED_ALREADY_MESSAGE,
   NONCE_MS,
