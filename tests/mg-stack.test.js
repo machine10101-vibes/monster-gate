@@ -10,6 +10,9 @@ import {
   splitStacks,
   stackSlots,
   storageVisual,
+  STORAGE_MAX_STACK,
+  splitStorageStacks,
+  storageStackMax,
 } from '../src/systems/stacks.js';
 
 function hunt(over = {}) {
