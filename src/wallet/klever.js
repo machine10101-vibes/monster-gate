@@ -34,24 +34,55 @@ function fail(code, message) {
   return err;
 }
 
-function signatureText(signed, depth = 0) {
-  if (signed == null || depth > 4) return '';
+export function signatureText(signed, depth = 0) {
+  if (signed == null || depth > 8) return '';
   if (typeof signed === 'string') {
     const trimmed = signed.trim();
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
         return signatureText(JSON.parse(trimmed), depth + 1);
       } catch {
-        return trimmed;
+        return '';
       }
     }
+    // Direct signMessage() results are strings. Ignore arbitrary echoed message
+    // text when walking an event object so it cannot be mistaken for a signature.
     return trimmed;
   }
-  if (Array.isArray(signed)) return signatureText(signed[0], depth + 1);
-  const nested = (typeof signed.data === 'string' && signed.data) || signed.data?.signature || '';
-  const value = signed.signature || signed.sig || signed.hex || signed.result || nested
-    || (typeof signed.toHex === 'function' ? signed.toHex() : '');
-  if (value && value !== signed) return signatureText(value, depth + 1);
+  if (ArrayBuffer.isView(signed) && signed.byteLength === 64) {
+    return [...new Uint8Array(signed.buffer, signed.byteOffset, signed.byteLength)]
+      .map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  if (Array.isArray(signed)) {
+    if (signed.length === 64 && signed.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)) {
+      return signed.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    }
+    for (const item of signed) {
+      const found = signatureText(item, depth + 1);
+      if (found) return found;
+    }
+    return '';
+  }
+  if (typeof signed !== 'object') return '';
+
+  // Prefer explicit signature fields. Never read an event's "message" field:
+  // Klever echoes the text to be signed there, not the cryptographic proof.
+  for (const key of ['signature', 'sig', 'hex']) {
+    if (signed[key] != null) {
+      const found = signatureText(signed[key], depth + 1);
+      if (found) return found;
+    }
+  }
+  if (typeof signed.toHex === 'function') {
+    const found = signatureText(signed.toHex(), depth + 1);
+    if (found) return found;
+  }
+  for (const key of ['result', 'data', 'response', 'payload']) {
+    if (signed[key] != null) {
+      const found = signatureText(signed[key], depth + 1);
+      if (found) return found;
+    }
+  }
   return '';
 }
 
@@ -111,7 +142,7 @@ function legacySignMessage(message) {
     });
     events.addEventListener(event.id, (result) => {
       const data = result?.data;
-      if (data?.status === 'ACCEPTED') resolve(data.data?.message ?? data.data ?? data);
+      if (data?.status === 'ACCEPTED') resolve(result);
       else reject(fail('rejected', 'The Klever app closed the sign-in request.'));
     });
     wallet.handleTransaction(JSON.stringify(event));
