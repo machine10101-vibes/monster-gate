@@ -175,13 +175,17 @@ function friendRow(game, social, p, snap, paint) {
     const res = await report(game, await social.inviteToParty(p.id || p.name));
     paint();
   };
+  const whisper = el('button', 'mg-btn quiet', 'Whisper');
+  whisper.type = 'button';
+  whisper.disabled = !snap.caps?.whisper;
+  whisper.onclick = () => focusWhisper(game, p);
   const more = el('button', 'mg-btn quiet', 'Remove');
   more.type = 'button';
   more.onclick = async () => {
     await report(game, await social.removeFriend(p.user_id || p.id));
     paint();
   };
-  row.append(invite, more);
+  row.append(invite, whisper, more);
   return row;
 }
 
@@ -463,6 +467,8 @@ function focusWhisper(game, player) {
   const chat = document.getElementById('world-chat');
   const input = chat?.querySelector('.wc-in');
   if (chat) chat.classList.remove('collapsed');
+  const whisperTab = chat?.querySelector('[data-ch="whisper"]');
+  whisperTab?.click();
   if (input) {
     input.value = `/w ${player.name} `;
     input.focus();
