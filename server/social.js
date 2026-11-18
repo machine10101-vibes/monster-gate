@@ -489,10 +489,7 @@ export function createSocialRuntime(world, opts = {}) {
     broadcastParty(party);
   }
 
-  function partyDecline(session, msg) {
-    const result=parties.decline(session, msg.invite_id || msg.id);
-    if(result?.party && result.party.members.length===1){const disbanded=parties.leave(result.party.members[0].id);applyPartyChange(disbanded);}
-  }
+  function partyDecline(session, msg) { parties.decline(session, msg.invite_id || msg.id); }
 
   function partyLeave(session) {
     const result = parties.leave(session);
