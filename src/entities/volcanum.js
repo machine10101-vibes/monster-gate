@@ -149,6 +149,18 @@ function paintBody() {
   for (const s of [-1, 1]) {
     blob(B, cx + s * 6.6, 8.4, 10.5, 3.7, 4.9, 5.6, plate, 21, 0.2);
     blob(B, cx + s * 6.4, 14.2, 25.5, 3.4, 3.8, 4.4, plate, 22, 0.2);
+    // Overlapping shoulder pauldrons give the forelimb roots a heavy,
+    // armored silhouette and catch light as the shoulders roll.
+    blob(B, cx + s * 8.8, 17.2, 25.4, 3.2, 3.7, 4.8, (x, y, z, d, dx, dy, dz) => {
+      if (dy > 0.25 && Math.abs(dz) < 0.45 && hash3(x, y, z, 116) > 0.62) return C.glow;
+      return plate(x, y, z, 116);
+    }, 116, 0.12);
+    stroke(B, cx + s * 8.6, 18, 28, cx + s * 10.5, 15, 23, 2, (t, x, y, z) => t > 0.72 ? C.glowHi : C.glow, 0.45, true);
+    // Raised rib plates frame the molten sternum core.
+    for (let r = 0; r < 3; r++) {
+      const z = 14 + r * 5;
+      stroke(B, cx + s * 2.2, 6 + r * 1.5, z, cx + s * 5.8, 8 + r * 1.3, z + 1, 2, (t, x, y, zz) => plate(x, y, zz, 117 + r), 0.55);
+    }
   }
   for (let z = 4; z <= 30; z += 2) {
     const top = topY(B, cx, z);
@@ -218,6 +230,16 @@ function paintNeck() {
   ];
   for (const [cy, cz, rx, ry, rz, seed] of neck) {
     blob(N, cx, cy, cz, rx, ry, rz, (x, y, z, d, dx, dy, dz) => (dz > 0.4 ? bellyRing(x, y, z) : plate(x, y, z, seed)), seed, 0.14);
+  }
+  // Overlapping side scutes make the neck read as a flexible chain of armor,
+  // rather than one smooth tube when it bends independently of the skull.
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 5; i++) {
+      const z = 31 + i * 3;
+      const y = 18 + i * 2.2;
+      blob(N, cx + side * (4.0 - i * 0.16), y, z, 1.45, 2.25, 2.2, (x, yy, zz) => plate(x, yy, zz, 130 + i), 130 + i, 0.08);
+      if (i % 2 === 0) stroke(N, cx + side * 4.4, y + 1, z + 1, cx + side * 4.9, y - 0.8, z - 1, 1, () => C.glow, 0.25, true);
+    }
   }
   return N;
 }
