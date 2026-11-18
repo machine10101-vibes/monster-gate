@@ -207,7 +207,9 @@ class Game {
     markBoot();
     // iPad Chrome and Brave both pretend to be a desktop. The first boot has to
     // be the small one: a crash-then-retry still dies if every boot draws the whole world.
-    this.safeBoot = isIOS() || isTablet() || killed;
+    // Touch phones can lose the WebGL context when the game first expands to landscape.
+    // Start them on the same conservative scene budget as iOS/tablets, then let them upgrade later.
+    this.safeBoot = isIOS() || isTablet() || !isDesktopGraphics() || killed;
     this.heavyBoot = this.safeBoot;
     this.lightBoot = this.safeBoot;
     const base = this.safeBoot ? QUALITIES[0] : pickQuality();
@@ -3525,9 +3527,11 @@ class Game {
       }
       this.step(dt, rawMs / 1000);
       this.renderer.render(this.scene, this.camera);
-      if (this.bootFrames >= 0) {
+      // Keep the crash-recovery marker until gameplay has actually started and stayed alive.
+      // The old counter ran during login/character select, so it expired before the first hunt.
+      if (this.started && this.bootFrames >= 0) {
         this.bootFrames += 1;
-        if (this.bootFrames === 90) {
+        if (this.bootFrames === 600) {
           clearBoot();
           this.bootFrames = -1;
         }
