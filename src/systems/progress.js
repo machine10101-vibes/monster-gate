@@ -12,6 +12,7 @@ import {
   stackSlots,
   storageStackSlots,
   STORAGE_MAX_STACK,
+  storageStackMax,
 } from './stacks.js';
 
 export const ANON_KEY = 'monster-gate-hunter-v1';
@@ -833,11 +834,11 @@ export class Progress {
     let remaining = n;
     for (const s of this.data.storage) {
       if (!s || s.k !== k || s.id !== id) continue;
-      remaining -= Math.max(0, STORAGE_MAX_STACK - (s.n | 0));
+      remaining -= Math.max(0, storageStackMax(k) - (s.n | 0));
       if (remaining <= 0) return true;
     }
     const empty = this.data.storage.filter((s) => !s).length;
-    return Math.ceil(remaining / STORAGE_MAX_STACK) <= empty;
+    return Math.ceil(remaining / storageStackMax(k)) <= empty;
   }
 
   /** Merge into an existing stack, or take the first empty slot. Gear always uses its own slot. */
@@ -851,15 +852,15 @@ export class Progress {
     } else {
       let remaining = n;
       for (const s of slots) {
-        if (!s || s.k !== k || s.id !== id || s.n >= STORAGE_MAX_STACK) continue;
-        const add = Math.min(remaining, STORAGE_MAX_STACK - s.n);
+        if (!s || s.k !== k || s.id !== id || s.n >= storageStackMax(k)) continue;
+        const add = Math.min(remaining, storageStackMax(k) - s.n);
         s.n += add;
         remaining -= add;
         if (!remaining) break;
       }
       while (remaining > 0) {
         const at = slots.findIndex((s) => !s);
-        const add = Math.min(remaining, STORAGE_MAX_STACK);
+        const add = Math.min(remaining, storageStackMax(k));
         slots[at] = { k, id, n: add };
         remaining -= add;
       }
@@ -1012,7 +1013,7 @@ function normalizeStorage(raw) {
         ? i
         : slots.findIndex((s) => !s);
       if (at < 0) break;
-      const n = Math.min(remaining, STORAGE_MAX_STACK);
+      const n = Math.min(remaining, storageStackMax(entry.k));
       slots[at] = { k: entry.k, id: entry.id, n };
       remaining -= n;
       first = false;
