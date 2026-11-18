@@ -121,6 +121,13 @@ test('storage has three 40-slot pages and 99-item stacks, separate from the 20-i
   assert.equal(larger.pullStorage(0, 99).n, 99);
   assert.equal(larger.data.storage[0], null);
 
+  const legacy = hunt({
+    storage: [{ k: 'good', id: 'copper_ore', n: 250 }, ...Array(29).fill(null)],
+  });
+  assert.equal(legacy.data.storage.length, 120);
+  assert.deepEqual(legacy.data.storage.filter(Boolean).map((s) => s.n), [99, 99, 52]);
+  assert.equal(legacy.storageUsed(), 3);
+
   const full = hunt();
   assert.equal(full.putStorage('good', 'copper_ore', 120 * 99), true);
   assert.equal(full.storageUsed(), 120);
