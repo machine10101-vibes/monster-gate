@@ -313,6 +313,7 @@ export async function createWorldServer(options = {}) {
     env: options.env || process.env,
     now: options.now,
     tickMs: options.tickMs,
+    socialStore: options.socialStore,
   });
   const server = http.createServer((req, res) => {
     const path = (req.url || '/').split('?')[0];
