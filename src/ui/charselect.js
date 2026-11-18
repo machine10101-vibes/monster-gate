@@ -12,7 +12,8 @@ import {
 } from '../systems/roster.js';
 import { CampStage } from '../world/camp.js';
 import { shortAddress } from '../wallet/klever.js';
-import { mountWalletSettings } from '../wallet/settings.js';
+import { readAccount } from '../wallet/account.js';
+import { linkKleverWallet, linkedWalletStatus } from '../wallet/link.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const $ = (id) => document.getElementById(id);
@@ -73,12 +74,7 @@ export class CharacterSelect {
       $('cs-account').textContent = g.wallet?.kind === 'guest'
         ? 'Playing as guest'
         : (g.wallet?.email || shortAddress(g.wallet?.address || ''));
-      const walletHost = $('cs-wallet');
-      if (walletHost) {
-        walletHost.replaceChildren();
-        walletHost.classList.toggle('hidden', g.wallet?.kind !== 'email');
-        if (g.wallet?.kind === 'email') mountWalletSettings(walletHost, g);
-      }
+      this.paintWalletLink();
       g.paintCloudStatus?.();
       this.filter = '';
       $('cs-search').value = '';
@@ -88,6 +84,48 @@ export class CharacterSelect {
       throw err;
     } finally {
       if (this.active) g.parkWorld?.();
+    }
+  }
+
+  paintWalletLink() {
+    const button = $('cs-wallet-connect');
+    const status = $('cs-wallet-status');
+    if (!button || !status) return;
+    const session = readAccount();
+    const eligible = !!(session?.kind === 'email' && session.userId);
+    button.classList.toggle('hidden', !eligible);
+    status.textContent = '';
+    button.disabled = false;
+    button.textContent = session?.kleverAddress ? 'Klever Wallet Connected' : 'Connect Klever Wallet';
+    if (!eligible) return;
+    linkedWalletStatus(session).then((result) => {
+      if (!this.active) return;
+      if (result.address) {
+        session.kleverAddress = result.address;
+        button.textContent = 'Klever Wallet Connected';
+      } else {
+        button.textContent = 'Connect Klever Wallet';
+      }
+    }).catch(() => {});
+  }
+
+  async connectKlever() {
+    const button = $('cs-wallet-connect');
+    const status = $('cs-wallet-status');
+    const session = readAccount();
+    if (!button || !session?.userId) {
+      if (status) status.textContent = 'Please sign in with email first.';
+      return;
+    }
+    button.disabled = true;
+    status.textContent = 'Confirm the connection in Klever Wallet…';
+    try {
+      await linkKleverWallet(session);
+      status.textContent = 'Klever wallet connected.';
+      this.paintWalletLink();
+    } catch (error) {
+      status.textContent = error?.message || 'The wallet could not be connected.';
+      button.disabled = false;
     }
   }
 
@@ -467,6 +505,7 @@ export class CharacterSelect {
   bind() {
     if (!this.root) return;
     $('cs-enter').addEventListener('click', () => this.enter());
+    $('cs-wallet-connect').addEventListener('click', () => this.connectKlever());
     $('cs-back').addEventListener('click', () => this.back());
     $('cs-create').addEventListener('click', () => this.showForm());
     $('cs-delete').addEventListener('click', () => this.askDelete());
