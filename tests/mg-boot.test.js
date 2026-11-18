@@ -331,8 +331,8 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(src('src/ui/charselect.js'), /single-character/);
   assert.match(src('src/style.css'), /#charselect\.single-character \.cs-panel/);
   assert.match(theme, /#loading\.held \.load-glow/);
-  assert.match(theme, /#loading\.held #load-video \{ opacity: 0; \}/);
-  assert.match(theme, /#loading\.held \.load-poster \{ opacity: 1; \}/);
+  assert.match(theme, /#loading\.held #load-video \{ opacity: 1; \}/);
+  assert.match(theme, /#loading\.held \.load-poster \{ opacity: 0; \}/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
   assert.match(theme, /mask-image:\s*radial-gradient/);
   assert.match(theme, /#loading \.load-bar \{[\s\S]*height:\s*26px/);
