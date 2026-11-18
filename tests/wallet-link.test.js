@@ -14,6 +14,7 @@ import {
   signedMessage,
 } from '../supabase/functions/_shared/linkAuth.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
+import { signatureText } from '../src/wallet/klever.js';
 import { parseMockWallet } from '../src/wallet/mock.js';
 
 ed.hashes.sha512 = sha512;
@@ -40,6 +41,22 @@ function proof(auth, { purpose, address, secret, userId, now = Date.now() }) {
   const message = signedMessage({ purpose, address, nonce: nonce.nonce, issued });
   return { message, signature: sign(secret, message), nonce: nonce.nonce };
 }
+
+test('Klever approval event extracts the signature, not the echoed message', () => {
+  const signature = 'ab'.repeat(64);
+  const event = {
+    data: {
+      status: 'ACCEPTED',
+      data: {
+        message: 'Monster Gate wants you to sign in.',
+        signature,
+      },
+    },
+  };
+  assert.equal(signatureText(event), signature);
+  assert.equal(signatureText({ data: { status: 'ACCEPTED', data: { message: 'echoed message only' } } }), '');
+  assert.equal(signatureText(signature), signature);
+});
 
 test('a wallet login never creates an account', () => {
   const a = keypair(3);
