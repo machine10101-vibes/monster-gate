@@ -40,6 +40,7 @@ function fakeNode(id) {
     listeners: {},
     classList: {
       add(...c) { c.forEach((x) => classes.add(x)); node.className = [...classes].join(' '); },
+      remove(...c) { c.forEach((x) => classes.delete(x)); node.className = [...classes].join(' '); },
       toggle(c, on) {
         if (on ?? !classes.has(c)) classes.add(c);
         else classes.delete(c);
@@ -113,6 +114,7 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   doc.map['load-video'].currentTime = 3.7;
   assert.equal(doc.map.loading.classList.contains('held'), false, 'the clip keeps playing while progress changes');
   assert.equal(doc.map['load-video'].paused, false);
+  const introDone = ui.waitForVideo({ timeoutMs: 1000 });
 
   doc.map['load-video'].currentTime = 6.2;
   doc.map['load-video'].ended = true;
@@ -120,6 +122,7 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.equal(doc.map.loading.classList.contains('held'), true);
   assert.equal(doc.map['load-video'].paused, true);
   assert.equal(doc.map['load-video'].currentTime, 6.2);
+  await introDone;
 
   await ui.dismiss({ now: 4000, wait: () => 0 });
   assert.equal(doc.map.loading.classList.contains('fading'), true);
@@ -202,6 +205,17 @@ test('rotation recovery is one-shot, short-lived, and only follows a real orient
   assert.equal(consumeRotationRecovery(storage, 'landscape', 2001), null, 'handoff is consumed once');
   assert.equal(rememberRotationRecovery(storage, 'hunter-1', 'portrait', 1000), true);
   assert.equal(consumeRotationRecovery(storage, 'landscape', 122000), null, 'stale handoffs never bypass login');
+});
+
+test('video playback failure restores the poster and releases boot instead of leaving a black frame', async () => {
+  const doc = fakeDoc();
+  const ui = mountLoading(doc, { reduced: false, mobile: true, fadeMs: 0 });
+  const waiting = ui.waitForVideo({ timeoutMs: 1000 });
+  doc.map['load-video'].listeners.error();
+  await waiting;
+  assert.equal(doc.map.loading.classList.contains('video-failed'), true);
+  assert.equal(doc.map.loading.classList.contains('video-playing'), false);
+  assert.equal(doc.map.loading.classList.contains('held'), true);
 });
 
 test('reduced motion skips the clip and embers', () => {
@@ -316,6 +330,8 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /clearSession\(\);/, 'fresh boot returns to the explicit login gate');
   assert.match(main, /if \(signed\) \{\s*this\.openCharacterSelect\(\);/, 'successful email sign-in opens character selection');
   assert.match(main, /mountLoading/);
+  assert.match(main, /await loadingScreen\.waitForVideo\(\)/);
+  assert.ok(main.indexOf('await loadingScreen.waitForVideo()') < main.indexOf('game = new Game()'), 'the intro must finish before WebGL is initialized');
   assert.match(main, /loadingScreen\.dismiss/);
   assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
   assert.match(main, /if \(this\.started && this\.bootFrames >= 0\)/);
