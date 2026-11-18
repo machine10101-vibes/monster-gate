@@ -59,11 +59,11 @@ About 10 Hz while hunting. Faster bursts are dropped (`error` `rate`). Speed abo
 
 ### chat
 
-`channel` is `world` (everyone) or `zone` (same `zone` string). Text is trimmed to 120 characters.
+`channel` is `world` (everyone), `zone` (same `zone` string), or `party` (current party only). Text is trimmed to 120 characters.
 
 ```json
 { "v": 1, "type": "chat", "channel": "world", "text": "Forge is hot." }
-{ "v": 1, "type": "chat", "channel": "zone", "text": "At the well." }
+{ "v": 1, "type": "chat", "channel": "zone", "text": "At the well." }\n{ "v": 1, "type": "chat", "channel": "party", "text": "Ready to enter?" }
 ```
 
 Rate: 2/s, 6 per 10 s. Excess is dropped with `error` `rate`.
@@ -89,7 +89,7 @@ A hunter with no frames for 30 s is disconnected.
 ### welcome
 
 ```json
-{ "v": 1, "type": "welcome", "protocol": 1, "tickHz": 10, "you": { "id": "g_ab12", "name": "Hunter", "guest": true } }
+{ "v": 1, "type": "welcome", "protocol": 1, "tickHz": 10, "you": { "id": "u_…", "name": "Hunter", "guest": false, "user_id": "uuid" }, "features": ["friends", "party", "whisper", "block"] }\n\nGuests receive `party` only. `friends` and `block` are advertised only when account-keyed social persistence is configured; signed-in hunters also receive `whisper`.
 ```
 
 ### snapshot
@@ -148,3 +148,26 @@ Zone-scoped patch, ~10 Hz, only for hunters in the same `zone`. `remove` is ids 
 | Chat | 2 / s, 6 / 10 s, 120 characters |
 | Heartbeat | ping/pong; idle 30 s |
 | World | `x,z` clamped to about `-50…1490` (10×10 tiles of 144) |
+
+## Social messages (World 1)
+
+All social actions are handled by the World 1 server. Social actions are rate-limited to 4/s with a 20-action burst. Guests may join parties, but friend management and block/ignore require a signed-in account.
+
+### Friends and presence
+
+Client messages: `friend_request {name}`, `friend_accept {user_id}`, `friend_decline {user_id}`, `friend_cancel {user_id}`, `friend_remove {user_id}`, `friend_list`, `block {user_id}`, `unblock {user_id}`, `ignore {user_id}`, and `unignore {user_id}`.
+
+Server messages: `friend_list {friends,pending_in,pending_out,blocked,ignored}`, `friend_request {from}`, and `friend_presence {user_id,id,name,presence,zone}`. Accepted friendships are stored as two directional rows keyed by Supabase auth user UUID. Blocks suppress chat and social contact in both directions; ignores suppress invitations and whispers but do not hide ordinary world chat.
+
+The migration is `supabase/migrations/20261118000000_friendships.sql`. Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and the server-only `SUPABASE_SERVICE_ROLE_KEY`. Never expose the service-role key to the browser.
+
+### Parties
+
+Client messages: `party_invite {id|name}`, `party_accept {invite_id}`, `party_decline {invite_id}`, `party_leave`, `party_kick {id}`, `party_promote {id}`, and `party_loot {loot}`.
+
+Server messages: `party_invite {invite_id,from,expires_at}` and `party_state {party}`. Parties contain at most four members; invitations expire after 60 seconds and require acceptance. The oldest remaining member becomes leader if the leader leaves. Loot mode is `round_robin` or `need_greed`.
+
+### Private messages
+
+Client sends `whisper {to,text}`; the server echoes a `chat` frame with `channel: "whisper"` only to sender and recipient. Whisper text is limited to 120 characters and uses the chat rate limit. A `/w Hunter message` command never falls back to public chat when whispers are unavailable.
+
