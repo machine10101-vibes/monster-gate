@@ -1389,9 +1389,20 @@ export class Monster {
       const chargeK = this.airCharge ? clamp(this.airChargeT / 0.38, 0, 1) : 0;
       const dive = diving ? clamp(this.t / DRAGON_DESCEND, 0, 1) : 0;
       const flapRate = ascending ? 8.5 : inAir ? 6 : diving ? 3 : this.state === 'breath' ? 12 : winding ? 4 : 7.5 + moving * 2.5;
-      const lk = Math.min(1, dt * 9);
+      const lk = Math.min(1, dt * 10);
+      const gaitRate = 4.2 + Math.min(spd, 3.2) * 2.1;
+      this.gaitPhase = (this.gaitPhase || 0) + dt * gaitRate * (moving > 0.04 ? 1 : 0.18);
+      const phase = this.gaitPhase;
+      let plantedStep = false;
       p.legs.forEach((l, i) => {
         const front = i < 2;
+        const side = i % 2 === 0 ? -1 : 1;
+        // Diagonal gait pairs share a rhythm; each foot lifts on recovery and
+        // reaches forward before taking weight again.
+        const gaitPhase = (i === 0 || i === 3) ? 0 : Math.PI;
+        const cycle = phase + gaitPhase;
+        const swing = Math.sin(cycle);
+        const lift = Math.max(0, Math.cos(cycle));
         let thigh = front ? -0.55 : 0.45;
         let knee = front ? 0.85 : -0.7;
         if (flying && !diving) {
@@ -1400,17 +1411,25 @@ export class Monster {
         } else if (diving) {
           thigh = front ? -1.15 : -0.35;
           knee = front ? -0.1 : -0.5;
+        } else if (moving > 0.04) {
+          thigh += swing * moving * (front ? 0.3 : 0.38);
+          // Front elbows tuck on lift; hind knees fold more deeply to clear
+          // the ground and extend into the push-off.
+          knee += lift * moving * (front ? 0.62 : 0.78);
+          if (lift > 0.92 && moving > 0.55) plantedStep = true;
+        } else {
+          thigh += Math.sin(t * 1.1 + i * 1.7) * 0.025;
+          knee += Math.sin(t * 1.4 + i) * 0.035;
         }
-        // A grounded four-beat gait: diagonal pairs counter-swing and the
-        // knee flexes on the recovery half of each step instead of moving rigidly.
-        const gaitPhase = (i === 0 || i === 3) ? 0 : Math.PI;
-        const stride = Math.sin(t * (5.2 + moving * 2.2) + gaitPhase) * moving * (flying ? 0.08 : 0.34);
-        const flex = Math.max(0, Math.cos(t * (5.2 + moving * 2.2) + gaitPhase)) * moving;
-        thigh += stride + Math.sin(t * 2 + i * 1.3) * 0.055;
-        knee += flying ? 0 : flex * (front ? 0.48 : 0.58);
         l.rotation.x += (thigh - l.rotation.x) * lk;
+        l.rotation.z += (side * (front ? -0.045 : 0.035) * (moving > 0.04 ? 1 : 0.35) - l.rotation.z) * lk;
         p.knees[i].rotation.x += (knee - p.knees[i].rotation.x) * lk;
       });
+      if (plantedStep && moving > 0.65 && !flying && (this.lastStepT || 0) <= 0) {
+        this.lastStepT = 0.34;
+        g.fx.dust(this.x, this.y + 0.04, this.z, 1.1, 0.55);
+      }
+      this.lastStepT = Math.max(0, (this.lastStepT || 0) - dt);
       const last = p.tail.length - 1;
       p.tail.forEach((sg, i) => {
         const sway = Math.sin(t * (winding || chargeK > 0 ? 6 : 2.6) - i * 0.8) * (0.2 + i * 0.06);
@@ -1444,8 +1463,12 @@ export class Monster {
         w.rotation.z = sgn * (base + Math.sin(t * flapRate) * amp);
         w.rotation.y = sgn * (sweep - Math.cos(t * flapRate) * sweepAmp);
         const og = p.wingsOuter[i];
-        og.rotation.z = sgn * (Math.sin(t * flapRate - 1.1) * amp * 0.8 - (diving ? 0.5 : 0.12));
-        og.rotation.y = sgn * (-0.08 - Math.cos(t * flapRate - 1.1) * sweepAmp * 0.8 - (diving ? 0.3 : 0));
+        // Wrist sections lag the shoulder through each power stroke and
+        // fold inward on the recovery stroke, like a membrane under tension.
+        const wristPhase = t * flapRate - 1.1;
+        og.rotation.z = sgn * (Math.sin(wristPhase) * amp * 0.8 - (diving ? 0.5 : 0.12) + Math.max(0, Math.cos(wristPhase)) * 0.12);
+        og.rotation.y = sgn * (-0.08 - Math.cos(wristPhase) * sweepAmp * 0.8 - (diving ? 0.3 : 0));
+        og.rotation.x = Math.sin(wristPhase) * (inAir ? 0.08 : 0.035);
       });
       let headX = 0.08 + Math.sin(t * 1.6) * 0.04;
       let jawX = 0.05;
@@ -1512,7 +1535,9 @@ export class Monster {
       p.head.rotation.z += ((-this.yawRate * 0.012) - p.head.rotation.z) * Math.min(1, dt * 5);
       p.jaw.rotation.x += (jawX - p.jaw.rotation.x) * Math.min(1, dt * 18);
       p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * (diving ? 14 : 8));
-      p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04;
+      const breathing = 1 + Math.sin(t * 1.75) * (moving < 0.08 ? 0.012 : 0.006);
+      p.body.scale.y += (breathing - p.body.scale.y) * Math.min(1, dt * 3.5);
+      p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04 + this.bank * 0.12;
       o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'chicken') {
       const b = m.body;
