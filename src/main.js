@@ -98,7 +98,7 @@ import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
-import { clearRotationRecovery, consumeRotationRecovery, rememberRotationRecovery, screenOrientation } from './engine/rotationRecovery.js';
+import { clearRotationRecovery, consumeRotationRecovery, isRotationRecoveryPending, rememberRotationRecovery, screenOrientation } from './engine/rotationRecovery.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
 
@@ -106,7 +106,17 @@ const CLOUD_AUTOSAVE_MS = 30000;
 const DEVICE_CHECK_MS = 4000;
 const sendingToLedger = typeof location !== 'undefined' && isAdminAccount(readAccount());
 if (sendingToLedger) location.replace(adminHref());
-const loadingScreen = !sendingToLedger && typeof document !== 'undefined' ? mountLoading() : null;
+let rotationReload = false;
+try {
+  rotationReload = !sendingToLedger && typeof window !== 'undefined'
+    && isRotationRecoveryPending(
+      globalThis.localStorage,
+      screenOrientation(window.innerWidth, window.innerHeight),
+    );
+} catch { /* unavailable storage means show the normal launch splash */ }
+const loadingScreen = !sendingToLedger && typeof document !== 'undefined'
+  ? mountLoading(document, { skip: rotationReload })
+  : null;
 /** Paint the WebGL fallback before Game/save-bridge so a hung hop cannot hide it. */
 const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && showGlFailIfNeeded({
   probe: defaultGlProbe,
