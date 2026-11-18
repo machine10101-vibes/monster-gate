@@ -50,6 +50,13 @@ test('mobile signing prefers the SDK method and prevents overlapping prompts', (
   assert.ok(request.indexOf("kw.signMessage(message)") < request.indexOf("legacySignMessage(message)"));
 });
 
+test('Klever Connect Signature objects expose bytes and hex fields', () => {
+  const bytes = new Uint8Array(64).fill(0xab);
+  const expected = 'ab'.repeat(64);
+  assert.equal(signatureText({ bytes }), expected);
+  assert.equal(signatureText({ hex: expected }), expected);
+});
+
 test('Klever approval event extracts the signature, not the echoed message', () => {
   const signature = 'ab'.repeat(64);
   const event = {
