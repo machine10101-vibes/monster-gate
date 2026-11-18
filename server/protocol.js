@@ -146,6 +146,8 @@ export function readMove(msg) {
     sheath: typeof msg.sheath === 'string' ? String(msg.sheath).slice(0, 24) : null,
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
+    hp: clampNum(msg.hp, 0, 999, 20),
+    max_hp: clampNum(msg.max_hp, 1, 999, 20),
     zone: cleanZone(msg.zone),
   };
 }
