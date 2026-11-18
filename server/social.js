@@ -23,6 +23,7 @@ const BLOCK_CAP = 100;
 export function createSocialRuntime(world, opts = {}) {
   const now = () => world.now();
   const persist = world.persist;
+  const friendFeatures = !!persist?.adapter && persist.adapter.kind === 'supabase';
   if (!persist?.listFriends || !persist?.requestFriend) {
     throw new Error('World persist must expose listFriends / requestFriend / acceptFriend / declineFriend / removeFriend (merge PR #60 friendships).');
   }
@@ -577,7 +578,7 @@ export function createSocialRuntime(world, opts = {}) {
     ignored,
     names,
     directory,
-    features: WELCOME_FEATURES,
+    features: friendFeatures ? WELCOME_FEATURES : ['party'],
     SOCIAL_TYPES,
     onJoin,
     loadRelations,
