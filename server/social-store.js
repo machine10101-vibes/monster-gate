@@ -17,8 +17,8 @@ export function createSupabaseSocialStore(env = process.env) {
   const url = String(env.SUPABASE_URL || '').replace(/\/$/, '');
   const key = String(env.SUPABASE_SERVICE_ROLE_KEY || '');
   if (!url || !key) return null;
-  const request = async (path, init = {}) => {
-    const res = await fetch(`${url}/rest/v1/${TABLE}${path}`, {
+  const request = async (path, init = {}, table = TABLE) => {
+    const res = await fetch(`${url}/rest/v1/${table}${path}`, {
       ...init,
       headers: {
         apikey: key,
@@ -43,7 +43,7 @@ export function createSupabaseSocialStore(env = process.env) {
     },
     async findByName(name) {
       const q = new URLSearchParams({ select: 'user_id,name', name: `ilike.${name}`, limit: '1' });
-      const rows = await request(`/../characters?${q}`).catch(() => []);
+      const rows = await request(`?${q}`, {}, 'characters').catch(() => []);
       return Array.isArray(rows) ? rows[0] || null : null;
     },
     async put(row) {
