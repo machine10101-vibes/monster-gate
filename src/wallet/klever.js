@@ -9,6 +9,7 @@ export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=fin
 export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-crypto/id1615064243';
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{20,}$/;
+let signingInFlight = false;
 
 export function isMobile() {
   const ua = navigator.userAgent || '';
@@ -150,8 +151,15 @@ function legacySignMessage(message) {
 }
 
 async function requestSignature(kw, message) {
+  // Use the SDK's supported message-signing API whenever it exists. Do not
+  // also dispatch a legacy event after this request: that can open a second
+  // approval sheet while the first one is still active.
+  if (typeof kw?.signMessage === 'function') return kw.signMessage(message);
+
+  // Older in-app browser builds expose only the event interface.
   const legacy = legacySignMessage(message);
   if (legacy) return legacy;
+
   const bridge = window.__kleverBrowser__?.bridge;
   if (typeof bridge === 'function') {
     return bridge({
@@ -162,7 +170,7 @@ async function requestSignature(kw, message) {
       url: location.href,
     });
   }
-  return kw.signMessage(message);
+  throw fail('unsupported', 'This Klever Wallet version does not support message signing. Please update Klever Wallet and try again.');
 }
 
 export function waitForProvider(ms = 2000) {
@@ -222,37 +230,45 @@ export async function connectWallet() {
  * checked against the address before it is sent. This never creates an account.
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
+  if (signingInFlight) {
+    throw fail('busy', 'A Klever signature request is already in progress. Please wait for it to finish.');
+  }
+  signingInFlight = true;
   holdPageStill();
-  const message = signedMessage({
-    purpose,
-    address,
-    nonce,
-    issued: new Date().toISOString(),
-  });
-  let signed;
   try {
-    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-    signed = await requestSignature(kw, message);
-  } catch (err) {
-    if (err?.code === 'rejected') throw err;
-    throw fail('rejected', mobile ? 'The Klever app closed the sign-in request.' : 'The Klever extension closed the sign-in request.');
+    const message = signedMessage({
+      purpose,
+      address,
+      nonce,
+      issued: new Date().toISOString(),
+    });
+    let signed;
+    try {
+      if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+      signed = await requestSignature(kw, message);
+    } catch (err) {
+      if (err?.code === 'rejected') throw err;
+      throw fail('rejected', mobile ? 'The Klever app closed the sign-in request.' : 'The Klever extension closed the sign-in request.');
+    }
+
+    const signature = signatureText(signed);
+    let ok = verifyKleverSignature(message, signature, address);
+    if (!ok && typeof kw.validateSignature === 'function') {
+      try {
+        const res = await kw.validateSignature(message, signature, address);
+        const signer = typeof res === 'object' ? res.signer || res.address : '';
+        ok = res === true || res?.isValid === true;
+        if (ok && signer && signer !== address) ok = false;
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
+    return { address, message, signature, nonce };
   } finally {
     releasePageHold();
+    signingInFlight = false;
   }
-  const signature = signatureText(signed);
-  let ok = verifyKleverSignature(message, signature, address);
-  if (!ok && typeof kw.validateSignature === 'function') {
-    try {
-      const res = await kw.validateSignature(message, signature, address);
-      const signer = typeof res === 'object' ? res.signer || res.address : '';
-      ok = res === true || res?.isValid === true;
-      if (ok && signer && signer !== address) ok = false;
-    } catch {
-      ok = false;
-    }
-  }
-  if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
-  return { address, message, signature, nonce };
 }
 
 /**
