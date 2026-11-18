@@ -8,6 +8,9 @@ import {
   ProtocolError,
 } from './protocol.js';
 import { openPersistence } from './store.js';
+import { createBucket } from './limits.js';
+import { createSupabaseSocialStore } from './social-store.js';
+import { SocialWorld } from './social-world.js';
 
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -29,6 +32,7 @@ function spawnPose(name, extra = {}) {
     armor: extra.armor || {},
     zone: extra.zone || 'Oakhollow',
     hp: extra.hp ?? 20,
+    max_hp: extra.max_hp ?? 20,
     movedAt: 0,
   };
 }
@@ -44,6 +48,7 @@ export class World {
     this.chatSeq = 0;
     this.timer = null;
     this.dirty = new Set();
+    this.social = new SocialWorld(this, opts.socialStore || createSupabaseSocialStore(this.env));
   }
 
   start() {
@@ -68,6 +73,7 @@ export class World {
       helloAt: this.now(),
       last: this.now(),
       limiter: createLimiter(this.now),
+      socialLimiter: createBucket(4, 20, this.now),
       authed: false,
     };
     ws.on('message', (data) => {
@@ -101,9 +107,10 @@ export class World {
         return;
       }
       if (msg.type === TYPES.move) this.move(session, msg);
-      else if (msg.type === TYPES.chat) this.chat(session, msg);
+      else if (msg.type === TYPES.chat) await this.chat(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
+      else if (await this.social.handle(session, msg)) return;
     } catch (err) {
       const code = err instanceof ProtocolError ? err.code : 'protocol';
       send(session.ws, errorFrame(code, err.message));
@@ -144,10 +151,14 @@ export class World {
     send(session.ws, TYPES.welcome, {
       protocol: PROTOCOL,
       tickHz: TICK_HZ,
-      you: { id: session.id, name: session.name, guest: !!ident.guest },
+      you: { id: session.id, name: session.name, guest: !!ident.guest, user_id: ident.guest ? undefined : ident.userId },
+      features: ['party', ...(this.social.store && !ident.guest ? ['friends', 'block'] : []), ...(!ident.guest ? ['whisper'] : [])],
     });
     this.sendSnapshot(session);
     this.dirty.add(session.id);
+    void this.social.onJoin(session);
+    const party = this.social.partyFor(session);
+    if (party) this.social.broadcastParty(party);
   }
 
   move(session, msg) {
@@ -162,13 +173,15 @@ export class World {
       return;
     }
     const zoneChanged = result.pose.zone !== session.zone;
+    const healthChanged = result.pose.hp !== session.hp || result.pose.max_hp !== session.max_hp;
     Object.assign(session, result.pose);
     this.dirty.add(session.id);
     if (zoneChanged) this.sendSnapshot(session);
+    if (zoneChanged || healthChanged) void this.social.onMove(session);
     this.persistPose(session);
   }
 
-  chat(session, msg) {
+  async chat(session, msg) {
     if (!session.limiter.allowChat()) {
       send(session.ws, errorFrame('rate', 'Slow down.'));
       return;
@@ -182,8 +195,15 @@ export class World {
       at: this.now(),
       zone: session.zone,
     };
+    if (channel === 'party' && !this.social.partyFor(session)) { send(session.ws, errorFrame('not_in_party', 'You are not in a party.')); return; }
     for (const other of this.players.values()) {
       if (channel === 'zone' && other.zone !== session.zone) continue;
+      if (channel === 'party' && !this.social.partyFor(session)?.members.includes(other)) continue;
+      if (this.social.store && !session.guest && !other.guest) {
+        const hidden = await this.social.blocked(session.userId, other.userId).catch(() => false)
+          || await this.social.blocked(other.userId, session.userId).catch(() => false);
+        if (hidden) continue;
+      }
       send(other.ws, TYPES.chat, frame);
     }
   }
@@ -211,6 +231,7 @@ export class World {
     if (session.authed && session.id) {
       this.players.delete(session.id);
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
+      void this.social.onDrop(session);
       this.dirty.delete(session.id);
       for (const other of this.players.values()) {
         if (other.zone === session.zone) {
@@ -243,6 +264,7 @@ export class World {
 
   tick() {
     const t = this.now();
+    this.social.tick();
     for (const p of [...this.players.values()]) {
       if (t - p.last > IDLE_MS) {
         this.drop(p, true);
@@ -291,6 +313,7 @@ export async function createWorldServer(options = {}) {
     env: options.env || process.env,
     now: options.now,
     tickMs: options.tickMs,
+    socialStore: options.socialStore,
   });
   const server = http.createServer((req, res) => {
     const path = (req.url || '/').split('?')[0];
