@@ -146,14 +146,16 @@ export function readMove(msg) {
     sheath: typeof msg.sheath === 'string' ? String(msg.sheath).slice(0, 24) : null,
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
+    hp: clampNum(msg.hp, 0, 999, 20),
+    max_hp: clampNum(msg.max_hp, 1, 999, 20),
     zone: cleanZone(msg.zone),
   };
 }
 
 export function readChat(msg) {
   if (msg.type !== TYPES.chat) throw new ProtocolError('protocol', 'Expected chat.');
-  const channel = msg.channel === 'zone' ? 'zone' : msg.channel === 'world' ? 'world' : '';
-  if (!channel) throw new ProtocolError('chat', 'Channel must be world or zone.');
+  const channel = ['world','zone','party'].includes(msg.channel) ? msg.channel : '';
+  if (!channel) throw new ProtocolError('chat', 'Channel must be world, zone, or party.');
   const text = cleanText(msg.text);
   if (!text) throw new ProtocolError('chat', 'Empty chat.');
   return { channel, text };
