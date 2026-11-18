@@ -312,9 +312,9 @@ test('?mockwallet is session-only and never a signup path', () => {
   assert.match(walletFn, /handoffNonce/);
   assert.match(walletFn, /handoffComplete/);
   assert.match(walletFn, /handoffPoll/);
-  assert.match(link, /startKleverHandoff/);
-  assert.match(link, /completeKleverHandoff/);
-  assert.match(link, /pollKleverHandoff/);
+  assert.match(src('../src/wallet/link.js'), /startKleverHandoff/);
+  assert.match(src('../src/wallet/link.js'), /completeKleverHandoff/);
+  assert.match(src('../src/wallet/link.js'), /pollKleverHandoff/);
   assert.match(main, /Sign-in complete — return to your original browser/);
   assert.match(src('../src/wallet/klever.js'), /pageUrl\(handoffId = ''\)/);
   assert.match(src('../supabase/migrations/20261118000000_klever_cross_browser_handoffs.sql'), /klever_handoffs/);
