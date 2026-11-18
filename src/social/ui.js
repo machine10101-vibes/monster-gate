@@ -340,12 +340,12 @@ export function mountSocialHud(game) {
     menu.querySelector('[data-act="friend"]').onclick = async () => {
       hideMenu();
       const res = await report(game, await social.requestFriend(player.name));
-      if (res?.ok) toast(game, `Request sent to ${player.name}`, 1600);
+      if (res?.ok && res.pending) toast(game, `Request sent to ${player.name}`, 1600);
     };
     menu.querySelector('[data-act="party"]').onclick = async () => {
       hideMenu();
       const res = await report(game, await social.inviteToParty(player.id || player.name));
-      if (res?.ok) toast(game, `${player.name} joined the party`, 1600);
+      if (res?.ok && res.pending) toast(game, 'Party invitation sent', 1600);
     };
     const whisperBtn = menu.querySelector('[data-act="whisper"]');
     if (whisperBtn) {
