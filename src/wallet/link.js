@@ -1,5 +1,5 @@
 import { loadCloudConfig } from './cloud.js';
-import { saveAccount } from './account.js';
+import { refreshAccountSession, saveAccount } from './account.js';
 import {
   connectWallet,
   isMobile,
@@ -25,21 +25,48 @@ function authHeaders(cfg, accessToken) {
   return headers;
 }
 
-async function walletPost(body) {
+async function walletPost(body, accountSession = null) {
   const cfg = await loadCloudConfig();
   if (!cfg.url || !cfg.key) return { status: 0, json: { error: 'The account service could not be reached.' } };
-  let res;
-  try {
-    res = await fetch(`${cfg.url}/functions/v1/wallet`, {
-      method: 'POST',
-      headers: authHeaders(cfg, body.accessToken),
-      body: JSON.stringify(body),
-    });
-  } catch {
-    return { status: 0, json: { error: 'The account service could not be reached.' } };
+  const send = async (payload) => {
+    let res;
+    try {
+      res = await fetch(`${cfg.url}/functions/v1/wallet`, {
+        method: 'POST',
+        headers: authHeaders(cfg, payload.accessToken),
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      return { status: 0, json: { error: 'The account service could not be reached.' } };
+    }
+    const json = await res.json().catch(() => ({}));
+    return { status: res.status, json };
+  };
+
+  let current = accountSession;
+  let payload = body;
+  if (current) {
+    current = await refreshAccountSession(current);
+    if (!current?.accessToken) {
+      return {
+        status: 401,
+        json: { code: 'email-session', error: 'This email account has no cloud sign-in session. Create or sign in to a cloud email account before connecting Klever.' },
+      };
+    }
+    payload = { ...body, accessToken: current.accessToken };
   }
-  const json = await res.json().catch(() => ({}));
-  return { status: res.status, json };
+
+  let result = await send(payload);
+  // A token can be revoked before its recorded expiry. Refresh once on auth failure.
+  if (result.status === 401 && current?.refreshToken) {
+    try {
+      current = await refreshAccountSession(current, { force: true });
+      result = await send({ ...body, accessToken: current.accessToken });
+    } catch {
+      /* Keep the original server response if the refresh token is no longer valid. */
+    }
+  }
+  return result;
 }
 
 function snapshotOf(session) {
@@ -76,8 +103,8 @@ function sessionFromWallet(json, fallbackEmail) {
   });
 }
 
-async function remoteNonce(purpose, address, accessToken) {
-  const res = await walletPost({ op: 'nonce', purpose, address, accessToken });
+async function remoteNonce(purpose, address, session) {
+  const res = await walletPost({ op: 'nonce', purpose, address }, session);
   if (!res.json?.nonce) {
     const err = fail(res.json?.code || 'unavailable', res.json?.error || 'The account service could not be reached.');
     throw err;
@@ -96,7 +123,7 @@ async function mockNonce(purpose, address, accessToken, session) {
 
 export async function requestNonce(purpose, address, session) {
   if (isMockWallet()) return mockNonce(purpose, address, session?.accessToken, session);
-  return remoteNonce(purpose, address, session?.accessToken);
+  return remoteNonce(purpose, address, session);
 }
 
 async function signFor(purpose, session) {
@@ -151,50 +178,57 @@ export async function loginWithKlever() {
 
 export async function linkKleverWallet(session) {
   if (!session?.userId) throw fail('rejected', 'Sign in with email first.');
-  const proof = await signFor('link', session);
+  const current = isMockWallet() ? session : await refreshAccountSession(session);
+  if (!isMockWallet() && !current?.accessToken) {
+    throw fail('rejected', 'This email account has no cloud sign-in session. Create or sign in to a cloud email account before connecting Klever.');
+  }
+  const proof = await signFor('link', current);
   if (isMockWallet()) {
     const auth = mockAuth();
     const out = auth.link({
-      userId: session.userId,
-      email: session.email,
+      userId: current.userId,
+      email: current.email,
       address: proof.address,
       message: proof.message,
       signature: proof.signature,
-      session: snapshotOf(session),
+      session: snapshotOf(current),
     });
     if (!out.ok) throw fail(out.code, out.error);
-    session.kleverAddress = proof.address;
-    return saveAccount(session);
+    current.kleverAddress = proof.address;
+    return saveAccount(current);
   }
   const res = await walletPost({
     op: 'link',
-    accessToken: session.accessToken,
     address: proof.address,
     message: proof.message,
     signature: proof.signature,
-  });
+  }, current);
   if (res.status !== 200) {
     throw fail(res.json?.code || 'rejected', res.json?.error || 'The wallet could not be linked.');
   }
-  session.kleverAddress = proof.address;
-  return saveAccount(session);
+  current.kleverAddress = proof.address;
+  return saveAccount(current);
 }
 
 export async function unlinkKleverWallet(session) {
   if (!session?.userId) throw fail('rejected', 'Sign in with email first.');
+  const current = isMockWallet() ? session : await refreshAccountSession(session);
+  if (!isMockWallet() && !current?.accessToken) {
+    throw fail('rejected', 'This email account has no cloud sign-in session. Create or sign in to a cloud email account before connecting Klever.');
+  }
   if (isMockWallet()) {
     const auth = mockAuth();
-    const out = auth.unlink({ userId: session.userId });
+    const out = auth.unlink({ userId: current.userId });
     if (!out.ok) throw fail(out.code, out.error);
-    session.kleverAddress = '';
-    return saveAccount(session);
+    current.kleverAddress = '';
+    return saveAccount(current);
   }
-  const res = await walletPost({ op: 'unlink', accessToken: session.accessToken });
+  const res = await walletPost({ op: 'unlink' }, current);
   if (res.status !== 200) {
     throw fail(res.json?.code || 'rejected', res.json?.error || 'The wallet could not be unlinked.');
   }
-  session.kleverAddress = '';
-  return saveAccount(session);
+  current.kleverAddress = '';
+  return saveAccount(current);
 }
 
 export async function linkedWalletStatus(session) {
@@ -204,7 +238,8 @@ export async function linkedWalletStatus(session) {
     const out = auth.status({ userId: session.userId });
     return { address: out.address || (mockAddress() && out.address), email: session.email };
   }
-  const res = await walletPost({ op: 'status', accessToken: session.accessToken });
+  if (!session.accessToken) return { address: session.kleverAddress || '' };
+  const res = await walletPost({ op: 'status' }, session);
   if (res.status !== 200) return { address: session.kleverAddress || '' };
   return { address: res.json.address || '', email: res.json.email || session.email };
 }

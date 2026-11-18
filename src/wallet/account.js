@@ -391,6 +391,22 @@ async function freshSession(session) {
   return adoptSession(session, await refreshOnce(session, cfg));
 }
 
+/**
+ * Return a current Supabase session for wallet-link requests.
+ * Wallet endpoints validate the access token independently of the local user id,
+ * so a stale or browser-only account must never be mistaken for an authenticated cloud session.
+ */
+export async function refreshAccountSession(session, { force = false } = {}) {
+  if (!session?.accessToken) return null;
+  const cfg = await cloudConfig();
+  if (!cfg.url || !cfg.key) throw fail('unavailable', CLOUD_UNAVAILABLE);
+  if (!force && Date.parse(session.expiresAt) > Date.now() + 60_000) return session;
+  if (!session.refreshToken) {
+    throw fail('rejected', 'Your email session has expired. Sign in with email again.');
+  }
+  return adoptSession(session, await refreshOnce(session, cfg));
+}
+
 function rememberSessionId(session, json) {
   const id = typeof json?.sessionId === 'string' ? json.sessionId.trim() : '';
   if (!UUID_RE.test(id) || !session) return session;
