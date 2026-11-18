@@ -57,6 +57,18 @@ test('Klever Connect Signature objects expose bytes and hex fields', () => {
   assert.equal(signatureText({ hex: expected }), expected);
 });
 
+test('wallet endpoint reports which proof validation stage rejected a request', () => {
+  const walletFn = src('../supabase/functions/wallet/index.ts');
+  assert.match(walletFn, /code: "proof-address"/);
+  assert.match(walletFn, /code: "proof-message"/);
+  assert.match(walletFn, /code: "proof-signature"/);
+  assert.match(walletFn, /stage: "address"/);
+  assert.match(walletFn, /stage: "message"/);
+  assert.match(walletFn, /stage: "signature"/);
+  assert.match(walletFn, /take_klever_nonce/);
+  assert.doesNotMatch(walletFn, /console\\.(?:log|warn)\\([^)]*(?:signature|nonce|address)\\s*[,}]/i);
+});
+
 test('Klever client forwards non-empty proof for authoritative server verification', () => {
   const klever = src('../src/wallet/klever.js');
   const start = klever.indexOf('export async function signProof');

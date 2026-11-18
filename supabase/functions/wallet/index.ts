@@ -3,7 +3,6 @@ import { withSupabase } from "@supabase/server";
 import { verifyKleverSignature } from "../hunter/verify.ts";
 import {
   ADDRESS_RE,
-  BAD_PROOF_MESSAGE,
   EXPIRED_MESSAGE,
   LINKED_ALREADY_MESSAGE,
   NONCE_MS,
@@ -80,8 +79,24 @@ function checkProof(
   message: string,
   signature: string,
 ): { nonce: string } | Response {
-  if (!ADDRESS_RE.test(address) || !proofMessageOk(message, { purpose, address }) || !verifyKleverSignature(message, signature, address)) {
-    return json({ error: BAD_PROOF_MESSAGE, code: "bad-signature" }, 401);
+  // Keep the rejection reason specific enough to diagnose the wallet integration,
+  // without ever logging or returning the signature, nonce, or full address.
+  if (!ADDRESS_RE.test(address)) {
+    console.warn("[wallet] proof rejected", { stage: "address", purpose });
+    return json({ error: "The selected Klever address was not accepted. Reconnect the wallet and try again.", code: "proof-address" }, 401);
+  }
+  if (!proofMessageOk(message, { purpose, address })) {
+    console.warn("[wallet] proof rejected", { stage: "message", purpose });
+    return json({ error: "The sign-in request did not match the selected wallet or has expired. Please try again.", code: "proof-message" }, 401);
+  }
+  if (!verifyKleverSignature(message, signature, address)) {
+    console.warn("[wallet] proof rejected", {
+      stage: "signature",
+      purpose,
+      signatureLength: signature.length,
+      signatureEncoding: /^[0-9a-fA-F]+$/.test(signature.replace(/^0x/i, "")) ? "hex" : "non-hex",
+    });
+    return json({ error: "The signature did not verify for the selected Klever address. Reconnect the intended account and try again.", code: "proof-signature" }, 401);
   }
   const lines = message.split("\n");
   const nonce = lines[3].slice("Nonce: ".length);
