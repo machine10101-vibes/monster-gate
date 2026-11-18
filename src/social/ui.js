@@ -340,8 +340,9 @@ export function mountSocialHud(game) {
     const isFriend = (snap.friends || []).some((f) => matchPerson(f, player));
     const inParty = social?.isPartyMember?.(player.id, player.name);
     const isMuted = game?.worldView?.isPlayerMuted?.(player.id, player.name) || false;
+    const isGuest = String(player.id || '').startsWith('g_');
     menu.hidden = false;
-    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty, isMuted });
+    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty, isMuted, isGuest });
     menu.innerHTML = `
       <b>${escapeHtml(player.name)}</b>
       ${offline ? `<p class="mg-social-note">${escapeHtml(socialOfflinePrompt({
@@ -503,14 +504,14 @@ function observeChat(onChat) {
 }
 
 /** Nameplate actions. Whisper and block appear only when welcome.features lists them. */
-export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false, isMuted = false } = {}) {
+export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false, isMuted = false, isGuest = false } = {}) {
   const items = [
     { act: 'friend', label: isFriend ? 'Friends' : 'Add friend', disabled: !!(offline || isSelf || isFriend) },
     { act: 'party', label: inParty ? 'In party' : 'Invite to party', disabled: !!(offline || isSelf || inParty) },
   ];
   if (!offline) items.push({ act: 'mute', label: isMuted ? 'Unmute chat' : 'Mute chat', disabled: !!isSelf });
   if (!offline && caps.whisper) items.push({ act: 'whisper', label: 'Whisper', disabled: !!isSelf });
-  if (!offline && caps.block) {
+  if (!offline && caps.block && !isGuest) {
     items.push({ act: 'block', label: 'Block', disabled: !!isSelf });
     items.push({ act: 'ignore', label: 'Ignore', disabled: !!isSelf });
   }
