@@ -115,28 +115,49 @@ const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && show
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
 const RESUME_CHARACTER_KEY = 'mg-resume-character';
+const RESUME_CHARACTER_MAX_AGE = 15 * 60 * 1000;
 
-function rememberResumeCharacter(id) {
-  try {
-    sessionStorage.setItem(RESUME_CHARACTER_KEY, String(id));
-  } catch {
-    /* private mode */
+function rememberResumeCharacter(id, address) {
+  const record = JSON.stringify({ id: String(id), address: String(address || ''), at: Date.now() });
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      store.setItem(RESUME_CHARACTER_KEY, record);
+    } catch {
+      /* private mode */
+    }
   }
 }
 
-function readResumeCharacter() {
-  try {
-    return sessionStorage.getItem(RESUME_CHARACTER_KEY) || '';
-  } catch {
-    return '';
+function readResumeCharacter(address) {
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      const raw = store.getItem(RESUME_CHARACTER_KEY);
+      if (!raw) continue;
+      let record;
+      try {
+        record = JSON.parse(raw);
+      } catch {
+        // Accept the short-lived ID format written by the previous release.
+        if (store === sessionStorage) return raw;
+        continue;
+      }
+      const age = Date.now() - Number(record.at);
+      if (record.id && age >= 0 && age <= RESUME_CHARACTER_MAX_AGE
+        && (!record.address || record.address === String(address || ''))) return String(record.id);
+    } catch {
+      /* try the other store */
+    }
   }
+  return '';
 }
 
 function clearResumeCharacter() {
-  try {
-    sessionStorage.removeItem(RESUME_CHARACTER_KEY);
-  } catch {
-    /* private mode */
+  for (const store of [localStorage, sessionStorage]) {
+    try {
+      store.removeItem(RESUME_CHARACTER_KEY);
+    } catch {
+      /* private mode */
+    }
   }
 }
 
@@ -779,7 +800,7 @@ class Game {
     if (this.started) return;
     // Klever's Android WebView can kill and recreate the page during rotation.
     // Restore the character selected immediately before that renderer restart.
-    const resumeId = readResumeCharacter();
+    const resumeId = readResumeCharacter(this.wallet?.address);
     if (resumeId) {
       const resumeChar = this.roster?.get(resumeId);
       if (resumeChar) {
@@ -1004,7 +1025,7 @@ class Game {
     if (this.started || !this.roster?.get(char.id)) return;
     // Keep this for the tab lifetime: if Klever kills the WebView on a later
     // orientation change, account restore can resume directly into this hunt.
-    rememberResumeCharacter(char.id);
+    rememberResumeCharacter(char.id, this.wallet?.address);
     this.character = char;
     this.roster.played(char.id);
     this.progress.useCharacter(this.roster.charKey(char.id));
@@ -1174,6 +1195,7 @@ class Game {
   }
 
   async signOut(repromptKlever) {
+    clearResumeCharacter();
     const leaveWorld = this.started;
     this.captureHunter();
     try {
@@ -1288,6 +1310,7 @@ class Game {
       if (this.wallet?.kind === 'email') return;
       const next = event?.address;
       if (!next || next === this.wallet?.address) return;
+      clearResumeCharacter();
       this.captureHunter();
       clearSession();
       this.wallet = null;
