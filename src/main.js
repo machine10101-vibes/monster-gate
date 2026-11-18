@@ -480,8 +480,7 @@ class Game {
       this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
     }
     this.started = true;
-    // The startup world build is complete; a later in-tab auth return should not replay its splash.
-    loadingScreen?.clearSkip?.();
+    // Keep the one-shot splash marker for this tab so auth/session reloads do not replay it.
     if (this.wakeWorld) {
       this.wakeWorld = false;
       this.ambient = createAmbient(this);
