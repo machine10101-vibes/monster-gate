@@ -150,7 +150,7 @@ export class MmoSocial {
   }
 
   applyFriendList(msg) {
-    this.state.friends = asList(msg.friends);
+    this.state.friends = asList(msg.friends).sort((a,b) => (b.presence === 'online') - (a.presence === 'online') || a.name.localeCompare(b.name));
     this.state.pendingIn = asList(msg.pending_in || msg.pendingIn);
     this.state.pendingOut = asList(msg.pending_out || msg.pendingOut);
     this.state.blocked = asList(msg.blocked);
