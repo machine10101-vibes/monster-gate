@@ -176,8 +176,15 @@ export function enterRift(game, opts = {}) {
   r.group.visible = true;
   r.cool = 1.2;
   game.riftRun = { party, scale, wave: 0, follow, looted: false };
-  const y = r.heightAt(r.spawn.x, r.spawn.z);
-  game.player.pos.set(r.spawn.x, y, r.spawn.z);
+  // Spawn just inside the arena, not on the south-side exit threshold.
+  // Clear momentum from the overworld so it cannot carry the player straight back out.
+  const spawnZ = r.spawn.z - 1.5;
+  const y = r.heightAt(r.spawn.x, spawnZ);
+  game.player.pos.set(r.spawn.x, y, spawnZ);
+  game.player.vel?.set(0, 0, 0);
+  game.player.knock?.set(0, 0, 0);
+  game.player.setState?.('idle');
+  game.player.syncObj?.();
   game.player.yaw = Math.PI;
   game.cam.targetYaw = Math.PI;
   game.zone = 'rift';
