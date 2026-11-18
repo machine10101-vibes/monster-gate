@@ -17,7 +17,7 @@ import {
   remainMinDisplay,
   setLoadProgress,
 } from '../src/ui/boot.js';
-import { consumeRotationRecovery, rememberRotationRecovery, screenOrientation } from '../src/engine/rotationRecovery.js';
+import { consumeRotationRecovery, isRotationRecoveryPending, rememberRotationRecovery, screenOrientation } from '../src/engine/rotationRecovery.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -129,64 +129,43 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.equal(doc.map.loading.classList.contains('hidden'), true);
 });
 
-test('a splash is never replayed after it has appeared in this tab, even after an interrupted reload', async () => {
-  const values = new Map();
+test('every normal launch shows the splash even when stale seen markers exist', async () => {
+  const values = new Map([
+    ['mg-load-seen', '1'],
+    ['mg-load-seen-at', '1000'],
+    ['mg-load-in-progress', '1'],
+  ]);
   const store = {
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); },
   };
-  const noTimers = { setInterval: () => 0, clearInterval: () => {} };
-  const first = fakeDoc();
-  const firstUi = mountLoading(first, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
-  assert.equal(first.map.loading.classList.contains('hidden'), false);
-  assert.equal(values.get('mg-load-seen'), '1');
-  assert.equal(values.get('mg-load-in-progress'), '1', 'splash uses its own in-progress marker');
-  assert.equal(values.has('mg-boot'), false, 'game crash-recovery marker is independent');
-  await firstUi.dismiss({ now: 4000, wait: () => 0 });
-  assert.equal(values.has('mg-load-in-progress'), false, 'successful completion clears only the splash marker');
-  values.set('mg-boot', '1');
-  const gameReload = fakeDoc();
-  mountLoading(gameReload, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
-  assert.equal(gameReload.map.loading.classList.contains('hidden'), true, 'game boot marker must not replay the splash on internal reload');
-  values.delete('mg-boot');
-
-  const repeat = fakeDoc();
-  mountLoading(repeat, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
-  assert.equal(repeat.map.loading.classList.contains('hidden'), true, 'auth/session reload skips the already completed splash');
-
-  values.set('mg-load-in-progress', '1');
-  const interrupted = fakeDoc();
-  mountLoading(interrupted, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
-  assert.equal(interrupted.map.loading.classList.contains('hidden'), true, 'an interrupted world reload must not replay the splash');
+  const doc = fakeDoc();
+  const ui = mountLoading(doc, { sessionStorage: store, reduced: true, fadeMs: 0 });
+  assert.equal(doc.map.loading.classList.contains('hidden'), false, 'old session/local markers cannot suppress a real launch');
+  assert.equal(values.get('mg-load-in-progress'), '1');
+  await ui.dismiss({ wait: () => 0 });
+  assert.equal(values.has('mg-load-in-progress'), false);
 });
 
-test('loading splash suppression survives a fresh WebView session but expires', () => {
-  const makeStore = () => {
-    const values = new Map();
-    return {
-      values,
-      getItem(key) { return values.get(key) ?? null; },
-      setItem(key, value) { values.set(key, String(value)); },
-      removeItem(key) { values.delete(key); },
-    };
+test('only an actual orientation-changing Enter World recovery may skip the splash', () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
   };
-  const persistent = makeStore();
-  const firstSession = makeStore();
-  const first = fakeDoc();
-  mountLoading(first, { sessionStorage: firstSession, localStorage: persistent, reduced: true, now: 1000 });
-  assert.equal(first.map.loading.classList.contains('hidden'), false);
-  assert.equal(persistent.getItem('mg-load-seen-at'), '1000');
-
-  const restartedSession = makeStore();
-  const restarted = fakeDoc();
-  mountLoading(restarted, { sessionStorage: restartedSession, localStorage: persistent, reduced: true, now: 5000 });
-  assert.equal(restarted.map.loading.classList.contains('hidden'), true, 'a new WebView session skips the already-seen splash');
-
-  const expiredSession = makeStore();
-  const expired = fakeDoc();
-  mountLoading(expired, { sessionStorage: expiredSession, localStorage: persistent, reduced: true, now: 1000 + 6 * 60 * 60 * 1000 });
-  assert.equal(expired.map.loading.classList.contains('hidden'), false, 'a genuinely new visit can show the splash after the six-hour window');
+  rememberRotationRecovery(storage, 'hunter-1', 'portrait', 1000);
+  assert.equal(isRotationRecoveryPending(storage, 'portrait', 2000), false, 'same orientation is a normal launch');
+  assert.equal(isRotationRecoveryPending(storage, 'landscape', 2000), true, 'changed orientation is a rotation reload');
+  const normal = fakeDoc();
+  mountLoading(normal, { reduced: true });
+  assert.equal(normal.map.loading.classList.contains('hidden'), false);
+  const rotation = fakeDoc();
+  mountLoading(rotation, { reduced: true, skip: true });
+  assert.equal(rotation.map.loading.classList.contains('hidden'), true, 'rotation-only resume avoids replaying the splash');
+  assert.deepEqual(consumeRotationRecovery(storage, 'landscape', 2000), { characterId: 'hunter-1' });
+  assert.equal(isRotationRecoveryPending(storage, 'landscape', 2001), false, 'the one-shot handoff has been consumed');
 });
 
 test('rotation recovery is one-shot, short-lived, and only follows a real orientation change', () => {
@@ -330,6 +309,8 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /clearSession\(\);/, 'fresh boot returns to the explicit login gate');
   assert.match(main, /if \(signed\) \{\s*this\.openCharacterSelect\(\);/, 'successful email sign-in opens character selection');
   assert.match(main, /mountLoading/);
+  assert.match(main, /isRotationRecoveryPending/);
+  assert.match(main, /mountLoading\(document, \{ skip: rotationReload \}\)/);
   assert.match(main, /await loadingScreen\.waitForVideo\(\)/);
   assert.ok(main.indexOf('await loadingScreen.waitForVideo()') < main.indexOf('game = new Game()'), 'the intro must finish before WebGL is initialized');
   assert.match(main, /loadingScreen\.dismiss/);
