@@ -3743,9 +3743,8 @@ async function startGame() {
     location.replace(adminHref());
     return;
   }
-  // Let the branded intro finish before WebGL and world generation compete
-  // with the mobile WebView video decoder for graphics resources.
-  if (loadingScreen) await loadingScreen.waitForVideo();
+  // Start WebGL and world generation immediately alongside the branded intro.
+  // The intro is only awaited when the game is ready to dismiss the loading UI.
   const bootSearch = typeof location !== 'undefined' ? location.search : '';
   if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
     dropOnlineWithoutSession({ search: bootSearch });
