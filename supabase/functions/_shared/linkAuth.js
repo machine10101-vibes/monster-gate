@@ -42,9 +42,19 @@ export function hexNonce(bytes) {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** The klv1 account only. Spaces, capital letters, and wrapping text are removed. */
+export function cleanKlvAddress(address) {
+  const compact = String(address ?? '')
+    .replace(/[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g, '')
+    .toLowerCase();
+  const match = /klv1[02-9ac-hj-np-z]{58}/.exec(compact);
+  return match ? match[0] : '';
+}
+
 export function signedMessage({ purpose, address, nonce, issued }) {
   const lead = purpose === 'link' ? LINK_LEAD : LOGIN_LEAD;
-  return [lead, SAFE_LINE, `Address: ${address}`, `Nonce: ${nonce}`, `Issued: ${issued}`].join('\n');
+  const clean = cleanKlvAddress(address);
+  return [lead, SAFE_LINE, `Address: ${clean}`, `Nonce: ${nonce}`, `Issued: ${issued}`].join('\n');
 }
 
 export function parseProofMessage(message) {

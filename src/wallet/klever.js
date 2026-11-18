@@ -1,5 +1,5 @@
 import { web } from '@klever/sdk-web';
-import { verifyKleverSignature } from './verify.js';
+import { publicKeyFromAddress, verifyKleverSignature } from './verify.js';
 import { signedMessage } from '../../supabase/functions/_shared/linkAuth.js';
 
 export const SESSION_KEY = 'monster-gate-klever-session';
@@ -11,6 +11,43 @@ export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=fin
 export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-crypto/id1615064243';
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
+
+/**
+ * The account Klever will sign with. The app sometimes wraps it, capitalizes
+ * it, or puts a space in the middle. The proof needs the 62-character klv1
+ * address and nothing else.
+ */
+export function klvAddress(value) {
+  const raw = looseText(value);
+  if (!raw) return '';
+  const compact = raw
+    .replace(/[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g, '')
+    .toLowerCase();
+  const match = /klv1[02-9ac-hj-np-z]{58}/.exec(compact);
+  if (!match || !publicKeyFromAddress(match[0])) return '';
+  return match[0];
+}
+
+function looseText(value) {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = klvAddress(item);
+      if (found) return found;
+    }
+    return '';
+  }
+  if (value && typeof value === 'object') {
+    for (const key of ['address', 'addr', 'walletAddress', 'account']) {
+      if (typeof value[key] === 'string') return value[key];
+      if (value[key] && typeof value[key] === 'object') {
+        const found = klvAddress(value[key]);
+        if (found) return found;
+      }
+    }
+  }
+  return '';
+}
 
 export function isMobile() {
   const ua = navigator.userAgent || '';
@@ -152,10 +189,13 @@ export function addressForSignature(candidates, message, addresses) {
 function addressesIn(value, depth = 0, out = []) {
   if (value == null || depth > 4 || out.length > 8) return out;
   if (typeof value === 'string') {
-    const found = value.match(/klv1[02-9ac-hj-np-z]{58}/g);
+    const compact = value
+      .replace(/[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g, '')
+      .toLowerCase();
+    const found = compact.match(/klv1[02-9ac-hj-np-z]{58}/g);
     if (found) {
       for (const address of found) {
-        if (!out.includes(address)) out.push(address);
+        if (!out.includes(address) && publicKeyFromAddress(address)) out.push(address);
       }
     }
     return out;
@@ -347,7 +387,7 @@ export function waitForProvider(ms = 2000) {
 export function providerAddress(kw) {
   if (!kw) return '';
   const found = kw.selectedAddress || kw.address || kw.accounts?.[0] || null;
-  return typeof found === 'string' && found.length > 10 ? found.trim() : '';
+  return klvAddress(found);
 }
 
 /** The account whose key signed the last attempt. The next proof names that account. */
@@ -374,10 +414,7 @@ export function noteSigner(address) {
  * account. A polled address is only a stand-in when the call returned none.
  */
 export function accountFromPrompt(returned, polled = '') {
-  const picked = addressText(returned);
-  if (ADDRESS_RE.test(picked)) return picked;
-  const fallback = typeof polled === 'string' ? polled.trim() : '';
-  return ADDRESS_RE.test(fallback) ? fallback : '';
+  return klvAddress(returned) || klvAddress(polled);
 }
 
 /**
@@ -387,16 +424,16 @@ export function accountFromPrompt(returned, polled = '') {
  * press is closed by the app.
  */
 export function signingAddress(kw, approved = '', prompted = false) {
-  const picked = typeof approved === 'string' ? approved.trim() : '';
-  if (prompted && ADDRESS_RE.test(picked)) return picked;
+  const picked = klvAddress(approved);
+  // The account the user just approved is the one the signature sheet signs.
+  if (prompted && picked) return picked;
   const noted = notedSigner();
   const accounts = providerAccounts(kw);
   if (ADDRESS_RE.test(noted) && (accounts.length === 0 || accounts.includes(noted))) return noted;
-  const own = typeof kw?.address === 'string' ? kw.address.trim() : '';
-  if (ADDRESS_RE.test(own)) return own;
-  if (ADDRESS_RE.test(picked)) return picked;
-  const provided = providerAddress(kw);
-  return ADDRESS_RE.test(provided) ? provided : '';
+  const own = klvAddress(kw?.address);
+  if (own) return own;
+  if (picked) return picked;
+  return providerAddress(kw);
 }
 
 /** Every klv account on the provider. The signer is first. */
@@ -516,16 +553,7 @@ export function pollProviderAddress(kw, maxPolls = 40, intervalMs = 500) {
 }
 
 function addressText(value) {
-  if (typeof value === 'string') return value.trim();
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const text = addressText(item);
-      if (ADDRESS_RE.test(text)) return text;
-    }
-    return '';
-  }
-  if (value && typeof value === 'object' && typeof value.address === 'string') return value.address.trim();
-  return '';
+  return klvAddress(value);
 }
 
 export function addressFromWallet(kw, returned) {
@@ -585,6 +613,10 @@ export async function connectWallet() {
  * checked against the address before it is sent. This never creates an account.
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
+  const clean = klvAddress(address);
+  if (!clean) {
+    throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
+  }
   const plan = signaturePlan(kw);
   // The in-app sheet closes if the page changes size. Wait until the connect
   // confirm has stopped moving the page, and do not resize under the signature.
@@ -599,16 +631,16 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   // The extension popup signs whichever account is named on the provider.
   // The phone already approved its klv account through requestAccount. A property
   // write there opens a transaction, so the address stays in the message.
-  if (plan === 'extension' && !mobile) pinAccount(kw, address);
+  if (plan === 'extension' && !mobile) pinAccount(kw, clean);
   const message = signedMessage({
     purpose,
-    address,
+    address: clean,
     nonce,
     issued: new Date().toISOString(),
   });
   let signed;
   try {
-    signed = await requestSignature(kw, message, address);
+    signed = await requestSignature(kw, message, clean);
   } catch (err) {
     if (err?.code === 'rejected' || connectionClosed(err)) {
       throw fail('rejected', 'The Klever window closed before it was signed. Press Connect Klever wallet and confirm in the window that stays open.');
@@ -619,13 +651,13 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   }
   const candidates = signatureCandidates(signed);
   const matched = addressForSignature(candidates, message, [
-    address,
+    clean,
     ...providerAccounts(kw),
     ...addressesIn(signed),
   ]);
-  if (matched === address) {
+  if (matched === clean) {
     noteSigner('');
-    return { address, message, signature: matchingSignature(candidates, message, address), nonce };
+    return { address: clean, message, signature: matchingSignature(candidates, message, clean), nonce };
   }
   if (matched) {
     noteSigner(matched);

@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
 import { keccak_256 as keccak } from '@noble/hashes/sha3.js';
-import { accountFromPrompt, addressForSignature, addressFromWallet, connectMethod, pollProviderAddress, providerAccounts, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan, signingAddress } from '../src/wallet/klever.js';
+import { accountFromPrompt, addressForSignature, addressFromWallet, connectMethod, klvAddress, pollProviderAddress, providerAccounts, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan, signingAddress } from '../src/wallet/klever.js';
+import { signedMessage } from '../supabase/functions/_shared/linkAuth.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -41,6 +42,19 @@ test('the connect reads selectedAddress, then address, then the first account', 
   assert.equal(accountFromPrompt(FORUM_ADDRESS, other), FORUM_ADDRESS);
   assert.equal(accountFromPrompt(undefined, other), other);
   assert.equal(accountFromPrompt('not-an-account', ''), '');
+  assert.equal(klvAddress(`  ${FORUM_ADDRESS.toUpperCase()}  `), FORUM_ADDRESS);
+  assert.equal(klvAddress(`${FORUM_ADDRESS.slice(0, 12)} ${FORUM_ADDRESS.slice(12)}`), FORUM_ADDRESS);
+  assert.equal(klvAddress(`Address: ${FORUM_ADDRESS}\n`), FORUM_ADDRESS);
+  assert.equal(accountFromPrompt({ address: ` ${FORUM_ADDRESS} ` }, other), FORUM_ADDRESS);
+  assert.equal(signingAddress({ address: ` ${other} ` }, ` ${FORUM_ADDRESS} `, true), FORUM_ADDRESS);
+  assert.equal(providerAddress({ address: ` ${FORUM_ADDRESS} ` }), FORUM_ADDRESS);
+  const proof = signedMessage({
+    purpose: 'link',
+    address: ` ${FORUM_ADDRESS} `,
+    nonce: 'abababababababababababababababab',
+    issued: '2026-11-18T03:12:00.000Z',
+  });
+  assert.equal(proof.split('\n')[2], `Address: ${FORUM_ADDRESS}`);
   assert.equal(signingAddress({ selectedAddress: FORUM_ADDRESS }), FORUM_ADDRESS);
   assert.deepEqual(providerAccounts({ address: other, selectedAddress: FORUM_ADDRESS, accounts: [FORUM_ADDRESS] }), [other, FORUM_ADDRESS]);
   assert.match(srcText, /providerAccounts\(kw\)/);
@@ -117,7 +131,7 @@ test('one Klever prompt stays open until it is signed', () => {
   assert.equal(srcText.includes('kw.requestAccount()'), true);
   assert.equal(srcText.includes('kw.enable()'), true);
   assert.equal(srcText.includes('setWalletAddress'), false);
-  assert.equal(srcText.includes('if (plan === \'extension\' && !mobile) pinAccount(kw, address)'), true);
+  assert.equal(srcText.includes('if (plan === \'extension\' && !mobile) pinAccount(kw, clean)'), true);
   assert.equal(srcText.includes('if (mobile) await pageSettledAfterSign()'), true);
   assert.equal(srcText.includes("const lockPage = plan === 'sheet';"), true);
   assert.equal(srcText.includes('noteSigner(matched)'), true);
