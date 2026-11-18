@@ -125,9 +125,12 @@ export function createSocialRuntime(world, opts = {}) {
   function isBlocked(a, b) { return !!a && !!b && (setOf(blocked,a).has(b) || setOf(blocked,b).has(a)); }
   function isIgnoredBy(target, actor) { return !!target && !!actor && setOf(ignored,target).has(actor); }
   async function loadRelations(userId) {
-    const rows = await persist.listRelations?.(userId) || [];
-    blocked.set(userId,new Set(rows.filter(r=>r.status==='blocked').map(r=>r.user_id)));
-    ignored.set(userId,new Set(rows.filter(r=>r.status==='ignored').map(r=>r.user_id)));
+    if (!persist.listRelations) return;
+    const rows = await persist.listRelations(userId) || [];
+    const nextBlocked=new Set(rows.filter(r=>r.status==='blocked').map(r=>r.user_id));
+    const nextIgnored=new Set(rows.filter(r=>r.status==='ignored').map(r=>r.user_id));
+    blocked.set(userId,nextBlocked);
+    ignored.set(userId,nextIgnored);
   }
 
   function blockedRows(userId) {
@@ -424,7 +427,8 @@ export function createSocialRuntime(world, opts = {}) {
 
   async function friendCancel(session,msg) {
     const otherId=requireUserId(msg.user_id||msg.id);
-    await persist.cancelFriend?.(session.userId,otherId);
+    if (!persist.cancelFriend) throw new SocialError('protocol','Request cancellation is unavailable.');
+    await persist.cancelFriend(session.userId,otherId);
     await pushFriendList(session);
     await pushFriendListTo(otherId);
   }
@@ -455,6 +459,7 @@ export function createSocialRuntime(world, opts = {}) {
     if (on) {
       if (set.size >= BLOCK_CAP) throw new SocialError('full', 'That list is full.');
       set.add(target.userId);
+      if (!persist.setRelation) throw new SocialError('persist','Block and ignore storage is unavailable.');
       await persist.setRelation(session.userId,target.userId,kind==='block'?'blocked':'ignored');
       map.set(session.userId,set);
       if (kind === 'block') {
