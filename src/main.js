@@ -3723,11 +3723,14 @@ function showBootGlFail() {
   });
 }
 
-function startGame() {
+async function startGame() {
   if (isAdminAccount(readAccount())) {
     location.replace(adminHref());
     return;
   }
+  // Let the branded intro finish before WebGL and world generation compete
+  // with the mobile WebView video decoder for graphics resources.
+  if (loadingScreen) await loadingScreen.waitForVideo();
   const bootSearch = typeof location !== 'undefined' ? location.search : '';
   if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
     dropOnlineWithoutSession({ search: bootSearch });
