@@ -52,6 +52,7 @@ export const TYPES = {
   friend_request: 'friend_request',
   friend_accept: 'friend_accept',
   friend_decline: 'friend_decline',
+  friend_cancel: 'friend_cancel',
   friend_remove: 'friend_remove',
   friend_list: 'friend_list',
   friend_presence: 'friend_presence',
@@ -65,6 +66,7 @@ export const TYPES = {
   party_leave: 'party_leave',
   party_kick: 'party_kick',
   party_promote: 'party_promote',
+  party_loot: 'party_loot',
   party_state: 'party_state',
   whisper: 'whisper',
 };
@@ -214,8 +216,8 @@ export function readMove(msg) {
 
 export function readChat(msg) {
   if (msg.type !== TYPES.chat) throw new ProtocolError('protocol', 'Expected chat.');
-  const channel = msg.channel === 'zone' ? 'zone' : msg.channel === 'world' ? 'world' : '';
-  if (!channel) throw new ProtocolError('chat', 'Channel must be world or zone.');
+  const channel = ['world','zone','party'].includes(msg.channel) ? msg.channel : '';
+  if (!channel) throw new ProtocolError('chat', 'Channel must be world, zone, or party.');
   const text = cleanText(msg.text);
   if (!text) throw new ProtocolError('chat', 'Empty chat.');
   return { channel, text };
