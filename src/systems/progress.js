@@ -823,12 +823,11 @@ export class Progress {
     return this.data.storage.reduce((n, s) => n + storageStackSlots(s), 0);
   }
 
-  canFitStorage(k, id, n = 1, page = 0) {
+  canFitStorage(k, id, n = 1, page = null) {
     n = n | 0;
-    page = Math.max(0, Math.min(STORAGE_TABS - 1, page | 0));
+    const start = page == null ? 0 : Math.max(0, Math.min(STORAGE_TABS - 1, page | 0)) * STORAGE_PAGE_SLOTS;
     if (n < 1) return false;
-    const start = page * STORAGE_PAGE_SLOTS;
-    const slots = this.data.storage.slice(start, start + STORAGE_PAGE_SLOTS);
+    const slots = this.data.storage.slice(start, start + (page == null ? STORAGE_SLOTS : STORAGE_PAGE_SLOTS));
     if (k === 'gear') {
       if (this.storedGear(id)) return false;
       return slots.some((s) => !s);
@@ -844,12 +843,11 @@ export class Progress {
   }
 
   /** Merge within the selected page, or take its first empty slot. Gear always uses its own slot. */
-  putStorage(k, id, n, page = 0) {
+  putStorage(k, id, n, page = null) {
     n = n | 0;
-    page = Math.max(0, Math.min(STORAGE_TABS - 1, page | 0));
+    const start = page == null ? 0 : Math.max(0, Math.min(STORAGE_TABS - 1, page | 0)) * STORAGE_PAGE_SLOTS;
     if (n < 1 || !this.canFitStorage(k, id, n, page)) return false;
-    const start = page * STORAGE_PAGE_SLOTS;
-    const slots = this.data.storage.slice(start, start + STORAGE_PAGE_SLOTS);
+    const slots = this.data.storage.slice(start, start + (page == null ? STORAGE_SLOTS : STORAGE_PAGE_SLOTS));
     if (k === 'gear') {
       const at = slots.findIndex((s) => !s);
       this.data.storage[start + at] = { k, id, n: 1 };
