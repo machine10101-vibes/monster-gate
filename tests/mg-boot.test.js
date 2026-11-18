@@ -293,13 +293,9 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.ok(manifest.icons.some((i) => i.src.includes('icon-192.png')));
   assert.ok(manifest.icons.some((i) => i.src.includes('icon-512.png')));
 
-  assert.match(main, /const RESUME_CHARACTER_KEY = 'mg-resume-character'/);
-  assert.match(main, /const RESUME_CHARACTER_MAX_AGE = 15 \* 60 \* 1000/);
-  assert.match(main, /rememberResumeCharacter\(char\.id, this\.wallet\?\.address\)/);
-  assert.match(main, /readResumeCharacter\(this\.wallet\?\.address\)/);
-  assert.match(main, /function resumeCharacterStores\(\)/);
-  assert.match(main, /const resumeId = readResumeCharacter\(this\.wallet\?\.address\)/);
-  assert.match(main, /this\.enterWorld\(resumeChar\)/, 'a WebView restart resumes the selected hunter without another Enter World tap');
+  assert.doesNotMatch(main, /readResumeCharacter|rememberResumeCharacter|mg-resume-character/, 'a page restart must never auto-enter a saved hunter');
+  assert.match(main, /clearSession\(\);/, 'fresh boot returns to the explicit login gate');
+  assert.match(main, /if \(signed\) \{\s*this\.openCharacterSelect\(\);/, 'successful email sign-in opens character selection');
   assert.match(main, /mountLoading/);
   assert.match(main, /loadingScreen\.dismiss/);
   assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
