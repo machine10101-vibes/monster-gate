@@ -365,7 +365,7 @@ export function createSocialRuntime(world, opts = {}) {
       const code=err?.code||'protocol',message=err?.message||'Social action failed.';
       if(!requestId) sender(session,'error',{code,message});
       sendResult(session,msg,false,{code,message});
-      if(requestId) throw Object.assign(new Error(message),{code});
+      if(requestId) return true;
       throw err;
     }
   }
