@@ -9,7 +9,7 @@ permissions:
 
 concurrency:
   group: monster-gate-pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-publish:
