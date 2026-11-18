@@ -286,11 +286,14 @@ async function handoffPoll(admin: Admin, body: Record<string, unknown>): Promise
   if (error) return json({ error: "The account service could not be reached." }, 503);
   if (complete?.session) return json({ complete: true, session: complete.session });
   const { data: row, error: pollError } = await admin.from("klever_handoffs")
-    .select("status, expires_at").eq("id", id).eq("poll_token_hash", hash).maybeSingle();
+    .select("status, expires_at, session").eq("id", id).eq("poll_token_hash", hash).maybeSingle();
   if (pollError) return json({ error: "The account service could not be reached." }, 503);
-  if (!row || row.status === "consumed" || new Date(row.expires_at).getTime() <= Date.now()) {
+  if (!row || new Date(row.expires_at).getTime() <= Date.now()) {
     return json({ error: "This sign-in request expired. Return to the game and try again.", code: "handoff-expired" }, 410);
   }
+  // The poll secret is private to the original browser. Retain the completed
+  // result until expiry so a lost HTTP response can be retried safely.
+  if (row.status === "consumed" && row.session) return json({ complete: true, session: row.session });
   return json({ complete: false });
 }
 
