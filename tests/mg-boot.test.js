@@ -32,6 +32,8 @@ function fakeNode(id) {
     children: [],
     className: '',
     currentTime: 0,
+    videoWidth: 672,
+    videoHeight: 448,
     ended: false,
     loop: true,
     muted: false,
@@ -100,7 +102,7 @@ test('boot helpers let the logo clip finish naturally and honor the min display'
 
 test('loading screen mounts, tracks progress, and dismisses', async () => {
   const doc = fakeDoc();
-  const ui = mountLoading(doc, { reduced: false, mobile: true, fadeMs: 0, now: 1000 });
+  const ui = mountLoading(doc, { reduced: false, mobile: true, fadeMs: 0, now: 1000, setInterval: () => 0, clearInterval: () => {} });
   assert.ok(ui);
   assert.equal(doc.map['load-video'].loop, false);
   assert.equal(doc.map['load-video'].muted, true);
@@ -328,9 +330,9 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /mountLoading/);
   assert.match(main, /isRotationRecoveryPending/);
   assert.match(main, /mountLoading\(document, \{ skip: rotationReload \}\)/);
-  assert.match(main, /await loadingScreen\.waitForVideo\(\)/);
-  assert.ok(main.indexOf('await loadingScreen.waitForVideo()') < main.indexOf('game = new Game()'), 'the intro must finish before WebGL is initialized');
-  assert.match(main, /loadingScreen\.dismiss/);
+  assert.doesNotMatch(main, /await loadingScreen\.waitForVideo\(\)/, 'WebGL and world generation must start while the intro is playing');
+  assert.match(main, /progress\(1, 'Ready'\);[\s\S]*if \(loadingScreen\) await loadingScreen\.dismiss\(\)/, 'the intro is awaited only after the world reports ready');
+  assert.match(src('src/ui/boot.js'), /await this\.waitForVideo\(\)/, 'dismiss keeps the final intro frame visible until the world is ready');
   assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
   assert.match(main, /if \(this\.started && this\.bootFrames >= 0\)/);
   assert.match(main, /this\.bootFrames === 600/);
