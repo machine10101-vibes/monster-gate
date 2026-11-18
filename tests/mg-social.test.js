@@ -107,10 +107,15 @@ test('mock party invite, leave, kick, promote', async () => {
   const s = mock();
   const inv = await s.act('party_invite', 'Bram');
   assert.equal(inv.ok, true);
+  assert.equal(inv.pending, true);
+  assert.equal(s.party.members.length, 1, 'invited hunter must accept before joining');
+  assert.equal(s.resolveOutgoingInvite(inv.invite_id).ok, true);
   assert.equal(s.party.members.length, 2);
   assert.equal(s.party.leader, 'u_you');
   const second = await s.act('party_invite', 'wv:lira');
   assert.equal(second.ok, true);
+  assert.equal(s.party.members.length, 2);
+  assert.equal(s.resolveOutgoingInvite(second.invite_id).ok, true);
   assert.equal(s.party.members.length, 3);
   const promo = await s.act('party_promote', 'Bram');
   assert.equal(promo.ok, true);
