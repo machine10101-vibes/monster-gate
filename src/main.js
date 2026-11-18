@@ -771,7 +771,7 @@ class Game {
       return;
     }
     if (signed) {
-      this.showWorldPicker();
+      this.openCharacterSelect();
       return;
     }
     if (this.wallet) this.openCharacterSelect();
