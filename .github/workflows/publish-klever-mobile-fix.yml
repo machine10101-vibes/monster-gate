@@ -1,0 +1,65 @@
+name: Publish Monster Gate Klever mobile fix
+
+on:
+  push:
+    branches:
+      - fix/klever-mobile-signature-flow
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monster-gate-pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out current game source
+        uses: actions/checkout@v4
+        with:
+          ref: fix/klever-mobile-signature-flow
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run wallet authentication tests
+        run: node --test tests/wallet-link.test.js tests/klever-signature-result.test.js
+
+      - name: Build production site
+        env:
+          MG_WORLD_URL: wss://monster-gate-world-1.onrender.com
+          VITE_BUILD_ID: ${{ github.sha }}
+        run: npm run build
+
+      - name: Check out Pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages
+          fetch-depth: 0
+
+      - name: Publish built files
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          test -s dist/index.html
+          test -n "$SOURCE_SHA"
+          find pages -mindepth 1 -maxdepth 1 ! -name .git ! -name CNAME ! -name .nojekyll -exec rm -rf {} +
+          cp -a dist/. pages/
+          test "$(cat pages/CNAME)" = "monstergate.online"
+          test -f pages/.nojekyll
+          git -C pages config user.name "github-actions[bot]"
+          git -C pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C pages add -A
+          git -C pages commit -m "Publish Klever mobile signature fix ($SOURCE_SHA)"
+          git -C pages push origin HEAD:gh-pages
