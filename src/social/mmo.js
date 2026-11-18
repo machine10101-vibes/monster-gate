@@ -5,6 +5,7 @@ const METHOD = {
   friend_request: 'friendRequest',
   friend_accept: 'friendAccept',
   friend_decline: 'friendDecline',
+  friend_cancel: 'friendCancel',
   friend_remove: 'friendRemove',
   friend_list: 'friendList',
   block: 'blockPlayer',
@@ -17,6 +18,7 @@ const METHOD = {
   party_leave: 'partyLeave',
   party_kick: 'partyKick',
   party_promote: 'partyPromote',
+  party_loot: 'partyLoot',
   whisper: 'sendWhisper',
 };
 
@@ -324,6 +326,7 @@ function payloadOf(type, a, b) {
   if (type === 'whisper') return { to: a, text: b };
   if (type === 'party_invite') return typeof a === 'string' && a.length <= 16 && !a.includes('_') ? { name: a } : { id: a };
   if (type === 'party_accept' || type === 'party_decline') return { invite_id: a };
+  if (type === 'party_loot') return { loot: a };
   if (type === 'party_leave' || type === 'friend_list') return {};
   return { id: a, user_id: a };
 }
