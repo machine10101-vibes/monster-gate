@@ -251,13 +251,41 @@ export class MmoClient {
     return true;
   }
 
+  send(type, extra = {}) {
+    if (!this.ws || this.ws.readyState !== 1) return { ok: false, code: 'offline', message: 'World connection is not ready.' };
+    this.ws.send(encode(type, extra));
+    return { ok: true, pending: true };
+  }
+
+  friendRequest(name) { return this.send('friend_request', { name }); }
+  friendAccept(user_id) { return this.send('friend_accept', { user_id }); }
+  friendDecline(user_id) { return this.send('friend_decline', { user_id }); }
+  friendCancel(user_id) { return this.send('friend_cancel', { user_id }); }
+  friendRemove(user_id) { return this.send('friend_remove', { user_id }); }
+  friendList() { return this.send('friend_list'); }
+  blockPlayer(user_id) { return this.send('block', { user_id }); }
+  unblockPlayer(user_id) { return this.send('unblock', { user_id }); }
+  ignorePlayer(user_id) { return this.send('ignore', { user_id }); }
+  unignorePlayer(user_id) { return this.send('unignore', { user_id }); }
+  partyInvite(ref) {
+    const value = String(ref || '');
+    return this.send('party_invite', value.startsWith('u_') || value.startsWith('g_') ? { id: value } : { name: value });
+  }
+  partyAccept(invite_id) { return this.send('party_accept', { invite_id }); }
+  partyDecline(invite_id) { return this.send('party_decline', { invite_id }); }
+  partyLeave() { return this.send('party_leave'); }
+  partyKick(id) { return this.send('party_kick', { id }); }
+  partyPromote(id) { return this.send('party_promote', { id }); }
+  partyLoot(loot) { return this.send('party_loot', { loot }); }
+  sendWhisper(to, text) { return this.send('whisper', { to, text }); }
+
   sendMove(pose) {
     if (!this.ws || this.ws.readyState !== 1 || !pose) return;
     this.ws.send(encode('move', {
       x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw,
       anim: pose.anim, move: pose.move,
       held: pose.held, sheath: pose.sheath,
-      look: pose.look, armor: pose.armor, zone: pose.zone,
+      look: pose.look, armor: pose.armor, hp: pose.hp, max_hp: pose.max_hp, zone: pose.zone,
     }));
   }
 
@@ -265,7 +293,8 @@ export class MmoClient {
     if (!this.ws || this.ws.readyState !== 1 || !msg) return;
     const text = String(msg.text || '').trim();
     if (!text) return;
-    this.ws.send(encode('chat', { channel: msg.channel === 'zone' ? 'zone' : 'world', text }));
+    const channel = ['zone','party'].includes(msg.channel) ? msg.channel : 'world';
+    this.ws.send(encode('chat', { channel, text }));
   }
 
   fail() {
