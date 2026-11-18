@@ -257,4 +257,9 @@ test('?mockwallet is session-only and never a signup path', () => {
   assert.match(src('../src/wallet/settings.js'), /Connect Klever wallet/);
   assert.match(src('../src/wallet/mock.js'), /MOCK WALLET/);
   assert.match(src('../src/wallet/mock.js'), /sessionStorage/);
+  const account = src('../src/wallet/account.js');
+  const link = src('../src/wallet/link.js');
+  assert.match(account, /export async function refreshAccountSession/);
+  assert.match(link, /refreshAccountSession\(current, \{ force: true \}\)/);
+  assert.match(link, /no cloud sign-in session/);
 });
