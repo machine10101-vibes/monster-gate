@@ -148,7 +148,6 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   }
   const skipRepeat = loadWasAlreadyShown(session);
   const video = doc.getElementById('load-video');
-  const poster = el.querySelector?.('.load-poster') || doc.querySelector?.('.load-poster');
   const tipEl = doc.getElementById('load-tip');
   const embers = doc.getElementById('load-embers');
   const reduced = opts.reduced ?? prefersReducedMotion(opts.win || globalThis);
