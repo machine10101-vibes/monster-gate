@@ -1,4 +1,5 @@
 name: Publish Monster Gate to GitHub Pages
+# Rebuild after the Klever provider-instance race fix.
 
 on:
   push:
