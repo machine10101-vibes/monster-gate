@@ -197,7 +197,8 @@ export class MmoClient {
     if (!this.ws || this.ws.readyState !== 1 || !msg) return;
     const text = String(msg.text || '').trim();
     if (!text) return;
-    this.ws.send(encode('chat', { channel: msg.channel === 'zone' ? 'zone' : 'world', text }));
+    const channel = ['zone','party'].includes(msg.channel) ? msg.channel : 'world';
+    this.ws.send(encode('chat', { channel, text }));
   }
 
   fail() {
