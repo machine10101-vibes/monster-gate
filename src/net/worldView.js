@@ -1369,8 +1369,24 @@ export class WorldView {
   }
 
   paintHud() {
-    if (!this.ui) return;
     const st = this.status;
+    const modePill = typeof document !== 'undefined'
+      ? document.getElementById('world-mode-pill')
+      : null;
+    if (modePill) {
+      const connected = st === STATUS.online;
+      modePill.hidden = false;
+      modePill.dataset.mode = connected ? 'online' : 'offline';
+      modePill.dataset.connectionState = st;
+      modePill.textContent = connected ? 'Online' : 'Offline';
+      modePill.setAttribute('aria-label', connected ? 'Connected to online play' : 'Not connected to online play');
+      modePill.title = connected
+        ? 'Connected to World 1 online play'
+        : (st === STATUS.connecting || st === STATUS.waking || st === STATUS.reconnecting)
+          ? 'Connecting to World 1 online play'
+          : 'Not connected to World 1 online play';
+    }
+    if (!this.ui) return;
     const count = Math.max(this.online, this.actors.size + (this.live ? 1 : 0));
     const label = st === STATUS.online
       ? `Online · ${count}`
