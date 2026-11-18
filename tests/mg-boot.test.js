@@ -63,6 +63,7 @@ function fakeDoc() {
   const map = {
     loading: fakeNode('loading'),
     'load-video': fakeNode('load-video'),
+    'load-freeze': Object.assign(fakeNode('load-freeze'), { getContext() { return { drawImage() { this.drawn = true; } }; } }),
     'load-tip': fakeNode('load-tip'),
     'load-embers': fakeNode('load-embers'),
     'load-fill': fakeNode('load-fill'),
@@ -103,7 +104,8 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.ok(ui);
   assert.equal(doc.map['load-video'].loop, false);
   assert.equal(doc.map['load-video'].muted, true);
-  assert.equal(doc.map.loading.classList.contains('video-playing'), true, 'native video playback is used without per-frame canvas work');
+  assert.equal(doc.map.loading.classList.contains('video-playing'), true, 'native video playback starts immediately');
+  assert.equal(doc.map['load-fill'].style.width, '2%', 'progress is visible from the moment the screen mounts');
   assert.ok(doc.map['load-embers'].children.length > 0);
   assert.match(doc.map['load-tip'].textContent, /Monster Gate/);
 
@@ -122,6 +124,7 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.equal(doc.map.loading.classList.contains('held'), true);
   assert.equal(doc.map['load-video'].paused, true);
   assert.equal(doc.map['load-video'].currentTime, 6.2);
+  assert.equal(doc.map.loading.classList.contains('frame-frozen'), true, 'the final decoded frame is captured to prevent the WebView poster appearing');
   await introDone;
 
   await ui.dismiss({ now: 4000, wait: () => 0 });
@@ -211,6 +214,12 @@ test('setLoadProgress clamps and writes the fill', () => {
   assert.equal(setLoadProgress(fill, text, 1.4, 'Ready'), 1);
   assert.equal(fill.style.width, '100%');
   assert.equal(setLoadProgress(fill, text, -2, 'x'), 0);
+});
+
+test('world loading begins without waiting for the intro clip to end', () => {
+  const main = src('src/main.js');
+  const boot = main.slice(main.indexOf('  // Start WebGL and world generation immediately alongside the branded intro.'), main.indexOf('  const bootSearch', main.indexOf('  // Start WebGL and world generation immediately alongside the branded intro.')));
+  assert.doesNotMatch(boot, /await loadingScreen\\.waitForVideo/);
 });
 
 test('world loading paints visible progress before expensive world setup', () => {
