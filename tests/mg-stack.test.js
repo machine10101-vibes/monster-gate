@@ -134,3 +134,29 @@ test('storage has three 40-slot pages and 99-item stacks, separate from the 20-i
   assert.equal(full.canFitStorage('good', 'copper_ore', 1), false);
   assert.equal(full.canFitStorage('good', 'tin_ore', 1), false);
 });
+
+
+test('storing places items only on the selected storage page', () => {
+  const p = hunt();
+  assert.equal(p.putStorage('good', 'copper_ore', 40, 1), true);
+  assert.equal(p.data.storage[0], null);
+  assert.equal(p.data.storage[40].n, 40);
+  assert.equal(p.storageUsed(), 1);
+
+  assert.equal(p.putStorage('good', 'copper_ore', 70, 1), true);
+  assert.equal(p.data.storage[40].n, 99);
+  assert.equal(p.data.storage[41].n, 11);
+  assert.equal(p.data.storage[0], null);
+
+  assert.equal(p.putStorage('good', 'tin_ore', 1, 0), true);
+  assert.equal(p.data.storage[1], null);
+  assert.equal(p.data.storage[0].id, 'tin_ore');
+
+  const fullPage = hunt();
+  for (let i = 0; i < 40; i++) {
+    assert.equal(fullPage.putStorage('good', 'copper_ore', 99, 1), true);
+  }
+  assert.equal(fullPage.canFitStorage('good', 'copper_ore', 1, 1), false);
+  assert.equal(fullPage.canFitStorage('good', 'tin_ore', 1, 1), false);
+  assert.equal(fullPage.canFitStorage('good', 'tin_ore', 1, 2), true);
+});
