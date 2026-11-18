@@ -121,6 +121,7 @@ export class SocialWorld {
       const rawId = String(m.user_id || m.id || '');
       const id = rawId.startsWith('u_') ? rawId.slice(2) : rawId;
       if (!id || id === s.userId) return fail('not_found', 'Hunter not found.');
+      if (id.startsWith('g_') && ['block','unblock','ignore','unignore'].includes(m.type)) return fail('guest', 'Guests cannot be blocked or ignored. Use Mute chat instead.');
       const find = (a,b,status) => rows.find(r => r.requester_id===a && r.target_id===b && (!status || r.status===status));
       if (m.type === 'friend_accept') {
         const req = find(id,s.userId,'pending'); if (!req) return fail('not_found','Request not found.');
