@@ -1401,7 +1401,13 @@ export class Monster {
           thigh = front ? -1.15 : -0.35;
           knee = front ? -0.1 : -0.5;
         }
-        thigh += Math.sin(t * 2 + i * 1.3) * 0.08 + (front ? -1 : 1) * moving * 0.12 * (flying ? 0 : 1);
+        // A grounded four-beat gait: diagonal pairs counter-swing and the
+        // knee flexes on the recovery half of each step instead of moving rigidly.
+        const gaitPhase = (i === 0 || i === 3) ? 0 : Math.PI;
+        const stride = Math.sin(t * (5.2 + moving * 2.2) + gaitPhase) * moving * (flying ? 0.08 : 0.34);
+        const flex = Math.max(0, Math.cos(t * (5.2 + moving * 2.2) + gaitPhase)) * moving;
+        thigh += stride + Math.sin(t * 2 + i * 1.3) * 0.055;
+        knee += flying ? 0 : flex * (front ? 0.48 : 0.58);
         l.rotation.x += (thigh - l.rotation.x) * lk;
         p.knees[i].rotation.x += (knee - p.knees[i].rotation.x) * lk;
       });
@@ -1443,6 +1449,7 @@ export class Monster {
       });
       let headX = 0.08 + Math.sin(t * 1.6) * 0.04;
       let jawX = 0.05;
+      let neckX = Math.sin(t * 0.72) * 0.035;
       let lean = 0.06 * moving + Math.sin(t * flapRate) * 0.025 + clamp(spd * 0.01, 0, 0.06);
       if (ascending) {
         const k = clamp(this.t / DRAGON_ASCEND, 0, 1);
@@ -1489,8 +1496,20 @@ export class Monster {
       if (inAir && Math.random() < dt * 16) g.fx.emit(this.x + (Math.random() - 0.5) * 2.2, this.y + this.hover + 0.8, this.z + (Math.random() - 0.5) * 2.2, 0, -1.2, 0, [0x4c97e8, 0x9258e4][Math.random() < 0.5 ? 0 : 1], 0.08, 0.5, 0);
       headX += this.kick * 0.3;
       lean += this.kick * 0.2;
+      if (ascending) neckX = -0.16;
+      else if (diving) neckX = 0.22 + dive * 0.12;
+      else if (this.state === 'breath') neckX = 0.12 + Math.sin(t * 16) * 0.025;
+      else if (winding) neckX = this.atk === 'breath' ? -0.08 : -0.18;
+      // Neck follows the target more slowly; the head adds its own counter-look
+      // and small exploratory motion, producing two visible independent joints.
+      if (p.neck) {
+        p.neck.rotation.x += (neckX - p.neck.rotation.x) * Math.min(1, dt * 7);
+        p.neck.rotation.y += (this.lookSm * 0.62 - p.neck.rotation.y) * Math.min(1, dt * 4.5);
+      }
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);
-      p.head.rotation.y += (this.lookSm * 0.9 - p.head.rotation.y) * Math.min(1, dt * 6);
+      const headLook = this.lookSm * 0.38 + Math.sin(t * 0.9) * (moving < 0.1 ? 0.045 : 0.012);
+      p.head.rotation.y += (headLook - p.head.rotation.y) * Math.min(1, dt * 8);
+      p.head.rotation.z += ((-this.yawRate * 0.012) - p.head.rotation.z) * Math.min(1, dt * 5);
       p.jaw.rotation.x += (jawX - p.jaw.rotation.x) * Math.min(1, dt * 18);
       p.bodyG.rotation.x += (lean - p.bodyG.rotation.x) * Math.min(1, dt * (diving ? 14 : 8));
       p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04;
