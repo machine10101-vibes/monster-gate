@@ -688,6 +688,20 @@ test('a rejected hello rejoins when the hunter signs in with a new token', () =>
   client.dispose();
 });
 
+test('social client actions wait for server confirmation', async () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  const client = new MmoClient(game, view, { url: 'ws://127.0.0.1:9' });
+  let frame = null;
+  client.ws = { readyState: 1, send(raw) { frame = JSON.parse(raw); } };
+  const pending = client.friendRequest('Bea');
+  assert.equal(frame.type, 'friend_request');
+  assert.ok(frame.request_id);
+  client.onFrame(JSON.stringify({ v: 1, type: 'social_result', request_id: frame.request_id, ok: true, pending: true }));
+  assert.deepEqual(await pending, { ok: true, pending: true, code: '', message: '' });
+  client.dispose();
+});
+
 test('welcome starts a keepalive ping so an idle signed-in hunter stays online', () => {
   const game = stubGame();
   const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
