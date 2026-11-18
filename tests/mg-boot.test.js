@@ -298,7 +298,7 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /rememberResumeCharacter\(char\.id, this\.wallet\?\.address\)/);
   assert.match(main, /readResumeCharacter\(this\.wallet\?\.address\)/);
   assert.match(main, /function resumeCharacterStores\(\)/);
-  assert.match(main, /const resumeId = readResumeCharacter\(\)/);
+  assert.match(main, /const resumeId = readResumeCharacter\(this\.wallet\?\.address\)/);
   assert.match(main, /this\.enterWorld\(resumeChar\)/, 'a WebView restart resumes the selected hunter without another Enter World tap');
   assert.match(main, /mountLoading/);
   assert.match(main, /loadingScreen\.dismiss/);
