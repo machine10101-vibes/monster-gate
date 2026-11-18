@@ -1258,9 +1258,9 @@ export class WorldView {
     const msg = cleanText(text);
     if (!msg) return false;
     const whisper = msg.match(/^\/w(?:hisper)?\s+(\S+)\s+(.+)$/i);
-    if (whisper) {
-      if (this.game?.social?.caps?.whisper) this.game.social.whisper(whisper[1], whisper[2]);
-      else this.game?.hud?.toast?.('Private whispers are unavailable on this connection.', 2200);
+    if (whisper || channel === 'whisper') {
+      if (whisper && this.game?.social?.caps?.whisper) this.game.social.whisper(whisper[1], whisper[2]);
+      else this.game?.hud?.toast?.(this.game?.social?.caps?.whisper ? 'Use /w Hunter message to send a private message.' : 'Private whispers are unavailable on this connection.', 2200);
       return true;
     }
     const allowed = ['world','zone','party'];
@@ -1299,6 +1299,7 @@ export class WorldView {
           <button type="button" data-ch="world">World</button>
           <button type="button" data-ch="zone">Zone</button>
           <button type="button" data-ch="party">Party</button>
+          <button type="button" data-ch="whisper">Whisper</button>
         </div>
         <div class="wc-stack">
           <div class="wc-log" role="log" aria-live="polite"></div>
@@ -1331,7 +1332,7 @@ export class WorldView {
     });
     chat.querySelectorAll('.wc-tabs button').forEach((b) => {
       b.addEventListener('click', () => {
-        this.channel = ['world','zone','party'].includes(b.dataset.ch) ? b.dataset.ch : 'world';
+        this.channel = ['world','zone','party','whisper'].includes(b.dataset.ch) ? b.dataset.ch : 'world';
         this.paintChat();
         this.ui.input?.focus();
       });
@@ -1435,6 +1436,7 @@ export class WorldView {
       if (m.channel === 'whisper') return true;
       if (this.channel === 'world') return m.channel === 'world';
       if (this.channel === 'party') return m.channel === 'party';
+      if (this.channel === 'whisper') return m.channel === 'whisper';
       return m.channel === 'zone' && (!m.zone || !zone || m.zone === zone);
     });
     this.ui.log.innerHTML = rows.slice(-40).map((m) => {
