@@ -778,12 +778,11 @@ class Game {
   }
 
   continueSignedInHunt() {
+    // Signing in restores the account, not the previous character selection.
+    // Always let the hunter choose a character before entering the world.
     this.hideWorldPicker();
     this.hideWorldAuth();
-    document.getElementById('title')?.classList.add('hidden');
-    const char = this.roster?.get(this.roster.last) || this.roster?.chars?.[0];
-    if (char) this.enterWorld(char);
-    else this.openCharacterSelect();
+    this.openCharacterSelect();
   }
 
   showWorldPicker({ force = false } = {}) {
