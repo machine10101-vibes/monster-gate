@@ -339,8 +339,9 @@ export function mountSocialHud(game) {
     const isSelf = player.id && snap.self?.id && player.id === snap.self.id;
     const isFriend = (snap.friends || []).some((f) => matchPerson(f, player));
     const inParty = social?.isPartyMember?.(player.id, player.name);
+    const isMuted = game?.worldView?.isPlayerMuted?.(player.id, player.name) || false;
     menu.hidden = false;
-    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty });
+    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty, isMuted });
     menu.innerHTML = `
       <b>${escapeHtml(player.name)}</b>
       ${offline ? `<p class="mg-social-note">${escapeHtml(socialOfflinePrompt({
@@ -378,6 +379,14 @@ export function mountSocialHud(game) {
       blockBtn.onclick = async () => {
         hideMenu();
         await report(game, await social.blockPlayer(player.id || player.name));
+      };
+    }
+    const muteBtn = menu.querySelector('[data-act="mute"]');
+    if (muteBtn) {
+      muteBtn.onclick = () => {
+        hideMenu();
+        const muted = game?.worldView?.toggleMutePlayer?.(player.id, player.name);
+        toast(game, muted ? `Muted ${player.name}` : `Unmuted ${player.name}`, 1400);
       };
     }
     const ignoreBtn = menu.querySelector('[data-act="ignore"]');
@@ -494,11 +503,12 @@ function observeChat(onChat) {
 }
 
 /** Nameplate actions. Whisper and block appear only when welcome.features lists them. */
-export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false } = {}) {
+export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false, isMuted = false } = {}) {
   const items = [
     { act: 'friend', label: isFriend ? 'Friends' : 'Add friend', disabled: !!(offline || isSelf || isFriend) },
     { act: 'party', label: inParty ? 'In party' : 'Invite to party', disabled: !!(offline || isSelf || inParty) },
   ];
+  if (!offline) items.push({ act: 'mute', label: isMuted ? 'Unmute chat' : 'Mute chat', disabled: !!isSelf });
   if (!offline && caps.whisper) items.push({ act: 'whisper', label: 'Whisper', disabled: !!isSelf });
   if (!offline && caps.block) {
     items.push({ act: 'block', label: 'Block', disabled: !!isSelf });
