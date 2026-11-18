@@ -5,7 +5,7 @@
 
 export const LOAD_MIN_MS = 1500;
 const LOAD_SEEN_KEY = 'mg-load-seen';
-const BOOT_IN_PROGRESS_KEY = 'mg-boot';
+const BOOT_IN_PROGRESS_KEY = 'mg-load-in-progress';
 export const LOAD_FADE_MS = 420;
 export const LOAD_TIP_MS = 3200;
 export const LOAD_EMBER_MAX = 22;
