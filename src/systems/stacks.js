@@ -47,13 +47,17 @@ export function bagSlotsFrom({ goods = {}, materials = {}, crafted = {}, storedG
   return n;
 }
 
-/** Storage crate stacks hold up to 99 gathered items, independently of bag stacks. */
-export function splitStorageStacks(n) {
+/** Gathered goods and parts use 99 per crate slot; carried supplies retain 20. */
+export function storageStackMax(kind) {
+  return kind === 'good' || kind === 'part' ? STORAGE_MAX_STACK : MAX_STACK;
+}
+
+export function splitStorageStacks(n, max = STORAGE_MAX_STACK) {
   n = n | 0;
   if (n < 1) return [];
   const out = [];
   while (n > 0) {
-    const take = Math.min(n, STORAGE_MAX_STACK);
+    const take = Math.min(n, max);
     out.push(take);
     n -= take;
   }
@@ -69,7 +73,7 @@ export function storageVisual(slots, cap) {
       cells.push({ k: s.k, id: s.id, n: 1, src });
       return;
     }
-    for (const part of splitStorageStacks(s.n)) cells.push({ k: s.k, id: s.id, n: part, src });
+    for (const part of splitStorageStacks(s.n, storageStackMax(s.k))) cells.push({ k: s.k, id: s.id, n: part, src });
   });
   const size = Math.max(cap | 0, cells.length);
   while (cells.length < size) cells.push(null);
@@ -78,5 +82,5 @@ export function storageVisual(slots, cap) {
 
 export function storageStackSlots(s) {
   if (!s) return 0;
-  return s.k === 'gear' ? 1 : Math.ceil(Math.max(0, s.n | 0) / STORAGE_MAX_STACK);
+  return s.k === 'gear' ? 1 : Math.ceil(Math.max(0, s.n | 0) / storageStackMax(s.k));
 }
