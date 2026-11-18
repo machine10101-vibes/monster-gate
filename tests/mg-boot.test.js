@@ -157,6 +157,34 @@ test('a splash is never replayed after it has appeared in this tab, even after a
   assert.equal(interrupted.map.loading.classList.contains('hidden'), true, 'an interrupted world reload must not replay the splash');
 });
 
+test('loading splash suppression survives a fresh WebView session but expires', () => {
+  const makeStore = () => {
+    const values = new Map();
+    return {
+      values,
+      getItem(key) { return values.get(key) ?? null; },
+      setItem(key, value) { values.set(key, String(value)); },
+      removeItem(key) { values.delete(key); },
+    };
+  };
+  const persistent = makeStore();
+  const firstSession = makeStore();
+  const first = fakeDoc();
+  mountLoading(first, { sessionStorage: firstSession, localStorage: persistent, reduced: true, now: 1000 });
+  assert.equal(first.map.loading.classList.contains('hidden'), false);
+  assert.equal(persistent.getItem('mg-load-seen-at'), '1000');
+
+  const restartedSession = makeStore();
+  const restarted = fakeDoc();
+  mountLoading(restarted, { sessionStorage: restartedSession, localStorage: persistent, reduced: true, now: 5000 });
+  assert.equal(restarted.map.loading.classList.contains('hidden'), true, 'a new WebView session skips the already-seen splash');
+
+  const expiredSession = makeStore();
+  const expired = fakeDoc();
+  mountLoading(expired, { sessionStorage: expiredSession, localStorage: persistent, reduced: true, now: 1000 + 6 * 60 * 60 * 1000 });
+  assert.equal(expired.map.loading.classList.contains('hidden'), false, 'a genuinely new visit can show the splash after the six-hour window');
+});
+
 test('reduced motion skips the clip and embers', () => {
   const doc = fakeDoc();
   mountLoading(doc, { reduced: true, fadeMs: 0 });
@@ -266,7 +294,10 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.ok(manifest.icons.some((i) => i.src.includes('icon-512.png')));
 
   assert.match(main, /const RESUME_CHARACTER_KEY = 'mg-resume-character'/);
-  assert.match(main, /rememberResumeCharacter\(char\.id\)/);
+  assert.match(main, /const RESUME_CHARACTER_MAX_AGE = 15 \* 60 \* 1000/);
+  assert.match(main, /rememberResumeCharacter\(char\.id, this\.wallet\?\.address\)/);
+  assert.match(main, /readResumeCharacter\(this\.wallet\?\.address\)/);
+  assert.match(main, /for \(const store of \[localStorage, sessionStorage\]\)/);
   assert.match(main, /const resumeId = readResumeCharacter\(\)/);
   assert.match(main, /this\.enterWorld\(resumeChar\)/, 'a WebView restart resumes the selected hunter without another Enter World tap');
   assert.match(main, /mountLoading/);
