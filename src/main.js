@@ -479,7 +479,9 @@ class Game {
     if (this.wallet.kind === 'guest') this.cloudState = 'off';
     document.body.classList.add('hunting');
     if (this.input.touch && (this.isLandscape() || isTablet())) {
-      this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
+      // Avoid requesting a native orientation lock during the first world entry.
+      // Some Android in-app WebViews restart their renderer while changing orientation.
+      this.enterImmersive({ gesture: false, lock: false });
     }
     this.started = true;
     // Keep the one-shot splash marker for this tab so auth/session reloads do not replay it.
@@ -1395,7 +1397,7 @@ class Game {
 
   toggleFullscreen() {
     if (isFullscreen()) exitGameFullscreen();
-    else this.enterImmersive({ gesture: true, lock: this.input.touch && !isTablet() });
+    else this.enterImmersive({ gesture: true, lock: false });
   }
 
   /* ------------------------- landscape fullscreen ------------------------- */
@@ -1429,7 +1431,7 @@ class Game {
       const tablet = isTablet();
       if (!this.input.touch && !tablet) return;
       if (this.isLandscape() || tablet) this.enterImmersive({ gesture: true, lock: this.isLandscape() && !tablet });
-      else if (e.target.closest?.('#rotate-overlay')) requestGameFullscreen(true);
+      else if (e.target.closest?.('#rotate-overlay')) this.enterImmersive({ gesture: false, lock: false });
     };
     window.addEventListener('touchend', ask, { capture: true });
     window.addEventListener('click', ask, { capture: true });
