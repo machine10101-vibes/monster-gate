@@ -71,7 +71,11 @@ export function mountFriends(body, game) {
     if (snap.pendingOut?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Sent'));
       for (const p of snap.pendingOut) {
-        const row = personRow(p, 'Waiting');
+        const row = personRow(p, 'Request sent');
+        const cancel = el('button', 'mg-btn quiet', 'Cancel');
+        cancel.type = 'button';
+        cancel.onclick = async () => { await report(game, await social.cancelFriend(p.user_id || p.id)); paint(); };
+        row.appendChild(cancel);
         root.appendChild(row);
       }
     }
@@ -82,6 +86,15 @@ export function mountFriends(body, game) {
     }
     for (const p of snap.friends) root.appendChild(friendRow(game, social, p, snap, paint));
 
+    if (snap.ignored?.length) {
+      root.appendChild(el('div', 'mg-social-h', 'Ignored'));
+      for (const p of snap.ignored) {
+        const row=personRow(p,'Ignored');
+        const un=el('button','mg-btn quiet','Unignore');un.type='button';
+        un.onclick=async()=>{await report(game,await social.unignorePlayer(p.user_id||p.id));paint();};
+        row.appendChild(un);root.appendChild(row);
+      }
+    }
     if (snap.blocked?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Blocked'));
       for (const p of snap.blocked) {
@@ -147,7 +160,7 @@ function friendRow(game, social, p, snap, paint) {
     invite.title = !leader ? 'Only the leader can invite' : p.presence === PRESENCE.online ? 'Invite to party' : 'They are offline';
   invite.onclick = async () => {
     const res = await report(game, await social.inviteToParty(p.id || p.name));
-    if (res?.ok) toast(game, `${p.name} joined the party`, 1600);
+    if (res?.ok && res.pending) toast(game, 'Party invitation sent', 1600);
     paint();
   };
   const more = el('button', 'mg-btn quiet', 'Remove');
@@ -232,8 +245,12 @@ export function mountSocialHud(game) {
     };
     actions.appendChild(leave);
     if (leader === you) {
+      const loot=el('select','mg-btn');loot.setAttribute('aria-label','Party loot mode');
+      loot.innerHTML='<option value="round_robin">Round robin loot</option><option value="need_greed">Need / greed loot</option>';
+      loot.value=party.loot||'round_robin';loot.onchange=async()=>report(game,await social.setLootMode(loot.value));actions.appendChild(loot);
       for (const m of party.members) {
         if (m.id === you) continue;
+        const promote=el('button','mg-btn quiet',`Make leader: ${m.name}`);promote.type='button';promote.onclick=async()=>report(game,await social.promote(m.id));actions.appendChild(promote);
         const kick = el('button', 'mg-btn quiet', `Kick ${m.name}`);
         kick.type = 'button';
         kick.onclick = async () => report(game, await social.kick(m.id));
