@@ -1528,6 +1528,8 @@ export class Monster {
       if (p.neck) {
         p.neck.rotation.x += (neckX - p.neck.rotation.x) * Math.min(1, dt * 7);
         p.neck.rotation.y += (this.lookSm * 0.62 - p.neck.rotation.y) * Math.min(1, dt * 4.5);
+        const neckRoll = -this.yawRate * 0.004 + this.bank * 0.16;
+        p.neck.rotation.z += (neckRoll - p.neck.rotation.z) * Math.min(1, dt * 5);
       }
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);
       const headLook = this.lookSm * 0.38 + Math.sin(t * 0.9) * (moving < 0.1 ? 0.045 : 0.012);
