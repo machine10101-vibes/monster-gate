@@ -125,7 +125,7 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.equal(doc.map.loading.classList.contains('hidden'), true);
 });
 
-test('a completed splash is not replayed on same-tab reload, but an interrupted boot recovers', async () => {
+test('a splash is never replayed after it has appeared in this tab, even after an interrupted reload', async () => {
   const values = new Map();
   const store = {
     getItem(key) { return values.get(key) ?? null; },
@@ -154,7 +154,7 @@ test('a completed splash is not replayed on same-tab reload, but an interrupted 
   values.set('mg-load-in-progress', '1');
   const interrupted = fakeDoc();
   mountLoading(interrupted, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
-  assert.equal(interrupted.map.loading.classList.contains('hidden'), false, 'an interrupted boot still gets its recovery screen');
+  assert.equal(interrupted.map.loading.classList.contains('hidden'), true, 'an interrupted world reload must not replay the splash');
 });
 
 test('reduced motion skips the clip and embers', () => {
@@ -270,6 +270,8 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
   assert.match(main, /if \(this\.started && this\.bootFrames >= 0\)/);
   assert.match(main, /this\.bootFrames === 600/);
+  assert.match(main, /this\.enterImmersive\(\{ gesture: false, lock: false \}\)/);
+  assert.doesNotMatch(main, /requestGameFullscreen\(true\)/);
   assert.doesNotMatch(main, /clearSkip/);
   assert.doesNotMatch(src('src/ui/boot.js'), /requestAnimationFrame|keySourceToCanvas\(video/);
   assert.match(theme, /#load-key \{ display: none !important; \}/);
