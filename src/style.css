@@ -4825,48 +4825,22 @@ html:has(#panel:not(.hidden)) #debug-badge {
 }
 
 
-/* Account wallet linking stays available in the character camp, before entering. */
-.cs-wallet {
-  position: absolute;
-  z-index: 18;
-  left: 16px;
-  bottom: 18px;
-  width: min(300px, calc(100vw - 32px));
+/* Keep Klever linking as a single inline action above Enter World. */
+.cs-wallet-connect {
   pointer-events: auto;
+  min-width: 210px;
+  padding: 8px 14px;
+  font-size: 11px;
 }
-.cs-wallet .wallet-link-card {
-  padding: 12px;
-  color: #e3e8f4;
-  background: linear-gradient(180deg, rgba(22, 26, 40, 0.96), rgba(9, 11, 19, 0.96));
-  border: 2px solid var(--gold-dim);
-  border-radius: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+.cs-wallet-status {
+  min-height: 14px;
+  color: #e3d39b;
+  font-size: 10px;
+  text-shadow: 0 2px 3px #000;
+  text-align: center;
 }
-.cs-wallet .wallet-link-card h3 {
-  margin: 0 0 6px;
-  color: #f1d98a;
-  font: 10px var(--font-px);
-}
-.cs-wallet .wallet-link-card p {
-  margin: 5px 0;
-  font-size: 12px;
-  line-height: 1.4;
-}
-.cs-wallet .wallet-link-actions { display: flex; gap: 8px; margin-top: 8px; }
-.cs-wallet .wallet-link-actions button {
-  min-height: 36px;
-  padding: 7px 10px;
-  color: #ffeab8;
-  background: linear-gradient(#8d261f, #51120f);
-  border: 1px solid var(--gold);
-  border-radius: 3px;
-  cursor: pointer;
-}
-.cs-wallet .wallet-link-actions button:disabled { opacity: .55; }
-.cs-wallet .wallet-link-copy { color: #aeb8cf; }
-.cs-wallet .wallet-link-who { color: #e3d39b; }
+.cs-wallet-status:empty { display: none; }
+.cs-enter { gap: 7px; }
 @media (max-width: 620px) {
-  .cs-wallet { left: 10px; bottom: 10px; width: min(260px, calc(100vw - 20px)); }
-  .cs-wallet .wallet-link-card { padding: 8px; }
-  .cs-wallet .wallet-link-card p { font-size: 11px; }
+  .cs-wallet-connect { min-width: 190px; padding: 7px 10px; }
 }
