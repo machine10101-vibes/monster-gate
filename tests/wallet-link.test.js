@@ -66,7 +66,7 @@ test('wallet endpoint reports which proof validation stage rejected a request', 
   assert.match(walletFn, /stage: "message"/);
   assert.match(walletFn, /stage: "signature"/);
   assert.match(walletFn, /take_klever_nonce/);
-  assert.doesNotMatch(walletFn, /console\\.(?:log|warn)\\([^)]*(?:signature|nonce|address)\\s*[,}]/i);
+  assert.doesNotMatch(walletFn, /console\.(?:log|warn)\([^)]*(?:signature|nonce|address)\s*[,}]/i);
 });
 
 test('Klever client forwards non-empty proof for authoritative server verification', () => {
