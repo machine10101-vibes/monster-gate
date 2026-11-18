@@ -511,13 +511,18 @@ h1 em,
    Keep the poster hidden: it is only the pre-playback / decode-failure fallback. */
 #loading.held #load-video { opacity: 1; }
 #loading.held .load-poster { opacity: 0; }
+.load-freeze { display: none; }
+#loading.frame-frozen #load-video { opacity: 0; }
+#loading.frame-frozen .load-poster { opacity: 0; }
+#loading.frame-frozen .load-freeze { display: block; }
 @keyframes load-pulse {
   0%, 100% { opacity: 0.42; transform: scale(1); }
   50% { opacity: 0.95; transform: scale(1.05); }
 }
 .load-poster,
 #load-video,
-.load-key {
+.load-key,
+.load-freeze {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -548,6 +553,7 @@ h1 em,
 .load-poster { z-index: 0; }
 #load-video { z-index: 1; }
 .load-key { z-index: 2; }
+.load-freeze { z-index: 3; }
 #loading.keyed #load-video,
 #loading.keyed .load-poster,
 .load-stage.is-keyed #load-video,
