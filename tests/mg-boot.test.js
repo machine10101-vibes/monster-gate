@@ -17,6 +17,7 @@ import {
   remainMinDisplay,
   setLoadProgress,
 } from '../src/ui/boot.js';
+import { consumeRotationRecovery, rememberRotationRecovery, screenOrientation } from '../src/engine/rotationRecovery.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -185,6 +186,24 @@ test('loading splash suppression survives a fresh WebView session but expires', 
   assert.equal(expired.map.loading.classList.contains('hidden'), false, 'a genuinely new visit can show the splash after the six-hour window');
 });
 
+test('rotation recovery is one-shot, short-lived, and only follows a real orientation change', () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+  assert.equal(screenOrientation(390, 844), 'portrait');
+  assert.equal(screenOrientation(844, 390), 'landscape');
+  assert.equal(rememberRotationRecovery(storage, 'hunter-1', 'portrait', 1000), true);
+  assert.equal(consumeRotationRecovery(storage, 'portrait', 2000), null, 'same-orientation fresh boots still require login');
+  assert.equal(rememberRotationRecovery(storage, 'hunter-1', 'portrait', 1000), true);
+  assert.deepEqual(consumeRotationRecovery(storage, 'landscape', 2000), { characterId: 'hunter-1' });
+  assert.equal(consumeRotationRecovery(storage, 'landscape', 2001), null, 'handoff is consumed once');
+  assert.equal(rememberRotationRecovery(storage, 'hunter-1', 'portrait', 1000), true);
+  assert.equal(consumeRotationRecovery(storage, 'landscape', 122000), null, 'stale handoffs never bypass login');
+});
+
 test('reduced motion skips the clip and embers', () => {
   const doc = fakeDoc();
   mountLoading(doc, { reduced: true, fadeMs: 0 });
@@ -315,6 +334,8 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(src('src/ui/charselect.js'), /single-character/);
   assert.match(src('src/style.css'), /#charselect\.single-character \.cs-panel/);
   assert.match(theme, /#loading\.held \.load-glow/);
+  assert.match(theme, /#loading\.held #load-video \\{ opacity: 0; \\}/);
+  assert.match(theme, /#loading\.held \.load-poster \\{ opacity: 1; \\}/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
   assert.match(theme, /mask-image:\s*radial-gradient/);
   assert.match(theme, /#loading \.load-bar \{[\s\S]*height:\s*26px/);
