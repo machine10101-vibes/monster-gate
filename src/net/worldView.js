@@ -1295,7 +1295,11 @@ export class WorldView {
     if (!msg) return false;
     const whisper = msg.match(/^\/w(?:hisper)?\s+(\S+)\s+(.+)$/i);
     if (whisper || channel === 'whisper') {
-      if (whisper && this.game?.social?.caps?.whisper) this.game.social.whisper(whisper[1], whisper[2]);
+      if (whisper && this.game?.social?.caps?.whisper) {
+        Promise.resolve(this.game.social.whisper(whisper[1], whisper[2])).then((result) => {
+          if (result && !result.ok) this.game?.hud?.toast?.(result.message || 'Whisper could not be delivered.', 2200);
+        }).catch(() => this.game?.hud?.toast?.('Whisper could not be delivered.', 2200));
+      }
       else this.game?.hud?.toast?.(this.game?.social?.caps?.whisper ? 'Use /w Hunter message to send a private message.' : 'Private whispers are unavailable on this connection.', 2200);
       return true;
     }
