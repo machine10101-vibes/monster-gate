@@ -498,13 +498,10 @@ class Game {
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.player.yaw, [], [], 0);
     this.bindUI();
     progress(0.98, 'Ready');
-    const account = readAccount();
-    if (account?.kind === 'email') {
-      await this.applyWallet(account);
-      this.watchAccount();
-    } else {
-      clearSession();
-    }
+    // Every fresh page boot returns to the login gate. Do not silently restore
+    // a saved email session here: that skips the required login step and can
+    // drop returning players straight into the character/world flow.
+    clearSession();
     this.refreshWalletUi();
     const taken = consumeTakenNotice();
     if (taken && !this.wallet) {
