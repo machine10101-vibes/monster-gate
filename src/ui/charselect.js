@@ -12,6 +12,7 @@ import {
 } from '../systems/roster.js';
 import { CampStage } from '../world/camp.js';
 import { shortAddress } from '../wallet/klever.js';
+import { mountWalletSettings } from '../wallet/settings.js';
 
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const $ = (id) => document.getElementById(id);
@@ -72,6 +73,12 @@ export class CharacterSelect {
       $('cs-account').textContent = g.wallet?.kind === 'guest'
         ? 'Playing as guest'
         : (g.wallet?.email || shortAddress(g.wallet?.address || ''));
+      const walletHost = $('cs-wallet');
+      if (walletHost) {
+        walletHost.replaceChildren();
+        walletHost.classList.toggle('hidden', g.wallet?.kind !== 'email');
+        if (g.wallet?.kind === 'email') mountWalletSettings(walletHost, g);
+      }
       g.paintCloudStatus?.();
       this.filter = '';
       $('cs-search').value = '';
