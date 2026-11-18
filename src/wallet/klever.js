@@ -42,6 +42,22 @@ export function normalizeKleverAddress(value, depth = 0) {
   return publicKeyFromAddress(match[0]) ? match[0] : '';
 }
 
+/** Read the account the provider has selected before falling back to its getter. */
+export function providerAddress(kw) {
+  if (!kw) return '';
+  const candidates = [kw.selectedAddress, kw.address, kw.accounts?.[0], kw.accounts];
+  try {
+    if (typeof kw.getWalletAddress === 'function') candidates.push(kw.getWalletAddress());
+  } catch {
+    /* A provider without a readable account can still expose selectedAddress. */
+  }
+  for (const candidate of candidates) {
+    const address = normalizeKleverAddress(candidate);
+    if (address) return address;
+  }
+  return '';
+}
+
 export function isMobile() {
   const ua = navigator.userAgent || '';
   if (/Android|iPhone|iPad|iPod/i.test(ua)) return true;
@@ -192,17 +208,8 @@ async function connectProvider(kw, mobile) {
     /* A wallet that is already connected rejects a second initialize. */
   }
 
-  const candidates = [];
-  try {
-    if (typeof kw.getWalletAddress === 'function') candidates.push(kw.getWalletAddress());
-  } catch {
-    /* Fall through to the provider's selected account fields. */
-  }
-  candidates.push(kw.selectedAddress, kw.address, kw.accounts?.[0], kw.accounts);
-  for (const candidate of candidates) {
-    const address = normalizeKleverAddress(candidate);
-    if (address) return address;
-  }
+  const address = providerAddress(kw);
+  if (address) return address;
 
   throw fail(
     'no-account',
