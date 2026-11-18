@@ -28,11 +28,14 @@ export class SocialWorld {
     if (session.guest || !this.store) throw Object.assign(new Error('Sign in to use friends.'), { code: 'auth' });
     return this.store.list(session.userId);
   }
-  async blocked(a, b) {
-    if (!this.store || !a || !b) return false;
+  async relation(a, b) {
+    if (!this.store || !a || !b) return '';
     const rows = await this.store.list(a);
-    return rows.some(r => r.requester_id === a && r.target_id === b && ['blocked','ignored'].includes(r.status));
+    return rows.find(r => r.requester_id === a && r.target_id === b)?.status || '';
   }
+  async blocked(a, b) { return (await this.relation(a,b)) === 'blocked'; }
+  async ignored(a, b) { return (await this.relation(a,b)) === 'ignored'; }
+  async restricted(a, b) { const status=await this.relation(a,b); return status==='blocked'||status==='ignored'; }
   onlineByUser(userId) { return this.world.byUser.get(userId) || null; }
   findOnline(ref) {
     const value = String(ref || '').trim();
@@ -111,7 +114,8 @@ export class SocialWorld {
       await this.store.put({ requester_id:s.userId,target_id:target.userId,status:'pending',requester_name:s.name,target_name:target.name });
       this.send(target, 'friend_request', { from:{ user_id:s.userId, id:s.id, name:s.name } });
     } else {
-      const id = String(m.user_id || m.id || '');
+      const rawId = String(m.user_id || m.id || '');
+      const id = rawId.startsWith('u_') ? rawId.slice(2) : rawId;
       if (!id || id === s.userId) return fail('not_found', 'Hunter not found.');
       const find = (a,b,status) => rows.find(r => r.requester_id===a && r.target_id===b && (!status || r.status===status));
       if (m.type === 'friend_accept') {
@@ -171,7 +175,7 @@ export class SocialWorld {
     if (m.type==='party_accept' || m.type==='party_decline') {
       const inv=this.invites.get(String(m.invite_id||'')); if (!inv || inv.target!==s || this.world.now()>inv.expires) { this.invites.delete(String(m.invite_id||'')); return fail('expired','That invite expired.'); }
       this.invites.delete(inv.inviteId);
-      if (m.type==='party_decline') return;
+      if (m.type==='party_decline') { const p=this.partyFor(inv.from); if(p && p.members.length===1){this.partyByPlayer.delete(inv.from.id);this.parties.delete(p.id);} return; }
       if (this.partyFor(s)) return fail('in_party','You are already in a party.');
       const p=this.partyFor(inv.from); if (!p || p.members.length>=MAX_PARTY) return fail('full','That party is full.');
       p.members.push(s); this.partyByPlayer.set(s.id,p.id); this.broadcastParty(p); return;
@@ -201,13 +205,22 @@ export class SocialWorld {
   async whisper(s,m) {
     const target=this.findOnline(m.to);
     const text=clean(m.text,120);
-    if(!target || target.guest || !text){this.error(s,'whisper','Whisper target unavailable.');return;}
-    if(await this.blocked(s.userId,target.userId) || await this.blocked(target.userId,s.userId)){this.error(s,'whisper','Whisper target unavailable.');return;}
+    if(!target || !text){this.error(s,'whisper','Whisper target unavailable.');return;}
+    if((!s.guest && !target.guest) && (await this.restricted(s.userId,target.userId) || await this.restricted(target.userId,s.userId))){this.error(s,'whisper','Whisper target unavailable.');return;}
     const frame={id:`c_${++this.world.chatSeq}`,channel:'whisper',from:{id:s.id,name:s.name},to:{id:target.id,name:target.name},text,at:this.world.now()};
     this.send(s,'chat',frame); this.send(target,'chat',frame);
   }
   async onMove(s) {
     const party=this.partyFor(s); if(party) this.broadcastParty(party);
+    if (!s.guest) await this.presence(s,true).catch(()=>{});
+  }
+  tick() {
+    const now=this.world.now();
+    for(const [id,inv] of this.invites) if(now>inv.expires){
+      this.invites.delete(id);
+      const p=this.partyFor(inv.from);
+      if(p && p.members.length===1){this.partyByPlayer.delete(inv.from.id);this.parties.delete(p.id);}
+    }
   }
   async onJoin(s) {
     await this.presence(s,true).catch(()=>{});
