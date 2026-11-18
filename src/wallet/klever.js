@@ -66,9 +66,10 @@ export function signatureText(signed, depth = 0, allowBareString = true) {
   }
   if (typeof signed !== 'object') return '';
 
-  // Prefer explicit signature fields. Never read an event's "message" field:
-  // Klever echoes the text to be signed there, not the cryptographic proof.
-  for (const key of ['signature', 'sig', 'hex']) {
+  // Klever Connect SDK Signature objects expose `bytes` and `hex`; older
+  // wallet responses may instead wrap the proof in signature/sig fields.
+  // Never read an event's "message" field: it is only the echoed challenge.
+  for (const key of ['signature', 'sig', 'hex', 'bytes']) {
     if (signed[key] != null) {
       const found = signatureText(signed[key], depth + 1, true);
       if (found) return found;
