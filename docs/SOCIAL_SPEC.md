@@ -1,8 +1,8 @@
-# Social protocol (proposal)
+# Social protocol (implemented)
 
-Client-owned spec for friends, presence, parties, shared XP, and loot. **MG Servers** should copy the message types into `PROTOCOL.md` and the send/receive methods into `src/net/mmo.js`. **MG Developer #2** owns the Supabase friends table (do not apply that migration from this PR).
+Protocol and behavior reference for the live World 1 social systems. Friends use the account-keyed Supabase migration in `supabase/migrations/20261118000000_friendships.sql`; parties are held in World 1 server memory. XP and loot distribution hooks remain documented design work until the combat/loot server systems consume them.
 
-The live GitHub Pages client never opens a world socket unless `?mmo=1` is set. Social UI:
+The live client uses the World 1 socket configuration. Social UI:
 
 | Flag | Backend |
 | --- | --- |
@@ -10,7 +10,7 @@ The live GitHub Pages client never opens a world socket unless `?mmo=1` is set. 
 | `?mmo=1` | Live adapter. Feature-detects methods and inbound frames on the existing `MmoClient`. Missing methods are a no-op; the UI does not throw. |
 | `?mmo=1&mocksocial=1` | In-process mock: fake friends, presence, incoming invites. No extra socket. Combine with `?mock=1` for a crowd. |
 
-This document does **not** replace `PROTOCOL.md`. Envelope, auth, move, and world/zone chat stay as they are (`v: 1`). New `type` values below are ignored by today's server (or returned as `error`) until MG Servers lands them.
+This document does **not** replace `PROTOCOL.md`. Envelope, auth, move, and world/zone chat stay as they are (`v: 1`). Social message types below are implemented by the current World 1 server.
 
 Live site: [https://monstergate.online/](https://monstergate.online/).
 
