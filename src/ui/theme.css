@@ -504,6 +504,9 @@ h1 em,
 #loading.held .load-glow {
   animation: load-pulse 2.6s ease-in-out infinite;
 }
+#load-key { display: none !important; }
+#loading.video-failed #load-video { opacity: 0; }
+#loading.video-playing .load-poster { opacity: 0; }
 @keyframes load-pulse {
   0%, 100% { opacity: 0.42; transform: scale(1); }
   50% { opacity: 0.95; transform: scale(1.05); }
