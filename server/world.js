@@ -175,7 +175,7 @@ export class World {
       else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.whisper(session, msg);
       else if (msg.type === TYPES.chat && msg.channel === 'party') this.partyChat(session, msg);
       else if (msg.type === TYPES.chat) this.chat(session, msg);
-      else if (msg.type === TYPES.whisper) await this.social.whisper(session, { ...msg, to: msg.to });
+      else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
