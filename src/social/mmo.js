@@ -63,24 +63,9 @@ export class MmoSocial {
       this.unhooks.push(() => { if (this.hooked === client) client.onFrame = orig; });
     }
 
-    const onMsg = (ev) => this.onFrame(ev?.data);
-    const hookWs = (ws) => {
-      if (!ws || ws.__mgSocial) return;
-      ws.__mgSocial = true;
-      ws.addEventListener?.('message', onMsg);
-      this.unhooks.push(() => {
-        try { ws.removeEventListener?.('message', onMsg); } catch { /* closed */ }
-      });
-    };
-    if (client.ws) hookWs(client.ws);
-    if (typeof client.connect === 'function') {
-      const origConnect = client.connect.bind(client);
-      client.connect = (...args) => {
-        origConnect(...args);
-        if (client.ws) hookWs(client.ws);
-      };
-      this.unhooks.push(() => { if (this.hooked === client) client.connect = origConnect; });
-    }
+    // MmoClient owns the WebSocket message listener and calls onFrame once.
+    // Wrapping onFrame above is the single social event tap; attaching a second
+    // ws listener here duplicated whispers, party updates and friend events.
 
     if (client.you) this.applyYou(client.you);
     this.emit('bind');
@@ -246,7 +231,7 @@ export class MmoSocial {
   }
 
   canSend(type) {
-    if (type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore') return this.caps.friends || this.caps.block;
+    if (type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type)) return this.caps.friends || this.caps.block;
     if (type.startsWith('party')) return this.caps.party;
     if (type === 'whisper') return this.caps.whisper;
     return false;
@@ -305,7 +290,7 @@ export class MmoSocial {
 
 function applyFeatures(caps, feats) {
   const list = Array.isArray(feats) ? feats : feats && typeof feats === 'object' ? Object.keys(feats).filter((k) => feats[k]) : [];
-  if (!list.length) return;
+  if (!Array.isArray(feats) && !(feats && typeof feats === 'object')) return;
   caps.friends = false;
   caps.party = false;
   caps.whisper = false;
@@ -320,7 +305,7 @@ function applyFeatures(caps, feats) {
 }
 
 function guestNeedsAuth(type) {
-  return type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore' || type === 'whisper';
+  return type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type);
 }
 
 function asList(rows) {
