@@ -15,6 +15,7 @@ alter table public.friendships add column if not exists target_name text not nul
 create index if not exists friendships_target_status_idx on public.friendships(target_id,status);
 create index if not exists friendships_requester_status_idx on public.friendships(requester_id,status);
 alter table public.friendships enable row level security;
+comment on column public.friendships.status is 'pending | accepted | blocked | ignored. Used by the live World 1 social protocol.';
 drop policy if exists friendships_select_own on public.friendships;
 create policy friendships_select_own on public.friendships for select to authenticated
 using (requester_id = auth.uid() or target_id = auth.uid());
