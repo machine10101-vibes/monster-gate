@@ -172,7 +172,7 @@ export class World {
         return;
       }
       if (msg.type === TYPES.move) this.move(session, msg);
-      else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.whisper(session, msg);
+      else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.handle(session,{...msg,type:'whisper'});
       else if (msg.type === TYPES.chat && msg.channel === 'party') this.partyChat(session, msg);
       else if (msg.type === TYPES.chat) this.chat(session, msg);
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
