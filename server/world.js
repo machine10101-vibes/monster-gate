@@ -199,7 +199,6 @@ export class World {
     for (const other of this.players.values()) {
       if (channel === 'zone' && other.zone !== session.zone) continue;
       if (channel === 'party' && !this.social.partyFor(session)?.members.includes(other)) continue;
-      if (channel === 'zone' && other.zone !== session.zone) continue;
       if (this.social.store && !session.guest && !other.guest) {
         const hidden = await this.social.blocked(session.userId, other.userId).catch(() => false)
           || await this.social.blocked(other.userId, session.userId).catch(() => false);
@@ -265,6 +264,7 @@ export class World {
 
   tick() {
     const t = this.now();
+    this.social.tick();
     for (const p of [...this.players.values()]) {
       if (t - p.last > IDLE_MS) {
         this.drop(p, true);
