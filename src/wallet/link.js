@@ -117,14 +117,7 @@ async function signFor(purpose, session) {
     }
     return signProof(purpose, nonce.nonce, next, kw, mobile);
   };
-  try {
-    return await prove(address);
-  } catch (err) {
-    // The wallet signed with its selected account. Ask once more, naming that account.
-    if (err?.code !== 'wrong-account' || typeof err.address !== 'string' || err.address === address) throw err;
-    address = err.address;
-    return prove(address);
-  }
+  return prove(address);
 }
 
 export async function loginWithKlever() {

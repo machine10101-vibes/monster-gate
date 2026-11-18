@@ -4,6 +4,7 @@ import { signedMessage } from '../../supabase/functions/_shared/linkAuth.js';
 
 export const SESSION_KEY = 'monster-gate-klever-session';
 const PROMPT_LOCK = 'monster-gate-klever-prompt-lock';
+const SIGNER_KEY = 'monster-gate-klever-signer';
 const PROMPT_COOL_MS = 90_000;
 export const KLEVER_EXTENSION = 'https://chromewebstore.google.com/detail/klever-wallet/ifclboecfhkjbpmhgehodcjpciihhmif';
 export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=finance.klever.bitcoin.wallet';
@@ -349,11 +350,33 @@ export function providerAddress(kw) {
   return typeof found === 'string' && found.length > 10 ? found.trim() : '';
 }
 
+/** The account whose key signed the last attempt. The next proof names that account. */
+export function notedSigner() {
+  try {
+    const value = sessionStorage.getItem(SIGNER_KEY) || '';
+    return ADDRESS_RE.test(value) ? value : '';
+  } catch {
+    return '';
+  }
+}
+
+export function noteSigner(address) {
+  try {
+    if (ADDRESS_RE.test(address || '')) sessionStorage.setItem(SIGNER_KEY, address);
+    else sessionStorage.removeItem(SIGNER_KEY);
+  } catch {
+    /* private mode can refuse the store */
+  }
+}
+
 /**
- * signMessage sends kleverWeb.address, not selectedAddress.
- * The proof has to name that account, or the signature cannot match.
+ * The proof names the account that signed last time, then kleverWeb.address.
+ * signMessage signs that account. A second signature in the same press is closed by the app.
  */
 export function signingAddress(kw, fallback = '') {
+  const noted = notedSigner();
+  const accounts = providerAccounts(kw);
+  if (ADDRESS_RE.test(noted) && (accounts.length === 0 || accounts.includes(noted))) return noted;
   const own = typeof kw?.address === 'string' ? kw.address.trim() : '';
   if (ADDRESS_RE.test(own)) return own;
   const next = typeof fallback === 'string' ? fallback.trim() : '';
@@ -405,28 +428,32 @@ export function primeKleverConnect() {
   return pendingAccount;
 }
 
+function startAccountPrompt(kw) {
+  try {
+    if (typeof kw.requestAccount === 'function') return kw.requestAccount();
+    if (typeof kw.enable === 'function') return kw.enable();
+    try {
+      return web.initialize({ timeout: 20_000, accountChangeCallback: () => undefined });
+    } catch {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
 function beginProviderConnect(kw) {
   const immediate = providerAddress(kw);
   if (ADDRESS_RE.test(immediate)) return Promise.resolve(immediate);
-  try {
-    if (typeof kw.requestAccount === 'function') {
-      const req = kw.requestAccount();
-      if (req && typeof req.then === 'function') Promise.resolve(req).catch(() => undefined);
-    } else if (typeof kw.enable === 'function') {
-      const req = kw.enable();
-      if (req && typeof req.then === 'function') Promise.resolve(req).catch(() => undefined);
-    } else {
-      try {
-        const pending = web.initialize({ timeout: 20_000, accountChangeCallback: () => undefined });
-        if (pending && typeof pending.then === 'function') Promise.resolve(pending).catch(() => undefined);
-      } catch {
-        /* Extension bridge may not be ready yet. */
-      }
-    }
-  } catch {
-    /* Continue to poll for the extension's response. */
-  }
-  return pollProviderAddress(kw);
+  // The prompt starts in this turn. Its promise is kept so the signature waits
+  // until this confirm has finished, instead of opening over it.
+  const request = startAccountPrompt(kw);
+  const appeared = pollProviderAddress(kw);
+  if (!request || typeof request.then !== 'function') return appeared;
+  return Promise.all([
+    appeared,
+    Promise.resolve(request).catch(() => undefined),
+  ]).then(([address]) => address);
 }
 
 function accountRequest(kw) {
@@ -531,12 +558,12 @@ export async function connectWallet() {
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
   const plan = signaturePlan(kw);
-  // The in-app sheet closes if the page changes size. On the phone, signMessage
-  // is that sheet: wait for the previous confirm to finish closing, pin the
-  // height, and let that paint before the signature opens. The desktop
-  // extension's window is separate, and locking the page under it closes it.
+  // The in-app sheet closes if the page changes size. Wait until the connect
+  // confirm has stopped moving the page, and do not resize under the signature.
+  // The legacy sheet is the only path that pins the page, and it does that
+  // before its own sheet opens. A second signature in this press is not opened.
   if (mobile) await pageSettledAfterSign();
-  const lockPage = plan === 'sheet' || mobile;
+  const lockPage = plan === 'sheet';
   if (lockPage) {
     holdPageStill();
     await paintSettled();
@@ -569,10 +596,12 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     ...addressesIn(signed),
   ]);
   if (matched === address) {
+    noteSigner('');
     return { address, message, signature: matchingSignature(candidates, message, address), nonce };
   }
   if (matched) {
-    const err = fail('wrong-account', 'Confirm the Klever account one more time.');
+    noteSigner(matched);
+    const err = fail('wrong-account', 'Press Connect Klever wallet again and confirm the signature that stays open.');
     err.address = matched;
     throw err;
   }
@@ -593,12 +622,7 @@ function localNonce() {
 
 export async function signIn() {
   const { kw, address, mobile } = await connectWallet();
-  try {
-    return await signProof('login', localNonce(), address, kw, mobile);
-  } catch (err) {
-    if (err?.code !== 'wrong-account' || !ADDRESS_RE.test(err.address || '')) throw err;
-    return signProof('login', localNonce(), err.address, kw, mobile);
-  }
+  return signProof('login', localNonce(), address, kw, mobile);
 }
 
 function saveSession(session) {
