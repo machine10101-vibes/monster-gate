@@ -173,12 +173,11 @@ export class World {
       return;
     }
     const zoneChanged = result.pose.zone !== session.zone;
+    const healthChanged = result.pose.hp !== session.hp || result.pose.max_hp !== session.max_hp;
     Object.assign(session, result.pose);
     this.dirty.add(session.id);
-    if (zoneChanged) {
-      this.sendSnapshot(session);
-      void this.social.onMove(session);
-    }
+    if (zoneChanged) this.sendSnapshot(session);
+    if (zoneChanged || healthChanged) void this.social.onMove(session);
     this.persistPose(session);
   }
 
