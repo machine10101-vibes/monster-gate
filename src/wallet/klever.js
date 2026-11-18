@@ -11,42 +11,46 @@ export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=fin
 export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-crypto/id1615064243';
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
+const ADDRESS_SPACE_RE = /[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g;
+const ADDRESS_KEYS = ['address', 'addr', 'walletAddress', 'account'];
 
 /**
  * The account Klever will sign with. The app sometimes wraps it, capitalizes
  * it, or puts a space in the middle. The proof needs the 62-character klv1
  * address and nothing else.
  */
-export function klvAddress(value) {
-  const raw = looseText(value);
-  if (!raw) return '';
-  const compact = raw
-    .replace(/[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g, '')
-    .toLowerCase();
-  const match = /klv1[02-9ac-hj-np-z]{58}/.exec(compact);
-  if (!match || !publicKeyFromAddress(match[0])) return '';
-  return match[0];
-}
-
-function looseText(value) {
-  if (typeof value === 'string') return value;
+export function normalizeKleverAddress(value, depth = 0) {
+  if (value == null || depth > 4) return '';
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = klvAddress(item);
+      const found = normalizeKleverAddress(item, depth + 1);
       if (found) return found;
     }
     return '';
   }
-  if (value && typeof value === 'object') {
-    for (const key of ['address', 'addr', 'walletAddress', 'account']) {
-      if (typeof value[key] === 'string') return value[key];
-      if (value[key] && typeof value[key] === 'object') {
-        const found = klvAddress(value[key]);
+  if (typeof value === 'object') {
+    for (const key of ADDRESS_KEYS) {
+      if (value[key] != null) {
+        const found = normalizeKleverAddress(value[key], depth + 1);
         if (found) return found;
       }
     }
+    for (const key of Object.keys(value)) {
+      if (ADDRESS_KEYS.includes(key) || typeof value[key] === 'function') continue;
+      const found = normalizeKleverAddress(value[key], depth + 1);
+      if (found) return found;
+    }
+    return '';
   }
-  return '';
+  if (typeof value !== 'string') return '';
+  const compact = value.replace(ADDRESS_SPACE_RE, '').toLowerCase();
+  const match = compact.match(/klv1[02-9ac-hj-np-z]{58}/);
+  if (!match || !ADDRESS_RE.test(match[0]) || !publicKeyFromAddress(match[0])) return '';
+  return match[0];
+}
+
+export function klvAddress(value) {
+  return normalizeKleverAddress(value);
 }
 
 export function isMobile() {
@@ -386,8 +390,9 @@ export function waitForProvider(ms = 2000) {
  */
 export function providerAddress(kw) {
   if (!kw) return '';
+  // getWalletAddress() is asynchronous. Never inspect its Promise as an address.
   const found = kw.selectedAddress || kw.address || kw.accounts?.[0] || null;
-  return klvAddress(found);
+  return klvAddress(found) || klvAddress(kw.accounts);
 }
 
 /** The account whose key signed the last attempt. The next proof names that account. */
@@ -427,13 +432,14 @@ export function signingAddress(kw, approved = '', prompted = false) {
   const picked = klvAddress(approved);
   // The account the user just approved is the one the signature sheet signs.
   if (prompted && picked) return picked;
+  // selectedAddress is the account Klever will sign. getWalletAddress can
+  // still be the previous account.
+  const selected = providerAddress(kw);
+  if (selected) return selected;
   const noted = notedSigner();
   const accounts = providerAccounts(kw);
   if (ADDRESS_RE.test(noted) && (accounts.length === 0 || accounts.includes(noted))) return noted;
-  const own = klvAddress(kw?.address);
-  if (own) return own;
-  if (picked) return picked;
-  return providerAddress(kw);
+  return picked;
 }
 
 /** Every klv account on the provider. The signer is first. */
@@ -451,11 +457,7 @@ export function providerAccounts(kw) {
   add(kw.address);
   add(kw.selectedAddress);
   add(kw.accounts);
-  try {
-    if (typeof kw.getWalletAddress === 'function') add(kw.getWalletAddress());
-  } catch {
-    /* a provider without an account */
-  }
+  // getWalletAddress is awaited by connectProvider; do not call it from this sync helper.
   return found;
 }
 
@@ -559,13 +561,7 @@ function addressText(value) {
 export function addressFromWallet(kw, returned) {
   const provided = providerAddress(kw);
   if (ADDRESS_RE.test(provided)) return provided;
-  let fromGetter = '';
-  try {
-    if (typeof kw?.getWalletAddress === 'function') fromGetter = kw.getWalletAddress();
-  } catch {
-    fromGetter = '';
-  }
-  for (const value of [returned, fromGetter, kw?.address]) {
+  for (const value of [returned, kw?.address]) {
     const text = addressText(value);
     if (ADDRESS_RE.test(text)) return text;
   }
@@ -578,22 +574,58 @@ function connectionClosed(err) {
   return /reject|declin|cancel|denied|closed/.test(text);
 }
 
-async function connectProvider(kw) {
-  try {
-    const result = await accountRequest(kw);
-    const approved = result && typeof result === 'object' ? result.address : result;
-    const address = signingAddress(kw, approved || '', result?.prompted === true);
-    if (ADDRESS_RE.test(address)) return address;
-  } catch (err) {
-    if (err?.code === 'rejected' || err?.code === 'no-account') throw err;
+let initializedKleverProvider = null;
+let pendingKleverInitialization = null;
+
+/** Initialize and cache the injected provider, matching the working GRT-VIP client. */
+export async function getKleverWebInstance(kw = typeof window === 'undefined' ? null : window.kleverWeb) {
+  if (typeof window === 'undefined') throw fail('browser-only', 'Klever Wallet can only be used in the browser.');
+  const provider = kw || window.kleverWeb;
+  if (!provider) throw fail('provider-missing', 'Klever Wallet was not detected. Open this page in the Klever Wallet browser and try again.');
+  if (initializedKleverProvider === provider) return provider;
+
+  if (!pendingKleverInitialization || pendingKleverInitialization.provider !== provider) {
+    const pending = (async () => {
+      if (typeof web.initialize !== 'function') {
+        throw fail('provider-init', 'The Klever SDK client could not initialize. Refresh the page inside Klever Wallet and try again.');
+      }
+      // Match the GRT client: initialize the imported SDK wrapper, not the
+      // raw window.kleverWeb injection. The wrapper owns the account manager.
+      await web.initialize({ timeout: 20_000, accountChangeCallback: () => undefined });
+      initializedKleverProvider = provider;
+    })();
+    pendingKleverInitialization = { provider, promise: pending };
   }
-  const address = signingAddress(kw);
-  if (address) return address;
-  throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
+
+  const current = pendingKleverInitialization;
+  try {
+    await current.promise;
+    return provider;
+  } finally {
+    if (pendingKleverInitialization === current) pendingKleverInitialization = null;
+  }
+}
+
+/**
+ * GRT-VIP's proven connection sequence: initialize once, then await
+ * getWalletAddress(). Do not open requestAccount/enable as a second prompt.
+ * The only user confirmation after this is the single login proof signature.
+ */
+export async function connectProvider(kw) {
+  const client = await getKleverWebInstance(kw);
+  if (typeof web.getWalletAddress !== 'function') {
+    throw fail('no-account', 'The Klever SDK did not return an account. Refresh the page inside Klever Wallet and try again.');
+  }
+  // getWalletAddress may be asynchronous in the injected-wallet runtime.
+  const returned = await web.getWalletAddress();
+  const address = klvAddress(returned) || providerAddress(client);
+  if (!ADDRESS_RE.test(address)) {
+    throw fail('no-account', 'Klever Wallet did not return a valid klv1 account. Select your account in Klever Wallet and try again.');
+  }
+  return address;
 }
 
 export async function connectWallet() {
-  primeKleverConnect();
   const mobile = isMobile();
   const kw = await waitForProvider(mobile ? (inKleverHandoff() ? 4000 : 900) : 2500);
   if (!kw) {
@@ -713,17 +745,19 @@ export function readSession() {
   try {
     const raw = storedSession();
     if (!raw) return null;
-    const ok = ADDRESS_RE.test(raw.address)
+    const address = normalizeKleverAddress(raw.address);
+    const ok = !!address
       && typeof raw.message === 'string'
       && typeof raw.signature === 'string'
-      && raw.message.includes(`Address: ${raw.address}`)
-      && verifyKleverSignature(raw.message, raw.signature, raw.address);
+      && raw.message.includes(`Address: ${address}`)
+      && verifyKleverSignature(raw.message, raw.signature, address);
     if (!ok) {
       for (const store of [sessionStorage, localStorage]) {
         try { store.removeItem(SESSION_KEY); } catch { /* already gone */ }
       }
       return null;
     }
+    raw.address = address;
     saveSession(raw);
     return raw;
   } catch {
