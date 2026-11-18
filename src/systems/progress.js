@@ -823,32 +823,36 @@ export class Progress {
     return this.data.storage.reduce((n, s) => n + storageStackSlots(s), 0);
   }
 
-  canFitStorage(k, id, n = 1) {
+  canFitStorage(k, id, n = 1, page = 0) {
     n = n | 0;
+    page = Math.max(0, Math.min(STORAGE_TABS - 1, page | 0));
     if (n < 1) return false;
+    const start = page * STORAGE_PAGE_SLOTS;
+    const slots = this.data.storage.slice(start, start + STORAGE_PAGE_SLOTS);
     if (k === 'gear') {
       if (this.storedGear(id)) return false;
-      if (!this.data.storage.some((s) => !s)) return false;
-      return this.storageUsed() < STORAGE_SLOTS;
+      return slots.some((s) => !s);
     }
     let remaining = n;
-    for (const s of this.data.storage) {
+    for (const s of slots) {
       if (!s || s.k !== k || s.id !== id) continue;
       remaining -= Math.max(0, storageStackMax(k) - (s.n | 0));
       if (remaining <= 0) return true;
     }
-    const empty = this.data.storage.filter((s) => !s).length;
+    const empty = slots.filter((s) => !s).length;
     return Math.ceil(remaining / storageStackMax(k)) <= empty;
   }
 
-  /** Merge into an existing stack, or take the first empty slot. Gear always uses its own slot. */
-  putStorage(k, id, n) {
+  /** Merge within the selected page, or take its first empty slot. Gear always uses its own slot. */
+  putStorage(k, id, n, page = 0) {
     n = n | 0;
-    if (n < 1 || !this.canFitStorage(k, id, n)) return false;
-    const slots = this.data.storage;
+    page = Math.max(0, Math.min(STORAGE_TABS - 1, page | 0));
+    if (n < 1 || !this.canFitStorage(k, id, n, page)) return false;
+    const start = page * STORAGE_PAGE_SLOTS;
+    const slots = this.data.storage.slice(start, start + STORAGE_PAGE_SLOTS);
     if (k === 'gear') {
       const at = slots.findIndex((s) => !s);
-      slots[at] = { k, id, n: 1 };
+      this.data.storage[start + at] = { k, id, n: 1 };
     } else {
       let remaining = n;
       for (const s of slots) {
@@ -861,7 +865,8 @@ export class Progress {
       while (remaining > 0) {
         const at = slots.findIndex((s) => !s);
         const add = Math.min(remaining, storageStackMax(k));
-        slots[at] = { k, id, n: add };
+        this.data.storage[start + at] = { k, id, n: add };
+        slots[at] = this.data.storage[start + at];
         remaining -= add;
       }
     }
@@ -869,7 +874,6 @@ export class Progress {
     return true;
   }
 
-  /** Pull up to n from a slot. Omit n to take the whole stack. */
   pullStorage(index, n) {
     const s = this.data.storage[index];
     if (!s) return null;
