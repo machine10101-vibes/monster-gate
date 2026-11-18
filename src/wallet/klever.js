@@ -34,20 +34,20 @@ function fail(code, message) {
   return err;
 }
 
-export function signatureText(signed, depth = 0) {
+export function signatureText(signed, depth = 0, allowBareString = true) {
   if (signed == null || depth > 8) return '';
   if (typeof signed === 'string') {
     const trimmed = signed.trim();
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
-        return signatureText(JSON.parse(trimmed), depth + 1);
+        return signatureText(JSON.parse(trimmed), depth + 1, false);
       } catch {
         return '';
       }
     }
     // Direct signMessage() results are strings. Ignore arbitrary echoed message
     // text when walking an event object so it cannot be mistaken for a signature.
-    return trimmed;
+    return allowBareString ? trimmed : '';
   }
   if (ArrayBuffer.isView(signed) && signed.byteLength === 64) {
     return [...new Uint8Array(signed.buffer, signed.byteOffset, signed.byteLength)]
@@ -69,17 +69,17 @@ export function signatureText(signed, depth = 0) {
   // Klever echoes the text to be signed there, not the cryptographic proof.
   for (const key of ['signature', 'sig', 'hex']) {
     if (signed[key] != null) {
-      const found = signatureText(signed[key], depth + 1);
+      const found = signatureText(signed[key], depth + 1, true);
       if (found) return found;
     }
   }
   if (typeof signed.toHex === 'function') {
-    const found = signatureText(signed.toHex(), depth + 1);
+    const found = signatureText(signed.toHex(), depth + 1, true);
     if (found) return found;
   }
   for (const key of ['result', 'data', 'response', 'payload']) {
     if (signed[key] != null) {
-      const found = signatureText(signed[key], depth + 1);
+      const found = signatureText(signed[key], depth + 1, false);
       if (found) return found;
     }
   }
