@@ -15,7 +15,7 @@ export { INVITE_TTL_MS, MAX_PARTY } from './party.js';
 export const SOCIAL_TYPES = new Set([
   'friend_request', 'friend_accept', 'friend_decline', 'friend_cancel', 'friend_remove', 'friend_list',
   'block', 'unblock', 'ignore', 'unignore',
-  'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'party_promote', 'party_loot',
+  'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'party_promote', 'party_loot', 'whisper',
   'whisper',
 ]);
 
@@ -563,6 +563,7 @@ export function createSocialRuntime(world, opts = {}) {
     };
     sender(session, TYPES.chat, frame);
     sender(target, TYPES.chat, frame);
+    return true;
   }
 
   function hidesChat(observer, speaker) {
