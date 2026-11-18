@@ -204,6 +204,16 @@ export function createMemoryAdapter() {
       return friendRequestResult(FRIEND_STATUS.accepted, peerOf(existing.requesterId), peerOf(existing.targetId));
     },
 
+    async cancelFriend(userId, otherUserId) {
+      const id=requireUserId(userId), other=requireUserId(otherUserId);
+      assertNotSelf(id,other);
+      const existing=findPair([...friendships.values()],id,other);
+      if(!existing || existing.status!==FRIEND_STATUS.pending || existing.requesterId!==id)throw hunterNotFound(other);
+      friendships.delete(pairKey(id,other));
+      writes+=1;
+      return {ok:true,userId:id,otherUserId:other};
+    },
+
     async declineFriend(userId, otherUserId) {
       const id = requireUserId(userId);
       const other = requireUserId(otherUserId);
