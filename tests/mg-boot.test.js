@@ -267,6 +267,9 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
 
   assert.match(main, /mountLoading/);
   assert.match(main, /loadingScreen\.dismiss/);
+  assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
+  assert.match(main, /if \(this\.started && this\.bootFrames >= 0\)/);
+  assert.match(main, /this\.bootFrames === 600/);
   assert.doesNotMatch(main, /clearSkip/);
   assert.doesNotMatch(src('src/ui/boot.js'), /requestAnimationFrame|keySourceToCanvas\(video/);
   assert.match(theme, /#load-key \{ display: none !important; \}/);
