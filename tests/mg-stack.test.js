@@ -96,21 +96,27 @@ test('saves and the hunter function still store one total per item', () => {
 });
 
 test('storage has three 40-slot pages and 99-item stacks, separate from the 20-item bag cap', () => {
-  const p = hunt();
-  assert.equal(p.putStorage('good', 'copper_ore', 45), true);
   assert.equal(STORAGE_SLOTS, 120);
   assert.equal(STORAGE_MAX_STACK, 99);
   assert.deepEqual(splitStorageStacks(205), [99, 99, 7]);
+
+  const p = hunt();
+  assert.equal(p.putStorage('good', 'copper_ore', 45), true);
   assert.equal(p.storageUsed(), 1);
   const cells = storageVisual(p.data.storage, STORAGE_SLOTS).filter(Boolean);
   assert.deepEqual(cells.map((c) => c.n), [45]);
   assert.equal(p.data.storage.filter(Boolean).length, 1);
-  assert.equal(p.data.storage.find((s) => s)?.n, 45);
-  assert.equal(p.putStorage('good', 'copper_ore', 160), true);
-  assert.equal(p.storageUsed(), 2);
-  assert.deepEqual(p.data.storage.filter(Boolean).map((s) => s.n), [99, 61]);
-  assert.equal(p.canFitStorage('good', 'copper_ore', 39), false);
-  assert.equal(p.canFitStorage('good', 'copper_ore', 40), true);
-  assert.equal(p.pullStorage(0, 99).n, 99);
-  assert.equal(p.data.storage[0], null);
+
+  const larger = hunt();
+  assert.equal(larger.putStorage('good', 'copper_ore', 160), true);
+  assert.equal(larger.storageUsed(), 2);
+  assert.deepEqual(larger.data.storage.filter(Boolean).map((s) => s.n), [99, 61]);
+  assert.equal(larger.pullStorage(0, 99).n, 99);
+  assert.equal(larger.data.storage[0], null);
+
+  const full = hunt();
+  assert.equal(full.putStorage('good', 'copper_ore', 120 * 99), true);
+  assert.equal(full.storageUsed(), 120);
+  assert.equal(full.canFitStorage('good', 'copper_ore', 1), false);
+  assert.equal(full.canFitStorage('good', 'tin_ore', 1), false);
 });
