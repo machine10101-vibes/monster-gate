@@ -26,6 +26,7 @@ export function createMemoryAdapter() {
   const byUser = new Map();
   const names = new Map();
   const friendships = new Map();
+  const relations = new Map();
   let writes = 0;
 
   function rowOf(userId) {
@@ -124,7 +125,26 @@ export function createMemoryAdapter() {
       byUser.clear();
       names.clear();
       friendships.clear();
+      relations.clear();
       writes = 0;
+    },
+
+    async listRelations(userId) {
+      const id = requireUserId(userId);
+      return [...relations.values()].filter(r => r.actorId === id).map(r => ({ user_id: r.targetId, status: r.status }));
+    },
+
+    async setRelation(userId, targetUserId, status) {
+      const id = requireUserId(userId), target = requireUserId(targetUserId);
+      assertNotSelf(id, target);
+      const key = `${id}:${target}`;
+      if (!status) relations.delete(key);
+      else {
+        if (!['blocked','ignored'].includes(status)) throw invalid('Unknown social relation.');
+        relations.set(key, { actorId:id, targetId:target, status, updatedAt:new Date().toISOString() });
+      }
+      writes += 1;
+      return { ok:true, user_id:target, status:status || '' };
     },
 
     async listFriends(userId) {
