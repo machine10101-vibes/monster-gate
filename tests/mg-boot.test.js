@@ -50,7 +50,7 @@ function fakeNode(id) {
     replaceChildren(...kids) { node.children = kids; },
     appendChild(c) { node.children.push(c); return c; },
     addEventListener(ev, fn) { node.listeners[ev] = fn; },
-    play() { node.paused = false; return Promise.resolve(); },
+    play() { node.paused = false; node.listeners.play?.(); return Promise.resolve(); },
     pause() { node.paused = true; },
     parentElement: { setAttribute() {} },
   };
@@ -101,6 +101,7 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.ok(ui);
   assert.equal(doc.map['load-video'].loop, false);
   assert.equal(doc.map['load-video'].muted, true);
+  assert.equal(doc.map.loading.classList.contains('video-playing'), true, 'native video playback is used without per-frame canvas work');
   assert.ok(doc.map['load-embers'].children.length > 0);
   assert.match(doc.map['load-tip'].textContent, /Monster Gate/);
 
@@ -124,34 +125,29 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.equal(doc.map.loading.classList.contains('hidden'), true);
 });
 
-test('a repeat boot in the same tab skips the duplicate splash, but interrupted boots replay it', () => {
+test('a completed splash is not replayed on same-tab reload, but an interrupted boot recovers', async () => {
   const values = new Map();
   const store = {
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, String(value)); },
     removeItem(key) { values.delete(key); },
   };
-  const first = fakeDoc();
   const noTimers = { setInterval: () => 0, clearInterval: () => {} };
-  const firstUi = mountLoading(first, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
+  const first = fakeDoc();
+  const firstUi = mountLoading(first, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
   assert.equal(first.map.loading.classList.contains('hidden'), false);
   assert.equal(values.get('mg-load-seen'), '1');
-  firstUi.clearSkip();
+  assert.equal(values.get('mg-boot'), '1', 'boot is marked in progress until the splash completes');
+  await firstUi.dismiss({ now: 4000, wait: () => 0 });
+  assert.equal(values.has('mg-boot'), false, 'successful completion clears only the in-progress marker');
 
-  const second = fakeDoc();
-  const secondUi = mountLoading(second, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
-  assert.equal(second.map.loading.classList.contains('hidden'), false, 'cleared after entering the world');
-  secondUi.clearSkip();
-
-  values.set('mg-load-seen', '1');
   const repeat = fakeDoc();
-  mountLoading(repeat, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
-  assert.equal(repeat.map.loading.classList.contains('hidden'), true);
-  assert.equal(repeat.map['load-video'].paused, true);
+  mountLoading(repeat, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
+  assert.equal(repeat.map.loading.classList.contains('hidden'), true, 'auth/session reload skips the already completed splash');
 
   values.set('mg-boot', '1');
   const interrupted = fakeDoc();
-  mountLoading(interrupted, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
+  mountLoading(interrupted, { ...noTimers, sessionStorage: store, reduced: true, fadeMs: 0 });
   assert.equal(interrupted.map.loading.classList.contains('hidden'), false, 'an interrupted boot still gets its recovery screen');
 });
 
@@ -265,7 +261,12 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
 
   assert.match(main, /mountLoading/);
   assert.match(main, /loadingScreen\.dismiss/);
-  assert.match(main, /loadingScreen\?\.clearSkip\?\.\(\)/);
+  assert.doesNotMatch(main, /clearSkip/);
+  assert.doesNotMatch(src('src/ui/boot.js'), /requestAnimationFrame|keySourceToCanvas\(video/);
+  assert.match(theme, /#load-key \{ display: none !important; \}/);
+  assert.match(theme, /#loading\.video-playing \.load-poster/);
+  assert.match(src('src/ui/charselect.js'), /single-character/);
+  assert.match(src('src/style.css'), /#charselect\.single-character \.cs-panel/);
   assert.match(theme, /#loading\.held \.load-glow/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
   assert.match(theme, /mask-image:\s*radial-gradient/);

@@ -55,6 +55,7 @@ function loadWasAlreadyShown(store) {
     const interrupted = store.getItem(BOOT_IN_PROGRESS_KEY) === '1';
     if (seen && !interrupted) return true;
     store.setItem(LOAD_SEEN_KEY, '1');
+    store.setItem(BOOT_IN_PROGRESS_KEY, '1');
   } catch {
     /* private browsing can disable session storage */
   }
@@ -147,28 +148,18 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   }
   const skipRepeat = loadWasAlreadyShown(session);
   const video = doc.getElementById('load-video');
-  const poster = el.querySelector?.('.load-poster') || doc.querySelector?.('.load-poster');
-  const canvas = doc.getElementById('load-key');
-  const stage = el.querySelector?.('.load-stage');
   const tipEl = doc.getElementById('load-tip');
   const embers = doc.getElementById('load-embers');
   const reduced = opts.reduced ?? prefersReducedMotion(opts.win || globalThis);
   const mobile = opts.mobile ?? (typeof matchMedia === 'function' && matchMedia('(max-width: 900px), (max-height: 520px)').matches);
   const startedAt = opts.now ?? Date.now();
   const fadeMs = opts.fadeMs ?? LOAD_FADE_MS;
-  const raf = opts.requestAnimationFrame || globalThis.requestAnimationFrame;
-  const caf = opts.cancelAnimationFrame || globalThis.cancelAnimationFrame;
   let tipIndex = 0;
   let tipTimer = 0;
   let held = false;
-  let rafId = 0;
-  let keyed = false;
   let resolveVideoDone = () => {};
   const videoDone = new Promise((resolve) => { resolveVideoDone = resolve; });
 
-  const clearSkip = () => {
-    try { session?.removeItem?.(LOAD_SEEN_KEY); } catch { /* storage is optional */ }
-  };
   if (skipRepeat) {
     el.classList.add('hidden');
     el.setAttribute('aria-hidden', 'true');
@@ -179,74 +170,35 @@ export function mountLoading(root = globalThis.document, opts = {}) {
       el, startedAt,
       setProgress(p, t) { return setLoadProgress(fill, text, p, t); },
       async dismiss() { return true; },
-      clearSkip,
     };
   }
 
   el.classList.toggle('reduced', reduced);
   spawnEmbers(embers, emberCount({ mobile, reduced }), (tag) => doc.createElement(tag));
 
-  const paint = (src) => {
-    if (!keySourceToCanvas(src, canvas)) return false;
-    keyed = true;
-    canvas.classList?.add?.('on');
-    stage?.classList?.add?.('is-keyed');
-    el.classList.add('keyed');
-    return true;
-  };
-
-  const paintVideo = () => {
-    if (!video || reduced) return paint(poster);
-    if ((video.readyState || 0) >= 2) return paint(video);
-    return paint(poster);
-  };
-
   const finish = () => {
     if (reduced || held || !finishVideoAtEnd(video)) return false;
     held = true;
     el.classList.add('held');
-    paint(video);
     resolveVideoDone();
-    if (rafId && typeof caf === 'function') caf(rafId);
-    rafId = 0;
     return true;
   };
-
-  const tick = () => {
-    rafId = 0;
-    if (held || reduced) return;
-    if (video?.ended) {
-      finish();
-      return;
-    }
-    paintVideo();
-    if (typeof raf === 'function') rafId = raf(tick);
-  };
-
-  if (poster && !poster.complete) poster.addEventListener?.('load', () => { if (!keyed || reduced || held) paint(poster); });
-  else if (poster) paint(poster);
-
   if (reduced) {
     try { video?.pause?.(); } catch { /* ignore */ }
-    paint(poster);
   } else if (video) {
     video.loop = false;
     video.muted = true;
     video.playsInline = true;
+    video.addEventListener('play', () => el.classList.add('video-playing'));
     video.addEventListener('ended', finish);
-    video.addEventListener('seeked', () => paint(video));
-    video.addEventListener('play', () => { if (!rafId && typeof raf === 'function') rafId = raf(tick); });
     const play = video.play?.();
     if (play && typeof play.catch === 'function') play.catch(() => {
       held = true;
+      el.classList.add('video-failed');
       el.classList.add('held');
-      paintVideo();
       resolveVideoDone();
     });
-    if (typeof raf === 'function') rafId = raf(tick);
-  } else {
-    resolveVideoDone();
-  }
+  } else resolveVideoDone();
 
   if (tipEl) {
     tipEl.textContent = nextTip(0);
@@ -268,7 +220,7 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     async dismiss({ now, wait = remainMinDisplay } = {}) {
       const delay = wait(startedAt, now ?? Date.now());
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-      if (!reduced && video && !video.ended && !video.paused) {
+      if (!reduced && video && !video.ended && !el.classList.contains('video-failed')) {
         const timeout = Math.max(0, Number(opts.videoEndTimeoutMs ?? 10000));
         await Promise.race([videoDone, new Promise((resolve) => setTimeout(resolve, timeout))]);
       }
@@ -277,10 +229,9 @@ export function mountLoading(root = globalThis.document, opts = {}) {
       el.classList.add('hidden');
       el.setAttribute('aria-hidden', 'true');
       try { video?.pause?.(); } catch { /* ignore */ }
-      if (rafId && typeof caf === 'function') caf(rafId);
       if (tipTimer) (opts.clearInterval || clearInterval)(tipTimer);
+      try { session?.removeItem?.(BOOT_IN_PROGRESS_KEY); } catch { /* storage is optional */ }
       return true;
     },
-    clearSkip,
   };
 }
