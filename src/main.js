@@ -747,21 +747,22 @@ class Game {
 
   continueAfterAccount() {
     if (this.started) return;
+    const signed = !!(this.wallet && this.wallet.kind === 'email');
+    // Email authentication always returns to the hunter camp first.
+    if (signed) {
+      this.openCharacterSelect();
+      return;
+    }
     if (shouldForceWorldPick()) {
       this.showWorldPicker({ force: true });
       return;
     }
     const join = consumeWorldJoin();
-    const signed = !!(this.wallet && this.wallet.kind !== 'guest');
     const next = worldJoinContinue({
-      signedIn: signed && hasWorldSessionToken(),
+      signedIn: false,
       join,
       hasCharacter: !!this.roster?.chars?.length,
     });
-    if (next === 'enter') {
-      this.continueSignedInHunt();
-      return;
-    }
     if (next === 'select') {
       this.openCharacterSelect();
       return;
@@ -770,13 +771,8 @@ class Game {
       this.openSocialSignIn();
       return;
     }
-    if (signed) {
-      this.openCharacterSelect();
-      return;
-    }
     if (this.wallet) this.openCharacterSelect();
   }
-
   continueSignedInHunt() {
     // Signing in restores the account, not the previous character selection.
     // Always let the hunter choose a character before entering the world.
