@@ -37,14 +37,6 @@ export function attachSocial(game, search) {
     if (evt?.type === 'error' && evt.code) {
       game?.hud?.toast?.(errorMessage(evt.code, evt.message), 2400);
     }
-    if (evt?.type === 'whisper' && evt.text && game.worldView?.pushChat) {
-      game.worldView.pushChat({
-        channel: 'whisper',
-        from: { id: snap.self?.id, name: snap.self?.name || 'Hunter' },
-        to: { id: evt.to, name: evt.name },
-        text: evt.text,
-      });
-    }
   });
   wrapGame(game, session);
   return session;
