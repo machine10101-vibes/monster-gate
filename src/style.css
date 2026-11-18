@@ -3785,6 +3785,33 @@ body.selecting #damage-layer { display: none; }
   .cs-blurb { min-height: 0; font-size: 13px; }
 }
 
+
+/* Compact character roster on touch devices held in landscape. Keep the
+   roster usable, but let the 3D hunter and action buttons own the screen. */
+@media (max-height: 600px) and (min-aspect-ratio: 5/4) and (max-width: 1100px) {
+  .cs-top { display: none; }
+  .cs-panel {
+    top: max(32px, var(--safe-t));
+    right: max(8px, var(--safe-r));
+    bottom: auto;
+    width: clamp(210px, 28vw, 270px);
+    height: min(46vh, 176px);
+    max-height: calc(100dvh - 78px - var(--safe-t) - var(--safe-b));
+  }
+  .cs-search { padding: 5px 6px 2px; }
+  .cs-search input { padding: 5px 7px; font-size: 12px; }
+  .cs-list { padding: 1px 5px 5px; }
+  .cs-group { margin: 3px 0 2px; padding: 4px 6px; font-size: 8px; }
+  .cs-row { gap: 7px; margin: 2px 0; padding: 4px 6px; }
+  .cs-emblem { width: 28px; height: 28px; font-size: 11px; }
+  .cs-info { gap: 1px; }
+  .cs-info b { font-size: 9px; }
+  .cs-lv { font-size: 10px; }
+  .cs-info small { font-size: 9px; }
+  .cs-rank { width: 28px; height: 28px; font-size: 11px; }
+  .cs-star { font-size: 18px; }
+}
+
 /* phone + tablet menus: fill the screen and drop the desktop gutters ------ */
 body.touch #dialog { z-index: 55; }
 body.touch #panel { z-index: 62; }
