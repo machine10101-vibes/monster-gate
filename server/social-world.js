@@ -184,7 +184,12 @@ export class SocialWorld {
       return;
     }
     if (m.type==='party_accept' || m.type==='party_decline') {
-      const inv=this.invites.get(String(m.invite_id||'')); if (!inv || inv.target!==s || this.world.now()>inv.expires) { this.invites.delete(String(m.invite_id||'')); return fail('expired','That invite expired.'); }
+      const inv=this.invites.get(String(m.invite_id||''));
+      if (!inv || inv.target!==s || this.world.now()>inv.expires) {
+        this.invites.delete(String(m.invite_id||''));
+        if (inv && this.world.now()>inv.expires) { const p=this.partyFor(inv.from); if(p && p.members.length===1){this.partyByPlayer.delete(inv.from.id);this.parties.delete(p.id);} }
+        return fail('expired','That invite expired.');
+      }
       this.invites.delete(inv.inviteId);
       if (m.type==='party_decline') { const p=this.partyFor(inv.from); if(p && p.members.length===1){this.partyByPlayer.delete(inv.from.id);this.parties.delete(p.id);} return; }
       if (this.partyFor(s)) return fail('in_party','You are already in a party.');
@@ -239,7 +244,10 @@ export class SocialWorld {
   }
   async onDrop(s) {
     await this.presence(s,false).catch(()=>{});
-    for(const [id,inv] of this.invites) if(inv.from===s || inv.target===s)this.invites.delete(id);
+    for(const [id,inv] of this.invites) if(inv.from===s || inv.target===s){
+      this.invites.delete(id);
+      if(inv.target===s){const pendingParty=this.partyFor(inv.from);if(pendingParty && pendingParty.members.length===1){this.partyByPlayer.delete(inv.from.id);this.parties.delete(pendingParty.id);}}
+    }
     const p=this.partyFor(s);
     if(p){
       p.members=p.members.filter(x=>x!==s);this.partyByPlayer.delete(s.id);
