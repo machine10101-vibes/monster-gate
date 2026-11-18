@@ -173,7 +173,7 @@ function bindHold(button, spec) {
   });
 }
 
-/** The town crate. The bag is on the left, thirty storage slots on the right. */
+/** The town crate. The bag is on the left, with the selected 40-slot storage page on the right. */
 export function mountStorage(body, game) {
   let tab = 'goods';
   let sel = null;
@@ -242,7 +242,7 @@ export function mountStorage(body, game) {
         i.textContent = it.badge;
         b.appendChild(i);
       }
-      if (touch) bindHold(b, { name: it.name, max: it.n, verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n), done: () => paint() });
+      if (touch) bindHold(b, { name: it.name, max: it.n, verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n, page), done: () => paint() });
       else b.onclick = () => {
         sel = it.key;
         paint();
@@ -260,7 +260,7 @@ export function mountStorage(body, game) {
       all.className = 'bag-act';
       all.textContent = current.n > 1 ? 'Store all' : 'Store';
       all.onclick = () => {
-        game.storeInCrate(current.k, current.id, current.n);
+        game.storeInCrate(current.k, current.id, current.n, page);
         paint();
       };
       row.appendChild(all);
@@ -270,7 +270,7 @@ export function mountStorage(body, game) {
         one.className = 'bag-act';
         one.textContent = 'Store 1';
         one.onclick = () => {
-          game.storeInCrate(current.k, current.id, 1);
+          game.storeInCrate(current.k, current.id, 1, page);
           paint();
         };
         row.appendChild(one);

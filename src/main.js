@@ -3164,7 +3164,7 @@ class Game {
     return true;
   }
 
-  storeInCrate(k, id, n) {
+  storeInCrate(k, id, n, page = 0) {
     n = n | 0;
     if (n < 1) return false;
     const pr = this.progress;
@@ -3172,7 +3172,7 @@ class Game {
       this.hud.toast('That is already in the crate', 1400);
       return false;
     }
-    if (!pr.canFitStorage(k, id, n)) {
+    if (!pr.canFitStorage(k, id, n, page)) {
       this.hud.toast('The crate is full', 1400);
       return false;
     }
@@ -3207,7 +3207,7 @@ class Game {
       pr.setStock(id, it.count);
       this.itemsChanged();
     } else return false;
-    if (!pr.putStorage(k, id, n)) {
+    if (!pr.putStorage(k, id, n, page)) {
       refund();
       this.hud.toast('The crate is full', 1400);
       return false;
