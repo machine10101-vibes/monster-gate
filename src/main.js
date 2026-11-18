@@ -98,6 +98,7 @@ import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
+import { clearRotationRecovery, consumeRotationRecovery, rememberRotationRecovery, screenOrientation } from './engine/rotationRecovery.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
 
@@ -460,6 +461,22 @@ class Game {
 
     if (loadingScreen) await loadingScreen.dismiss();
     else document.getElementById('loading')?.classList.add('hidden');
+
+    // Klever can recreate its Android WebView during a physical rotation. Only
+    // restore a hunt when Enter World was tapped moments earlier and the
+    // orientation actually changed; ordinary launches still stop at login.
+    const rotationRecovery = consumeRotationRecovery(
+      localStorage,
+      screenOrientation(window.innerWidth, window.innerHeight),
+    );
+    if (rotationRecovery) {
+      const account = readAccount();
+      if (account) {
+        await this.applyWallet(account);
+        const selected = this.roster?.get(rotationRecovery.characterId);
+        if (selected) this.enterWorld(selected);
+      }
+    }
     consumeWorldAuth();
     if (shouldForceWorldPick() && !this.started) this.showWorldPicker({ force: true });
     if (this.started) document.getElementById('title')?.classList.add('hidden');
@@ -964,6 +981,11 @@ class Game {
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
   enterWorld(char) {
     if (this.started || !this.roster?.get(char.id)) return;
+    rememberRotationRecovery(
+      localStorage,
+      char.id,
+      screenOrientation(window.innerWidth, window.innerHeight),
+    );
     this.character = char;
     this.roster.played(char.id);
     this.progress.useCharacter(this.roster.charKey(char.id));
@@ -1133,6 +1155,7 @@ class Game {
   }
 
   async signOut(repromptKlever) {
+    clearRotationRecovery(localStorage);
     const leaveWorld = this.started;
     this.captureHunter();
     try {
