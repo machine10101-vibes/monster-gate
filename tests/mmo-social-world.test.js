@@ -45,7 +45,6 @@ test('World 1 parties require acceptance, broadcast authoritative state, promote
   b.send(encode('party_accept', { invite_id: invite.invite_id }));
   await waitFor(a, m => m.type === 'party_state' && m.party?.members?.length === 2);
   await waitFor(b, m => m.type === 'party_state' && m.party?.members?.length === 2);
-  a.send(encode('party_promote', { id: 'g_' + 'unused' }));
   await new Promise(r => setTimeout(r, 30));
   const party = am.filter(m => m.type === 'party_state' && m.party).at(-1).party;
   const memberB = party.members.find(m => m.name === 'Bea');
@@ -85,6 +84,7 @@ test('signed-in friends persist in social store and whispers are private', async
   assert.equal(cm.some(m => m.type === 'chat' && m.channel === 'whisper'), false);
 
   a.send(encode('block', { user_id: 'id-cal' }));
+  await waitFor(a, m => m.type === 'friend_list' && m.blocked?.some(f => f.user_id === 'id-cal'));
   c.send(encode('chat', { channel: 'world', text: 'This should be hidden.' }));
   await new Promise(r => setTimeout(r, 60));
   assert.equal(am.some(m => m.type === 'chat' && m.text === 'This should be hidden.'), false);
