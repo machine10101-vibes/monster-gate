@@ -173,6 +173,7 @@ export class World {
       }
       if (msg.type === TYPES.move) this.move(session, msg);
       else if (msg.type === TYPES.chat && msg.channel === 'whisper') await this.social.whisper(session, msg);
+      else if (msg.type === TYPES.chat && msg.channel === 'party') this.partyChat(session, msg);
       else if (msg.type === TYPES.chat) this.chat(session, msg);
       else if (msg.type === TYPES.whisper) await this.social.whisper(session, { ...msg, to: msg.to });
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
@@ -362,6 +363,15 @@ export class World {
     this.social.onHp(session, prevHp);
     this.social.onPose?.(session);
     this.persistPose(session);
+  }
+
+  partyChat(session,msg) {
+    if (!session.limiter.allowChat()) { send(session.ws,errorFrame('rate','Slow down.')); return; }
+    const party=this.social.parties.partyOf(session.id);
+    if(!party){send(session.ws,errorFrame('not_in_party','You are not in a party.'));return;}
+    const text=msg.text;
+    const frame={id:`c_${++this.chatSeq}`,channel:'party',from:{id:session.id,name:session.name},text,at:this.now()};
+    for(const member of party.members){const target=this.players.get(member.id);if(target)send(target.ws,TYPES.chat,frame);}
   }
 
   chat(session, msg) {
