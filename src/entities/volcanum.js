@@ -545,11 +545,16 @@ export function buildVolcanumDragon() {
   const body = meshFrom(paintBody(), BO.x, BO.y, BO.z, mat);
   bodyG.add(body);
 
+  // Two-stage neck/head rig: the neck tracks the target while the skull can
+  // counter-steer, look around, and pitch independently.
+  const neck = new THREE.Group();
+  neck.position.set(0, (23 - BO.y) * S, (34 - BO.z) * S);
+  bodyG.add(neck);
   const head = new THREE.Group();
-  head.position.set(0, (27 - BO.y) * S, (42.8 - BO.z) * S);
+  head.position.set(0, (27 - 23) * S, (42.8 - 34) * S);
   head.scale.setScalar(0.86);
   head.add(meshFrom(paintHead(), HO.x, HO.y, HO.z, mat));
-  bodyG.add(head);
+  neck.add(head);
   const jaw = new THREE.Group();
   jaw.position.set(0, -1.4 * S, 4 * S);
   jaw.add(meshFrom(paintJaw(), 9, 4, 3, mat));
@@ -617,5 +622,5 @@ export function buildVolcanumDragon() {
     tail.push(g);
   });
 
-  return { root, mat, parts: { body, bodyG, head, jaw, legs, knees, tail, wings, wingsOuter } };
+  return { root, mat, parts: { body, bodyG, neck, head, jaw, legs, knees, tail, wings, wingsOuter } };
 }
