@@ -52,8 +52,9 @@ function loadWasAlreadyShown(store) {
   if (!store?.getItem || !store?.setItem) return false;
   try {
     const seen = store.getItem(LOAD_SEEN_KEY) === '1';
-    const interrupted = store.getItem(BOOT_IN_PROGRESS_KEY) === '1';
-    if (seen && !interrupted) return true;
+    // Once the splash has played in this tab, never replay it on an internal
+    // WebView reload (for example, during the first portrait-to-landscape switch).
+    if (seen) return true;
     store.setItem(LOAD_SEEN_KEY, '1');
     store.setItem(BOOT_IN_PROGRESS_KEY, '1');
   } catch {
