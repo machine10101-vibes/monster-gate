@@ -1,6 +1,6 @@
 /**
- * Brand loading screen. The clip already carries the MONSTERGATE .online logo,
- * so we play it once and hold a clean mid-shot instead of looping the crop.
+ * Brand loading screen. The clip carries the MONSTERGATE .online logo;
+ * play it once through its final frame, independently of world-build progress.
  */
 
 export const LOAD_MIN_MS = 1500;
