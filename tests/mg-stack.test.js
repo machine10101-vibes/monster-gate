@@ -98,7 +98,11 @@ test('saves and the hunter function still store one total per item', () => {
 test('storage has three 40-slot pages and 99-item stacks, separate from the 20-item bag cap', () => {
   assert.equal(STORAGE_SLOTS, 120);
   assert.equal(STORAGE_MAX_STACK, 99);
+  assert.equal(storageStackMax('good'), 99);
+  assert.equal(storageStackMax('part'), 99);
+  assert.equal(storageStackMax('potion'), 20);
   assert.deepEqual(splitStorageStacks(205), [99, 99, 7]);
+  assert.deepEqual(splitStorageStacks(45, storageStackMax('potion')), [20, 20, 5]);
 
   const p = hunt();
   assert.equal(p.putStorage('good', 'copper_ore', 45), true);
