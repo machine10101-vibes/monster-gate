@@ -147,7 +147,8 @@ export class SocialWorld {
     }
     await this.friendList(s);
     if (m.type !== 'friend_list') {
-      const id = String(m.user_id || m.id || '');
+      const rawId = String(m.user_id || m.id || '');
+      const id = rawId.startsWith('u_') ? rawId.slice(2) : rawId;
       const target = this.onlineByUser(id);
       if (target && target !== s) await this.friendList(target).catch(()=>{});
     }
@@ -175,7 +176,7 @@ export class SocialWorld {
       if (this.partyByPlayer.has(target.id)) return fail('in_party','That hunter is already in a party.');
       if (party && party.leader!==s.id) return fail('not_leader','Only the leader can invite.');
       if ((party?.members.length||1)>=MAX_PARTY) return fail('full','Party is full (4).');
-      if (!s.guest && !target.guest && (await this.blocked(s.userId,target.userId) || await this.blocked(target.userId,s.userId))) return fail('blocked','Party invite unavailable.');
+      if (!s.guest && !target.guest && (await this.blocked(s.userId,target.userId) || await this.blocked(target.userId,s.userId) || await this.ignored(target.userId,s.userId))) return fail('blocked','Party invite unavailable.');
       if (!party) party=this.makeParty(s);
       const inviteId=`pinv_${++this.inviteSeq}`;
       this.invites.set(inviteId,{ inviteId,from:s,target,expires:this.world.now()+INVITE_TTL });
@@ -216,7 +217,7 @@ export class SocialWorld {
     const target=this.findOnline(m.to);
     const text=clean(m.text,120);
     if(!target || !text){this.error(s,'whisper','Whisper target unavailable.');return;}
-    if((!s.guest && !target.guest) && (await this.restricted(s.userId,target.userId) || await this.restricted(target.userId,s.userId))){this.error(s,'whisper','Whisper target unavailable.');return;}
+    if((!s.guest && !target.guest) && (await this.blocked(s.userId,target.userId) || await this.blocked(target.userId,s.userId) || await this.ignored(target.userId,s.userId))){this.error(s,'whisper','Whisper target unavailable.');return;}
     const frame={id:`c_${++this.world.chatSeq}`,channel:'whisper',from:{id:s.id,name:s.name},to:{id:target.id,name:target.name},text,at:this.world.now()};
     this.send(s,'chat',frame); this.send(target,'chat',frame);
   }
