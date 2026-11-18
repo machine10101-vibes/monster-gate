@@ -30,6 +30,7 @@ import {
   maybeResumeOnline,
   mmoClientClosed,
   offlineSearch,
+  onWorldPlayClick,
   onlineSearch,
   paintWorldModePill,
   paintWorldPicker,
@@ -37,6 +38,7 @@ import {
   parseWorldHealth,
   rememberWorldMode,
   remountMmoClient,
+  signedInWorldContinue,
   shouldAutoOnline,
   shouldDropOnlineWithoutSession,
   shouldForceWorldPick,
@@ -364,6 +366,29 @@ test('paintWorldPlayButton and the Online/Offline pill follow the same state', (
   paintWorldModePill(pill, { search: '?mmo=1' });
   assert.equal(pill.dataset.mode, 'online');
   assert.equal(pill.textContent, 'Online');
+
+  const live = { hidden: false, dataset: { mode: 'online', connectionState: 'online' }, textContent: 'Online' };
+  paintWorldModePill(live, { search: '' });
+  assert.equal(live.textContent, 'Online', 'a live socket owns the pill');
+  assert.equal(live.dataset.mode, 'online');
+});
+
+test('signing in from World 1 stays on World 1', () => {
+  assert.equal(signedInWorldContinue({ join: 'online', search: '', hasToken: true }), 'enter-online');
+  assert.equal(signedInWorldContinue({ join: 'online', search: '?mmo=1', hasToken: true }), 'select');
+  assert.equal(signedInWorldContinue({ join: 'offline', search: '', hasToken: true }), 'select');
+  assert.equal(signedInWorldContinue({ join: null, search: '', hasToken: true }), 'select');
+  assert.equal(signedInWorldContinue({ join: 'online', search: '', hasToken: false }), 'select');
+  const session = memoryStore();
+  const storage = memoryStore();
+  assert.equal(onWorldPlayClick({
+    stores: [session],
+    storage,
+    session,
+    onNeedSignIn() {},
+  }), false);
+  assert.equal(session.getItem(WORLD_JOIN_KEY), 'online');
+  assert.equal(storage.getItem(WORLD_MODE_KEY), 'online');
 });
 
 test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wired', () => {

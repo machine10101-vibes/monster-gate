@@ -14,6 +14,8 @@ export const PROTOCOL = 1;
 
 const SESSION_KEY = 'monster-gate-account-session';
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
+const PING_MS = 15000;
+const TOKEN_WATCH_MS = 400;
 
 function paramsOf(search) {
   const raw = String(search || '');
@@ -43,16 +45,29 @@ export function resolveServerUrl(search = '', opts = {}) {
   return '';
 }
 
-function readAccessToken() {
-  if (typeof sessionStorage === 'undefined') return '';
-  for (const store of [sessionStorage, typeof localStorage !== 'undefined' ? localStorage : null]) {
-    if (!store) continue;
-    try {
-      const raw = JSON.parse(store.getItem(SESSION_KEY) || 'null');
-      if (raw && typeof raw.accessToken === 'string') return raw.accessToken;
-    } catch {
-      /* try the other store */
-    }
+function tokenFromStore(store) {
+  if (!store?.getItem) return '';
+  try {
+    const raw = JSON.parse(store.getItem(SESSION_KEY) || 'null');
+    const token = raw && typeof raw.accessToken === 'string' ? raw.accessToken.trim() : '';
+    return token;
+  } catch {
+    return '';
+  }
+}
+
+/** Live wallet token, else the first non-blank stored session token. */
+export function readAccessToken(game) {
+  const wallet = game?.wallet && typeof game.wallet.accessToken === 'string'
+    ? game.wallet.accessToken.trim()
+    : '';
+  if (wallet) return wallet;
+  const stores = [];
+  if (typeof sessionStorage !== 'undefined') stores.push(sessionStorage);
+  if (typeof localStorage !== 'undefined') stores.push(localStorage);
+  for (const store of stores) {
+    const token = tokenFromStore(store);
+    if (token) return token;
   }
   return '';
 }
@@ -81,6 +96,11 @@ export class MmoClient {
     this.timer = 0;
     this.you = null;
     this.bound = false;
+    this.pingTimer = 0;
+    this.tokenWatch = 0;
+    this.authHold = false;
+    this.rejectedToken = '';
+    this.lastHelloToken = '';
   }
 
   bind() {
@@ -112,16 +132,20 @@ export class MmoClient {
     ws.addEventListener('open', () => {
       if (this.ws !== ws) return;
       this.attempt = 0;
+      const token = readAccessToken(this.game);
+      this.lastHelloToken = token;
       ws.send(encode('hello', {
-        token: readAccessToken(),
+        token,
         name: localName(this.game),
         look: localLook(this.game),
       }));
     });
     ws.addEventListener('message', (ev) => this.onFrame(ev.data));
     ws.addEventListener('close', () => {
-      if (this.ws === ws) this.ws = null;
-      if (!this.closed) this.schedule();
+      if (this.ws !== ws) return;
+      this.stopPing();
+      this.ws = null;
+      if (!this.closed && !this.authHold) this.schedule();
     });
     ws.addEventListener('error', () => {
       /* close handler schedules reconnect */
@@ -138,7 +162,13 @@ export class MmoClient {
     if (!msg || msg.v !== PROTOCOL) return;
     if (msg.type === 'welcome') {
       this.you = msg.you || null;
+      this.authHold = false;
+      this.rejectedToken = '';
+      this.stopTokenWatch();
+      this.startPing();
       this.setStatus({ status: 'online', online: msg.online });
+    } else if (msg.type === 'pong') {
+      /* keepalive reply */
     } else if (msg.type === 'snapshot') {
       this.view?.applySnapshot?.(msg.players || [], { online: msg.online, zone: msg.zone });
       if (msg.online != null) this.view?.setOnlineCount?.(msg.online);
@@ -150,8 +180,75 @@ export class MmoClient {
     } else if (msg.type === 'leave' && msg.id) {
       this.view?.removePlayer?.(msg.id);
     } else if (msg.type === 'error') {
-      this.view?.setStatus?.({ status: this.view.status || 'online', detail: msg.message || msg.code });
+      this.setStatus({
+        status: this.view?.status || 'connecting',
+        code: msg.code || '',
+        message: msg.message || '',
+        detail: msg.message || msg.code || '',
+      });
     }
+  }
+
+  startPing() {
+    this.stopPing();
+    const timer = setInterval(() => {
+      if (this.ws && this.ws.readyState === 1) this.ws.send(encode('ping', { t: Date.now() }));
+    }, PING_MS);
+    timer.unref?.();
+    this.pingTimer = timer;
+  }
+
+  stopPing() {
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    this.pingTimer = 0;
+  }
+
+  stopTokenWatch() {
+    if (this.tokenWatch) clearInterval(this.tokenWatch);
+    this.tokenWatch = 0;
+  }
+
+  /**
+   * Auth failed for the token we just sent. Keep the client so a later sign-in
+   * can hello again. The same rejected token is not retried.
+   */
+  holdForAuth() {
+    if (this.closed) return;
+    this.authHold = true;
+    this.rejectedToken = this.lastHelloToken || readAccessToken(this.game);
+    this.stopPing();
+    clearTimeout(this.timer);
+    this.timer = 0;
+    if (this.ws) {
+      const ws = this.ws;
+      this.ws = null;
+      try { ws.close(); } catch { /* already closing */ }
+    }
+    this.watchToken();
+  }
+
+  watchToken() {
+    this.stopTokenWatch();
+    if (this.pollToken()) return;
+    const timer = setInterval(() => {
+      if (this.pollToken()) this.stopTokenWatch();
+    }, TOKEN_WATCH_MS);
+    timer.unref?.();
+    this.tokenWatch = timer;
+  }
+
+  /** Re-hello when the signed-in token is no longer the one World 1 rejected. */
+  pollToken() {
+    if (this.closed || !this.authHold) return false;
+    const token = readAccessToken(this.game);
+    if (!token || token === this.rejectedToken) return false;
+    this.authHold = false;
+    this.rejectedToken = '';
+    this.stopTokenWatch();
+    this.view?.clearAuthLatch?.();
+    this.attempt = 0;
+    this.connect();
+    return true;
   }
 
   sendMove(pose) {
@@ -197,7 +294,10 @@ export class MmoClient {
 
   dispose() {
     this.closed = true;
+    this.authHold = false;
     clearTimeout(this.timer);
+    this.stopPing();
+    this.stopTokenWatch();
     if (this.ws) {
       try { this.ws.close(); } catch { /* already closing */ }
       this.ws = null;

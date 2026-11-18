@@ -326,7 +326,8 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
 
   assert.doesNotMatch(main, /readResumeCharacter|rememberResumeCharacter|mg-resume-character/, 'a page restart must never auto-enter a saved hunter');
   assert.match(main, /clearSession\(\);/, 'fresh boot returns to the explicit login gate');
-  assert.match(main, /if \(signed\) \{\s*this\.openCharacterSelect\(\);/, 'successful email sign-in opens character selection');
+  assert.match(main, /if \(signed\) \{[\s\S]*?this\.openCharacterSelect\(\);/, 'successful email sign-in opens character selection');
+  assert.match(main, /signedInWorldContinue\([\s\S]*?enterOnlineWorld\(\)/, 'World 1 sign-in keeps the hunter on World 1');
   assert.match(main, /mountLoading/);
   assert.match(main, /isRotationRecoveryPending/);
   assert.match(main, /mountLoading\(document, \{ skip: rotationReload \}\)/);

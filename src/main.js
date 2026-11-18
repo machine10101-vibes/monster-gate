@@ -44,6 +44,7 @@ import {
   shouldForceWorldPick,
   shouldFreshMmoClient,
   shouldMountOnline,
+  signedInWorldContinue,
   worldJoinContinue,
   worldPickerState,
   worldServerConfigured,
@@ -784,8 +785,20 @@ class Game {
     // can close character selection before cloud sync/world startup is ready,
     // leaving Klever's recreated WebView on a blank or inaccessible screen.
     const signed = !!(this.wallet && this.wallet.kind === 'email');
-    // Email authentication always returns to the hunter camp first.
+    // Email authentication returns to the hunter camp, unless World 1 was the
+    // button that opened sign-in. That choice has to keep ?mmo=1 or the pill
+    // stays Offline on a solo hunt.
     if (signed) {
+      const join = consumeWorldJoin();
+      const search = typeof location !== 'undefined' ? location.search : '';
+      if (signedInWorldContinue({
+        join,
+        search,
+        hasToken: hasWorldSessionToken(),
+      }) === 'enter-online') {
+        enterOnlineWorld();
+        return;
+      }
       this.openCharacterSelect();
       return;
     }
@@ -877,6 +890,8 @@ class Game {
     const search = typeof location !== 'undefined' ? location.search : '';
     if (!worldServerConfigured(search)) return;
     if (!hasWorldSessionToken()) {
+      rememberWorldMode('online');
+      markWorldJoin('online');
       this.openSocialSignIn();
       return;
     }

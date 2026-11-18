@@ -5,10 +5,10 @@ import {
   ANIM, AUTH_SIGNIN_BTN, AUTH_SIGNIN_TITLE, AUTH_SOLO_BTN, CHAT_MAX, LOCAL_BUBBLE_S, LOCAL_PIN_S,
   REMOTE_PREFIX, STATUS, WAKE_SECONDS, WORLD_SPAWN, WORLD_VIEW,
   SnapshotBuffer, WorldView, angLerp, animName, animOf, fullyVisibleRows, isAuthReject, isWorldWireError,
-  newestKeepIndex, normalizeChat, normalizePlayer, parseMmoFlags, planLogCull, wakeClock, worldView,
+  newestKeepIndex, normalizeChat, normalizePlayer, parseMmoFlags, planLogCull, wakeClock, worldModeLabel, worldView,
 } from '../src/net/worldView.js';
 import { HUNTERS, MockWorld } from '../src/net/worldMock.js';
-import { attachMmo, parseMmoClientFlags } from '../src/net/mmo.js';
+import { MmoClient, attachMmo, parseMmoClientFlags, readAccessToken } from '../src/net/mmo.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -499,6 +499,7 @@ test('setStatus error name_taken accepts object detail without auto-reconnect', 
 test('auth reject latches Sign in panel and ignores later reconnecting (MG-MMO-3)', () => {
   assert.equal(isAuthReject({ code: 'auth' }), true);
   assert.equal(isAuthReject('auth'), true);
+  assert.equal(isAuthReject('That sign-in is not valid.'), true);
   assert.equal(isAuthReject({ status: 'online', detail: 'Sign in to hunt online. Guests stay solo.' }), true);
   assert.equal(isAuthReject('reconnecting'), false);
   assert.equal(isAuthReject({ code: 'name_taken' }), false);
@@ -572,6 +573,119 @@ test('paintHud hides the center Online chip once World 1 is live', () => {
   view.paintHud();
   assert.equal(status.hidden, false);
   assert.match(status.innerHTML, /Error/);
+});
+
+test('world mode pill stays Online once the signed-in socket is live', () => {
+  assert.equal(worldModeLabel(STATUS.online), 'Online');
+  assert.equal(worldModeLabel(STATUS.connecting), 'Connecting');
+  assert.equal(worldModeLabel(STATUS.waking), 'Waking');
+  assert.equal(worldModeLabel(STATUS.reconnecting), 'Reconnecting');
+  assert.equal(worldModeLabel(STATUS.error, true), 'Sign in');
+  assert.equal(worldModeLabel(STATUS.offline), 'Offline');
+
+  const pill = {
+    hidden: true,
+    dataset: {},
+    textContent: 'Offline',
+    title: '',
+    setAttribute(name, value) { this[name] = value; },
+  };
+  const prev = globalThis.document;
+  globalThis.document = {
+    getElementById(id) { return id === 'world-mode-pill' ? pill : null; },
+  };
+  try {
+    const view = new WorldView(stubGame(), { spawnRemote: stubRemote, search: '?mmo=1' });
+    view.status = STATUS.connecting;
+    view.paintHud();
+    assert.equal(pill.textContent, 'Connecting');
+    assert.equal(pill.dataset.mode, 'connecting');
+    assert.equal(pill.dataset.connectionState, STATUS.connecting);
+
+    view.status = STATUS.online;
+    view.paintHud();
+    assert.equal(pill.textContent, 'Online');
+    assert.equal(pill.dataset.mode, 'online');
+    assert.equal(pill['aria-label'], 'Connected to online play');
+
+    view.status = STATUS.reconnecting;
+    view.paintHud();
+    assert.equal(pill.textContent, 'Reconnecting');
+    assert.notEqual(pill.textContent, 'Offline');
+
+    view.status = STATUS.offline;
+    view.paintHud();
+    assert.equal(pill.textContent, 'Offline');
+    assert.equal(pill.dataset.mode, 'offline');
+  } finally {
+    if (prev === undefined) delete globalThis.document;
+    else globalThis.document = prev;
+  }
+});
+
+test('a rejected hello rejoins when the hunter signs in with a new token', () => {
+  const prevS = globalThis.sessionStorage;
+  const prevL = globalThis.localStorage;
+  const blank = {
+    getItem(key) {
+      return key === 'monster-gate-account-session' ? JSON.stringify({ accessToken: '' }) : null;
+    },
+  };
+  const kept = {
+    getItem(key) {
+      return key === 'monster-gate-account-session' ? JSON.stringify({ accessToken: 'kept' }) : null;
+    },
+  };
+  globalThis.sessionStorage = blank;
+  globalThis.localStorage = kept;
+  try {
+    assert.equal(readAccessToken(), 'kept');
+    assert.equal(readAccessToken({ wallet: { accessToken: ' wallet ' } }), 'wallet');
+  } finally {
+    if (prevS === undefined) delete globalThis.sessionStorage;
+    else globalThis.sessionStorage = prevS;
+    if (prevL === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = prevL;
+  }
+
+  const game = stubGame();
+  game.wallet = { accessToken: 'expired-token' };
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  const client = new MmoClient(game, view, { url: 'ws://127.0.0.1:9' });
+  game.mmo = client;
+  client.onFrame(JSON.stringify({
+    v: 1,
+    type: 'error',
+    code: 'auth',
+    message: 'That sign-in is not valid.',
+  }));
+  assert.equal(view.authReject, true);
+  assert.equal(view.status, STATUS.error);
+  assert.equal(client.closed, false);
+  assert.equal(client.authHold, true);
+  assert.equal(client.rejectedToken, 'expired-token');
+
+  let opened = 0;
+  client.connect = () => { opened += 1; };
+  assert.equal(client.pollToken(), false);
+  game.wallet.accessToken = 'fresh-token';
+  assert.equal(client.pollToken(), true);
+  assert.equal(view.authReject, false);
+  assert.equal(opened, 1);
+  assert.equal(client.authHold, false);
+  client.dispose();
+});
+
+test('welcome starts a keepalive ping so an idle signed-in hunter stays online', () => {
+  const game = stubGame();
+  const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
+  const client = new MmoClient(game, view, { url: 'ws://127.0.0.1:9' });
+  client.onFrame(JSON.stringify({ v: 1, type: 'welcome', you: { id: 'you' }, online: 1 }));
+  assert.equal(view.status, STATUS.online);
+  assert.ok(client.pingTimer);
+  client.dispose();
+  assert.equal(client.pingTimer, 0);
+  assert.equal(view.status, STATUS.offline);
 });
 
 test('world wire errors stay online, do not paint, and snap a far hunter to spawn', () => {

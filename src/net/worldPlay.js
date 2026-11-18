@@ -193,6 +193,8 @@ export function paintWorldPlayButton(el, opts = {}) {
 
 export function paintWorldModePill(el, { search, loc } = {}) {
   if (!el) return;
+  // worldView.paintHud owns the pill after the socket reports a state.
+  if (el.dataset?.connectionState) return;
   const online = isWorldOnline(search ?? loc?.search ?? currentLoc().search);
   el.hidden = false;
   el.dataset.mode = online ? 'online' : 'offline';
@@ -419,10 +421,18 @@ export function leaveOnlineWorld(opts = {}) {
 
 export function onWorldPlayClick(opts = {}) {
   if (!hasWorldSessionToken(opts.stores) && !opts.force) {
+    rememberWorldMode('online', opts.storage);
+    markWorldJoin('online', opts.session || opts.storage);
     opts.onNeedSignIn?.();
     return false;
   }
   return enterOnlineWorld(opts);
+}
+
+/** Signed-in hunter who asked for World 1 should not land in solo. */
+export function signedInWorldContinue({ join = null, search = '', hasToken = false } = {}) {
+  if (join === 'online' && hasToken && !isWorldOnline(search)) return 'enter-online';
+  return 'select';
 }
 
 export function shouldForceWorldPick({ search, win } = {}) {

@@ -1726,6 +1726,11 @@ h1 em {
   pointer-events: none;
   white-space: nowrap;
 }
+.world-mode-pill[data-mode="connecting"],
+.world-mode-pill[data-mode="waking"],
+.world-mode-pill[data-mode="reconnecting"] {
+  color: #ffe3a3;
+}
 .world-mode-pill[data-mode="online"] {
   color: #7ef6ff;
 }

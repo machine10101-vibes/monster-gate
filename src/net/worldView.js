@@ -73,14 +73,14 @@ export function isAuthReject(status, detail) {
     if (typeof bag === 'string') {
       const s = bag.trim();
       if (/^auth$/i.test(s)) return true;
-      if (/sign in to hunt online/i.test(s) || /guests stay solo/i.test(s)) return true;
+      if (/sign in to hunt online/i.test(s) || /guests stay solo/i.test(s) || /sign-in is not valid/i.test(s)) return true;
       continue;
     }
     if (typeof bag === 'object') {
       const code = String(bag.code || '');
       const msg = String(bag.message || (typeof bag.detail === 'string' ? bag.detail : '') || '');
       if (code === 'auth' || /^auth$/i.test(msg)) return true;
-      if (/sign in to hunt online/i.test(msg) || /guests stay solo/i.test(msg)) return true;
+      if (/sign in to hunt online/i.test(msg) || /guests stay solo/i.test(msg) || /sign-in is not valid/i.test(msg)) return true;
       if (bag.detail && typeof bag.detail === 'object' && isAuthReject(null, bag.detail)) return true;
     }
   }
@@ -105,6 +105,16 @@ export const STATUS = {
   reconnecting: 'reconnecting',
   error: 'error',
 };
+
+/** Pill copy. Only a live socket is "Online"; a World 1 handshake is not "Offline". */
+export function worldModeLabel(status, auth = false) {
+  if (status === STATUS.online) return 'Online';
+  if (status === STATUS.connecting) return 'Connecting';
+  if (status === STATUS.waking) return 'Waking';
+  if (status === STATUS.reconnecting) return 'Reconnecting';
+  if (status === STATUS.error && auth) return 'Sign in';
+  return 'Offline';
+}
 
 export const WAKE_SECONDS = 30;
 export const WAKE_STUCK_MS = 60000;
@@ -762,10 +772,18 @@ export class WorldView {
     this.hideAuthPanel();
   }
 
-  /** Call mmo.js public dispose/close if present. Do not open sockets here. */
+  /** Pause the socket on auth. A client that can wait for a new token stays open. */
   stopMmoTransport() {
     const mmo = this.game?.mmo || (typeof window !== 'undefined' ? window.__mmo : null);
     if (!mmo) return;
+    if (typeof mmo.holdForAuth === 'function') {
+      try {
+        mmo.holdForAuth();
+        return;
+      } catch {
+        /* fall through and close the socket */
+      }
+    }
     const stop = mmo.dispose || mmo.close || mmo.disconnect || mmo.stop;
     if (typeof stop !== 'function') return;
     try {
@@ -1374,15 +1392,20 @@ export class WorldView {
       ? document.getElementById('world-mode-pill')
       : null;
     if (modePill) {
+      const label = worldModeLabel(st, this.authReject || this.errorCode() === 'auth');
       const connected = st === STATUS.online;
+      const pending = st === STATUS.connecting || st === STATUS.waking || st === STATUS.reconnecting;
       modePill.hidden = false;
-      modePill.dataset.mode = connected ? 'online' : 'offline';
+      modePill.dataset.mode = connected ? 'online' : (pending ? st : 'offline');
       modePill.dataset.connectionState = st;
-      modePill.textContent = connected ? 'Online' : 'Offline';
-      modePill.setAttribute('aria-label', connected ? 'Connected to online play' : 'Not connected to online play');
+      modePill.textContent = label;
+      modePill.setAttribute(
+        'aria-label',
+        connected ? 'Connected to online play' : pending ? 'Connecting to online play' : 'Not connected to online play',
+      );
       modePill.title = connected
         ? 'Connected to World 1 online play'
-        : (st === STATUS.connecting || st === STATUS.waking || st === STATUS.reconnecting)
+        : pending
           ? 'Connecting to World 1 online play'
           : 'Not connected to World 1 online play';
     }
