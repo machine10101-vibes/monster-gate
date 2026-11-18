@@ -23,6 +23,9 @@ test('hello / move / chat validation', () => {
   const move = readMove({ type: 'move', v: 1, x: 80, z: 70, yaw: 1, anim: 'attack', zone: 'Oakhollow' });
   assert.equal(move.anim, 1);
   assert.equal(move.zone, 'Oakhollow');
+  const health = readMove({ type: 'move', v: 1, hp: 38, max_hp: 24 });
+  assert.equal(health.hp, 38);
+  assert.equal(health.max_hp, 24);
   const chat = readChat({ type: 'chat', v: 1, channel: 'zone', text: '  hi  ' + 'x'.repeat(200) });
   assert.equal(chat.channel, 'zone');
   assert.equal(chat.text.length, CHAT_MAX);
