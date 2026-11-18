@@ -335,6 +335,53 @@ test('leader leave or disconnect promotes the oldest remaining member', async (t
   await srv.close();
 });
 
+test('block and ignore relations persist across reconnects and can be reversed', async (t) => {
+  const srv=await start(t);
+  const a=await join(srv,'ann','Ann');
+  const b=await join(srv,'bea','Bea');
+  b.ws.send(encode('block',{user_id:ANN}));
+  await waitUntil(()=>latest(b.msgs,'friend_list')?.blocked?.some(r=>r.user_id===ANN));
+  b.ws.close();
+  await new Promise(r=>setTimeout(r,30));
+  const b2=await join(srv,'bea','Bea');
+  assert.ok(latest(b2.msgs,'friend_list')?.blocked?.some(r=>r.user_id===ANN),'block survives reconnect');
+  a.ws.send(encode('friend_request',{name:'Bea'}));
+  await waitUntil(()=>a.msgs.some(m=>m.type==='error'&&m.code==='blocked'));
+  b2.ws.send(encode('unblock',{user_id:ANN}));
+  await waitUntil(()=>!(latest(b2.msgs,'friend_list')?.blocked||[]).some(r=>r.user_id===ANN));
+  b2.ws.send(encode('ignore',{user_id:ANN}));
+  await waitUntil(()=>latest(b2.msgs,'friend_list')?.ignored?.some(r=>r.user_id===ANN));
+  a.ws.send(encode('party_invite',{name:'Bea'}));
+  await waitUntil(()=>a.msgs.some(m=>m.type==='error'&&m.code==='ignored'));
+  b2.ws.send(encode('unignore',{user_id:ANN}));
+  await waitUntil(()=>!(latest(b2.msgs,'friend_list')?.ignored||[]).some(r=>r.user_id===ANN));
+  a.ws.close(); b2.ws.close(); await srv.close();
+});
+
+test('friend request cancellation only removes the outgoing pending direction',async(t)=>{
+  const srv=await start(t);
+  const a=await join(srv,'ann','Ann'), b=await join(srv,'bea','Bea');
+  a.ws.send(encode('friend_request',{name:'Bea'}));
+  await waitUntil(()=>latest(a.msgs,'friend_list')?.pending_out?.some(p=>p.user_id===BEA));
+  a.ws.send(encode('friend_cancel',{user_id:BEA}));
+  await waitUntil(()=>latest(a.msgs,'friend_list')?.pending_out?.length===0);
+  assert.equal((latest(b.msgs,'friend_list')?.pending_in||[]).length,0);
+  a.ws.close();b.ws.close();await srv.close();
+});
+
+test('party chat is limited to current members and is sanitized',async(t)=>{
+  const srv=await start(t);
+  const a=await join(srv,'ann','Ann'),b=await join(srv,'bea','Bea'),c=await join(srv,'cal','Cal');
+  a.ws.send(encode('party_invite',{name:'Bea'}));
+  await waitUntil(()=>latest(b.msgs,'party_invite'));
+  b.ws.send(encode('party_accept',{invite_id:latest(b.msgs,'party_invite').invite_id}));
+  await waitUntil(()=>latest(a.msgs,'party_state')?.party?.members?.length===2);
+  a.ws.send(encode('chat',{channel:'party',text:'  Ready   at   gate  '}));
+  await waitUntil(()=>b.msgs.some(m=>m.type==='chat'&&m.channel==='party'&&m.text==='Ready at gate'));
+  assert.equal(c.msgs.some(m=>m.type==='chat'&&m.channel==='party'),false);
+  a.ws.close();b.ws.close();c.ws.close();await srv.close();
+});
+
 test('social actions are rate limited and whispers and blocks work', async (t) => {
   const srv = await start(t);
   const a = await join(srv, 'ann', 'Ann');
