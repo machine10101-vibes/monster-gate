@@ -48,6 +48,7 @@ export class CharacterSelect {
     this.hourWas = null;
     this.noteTimer = 0;
     this.plates = new Map();
+    this.worldsOpen = false;
     this.root = $('charselect');
     this.bind();
   }
@@ -139,6 +140,7 @@ export class CharacterSelect {
     this.stage?.hide();
     this.clearPlates();
     $('cs-confirm')?.classList.add('hidden');
+    this.hideWorldMenu();
     if (this.hourWas != null) {
       g.sky.setHour(this.hourWas);
       this.hourWas = null;
@@ -184,7 +186,11 @@ export class CharacterSelect {
     const c = this.roster.get(this.selectedId);
     const listMode = this.mode === 'list';
     $('cs-name').textContent = c?.name || '';
-    $('cs-enter').disabled = !c || !listMode;
+    const canEnter = !!c && listMode;
+    const choose = $('cs-choose-world');
+    const solo = $('cs-play-solo');
+    if (choose) choose.disabled = !canEnter;
+    if (solo) solo.disabled = !canEnter;
     $('cs-delete').disabled = !c;
     $('cs-restore').disabled = !this.roster.canRestore();
     $('cs-create').disabled = this.roster.full;
@@ -327,9 +333,49 @@ export class CharacterSelect {
   }
 
   enter() {
+    this.playSolo();
+  }
+
+  playSolo() {
+    this.hideWorldMenu();
     if (!this.active || this.mode !== 'list') return;
     const c = this.roster.get(this.selectedId);
-    if (c) this.game.enterWorld(c);
+    if (!c) return;
+    if (typeof this.game.enterSoloHunt === 'function') this.game.enterSoloHunt(c);
+    else this.game.enterWorld(c);
+  }
+
+  chooseWorld() {
+    if (!this.active || this.mode !== 'list' || !this.roster.get(this.selectedId)) return;
+    this.worldsOpen = true;
+    const root = $('cs-worlds');
+    if (!root) return;
+    root.classList.remove('hidden');
+    root.hidden = false;
+    this.game.refreshWorldHealth?.();
+    this.paintWorldMenu();
+  }
+
+  hideWorldMenu() {
+    this.worldsOpen = false;
+    const root = $('cs-worlds');
+    if (!root) return;
+    root.classList.add('hidden');
+    root.hidden = true;
+  }
+
+  paintWorldMenu() {
+    const btn = $('cs-world-1');
+    const status = $('cs-world-1-status');
+    const ready = this.game.worldOneReady?.() !== false;
+    if (btn) btn.disabled = !ready;
+    if (status) status.textContent = ready ? (this.game.worldHealth?.label || 'Checking…') : 'Coming soon';
+  }
+
+  pickWorld1() {
+    if (!this.worldsOpen || $('cs-world-1')?.disabled) return;
+    const c = this.roster.get(this.selectedId);
+    if (c) this.game.enterWorldOneHunt?.(c);
   }
 
   back() {
@@ -506,7 +552,13 @@ export class CharacterSelect {
 
   bind() {
     if (!this.root) return;
-    $('cs-enter').addEventListener('click', () => this.enter());
+    $('cs-play-solo')?.addEventListener('click', () => this.playSolo());
+    $('cs-choose-world')?.addEventListener('click', () => this.chooseWorld());
+    $('cs-world-1')?.addEventListener('click', () => this.pickWorld1());
+    $('cs-worlds-back')?.addEventListener('click', () => this.hideWorldMenu());
+    $('cs-worlds')?.addEventListener('click', (e) => {
+      if (e.target === $('cs-worlds')) this.hideWorldMenu();
+    });
     $('cs-wallet-connect').addEventListener('click', () => this.connectKlever());
     $('cs-back').addEventListener('click', () => this.back());
     $('cs-create').addEventListener('click', () => this.showForm());
@@ -569,11 +621,13 @@ export class CharacterSelect {
       const typing = e.target?.closest?.('input, textarea');
       if (e.key === 'Escape') {
         if (!$('cs-confirm').classList.contains('hidden')) $('cs-confirm').classList.add('hidden');
+        else if (this.worldsOpen) this.hideWorldMenu();
         else if (this.mode === 'create') this.back();
         else return;
         e.preventDefault();
         return;
       }
+      if (this.worldsOpen) return;
       if (typing || this.mode !== 'list' || !$('cs-confirm').classList.contains('hidden')) return;
       if (e.key === 'Enter') {
         if (e.target?.closest?.('button, .cs-row')) return;
