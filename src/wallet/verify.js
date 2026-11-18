@@ -31,19 +31,29 @@ export function addressFromPublicKey(publicKey) {
  * The prefix keeps a login signature from ever being a transaction.
  */
 function preparedHash(body, length) {
+  return keccak_256(preparedBytes(body, length));
+}
+
+function preparedBytes(body, length) {
   const prefix = new TextEncoder().encode(PREFIX);
   const digits = new TextEncoder().encode(String(length));
   const bytes = new Uint8Array(prefix.length + digits.length + body.length);
   bytes.set(prefix, 0);
   bytes.set(digits, prefix.length);
   bytes.set(body, prefix.length + digits.length);
-  return keccak_256(bytes);
+  return bytes;
 }
 
 /** Klever's prepare_message uses the UTF-8 byte length, then keccak256. */
 export function kleverMessageHash(message) {
   const body = new TextEncoder().encode(String(message));
   return preparedHash(body, body.length);
+}
+
+function hexText(body) {
+  let out = '';
+  for (let i = 0; i < body.length; i++) out += body[i].toString(16).padStart(2, '0');
+  return out;
 }
 
 /**
@@ -68,14 +78,31 @@ function signedTexts(message) {
 
 function accepts(compact, pub, text) {
   const body = new TextEncoder().encode(text);
-  try {
-    if (ed.verify(compact, preparedHash(body, body.length), pub)) return true;
-    // The extension's own validator uses the JavaScript string length.
-    if (text.length !== body.length && ed.verify(compact, preparedHash(body, text.length), pub)) return true;
-    return ed.verify(compact, body, pub);
-  } catch {
-    return false;
-  }
+  const prefixed = preparedBytes(body, body.length);
+  const prefix = new TextEncoder().encode(PREFIX);
+  const withPrefix = new Uint8Array(prefix.length + body.length);
+  withPrefix.set(prefix, 0);
+  withPrefix.set(body, prefix.length);
+  const hexBody = new TextEncoder().encode(hexText(body));
+  const payloads = [
+    preparedHash(body, body.length),
+    body,
+    prefixed,
+    withPrefix,
+    keccak_256(withPrefix),
+    keccak_256(body),
+    preparedHash(hexBody, hexBody.length),
+    hexBody,
+  ];
+  // The extension's own validator uses the JavaScript string length.
+  if (text.length !== body.length) payloads.push(preparedHash(body, text.length));
+  return payloads.some((payload) => {
+    try {
+      return ed.verify(compact, payload, pub);
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function signatureBytes(signature) {

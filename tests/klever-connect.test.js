@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
+import { keccak_256 as keccak } from '@noble/hashes/sha3.js';
 import { addressForSignature, addressFromWallet, connectMethod, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
@@ -115,7 +116,24 @@ test('a signature from the account Klever selected still proves that account', (
     selectedAddress,
   );
   const buried = `${'ab'.repeat(40)}${signature}`;
-  assert.deepEqual(signatureCandidates(buried), [buried.slice(0, 128), signature]);
+  assert.equal(signatureCandidates(buried).includes(signature), true);
+  const middle = `${'ab'.repeat(20)}${signature}${'cd'.repeat(20)}`;
+  assert.equal(signatureCandidates(middle).includes(signature), true);
+  const secret = new Uint8Array(32).fill(3);
+  const address = addressFromPublicKey(ed.getPublicKey(secret));
+  const login = `Monster Gate wants you to connect this Klever wallet to your account.\nThis does not send any coins.\nAddress: ${address}\nNonce: abcdabcdabcdabcdabcdabcdabcdabcd\nIssued: 2026-11-18T00:20:00.000Z`;
+  const body = new TextEncoder().encode(login);
+  const prefix = new TextEncoder().encode('\u0017Klever Signed Message:\n');
+  const digits = new TextEncoder().encode(String(body.length));
+  const prefixed = new Uint8Array(prefix.length + digits.length + body.length);
+  prefixed.set(prefix, 0);
+  prefixed.set(digits, prefix.length);
+  prefixed.set(body, prefix.length + digits.length);
+  const hex = Buffer.from(body).toString('hex');
+  assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(prefixed, secret)).toString('hex'), address), true);
+  assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(keccak(body), secret)).toString('hex'), address), true);
+  assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(kleverMessageHash(hex), secret)).toString('hex'), address), true);
+  assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(new Uint8Array(32).fill(9), secret)).toString('hex'), address), false);
 });
 
 test('an email account connects Klever from the character camp', () => {

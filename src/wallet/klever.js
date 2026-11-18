@@ -74,9 +74,22 @@ function signatureSlices(value) {
       }
     }
   }
-  if (!bytes || bytes.length < 64 || bytes.length > 512) return [];
-  const slices = [bytes.slice(0, 64)];
-  if (bytes.length > 64) slices.push(bytes.slice(-64));
+  if (!bytes || bytes.length < 64 || bytes.length > 4096) return [];
+  if (bytes.length === 64) return [bytes];
+  const slices = [];
+  const span = bytes.length - 64;
+  const push = (start) => {
+    if (slices.length >= 80 || start < 0 || start > span) return;
+    slices.push(bytes.slice(start, start + 64));
+  };
+  if (span <= 80) {
+    for (let i = 0; i <= span; i++) push(i);
+    return slices;
+  }
+  push(0);
+  push(span);
+  for (let i = 1; i < 40; i++) push(i);
+  for (let i = span - 1; i >= span - 40; i--) push(i);
   return slices;
 }
 
@@ -158,6 +171,16 @@ function pinAccount(kw, address) {
     kw.address = address;
   } catch {
     /* a read-only provider still signs the account it already has */
+  }
+}
+
+/** The phone app signs the account selected in the browser. Point that at the klv address. */
+async function selectAccount(kw, address) {
+  if (!kw || typeof kw.setWalletAddress !== 'function' || !ADDRESS_RE.test(address || '')) return;
+  try {
+    await kw.setWalletAddress(address);
+  } catch {
+    /* the sign request still names the account */
   }
 }
 
@@ -401,8 +424,9 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     await paintSettled();
   }
   // The extension popup signs whichever account is named on the provider.
-  // The phone app treats that write as a transaction, so the address stays in the message.
+  // The phone app has a setter for the same choice, and a property write opens a transaction.
   if (plan === 'extension' && !mobile) pinAccount(kw, address);
+  else await selectAccount(kw, address);
   const message = signedMessage({
     purpose,
     address,
