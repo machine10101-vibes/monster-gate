@@ -22,9 +22,11 @@ export function shortAddress(address) {
   return `${address.slice(0, 8)}…${address.slice(-6)}`;
 }
 
-export function pageUrl() {
+export function pageUrl(handoffId = '') {
   const url = new URL(location.href);
   url.searchParams.set('klever', '1');
+  if (handoffId) url.searchParams.set('handoff', handoffId);
+  else url.searchParams.delete('handoff');
   url.hash = '';
   return url.toString();
 }
@@ -351,12 +353,12 @@ export function kleverLaunchUrl(page, android) {
 }
 
 /** Hands this page to the Klever Wallet app so it can ask for the signature. */
-export function launchKleverApp() {
+export function launchKleverApp(handoffId = '') {
   const android = /Android/i.test(navigator.userAgent);
   const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (!android && !ios) return false;
-  location.href = kleverLaunchUrl(pageUrl(), android);
+  location.href = kleverLaunchUrl(pageUrl(handoffId), android);
   return true;
 }
 

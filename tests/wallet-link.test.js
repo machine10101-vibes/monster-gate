@@ -308,6 +308,17 @@ test('?mockwallet is session-only and never a signup path', () => {
   assert.match(hunter, /account-load/);
   assert.match(hunter, /account-save/);
   assert.match(walletFn, /op === "login"/);
+  assert.match(walletFn, /handoffStart/);
+  assert.match(walletFn, /handoffNonce/);
+  assert.match(walletFn, /handoffComplete/);
+  assert.match(walletFn, /handoffPoll/);
+  assert.match(link, /startKleverHandoff/);
+  assert.match(link, /completeKleverHandoff/);
+  assert.match(link, /pollKleverHandoff/);
+  assert.match(main, /Sign-in complete — return to your original browser/);
+  assert.match(src('../src/wallet/klever.js'), /pageUrl\(handoffId = ''\)/);
+  assert.match(src('../supabase/migrations/20261118000000_klever_cross_browser_handoffs.sql'), /klever_handoffs/);
+
   assert.match(walletFn, /UNLINKED_MESSAGE/);
   assert.doesNotMatch(src('../src/wallet/link.js'), /createAccount/);
   assert.match(src('../src/ui/hud.js'), /mountWalletSettings/);

@@ -191,6 +191,109 @@ async function login(admin: Admin, body: Record<string, unknown>): Promise<Respo
   return json({ created: false, userId: linked.user_id, email: linked.email, session });
 }
 
+
+const HANDOFF_MS = 5 * 60 * 1000;
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function handoffStart(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const id = typeof body.id === "string" ? body.id : "";
+  const pollToken = typeof body.pollToken === "string" ? body.pollToken : "";
+  if (!UUID_RE.test(id) || !/^[0-9a-f]{64}$/.test(pollToken)) {
+    return json({ error: "The sign-in handoff could not be started." }, 400);
+  }
+  const expiresAt = new Date(Date.now() + HANDOFF_MS).toISOString();
+  await admin.from("klever_handoffs").delete().lt("expires_at", new Date().toISOString());
+  const { error } = await admin.from("klever_handoffs").insert({
+    id,
+    poll_token_hash: await sha256Hex(pollToken),
+    expires_at: expiresAt,
+  });
+  if (error) return json({ error: "The account service could not be reached." }, 503);
+  return json({ id, expiresAt });
+}
+
+async function handoffNonce(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const id = typeof body.id === "string" ? body.id : "";
+  const address = typeof body.address === "string" ? body.address : "";
+  if (!UUID_RE.test(id) || !ADDRESS_RE.test(address)) return json({ error: "Choose a Klever account, then try again." }, 400);
+  const { data: handoff, error: readError } = await admin.from("klever_handoffs")
+    .select("id, nonce, address, status, expires_at")
+    .eq("id", id).eq("status", "pending").gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (readError) return json({ error: "The account service could not be reached." }, 503);
+  if (!handoff) return json({ error: "This sign-in request expired. Return to your original browser and try again.", code: "handoff-expired" }, 410);
+  if (handoff.nonce) {
+    if (handoff.address !== address) return json({ error: "The selected wallet does not match this sign-in request.", code: "handoff-wallet" }, 409);
+    return json({ nonce: handoff.nonce, expiresAt: handoff.expires_at });
+  }
+  const nonce = hexNonce(crypto.getRandomValues(new Uint8Array(16)));
+  const expiresAt = new Date(Date.now() + NONCE_MS).toISOString();
+  const { error: nonceError } = await admin.from("klever_nonces").insert({
+    nonce, purpose: "login", address, user_id: null, expires_at: expiresAt,
+  });
+  if (nonceError) return json({ error: "The account service could not be reached." }, 503);
+  const { data: updated, error } = await admin.from("klever_handoffs")
+    .update({ nonce, address }).eq("id", id).eq("status", "pending").is("nonce", null)
+    .select("id").maybeSingle();
+  if (error) return json({ error: "The account service could not be reached." }, 503);
+  if (!updated) return json({ error: "This sign-in request is already being used. Return to your original browser and try again.", code: "handoff-used" }, 409);
+  return json({ nonce, expiresAt });
+}
+
+async function handoffComplete(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const id = typeof body.id === "string" ? body.id : "";
+  const address = typeof body.address === "string" ? body.address : "";
+  const message = typeof body.message === "string" ? body.message : "";
+  const signature = typeof body.signature === "string" ? body.signature : "";
+  if (!UUID_RE.test(id)) return json({ error: "The sign-in request was not understood." }, 400);
+  const proof = checkProof("login", address, message, signature);
+  if (proof instanceof Response) return proof;
+  const { data: handoff, error: readError } = await admin.from("klever_handoffs")
+    .select("id, nonce, address, status, expires_at")
+    .eq("id", id).eq("status", "pending").eq("nonce", proof.nonce)
+    .eq("address", address).gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (readError) return json({ error: "The account service could not be reached." }, 503);
+  if (!handoff) return json({ error: "This sign-in request expired or was already used.", code: "handoff-expired" }, 410);
+  const consumed = await consumeNonce(admin, proof.nonce, "login", address, null);
+  if (consumed) return consumed;
+  const linked = await linkedRow(admin, address);
+  if (linked instanceof Response) return linked;
+  if (!linked) return json({ error: UNLINKED_MESSAGE, code: UNLINKED_CODE, created: false }, 401);
+  const minted = await mintSession(linked.email);
+  if (minted instanceof Response) return minted;
+  const session = { ...minted, email: linked.email, userId: linked.user_id, address };
+  const { data: saved, error } = await admin.from("klever_handoffs")
+    .update({ status: "complete", session, completed_at: new Date().toISOString() })
+    .eq("id", id).eq("status", "pending").select("id").maybeSingle();
+  if (error) return json({ error: "The account service could not be reached." }, 503);
+  if (!saved) return json({ error: "This sign-in request was already completed.", code: "handoff-used" }, 409);
+  return json({ completed: true, message: "Sign-in complete. Return to your original browser." });
+}
+
+async function handoffPoll(admin: Admin, body: Record<string, unknown>): Promise<Response> {
+  const id = typeof body.id === "string" ? body.id : "";
+  const pollToken = typeof body.pollToken === "string" ? body.pollToken : "";
+  if (!UUID_RE.test(id) || !/^[0-9a-f]{64}$/.test(pollToken)) return json({ error: "The sign-in request was not understood." }, 400);
+  const hash = await sha256Hex(pollToken);
+  const now = new Date().toISOString();
+  const { data: complete, error } = await admin.from("klever_handoffs")
+    .update({ status: "consumed" })
+    .eq("id", id).eq("poll_token_hash", hash).eq("status", "complete")
+    .gt("expires_at", now).select("id, session").maybeSingle();
+  if (error) return json({ error: "The account service could not be reached." }, 503);
+  if (complete?.session) return json({ complete: true, session: complete.session });
+  const { data: row, error: pollError } = await admin.from("klever_handoffs")
+    .select("status, expires_at").eq("id", id).eq("poll_token_hash", hash).maybeSingle();
+  if (pollError) return json({ error: "The account service could not be reached." }, 503);
+  if (!row || row.status === "consumed" || new Date(row.expires_at).getTime() <= Date.now()) {
+    return json({ error: "This sign-in request expired. Return to the game and try again.", code: "handoff-expired" }, 410);
+  }
+  return json({ complete: false });
+}
+
 async function status(admin: Admin, body: Record<string, unknown>): Promise<Response> {
   const user = await accountUser(body.accessToken);
   if (user instanceof Response) return user;
@@ -287,6 +390,10 @@ export default {
     }
     const admin = ctx.supabaseAdmin as unknown as Admin;
     if (body.op === "nonce") return issueNonce(admin, body);
+    if (body.op === "handoff_start") return handoffStart(admin, body);
+    if (body.op === "handoff_nonce") return handoffNonce(admin, body);
+    if (body.op === "handoff_complete") return handoffComplete(admin, body);
+    if (body.op === "handoff_poll") return handoffPoll(admin, body);
     if (body.op === "login") return login(admin, body);
     if (body.op === "link") return link(admin, body);
     if (body.op === "unlink") return unlink(admin, body);
