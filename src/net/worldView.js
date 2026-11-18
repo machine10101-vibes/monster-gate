@@ -446,6 +446,7 @@ export class WorldView {
     this.search = opts.search ?? (typeof location !== 'undefined' ? location.search : '');
     this.actors = new Map();
     this.chat = [];
+    this.mutedPlayers = new Set();
     this.channel = 'world';
     this.status = STATUS.offline;
     this.detail = '';
@@ -657,6 +658,7 @@ export class WorldView {
   pushChat(raw) {
     const msg = normalizeChat(raw);
     if (!msg) return;
+    if (msg.channel !== 'whisper' && (this.mutedPlayers.has(String(msg.from.id)) || this.mutedPlayers.has(`name:${String(msg.from.name || '').toLowerCase()}`))) return;
     this.chat.push(msg);
     if (this.chat.length > 80) this.chat.shift();
     const row = this.actors.get(msg.from.id);
@@ -671,6 +673,20 @@ export class WorldView {
       this.armPinTimer();
     }
     this.paintChat();
+  }
+
+  toggleMutePlayer(id, name = '') {
+    const key = String(id || '') || `name:${String(name).toLowerCase()}`;
+    if (!key) return false;
+    const muted = this.mutedPlayers.has(key);
+    if (muted) this.mutedPlayers.delete(key);
+    else this.mutedPlayers.add(key);
+    return !muted;
+  }
+
+  isPlayerMuted(id, name = '') {
+    return this.mutedPlayers.has(String(id || ''))
+      || this.mutedPlayers.has(`name:${String(name || '').toLowerCase()}`);
   }
 
   setStatus(status, detail = '') {
@@ -1445,8 +1461,9 @@ export class WorldView {
       const pid = escapeHtml(m.from.id);
       const mine = m.from.id === 'you' || this.isLocalId(m.from.id);
       const tag = m.channel === 'whisper' ? '<i class="wc-wh">whisper</i> ' : '';
+      const stamp = Number.isFinite(Number(m.at)) ? new Date(Number(m.at)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const cls = mine ? ' class="wc-you"' : '';
-      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text}</p>`;
+      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text} <small class="wc-time" title="Message time">${escapeHtml(stamp)}</small></p>`;
     }).join('');
     this.ui.log.scrollTop = this.ui.log.scrollHeight;
     this.paintPin();
