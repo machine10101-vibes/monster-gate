@@ -1264,6 +1264,8 @@ export class WorldView {
       sheath: p.sheathKind || null,
       look: localLook(this.game),
       armor: localArmor(this.game),
+      hp: Number.isFinite(p.hp) ? p.hp : 20,
+      max_hp: Number.isFinite(p.maxHp) ? p.maxHp : 20,
       zone: zoneOf(this.game),
     };
     this._onLocalMove?.(pose);
