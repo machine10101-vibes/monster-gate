@@ -328,37 +328,45 @@ export function createSocialRuntime(world, opts = {}) {
     if (result) applyPartyChange(result, [session]);
   }
 
-  async function handle(session, msg) {
-    const type = msg.type;
-    if (type.startsWith('friend') || type === 'block' || type === 'unblock' || type === 'ignore' || type === 'unignore') {
-      assertAuthed(session);
-    }
-    if (type !== 'friend_list' && type !== 'party_leave') {
-      if (session.limiter && !session.limiter.allowSocial()) {
-        throw new ProtocolError('rate', 'Slow down.');
-      }
-    }
+  function sendResult(session,msg,ok,extra={}) {
+    if(msg.request_id) sender(session,'social_result',{request_id:String(msg.request_id).slice(0,64),ok,...extra});
+  }
 
-    switch (type) {
-      case 'friend_request': return friendRequest(session, msg);
-      case 'friend_accept': return friendAccept(session, msg);
-      case 'friend_decline': return friendDecline(session, msg);
-      case 'friend_cancel': return friendCancel(session, msg);
-      case 'friend_remove': return friendRemove(session, msg);
-      case 'friend_list': return pushFriendList(session);
-      case 'block': return setRelation(session, msg, 'block', true);
-      case 'unblock': return setRelation(session, msg, 'block', false);
-      case 'ignore': return setRelation(session, msg, 'ignore', true);
-      case 'unignore': return setRelation(session, msg, 'ignore', false);
-      case 'party_invite': return partyInvite(session, msg);
-      case 'party_accept': return partyAccept(session, msg);
-      case 'party_decline': return partyDecline(session, msg);
-      case 'party_leave': return partyLeave(session);
-      case 'party_kick': return partyKick(session, msg);
-      case 'party_promote': return partyPromote(session, msg);
-      case 'party_loot': return partyLoot(session, msg);
-      case 'whisper': return whisper(session, msg);
-      default: return null;
+  async function handle(session, msg) {
+    const type=msg.type, requestId=msg.request_id;
+    try {
+      if (type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type)) assertAuthed(session);
+      if (type !== 'friend_list' && type !== 'party_leave' && session.limiter && !session.limiter.allowSocial()) {
+        throw new ProtocolError('rate','Slow down.');
+      }
+      switch (type) {
+        case 'friend_request': await friendRequest(session,msg); break;
+        case 'friend_accept': await friendAccept(session,msg); break;
+        case 'friend_decline': await friendDecline(session,msg); break;
+        case 'friend_cancel': await friendCancel(session,msg); break;
+        case 'friend_remove': await friendRemove(session,msg); break;
+        case 'friend_list': await pushFriendList(session); break;
+        case 'block': await setRelation(session,msg,'block',true); break;
+        case 'unblock': await setRelation(session,msg,'block',false); break;
+        case 'ignore': await setRelation(session,msg,'ignore',true); break;
+        case 'unignore': await setRelation(session,msg,'ignore',false); break;
+        case 'party_invite': partyInvite(session,msg); break;
+        case 'party_accept': partyAccept(session,msg); break;
+        case 'party_decline': partyDecline(session,msg); break;
+        case 'party_leave': partyLeave(session); break;
+        case 'party_kick': partyKick(session,msg); break;
+        case 'party_promote': partyPromote(session,msg); break;
+        case 'party_loot': partyLoot(session,msg); break;
+        default: return null;
+      }
+      sendResult(session,msg,true,{pending:type==='friend_request'||type==='party_invite'});
+      return true;
+    } catch(err) {
+      const code=err?.code||'protocol',message=err?.message||'Social action failed.';
+      if(!requestId) sender(session,'error',{code,message});
+      sendResult(session,msg,false,{code,message});
+      if(requestId) throw Object.assign(new Error(message),{code});
+      throw err;
     }
   }
 
