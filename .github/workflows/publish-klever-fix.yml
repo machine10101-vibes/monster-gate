@@ -36,6 +36,7 @@ jobs:
       - name: Run tests
         # The full suite has an unrelated existing WebGL Retry timing failure.
         # Gate this hotfix deployment on the Klever-specific regression tests.
+        # Wallet proof validation remains enabled in production.
         run: node --test tests/klever*.test.js
 
       - name: Build production site
