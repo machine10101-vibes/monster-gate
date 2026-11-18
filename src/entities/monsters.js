@@ -1808,7 +1808,11 @@ export class Spawner {
     for (const [t, x, z] of spots) this.spawn(t, x, z, false);
     this.fillChickens(99);
     // The iPad dies if the dragon, knights and jungle packs are built in the same breath as the first picture.
-    if (nearOnly) return;
+    // Keep the heavy spawn deferred, but let fillVolcanum create the lair boss on its next update.
+    if (nearOnly) {
+      this.volcanumT = 0;
+      return;
+    }
     const camp = w.orcCamp;
     if (camp) {
       const pack = [[-2.2, 0.6], [1.8, -1.1], [0.3, 2.5], [8.2, 4.8], [-6.4, 6.6], [2.4, -9.2]];
@@ -1847,6 +1851,8 @@ export class Spawner {
     if (w.volcanumLair) {
       const lair = this.spawn('volcanum', w.volcanumLair.x, w.volcanumLair.z, false);
       lair.home = { x: w.volcanumLair.x, z: w.volcanumLair.z };
+      this.volcanumSpawned = true;
+      this.volcanumT = 0;
     }
   }
 
@@ -1998,11 +2004,27 @@ export class Spawner {
     const g = this.game;
     const lair = g.world?.volcanumLair;
     if (!lair || g.world?.realm !== 'over') return;
+
+    // The light/safe boot skips heavy bosses during the loading screen. Spawn
+    // Volcanum on the first world update after entry instead of making hunters
+    // wait through the full respawn cooldown.
+    const alive = g.monsters.some((m) => !m.dead && m.type === 'volcanum');
+    if (alive) {
+      this.volcanumSpawned = true;
+      this.volcanumT = 0;
+      return;
+    }
+
+    const initialSpawn = !this.volcanumSpawned;
     this.volcanumT = (this.volcanumT || 0) + 1;
-    if (this.volcanumT < 90) return;
-    if (g.monsters.some((m) => !m.dead && m.type === 'volcanum')) return;
-    if (Math.hypot(lair.x - g.player.pos.x, lair.z - g.player.pos.z) < 28) return;
+    if (this.volcanumT < (initialSpawn ? 1 : 90)) return;
+
+    // Keep the respawn from appearing directly on top of a hunter, but never
+    // block the first lair spawn just because the hunter has reached the nest.
+    if (!initialSpawn && Math.hypot(lair.x - g.player.pos.x, lair.z - g.player.pos.z) < 28) return;
+
     this.volcanumT = 0;
+    this.volcanumSpawned = true;
     const m = this.spawn('volcanum', lair.x, lair.z);
     m.home = { x: lair.x, z: lair.z };
   }
