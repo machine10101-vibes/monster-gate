@@ -163,6 +163,9 @@ export class SocialWorld {
       const target=this.findOnline(m.id || m.name);
       if (!target) return fail('offline','That hunter is not online.');
       if (target===s) return fail('self','You cannot invite yourself.');
+      const pending = [...this.invites.values()].find(inv => inv.target === target);
+      if (pending && pending.from !== s) return fail('busy','That hunter already has a party invitation.');
+      if (pending) this.invites.delete(pending.inviteId);
       if (this.partyByPlayer.has(target.id)) return fail('in_party','That hunter is already in a party.');
       if (party && party.leader!==s.id) return fail('not_leader','Only the leader can invite.');
       if ((party?.members.length||1)>=MAX_PARTY) return fail('full','Party is full (4).');
@@ -189,7 +192,7 @@ export class SocialWorld {
       party.members=party.members.filter(x=>x!==target); this.partyByPlayer.delete(target.id);
       if (party.members.length<2) { for(const x of party.members)this.send(x,'party_state',{party:null}); this.parties.delete(party.id); }
       else { if(party.leader===target.id)party.leader=party.members[0].id; this.broadcastParty(party); }
-      if (target!==s) this.send(target,'party_state',{party:null});
+      this.send(target,'party_state',{party:null});
       return;
     }
     if (m.type==='party_promote') {
