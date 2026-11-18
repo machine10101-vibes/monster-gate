@@ -254,7 +254,7 @@ export function normalizeChat(raw) {
   if (!raw) return null;
   const text = cleanText(raw.text);
   if (!text) return null;
-  const channel = raw.channel === 'zone' ? 'zone' : raw.channel === 'whisper' ? 'whisper' : 'world';
+  const channel = raw.channel === 'zone' ? 'zone' : raw.channel === 'whisper' ? 'whisper' : raw.channel === 'party' ? 'party' : 'world';
   const from = raw.from && typeof raw.from === 'object' ? raw.from : {};
   return {
     id: String(raw.id || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).slice(0, 48),
@@ -658,7 +658,7 @@ export class WorldView {
   pushChat(raw) {
     const msg = normalizeChat(raw);
     if (!msg) return;
-    if (msg.channel !== 'whisper' && (this.mutedPlayers.has(String(msg.from.id)) || this.mutedPlayers.has(`name:${String(msg.from.name || '').toLowerCase()}`))) return;
+    if (this.mutedPlayers.has(String(msg.from.id)) || this.mutedPlayers.has(`name:${String(msg.from.name || '').toLowerCase()}`)) return;
     this.chat.push(msg);
     if (this.chat.length > 80) this.chat.shift();
     const row = this.actors.get(msg.from.id);
