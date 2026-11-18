@@ -152,6 +152,10 @@ export function createPersistence(options = {}) {
       return adapter.declineFriend(requireUserId(userId), requireUserId(otherUserId));
     },
 
+    async cancelFriend(userId, otherUserId) {
+      return adapter.declineFriend(requireUserId(otherUserId), requireUserId(userId));
+    },
+
     async removeFriend(userId, otherUserId) {
       return adapter.removeFriend(requireUserId(userId), requireUserId(otherUserId));
     },
