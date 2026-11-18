@@ -414,6 +414,11 @@ class Game {
         if (text) text.textContent = t;
       }
     };
+    // Paint a visible loading state before synchronous world setup begins.
+    // Klever's Android WebView can otherwise leave the bar looking idle until
+    // the first generation milestone several frames into the build.
+    progress(0.06, 'Preparing the world');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     this.world = new World(this.quality);
     await this.world.build(progress);
     this.scene.add(this.world.group);
