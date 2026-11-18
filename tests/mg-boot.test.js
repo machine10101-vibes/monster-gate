@@ -265,6 +265,10 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.ok(manifest.icons.some((i) => i.src.includes('icon-192.png')));
   assert.ok(manifest.icons.some((i) => i.src.includes('icon-512.png')));
 
+  assert.match(main, /const RESUME_CHARACTER_KEY = 'mg-resume-character'/);
+  assert.match(main, /rememberResumeCharacter\(char\.id\)/);
+  assert.match(main, /const resumeId = readResumeCharacter\(\)/);
+  assert.match(main, /this\.enterWorld\(resumeChar\)/, 'a WebView restart resumes the selected hunter without another Enter World tap');
   assert.match(main, /mountLoading/);
   assert.match(main, /loadingScreen\.dismiss/);
   assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
