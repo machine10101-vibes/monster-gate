@@ -273,6 +273,10 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /this\.enterImmersive\(\{ gesture: false, lock: false \}\)/);
   assert.doesNotMatch(main, /requestGameFullscreen\(true\)/);
   assert.doesNotMatch(main, /lock:\s*this\.isLandscape\(\)\s*&&\s*!tablet/, 'generic touch/click handler must not request orientation lock');
+  const immersive = main.slice(main.indexOf('  syncImmersive()'), main.indexOf('  tuckChrome()'));
+  assert.match(immersive, /scheduleResize\(\)/, 'orientation and viewport events coalesce renderer resizes');
+  assert.doesNotMatch(immersive, /this\.tuckChrome\(\)/, 'orientation changes must not scroll or resize the document to hide browser chrome');
+  assert.doesNotMatch(immersive, /setTimeout\(sync, 80\)|setTimeout\(sync, 350\)/, 'avoid repeated delayed resize passes after rotation');
   assert.doesNotMatch(main, /clearSkip/);
   assert.doesNotMatch(src('src/ui/boot.js'), /requestAnimationFrame|keySourceToCanvas\(video/);
   assert.match(theme, /#load-key \{ display: none !important; \}/);
