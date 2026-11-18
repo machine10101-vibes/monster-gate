@@ -34,25 +34,115 @@ function fail(code, message) {
   return err;
 }
 
-function signatureText(signed, depth = 0) {
-  if (signed == null || depth > 4) return '';
-  if (typeof signed === 'string') {
-    const trimmed = signed.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+function bytesToHex(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
+  return out;
+}
+
+function signatureSlices(value) {
+  let bytes = null;
+  if (value instanceof Uint8Array) bytes = value;
+  else if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+    bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  } else if (Array.isArray(value) && value.length >= 64 && value.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+    bytes = Uint8Array.from(value);
+  } else if (typeof value === 'string') {
+    const raw = value.trim().replace(/^0x/i, '').replace(/\\s+/g, '');
+    if (!raw || raw.length > 1200) return [];
+    if (/^[0-9a-fA-F]+$/.test(raw) && raw.length % 2 === 0) {
+      const out = new Uint8Array(raw.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = Number.parseInt(raw.slice(i * 2, i * 2 + 2), 16);
+      bytes = out;
+    } else {
+      const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
       try {
-        return signatureText(JSON.parse(trimmed), depth + 1);
+        const bin = atob(padded);
+        if (bin.length >= 64 && bin.length <= 160) {
+          const out = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+          bytes = out;
+        }
       } catch {
-        return trimmed;
+        return [];
       }
     }
-    return trimmed;
   }
-  if (Array.isArray(signed)) return signatureText(signed[0], depth + 1);
-  const nested = (typeof signed.data === 'string' && signed.data) || signed.data?.signature || '';
-  const value = signed.signature || signed.sig || signed.hex || signed.result || nested
-    || (typeof signed.toHex === 'function' ? signed.toHex() : '');
-  if (value && value !== signed) return signatureText(value, depth + 1);
-  return '';
+  if (!bytes || bytes.length < 64 || bytes.length > 4096) return [];
+  if (bytes.length === 64) return [bytes];
+  const slices = [];
+  const span = bytes.length - 64;
+  const push = (offset) => {
+    if (slices.length < 80 && offset >= 0 && offset <= span) slices.push(bytes.slice(offset, offset + 64));
+  };
+  if (span <= 80) {
+    for (let i = 0; i <= span; i++) push(i);
+  } else {
+    push(0);
+    push(span);
+    for (let i = 1; i < 40; i++) push(i);
+    for (let i = span - 1; i >= span - 40; i--) push(i);
+  }
+  return slices;
+}
+
+/**
+ * Klever's mobile SIGN_MESSAGE result can echo the original message alongside
+ * the signature. Walk the complete response and keep only 64-byte candidates;
+ * never mistake the echoed message for the signature itself.
+ */
+export function signatureCandidates(signed, depth = 0, out = []) {
+  if (signed == null || depth > 5) return out;
+  if (typeof signed === 'string') {
+    const trimmed = signed.trim();
+    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && trimmed.length < 8000) {
+      try {
+        signatureCandidates(JSON.parse(trimmed), depth + 1, out);
+        return out;
+      } catch {
+        /* Treat it as a possible encoded signature below. */
+      }
+    }
+  }
+  for (const bytes of signatureSlices(signed)) {
+    const hex = bytesToHex(bytes);
+    if (!out.includes(hex)) out.push(hex);
+  }
+  if (Array.isArray(signed)) {
+    if (!signatureSlices(signed).length) {
+      for (const item of signed) signatureCandidates(item, depth + 1, out);
+    }
+    return out;
+  }
+  if (typeof signed === 'object' && !ArrayBuffer.isView(signed)) {
+    if (typeof signed.toHex === 'function') {
+      try { signatureCandidates(signed.toHex(), depth + 1, out); } catch { /* ignore */ }
+    }
+    if (typeof signed.toBase64 === 'function') {
+      try { signatureCandidates(signed.toBase64(), depth + 1, out); } catch { /* ignore */ }
+    }
+    for (const key of Object.keys(signed)) signatureCandidates(signed[key], depth + 1, out);
+  }
+  return out;
+}
+
+function addressesIn(value, depth = 0, out = []) {
+  if (value == null || depth > 4 || out.length > 8) return out;
+  if (typeof value === 'string') {
+    const compact = value.replace(/[\\u0000-\\u0020\\u007f\\u00a0\\u1680\\u2000-\\u200a\\u200b\\u200c\\u200d\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+/g, '').toLowerCase();
+    const found = compact.match(/klv1[02-9ac-hj-np-z]{58}/g);
+    if (found) for (const address of found) if (!out.includes(address)) out.push(address);
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+  const items = Array.isArray(value) ? value : Object.keys(value).map((key) => value[key]);
+  for (const item of items) addressesIn(item, depth + 1, out);
+  return out;
+}
+
+function signatureFromResponse(signed, message, address) {
+  return signatureCandidates(signed).find((candidate) => verifyKleverSignature(message, candidate, address)) || '';
 }
 
 /** True when this page already asked the wallet a moment ago. Stops a reload from asking again. */
@@ -110,9 +200,18 @@ function legacySignMessage(message) {
       preTransaction: message,
     });
     events.addEventListener(event.id, (result) => {
-      const data = result?.data;
-      if (data?.status === 'ACCEPTED') resolve(data.data?.message ?? data.data ?? data);
-      else reject(fail('rejected', 'The Klever app closed the sign-in request.'));
+      const status = String(result?.status || result?.data?.status || '').toUpperCase();
+      if (['REJECTED', 'CANCELLED', 'CANCELED', 'DENIED'].includes(status)) {
+        reject(fail('rejected', 'The Klever app closed the sign-in request.'));
+        return;
+      }
+      if (['ACCEPTED', 'SUCCESS', 'SIGNED'].includes(status) || signatureCandidates(result).length) {
+        // Keep the full envelope: data.message may be only the echoed prompt,
+        // while data.signature contains the actual Ed25519 proof.
+        resolve(result);
+        return;
+      }
+      reject(fail('rejected', 'The Klever app did not return a signature.'));
     });
     wallet.handleTransaction(JSON.stringify(event));
   });
@@ -208,19 +307,34 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   } finally {
     releasePageHold();
   }
-  const signature = signatureText(signed);
-  let ok = verifyKleverSignature(message, signature, address);
+  const candidates = signatureCandidates(signed);
+  let signature = signatureFromResponse(signed, message, address);
+  let ok = !!signature;
   if (!ok && typeof kw.validateSignature === 'function') {
-    try {
-      const res = await kw.validateSignature(message, signature, address);
-      const signer = typeof res === 'object' ? res.signer || res.address : '';
-      ok = res === true || res?.isValid === true;
-      if (ok && signer && signer !== address) ok = false;
-    } catch {
-      ok = false;
+    for (const candidate of candidates) {
+      try {
+        const res = await kw.validateSignature(message, candidate, address);
+        const signer = typeof res === 'object' ? res.signer || res.address : '';
+        if ((res === true || res?.isValid === true) && (!signer || signer === address)) {
+          signature = candidate;
+          ok = true;
+          break;
+        }
+      } catch {
+        /* Try the next candidate from the Klever response. */
+      }
     }
   }
-  if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
+  if (!ok) {
+    const signerAddresses = addressesIn(signed);
+    const wrongSigner = signerAddresses.find((candidate) =>
+      candidate !== address && candidates.some((candidateSignature) =>
+        verifyKleverSignature(message, candidateSignature, candidate)));
+    if (wrongSigner) {
+      throw fail('wrong-account', 'Klever signed with a different selected account. Select the intended klv account in Klever Wallet and try again.');
+    }
+    throw fail('bad-signature', 'Klever approved the request but did not return a verifiable signature for the selected account.');
+  }
   return { address, message, signature, nonce };
 }
 
