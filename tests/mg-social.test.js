@@ -373,7 +373,8 @@ test('friends cap constant and SOCIAL_SPEC cover the protocol', () => {
   assert.match(spec, /0\.08/);
   const mmo = src('../src/net/mmo.js');
   assert.match(mmo, /export class MmoClient/);
-  assert.doesNotMatch(mmo, /friendRequest/);
+  assert.match(mmo, /friendRequest\(name\)/);
+  assert.match(mmo, /sendWhisper\(to, text\)/);
   const proto = src('../PROTOCOL.md');
-  assert.doesNotMatch(proto, /friend_request/);
+  assert.match(proto, /friend_request/);
 });
