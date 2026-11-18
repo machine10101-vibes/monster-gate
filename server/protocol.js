@@ -152,8 +152,8 @@ export function readMove(msg) {
 
 export function readChat(msg) {
   if (msg.type !== TYPES.chat) throw new ProtocolError('protocol', 'Expected chat.');
-  const channel = msg.channel === 'zone' ? 'zone' : msg.channel === 'world' ? 'world' : '';
-  if (!channel) throw new ProtocolError('chat', 'Channel must be world or zone.');
+  const channel = ['world','zone','party'].includes(msg.channel) ? msg.channel : '';
+  if (!channel) throw new ProtocolError('chat', 'Channel must be world, zone, or party.');
   const text = cleanText(msg.text);
   if (!text) throw new ProtocolError('chat', 'Empty chat.');
   return { channel, text };
