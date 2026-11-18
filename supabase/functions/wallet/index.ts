@@ -280,7 +280,7 @@ async function handoffPoll(admin: Admin, body: Record<string, unknown>): Promise
   const hash = await sha256Hex(pollToken);
   const now = new Date().toISOString();
   const { data: complete, error } = await admin.from("klever_handoffs")
-    .update({ status: "consumed", session: null })
+    .update({ status: "consumed" })
     .eq("id", id).eq("poll_token_hash", hash).eq("status", "complete")
     .gt("expires_at", now).select("id, session").maybeSingle();
   if (error) return json({ error: "The account service could not be reached." }, 503);
