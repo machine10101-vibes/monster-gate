@@ -404,7 +404,9 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
     /if \(this\.cloudState === 'error'\) return;/,
     'a guild-record miss must not trap the hunter on the title after sign-in',
   );
-  assert.match(main, /continueSignedInHunt[\s\S]*roster\.last/);
+  const signedInContinuation = main.match(/  continueSignedInHunt\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
+  assert.match(signedInContinuation, /openCharacterSelect/);
+  assert.doesNotMatch(signedInContinuation, /roster\.last|enterWorld/);
   assert.match(main, /this\.roster = new Roster\(session\.address/);
   assert.match(main, /pickWorldSolo[\s\S]*openCharacterSelect/);
   assert.match(main, /pickWorldOnline[\s\S]*enterOnlineWorld/);
