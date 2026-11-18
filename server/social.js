@@ -396,7 +396,7 @@ export function createSocialRuntime(world, opts = {}) {
       ? { userId: requireUserId(query) }
       : (findByName(query) ? { userId: findByName(query).userId } : null);
     if (preview?.userId === session.userId) throw new SocialError('self', 'That hunter is you.');
-    if (preview?.userId && isBlocked(session.userId, preview.userId)) throw new SocialError('blocked', 'Blocked.');
+    if (preview?.userId && (isBlocked(session.userId, preview.userId) || isIgnoredBy(preview.userId,session.userId))) throw new SocialError('blocked', 'Blocked.');
     await enforceFriendCap(session.userId, 1);
     const result = await callFriends(() => persist.requestFriend(session.userId, query));
     const otherId = result?.to?.userId || result?.from?.userId;
@@ -416,7 +416,7 @@ export function createSocialRuntime(world, opts = {}) {
   async function friendAccept(session, msg) {
     const fromId = requireUserId(msg.user_id || msg.id);
     if (fromId === session.userId) throw new SocialError('self', 'That hunter is you.');
-    if (isBlocked(session.userId, fromId)) throw new SocialError('blocked', 'Blocked.');
+    if (isBlocked(session.userId, fromId) || isIgnoredBy(session.userId,fromId)) throw new SocialError('blocked', 'Blocked.');
     await enforceFriendCap(session.userId, 1);
     await callFriends(() => persist.acceptFriend(session.userId, fromId));
     await afterFriendsChanged(session, fromId, { accepted: true });
