@@ -193,6 +193,15 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
       );
     },
 
+    async cancelFriend(userId, otherUserId) {
+      const id=requireUserId(userId), other=requireUserId(otherUserId);
+      assertNotSelf(id,other);
+      const existing=await findPairRow(db,id,other);
+      if(!existing || existing.status!=='pending' || existing.requesterId!==id)throw hunterNotFound(other);
+      await deletePair(db,existing);
+      return {ok:true,userId:id,otherUserId:other};
+    },
+
     async declineFriend(userId, otherUserId) {
       const id = requireUserId(userId);
       const other = requireUserId(otherUserId);
