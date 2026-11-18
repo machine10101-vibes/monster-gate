@@ -119,6 +119,9 @@ export class SocialWorld {
         await this.store.remove(id,s.userId);
         await this.store.put({ requester_id:s.userId,target_id:id,status:'accepted',requester_name:s.name,target_name:req.requester_name });
         await this.store.put({ requester_id:id,target_id:s.userId,status:'accepted',requester_name:req.requester_name,target_name:s.name });
+      } else if (m.type === 'friend_cancel') {
+        if (!find(s.userId,id,'pending')) return fail('not_found','Request not found.');
+        await this.store.remove(s.userId,id);
       } else if (m.type === 'friend_decline') {
         if (!find(id,s.userId,'pending')) return fail('not_found','Request not found.');
         await this.store.remove(id,s.userId);
