@@ -4,9 +4,6 @@
  */
 
 export const LOAD_MIN_MS = 1500;
-const LOAD_SEEN_KEY = 'mg-load-seen';
-const LOAD_SEEN_AT_KEY = 'mg-load-seen-at';
-const LOAD_SEEN_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const BOOT_IN_PROGRESS_KEY = 'mg-load-in-progress';
 export const LOAD_FADE_MS = 420;
 export const LOAD_TIP_MS = 3200;
@@ -50,34 +47,6 @@ export function finishVideoAtEnd(video) {
   return true;
 }
 
-function loadWasAlreadyShown(store, persistent, now = Date.now()) {
-  let sessionSeen = false;
-  let persistentSeen = false;
-  try {
-    sessionSeen = !!store?.getItem && store.getItem(LOAD_SEEN_KEY) === '1';
-    const at = Number(persistent?.getItem?.(LOAD_SEEN_AT_KEY) || 0);
-    persistentSeen = at > 0 && now >= at && now - at < LOAD_SEEN_MAX_AGE_MS;
-  } catch {
-    /* local storage may be unavailable */
-  }
-  // Klever can recreate the WebView with a brand-new sessionStorage. Keep a
-  // short-lived marker in localStorage so a rotation restart does not replay
-  // the full splash before restoring the selected hunter.
-  if (sessionSeen || persistentSeen) {
-    if (!persistentSeen) {
-      try { persistent?.setItem?.(LOAD_SEEN_AT_KEY, String(now)); } catch { /* optional */ }
-    }
-    return true;
-  }
-  try {
-    store?.setItem?.(LOAD_SEEN_KEY, '1');
-    store?.setItem?.(BOOT_IN_PROGRESS_KEY, '1');
-    persistent?.setItem?.(LOAD_SEEN_AT_KEY, String(now));
-  } catch {
-    /* private browsing can disable storage */
-  }
-  return false;
-}
 
 export function setLoadProgress(fill, textEl, p, t) {
   const pct = Math.max(0, Math.min(1, Number(p) || 0));
@@ -163,12 +132,11 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   if (session === undefined) {
     try { session = globalThis.sessionStorage; } catch { session = null; }
   }
-  let persistent = opts.localStorage;
-  if (persistent === undefined) {
-    try { persistent = globalThis.localStorage; } catch { persistent = null; }
-  }
   const startedAt = opts.now ?? Date.now();
-  const skipRepeat = loadWasAlreadyShown(session, persistent, startedAt);
+  const skipRepeat = opts.skip === true;
+  if (!skipRepeat) {
+    try { session?.setItem?.(BOOT_IN_PROGRESS_KEY, '1'); } catch { /* storage is optional */ }
+  }
   const video = doc.getElementById('load-video');
   const tipEl = doc.getElementById('load-tip');
   const embers = doc.getElementById('load-embers');
