@@ -7,6 +7,8 @@ import { bech32 } from "bech32";
 ed.hashes.sha512 = sha512;
 
 const PREFIX = "\u0017Klever Signed Message:\n";
+// Older Klever builds sign the same line without the leading length byte.
+const LEGACY_PREFIX = "Klever Signed Message:\n";
 const LOGIN_LEAD = "Monster Gate wants you to sign in with your Klever wallet.";
 const LOGIN_SAFE = "This does not send any coins.";
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -24,8 +26,8 @@ export function publicKeyFromAddress(address: string): Uint8Array | null {
   }
 }
 
-function preparedBytes(body: Uint8Array, length: number): Uint8Array {
-  const prefix = new TextEncoder().encode(PREFIX);
+function preparedBytes(body: Uint8Array, length: number, prefixText = PREFIX): Uint8Array {
+  const prefix = new TextEncoder().encode(prefixText);
   const digits = new TextEncoder().encode(String(length));
   const bytes = new Uint8Array(prefix.length + digits.length + body.length);
   bytes.set(prefix, 0);
@@ -78,6 +80,7 @@ function accepts(compact: Uint8Array, pub: Uint8Array, text: string): boolean {
   const hexBody = new TextEncoder().encode(hexText(body));
   const payloads = [
     preparedHash(body, body.length),
+    keccak_256(preparedBytes(body, body.length, LEGACY_PREFIX)),
     body,
     prefixed,
     withPrefix,

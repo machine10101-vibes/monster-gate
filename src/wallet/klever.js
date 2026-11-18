@@ -370,17 +370,31 @@ export function noteSigner(address) {
 }
 
 /**
- * The proof names the account that signed last time, then kleverWeb.address.
- * signMessage signs that account. A second signature in the same press is closed by the app.
+ * The account requestAccount just returned. The signature sheet signs that
+ * account. A polled address is only a stand-in when the call returned none.
  */
-export function signingAddress(kw, fallback = '') {
+export function accountFromPrompt(returned, polled = '') {
+  const picked = addressText(returned);
+  if (ADDRESS_RE.test(picked)) return picked;
+  const fallback = typeof polled === 'string' ? polled.trim() : '';
+  return ADDRESS_RE.test(fallback) ? fallback : '';
+}
+
+/**
+ * The proof names the account the user just approved. That is the account the
+ * signature sheet signs. A stale kleverWeb.address is only used when this press
+ * did not ask the wallet to pick an account. A second signature in the same
+ * press is closed by the app.
+ */
+export function signingAddress(kw, approved = '', prompted = false) {
+  const picked = typeof approved === 'string' ? approved.trim() : '';
+  if (prompted && ADDRESS_RE.test(picked)) return picked;
   const noted = notedSigner();
   const accounts = providerAccounts(kw);
   if (ADDRESS_RE.test(noted) && (accounts.length === 0 || accounts.includes(noted))) return noted;
   const own = typeof kw?.address === 'string' ? kw.address.trim() : '';
   if (ADDRESS_RE.test(own)) return own;
-  const next = typeof fallback === 'string' ? fallback.trim() : '';
-  if (ADDRESS_RE.test(next)) return next;
+  if (ADDRESS_RE.test(picked)) return picked;
   const provided = providerAddress(kw);
   return ADDRESS_RE.test(provided) ? provided : '';
 }
@@ -444,16 +458,28 @@ function startAccountPrompt(kw) {
 
 function beginProviderConnect(kw) {
   const immediate = providerAddress(kw);
-  if (ADDRESS_RE.test(immediate)) return Promise.resolve(immediate);
+  if (ADDRESS_RE.test(immediate)) return Promise.resolve({ address: immediate, prompted: false });
   // The prompt starts in this turn. Its promise is kept so the signature waits
   // until this confirm has finished, instead of opening over it.
+  // The account the call returns is the one the user approved. The poll can
+  // still be showing the previous account when that call resolves.
   const request = startAccountPrompt(kw);
-  const appeared = pollProviderAddress(kw);
-  if (!request || typeof request.then !== 'function') return appeared;
+  const appeared = pollProviderAddress(kw).catch((err) => err);
+  if (!request || typeof request.then !== 'function') {
+    return appeared.then((polled) => {
+      if (polled instanceof Error) throw polled;
+      return { address: polled, prompted: true };
+    });
+  }
   return Promise.all([
     appeared,
     Promise.resolve(request).catch(() => undefined),
-  ]).then(([address]) => address);
+  ]).then(([polled, returned]) => {
+    const address = accountFromPrompt(returned, polled instanceof Error ? '' : polled);
+    if (address) return { address, prompted: true };
+    if (polled instanceof Error) throw polled;
+    throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
+  });
 }
 
 function accountRequest(kw) {
@@ -526,12 +552,14 @@ function connectionClosed(err) {
 
 async function connectProvider(kw) {
   try {
-    const address = signingAddress(kw, await accountRequest(kw));
+    const result = await accountRequest(kw);
+    const approved = result && typeof result === 'object' ? result.address : result;
+    const address = signingAddress(kw, approved || '', result?.prompted === true);
     if (ADDRESS_RE.test(address)) return address;
   } catch (err) {
     if (err?.code === 'rejected' || err?.code === 'no-account') throw err;
   }
-  const address = signingAddress(kw, addressFromWallet(kw));
+  const address = signingAddress(kw);
   if (address) return address;
   throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
 }

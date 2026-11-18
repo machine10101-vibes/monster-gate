@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
 import { keccak_256 as keccak } from '@noble/hashes/sha3.js';
-import { addressForSignature, addressFromWallet, connectMethod, pollProviderAddress, providerAccounts, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan, signingAddress } from '../src/wallet/klever.js';
+import { accountFromPrompt, addressForSignature, addressFromWallet, connectMethod, pollProviderAddress, providerAccounts, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan, signingAddress } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -35,6 +35,12 @@ test('the connect reads selectedAddress, then address, then the first account', 
   assert.equal(addressFromWallet({ address: 'klv1qpzry9x8gf2tvdw0s3jn' }), '');
   assert.equal(addressFromWallet({}), '');
   assert.equal(signingAddress({ address: other, selectedAddress: FORUM_ADDRESS }), other);
+  assert.equal(signingAddress({ address: other }, FORUM_ADDRESS, true), FORUM_ADDRESS);
+  assert.equal(signingAddress({ address: other }, FORUM_ADDRESS, false), other);
+  assert.equal(accountFromPrompt({ address: FORUM_ADDRESS }, other), FORUM_ADDRESS);
+  assert.equal(accountFromPrompt(FORUM_ADDRESS, other), FORUM_ADDRESS);
+  assert.equal(accountFromPrompt(undefined, other), other);
+  assert.equal(accountFromPrompt('not-an-account', ''), '');
   assert.equal(signingAddress({ selectedAddress: FORUM_ADDRESS }), FORUM_ADDRESS);
   assert.deepEqual(providerAccounts({ address: other, selectedAddress: FORUM_ADDRESS, accounts: [FORUM_ADDRESS] }), [other, FORUM_ADDRESS]);
   assert.match(srcText, /providerAccounts\(kw\)/);
@@ -160,6 +166,13 @@ test('a signature from the account Klever selected still proves that account', (
   assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(prefixed, secret)).toString('hex'), address), true);
   assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(keccak(body), secret)).toString('hex'), address), true);
   assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(kleverMessageHash(hex), secret)).toString('hex'), address), true);
+  const legacyPrefix = new TextEncoder().encode('Klever Signed Message:\n');
+  const legacyDigits = new TextEncoder().encode(String(body.length));
+  const legacy = new Uint8Array(legacyPrefix.length + legacyDigits.length + body.length);
+  legacy.set(legacyPrefix, 0);
+  legacy.set(legacyDigits, legacyPrefix.length);
+  legacy.set(body, legacyPrefix.length + legacyDigits.length);
+  assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(keccak(legacy), secret)).toString('hex'), address), true);
   assert.equal(verifyKleverSignature(login, Buffer.from(ed.sign(new Uint8Array(32).fill(9), secret)).toString('hex'), address), false);
 });
 

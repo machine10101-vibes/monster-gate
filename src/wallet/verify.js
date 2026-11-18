@@ -7,6 +7,8 @@ import { keccak_256 } from '@noble/hashes/sha3.js';
 ed.hashes.sha512 = sha512;
 
 const PREFIX = '\u0017Klever Signed Message:\n';
+// Older Klever builds sign the same line without the leading length byte.
+const LEGACY_PREFIX = 'Klever Signed Message:\n';
 
 /** Klever addresses are bech32 encodings of the 32-byte Ed25519 public key. */
 export function publicKeyFromAddress(address) {
@@ -34,8 +36,8 @@ function preparedHash(body, length) {
   return keccak_256(preparedBytes(body, length));
 }
 
-function preparedBytes(body, length) {
-  const prefix = new TextEncoder().encode(PREFIX);
+function preparedBytes(body, length, prefixText = PREFIX) {
+  const prefix = new TextEncoder().encode(prefixText);
   const digits = new TextEncoder().encode(String(length));
   const bytes = new Uint8Array(prefix.length + digits.length + body.length);
   bytes.set(prefix, 0);
@@ -86,6 +88,7 @@ function accepts(compact, pub, text) {
   const hexBody = new TextEncoder().encode(hexText(body));
   const payloads = [
     preparedHash(body, body.length),
+    keccak_256(preparedBytes(body, body.length, LEGACY_PREFIX)),
     body,
     prefixed,
     withPrefix,
