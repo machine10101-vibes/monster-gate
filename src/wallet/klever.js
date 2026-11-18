@@ -196,9 +196,17 @@ function releasePageHold() {
 
 /**
  * Older Klever builds have no signMessage. Their sheet takes a SIGN_MESSAGE
- * request through handleTransaction. The bridge PIN is the last resort: the
- * app dismisses it as soon as fingerprint starts.
+ * request through handleTransaction. The app reports a finished sign on the
+ * result or nested under data. A cancel is the only rejection. The bridge PIN
+ * is the last resort: the app dismisses it as soon as fingerprint starts.
  */
+export function sheetResultAccepted(result) {
+  const status = `${result?.status || result?.data?.status || ''}`.toUpperCase();
+  if (status === 'REJECTED' || status === 'CANCELLED' || status === 'CANCELED' || status === 'DENIED') return false;
+  if (status === 'ACCEPTED' || status === 'SUCCESS' || status === 'SIGNED') return true;
+  return signatureCandidates(result).length > 0;
+}
+
 function legacySignMessage(message, address) {
   const wallet = window.kleverWallet;
   const events = window.kleverWalletEvents;
@@ -209,6 +217,7 @@ function legacySignMessage(message, address) {
       chain: 'KLEVER',
       type: 'SIGN_MESSAGE',
       address,
+      message,
       transactionInfo: {
         siteUrl: location.href,
         hostname: location.hostname,
@@ -216,8 +225,7 @@ function legacySignMessage(message, address) {
       preTransaction: message,
     });
     events.addEventListener(event.id, (result) => {
-      const data = result?.data;
-      if (data?.status === 'ACCEPTED') resolve(data);
+      if (sheetResultAccepted(result)) resolve(result);
       else reject(fail('rejected', 'The Klever app closed the sign-in request.'));
     });
     wallet.handleTransaction(JSON.stringify(event));
@@ -234,11 +242,10 @@ function pageWallet() {
 }
 
 /**
- * One signer, and only one. signMessage returns a signature of the login text.
- * The in-app sheet goes through handleTransaction, and Klever shows that as a
- * transaction whose signature does not prove this message. The sheet is only
- * used when the page has no signMessage. The page is not resized under the
- * extension window, and a second prompt is never opened while the first is up.
+ * One signer, and only one. signMessage takes the login text and nothing else:
+ * the legacy app treats a second argument as a private key and opens a transaction.
+ * The sheet is only used when the page has no signMessage. The page is not resized
+ * under the extension window, and a second prompt is never opened while the first is up.
  */
 export function signaturePlan(kw, page = pageWallet()) {
   if (typeof kw?.signMessage === 'function') return 'extension';
@@ -255,7 +262,7 @@ export function signaturePlan(kw, page = pageWallet()) {
 async function requestSignature(kw, message, address) {
   const plan = signaturePlan(kw);
   if (plan === 'sheet') return legacySignMessage(message, address);
-  if (plan === 'extension') return kw.signMessage(message, address);
+  if (plan === 'extension') return kw.signMessage(message);
   if (plan === 'bridge') {
     return window.__kleverBrowser__.bridge({
       type: 'SIGN_IN_MESSAGE',
@@ -393,7 +400,9 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     holdPageStill();
     await paintSettled();
   }
-  pinAccount(kw, address);
+  // The extension popup signs whichever account is named on the provider.
+  // The phone app treats that write as a transaction, so the address stays in the message.
+  if (plan === 'extension' && !mobile) pinAccount(kw, address);
   const message = signedMessage({
     purpose,
     address,

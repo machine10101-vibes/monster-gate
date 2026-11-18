@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
-import { addressForSignature, addressFromWallet, connectMethod, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
+import { addressForSignature, addressFromWallet, connectMethod, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -85,8 +85,14 @@ test('one Klever prompt stays open until it is signed', () => {
   assert.equal(signaturePlan({}, { bridge() {} }), 'bridge');
   assert.equal(signaturePlan({}, {}), '');
   const srcText = src('../src/wallet/klever.js');
-  assert.equal(srcText.includes('kw.address = address'), true);
+  assert.equal(srcText.includes('kw.signMessage(message)'), true);
+  assert.equal(srcText.includes('kw.signMessage(message, address)'), false);
+  assert.equal(srcText.includes('if (plan === \'extension\' && !mobile) pinAccount(kw, address)'), true);
   assert.equal(srcText.includes('activeElement.blur'), false);
+  assert.equal(sheetResultAccepted({ status: 'ACCEPTED', signature: FORUM_SIGNATURE }), true);
+  assert.equal(sheetResultAccepted({ data: FORUM_SIGNATURE }), true);
+  assert.equal(sheetResultAccepted({ status: 'CANCELLED' }), false);
+  assert.equal(src('../src/main.js').includes("note?.(err.message || 'The wallet could not be linked.', true, true)"), true);
   assert.match(src('../src/wallet/link.js'), /wrong-account/);
 });
 
