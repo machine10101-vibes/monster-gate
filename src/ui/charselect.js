@@ -152,10 +152,12 @@ export class CharacterSelect {
     this.info.clear();
     for (const c of roster.chars) this.info.set(c.id, roster.summary(c.id));
     if (!roster.chars.length) {
+      this.root?.classList.remove('single-character');
       this.showForm();
       return;
     }
     this.mode = 'list';
+    this.root?.classList.toggle('single-character', roster.chars.length === 1);
     $('cs-form').classList.add('hidden');
     $('cs-panel').classList.remove('hidden');
     $('cs-enter-wrap').classList.remove('hidden');
