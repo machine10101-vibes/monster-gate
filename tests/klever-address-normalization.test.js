@@ -7,7 +7,7 @@ const ADDRESS = 'klv159vrgc50hqnr44zn25cdndmdwgrqvdsajax58asmslmqhcjfunwqktvupu'
 test('normalizes Klever account text before creating a signed proof', () => {
   assert.equal(normalizeKleverAddress(ADDRESS), ADDRESS);
   assert.equal(normalizeKleverAddress(`  ${ADDRESS.toUpperCase()}  `), ADDRESS);
-  assert.equal(normalizeKleverAddress(`Address: ${ADDRESS}\\n`), ADDRESS);
+  assert.equal(normalizeKleverAddress(`Address: ${ADDRESS}\n`), ADDRESS);
   assert.equal(normalizeKleverAddress(`${ADDRESS.slice(0, 18)} ${ADDRESS.slice(18)}`), ADDRESS);
 });
 
