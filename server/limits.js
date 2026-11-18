@@ -71,6 +71,8 @@ export function applyMove(prev, next, nowMs) {
       sheath: next.sheath,
       look: next.look || prev.look,
       armor: next.armor || prev.armor,
+      hp: Math.min(next.max_hp || prev.max_hp || 20, Math.max(0, next.hp ?? prev.hp ?? 20)),
+      max_hp: Math.max(1, next.max_hp || prev.max_hp || 20),
       zone: next.zone || prev.zone,
       movedAt: nowMs,
     },
