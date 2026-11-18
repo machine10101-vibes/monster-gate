@@ -1470,10 +1470,8 @@ class Game {
       requestGameFullscreen(lock && gesture).then((ok) => {
         this.fsPending = false;
         if (ok) this.clearTuck();
-        else if (!tablet && !this.tucked) {
-          this.tucked = true;
-          this.tuckChrome();
-        }
+        // If fullscreen is unavailable, keep the browser chrome as-is. Scrolling
+        // the Klever WebView during rotation can trigger another renderer reset.
         this.scheduleResize();
       });
     }
