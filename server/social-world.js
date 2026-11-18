@@ -63,7 +63,8 @@ export class SocialWorld {
       else if (r.status === 'blocked' && outgoing) blocked.push(p);
       else if (r.status === 'ignored' && outgoing) ignored.push(p);
     }
-    this.send(s, 'friend_list', { friends, pending_in, pending_out, blocked, ignored });
+    const uniqueFriends = [...new Map(friends.map(p => [p.user_id, p])).values()];
+    this.send(s, 'friend_list', { friends: uniqueFriends, pending_in, pending_out, blocked, ignored });
   }
   async presence(session, online) {
     if (session.guest || !this.store) return;
