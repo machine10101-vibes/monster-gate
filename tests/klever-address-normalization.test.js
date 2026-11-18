@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { normalizeKleverAddress } from '../src/wallet/klever.js';
+import { normalizeKleverAddress, providerAddress } from '../src/wallet/klever.js';
 
 const ADDRESS = 'klv159vrgc50hqnr44zn25cdndmdwgrqvdsajax58asmslmqhcjfunwqktvupu';
 
@@ -22,4 +22,14 @@ test('rejects malformed or non-Klever account values', () => {
   assert.equal(normalizeKleverAddress('not-a-wallet'), '');
   assert.equal(normalizeKleverAddress('klv1short'), '');
   assert.equal(normalizeKleverAddress({ address: '0x1234' }), '');
+});
+
+test('uses the selected Klever account before a stale provider getter', () => {
+  const stale = 'klv1fr724pjdjp3l8unuvgda0k6vt06d875hj7t5ggrxymzcg3jcveysejzljc';
+  assert.equal(providerAddress({
+    selectedAddress: ` ${ADDRESS.toUpperCase()} `,
+    address: stale,
+    getWalletAddress: () => stale,
+  }), ADDRESS);
+  assert.equal(providerAddress({ accounts: [ADDRESS] }), ADDRESS);
 });
