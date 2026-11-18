@@ -42,6 +42,13 @@ function proof(auth, { purpose, address, secret, userId, now = Date.now() }) {
   return { message, signature: sign(secret, message), nonce: nonce.nonce };
 }
 
+test('mobile signing prefers the SDK method and prevents overlapping prompts', () => {
+  const klever = src('../src/wallet/klever.js');
+  assert.match(klever, /if \(typeof kw\?\.signMessage === 'function'\) return kw\.signMessage\(message\)/);
+  assert.match(klever, /if \(signingInFlight\)[\s\S]*A Klever signature request is already in progress/);
+  assert.ok(klever.indexOf("kw.signMessage(message)") < klever.indexOf("legacySignMessage(message)"));
+});
+
 test('Klever approval event extracts the signature, not the echoed message', () => {
   const signature = 'ab'.repeat(64);
   const event = {
