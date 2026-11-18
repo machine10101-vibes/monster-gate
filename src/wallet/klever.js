@@ -323,6 +323,42 @@ export function providerAddress(kw) {
   return typeof found === 'string' && found.length > 10 ? found.trim() : '';
 }
 
+/**
+ * signMessage sends kleverWeb.address, not selectedAddress.
+ * The proof has to name that account, or the signature cannot match.
+ */
+export function signingAddress(kw, fallback = '') {
+  const own = typeof kw?.address === 'string' ? kw.address.trim() : '';
+  if (ADDRESS_RE.test(own)) return own;
+  const next = typeof fallback === 'string' ? fallback.trim() : '';
+  if (ADDRESS_RE.test(next)) return next;
+  const provided = providerAddress(kw);
+  return ADDRESS_RE.test(provided) ? provided : '';
+}
+
+/** Every klv account on the provider. The signer is first. */
+export function providerAccounts(kw) {
+  const found = [];
+  const add = (value) => {
+    if (Array.isArray(value)) {
+      for (const item of value) add(item);
+      return;
+    }
+    const text = addressText(value);
+    if (ADDRESS_RE.test(text) && !found.includes(text)) found.push(text);
+  };
+  if (!kw) return found;
+  add(kw.address);
+  add(kw.selectedAddress);
+  add(kw.accounts);
+  try {
+    if (typeof kw.getWalletAddress === 'function') add(kw.getWalletAddress());
+  } catch {
+    /* a provider without an account */
+  }
+  return found;
+}
+
 /** requestAccount, or enable, or the SDK initialize. Same order as the working connect. */
 export function connectMethod(kw) {
   if (kw && typeof kw.requestAccount === 'function') return 'requestAccount';
@@ -437,12 +473,12 @@ function connectionClosed(err) {
 
 async function connectProvider(kw) {
   try {
-    const address = await accountRequest(kw);
+    const address = signingAddress(kw, await accountRequest(kw));
     if (ADDRESS_RE.test(address)) return address;
   } catch (err) {
     if (err?.code === 'rejected' || err?.code === 'no-account') throw err;
   }
-  const address = addressFromWallet(kw);
+  const address = signingAddress(kw, addressFromWallet(kw));
   if (address) return address;
   throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
 }
@@ -501,7 +537,7 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
   const candidates = signatureCandidates(signed);
   const matched = addressForSignature(candidates, message, [
     address,
-    addressFromWallet(kw),
+    ...providerAccounts(kw),
     ...addressesIn(signed),
   ]);
   if (matched === address) {

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
 import { keccak_256 as keccak } from '@noble/hashes/sha3.js';
-import { addressForSignature, addressFromWallet, connectMethod, pollProviderAddress, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
+import { addressForSignature, addressFromWallet, connectMethod, pollProviderAddress, providerAccounts, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan, signingAddress } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -34,6 +34,10 @@ test('the connect reads selectedAddress, then address, then the first account', 
   assert.equal(addressFromWallet({}, [FORUM_ADDRESS]), FORUM_ADDRESS);
   assert.equal(addressFromWallet({ address: 'klv1qpzry9x8gf2tvdw0s3jn' }), '');
   assert.equal(addressFromWallet({}), '');
+  assert.equal(signingAddress({ address: other, selectedAddress: FORUM_ADDRESS }), other);
+  assert.equal(signingAddress({ selectedAddress: FORUM_ADDRESS }), FORUM_ADDRESS);
+  assert.deepEqual(providerAccounts({ address: other, selectedAddress: FORUM_ADDRESS, accounts: [FORUM_ADDRESS] }), [other, FORUM_ADDRESS]);
+  assert.match(srcText, /providerAccounts\(kw\)/);
 });
 
 test('the page polls the provider until the klv account is approved', async () => {
