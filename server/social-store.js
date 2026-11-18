@@ -7,6 +7,7 @@ export function createMemorySocialStore() {
   return {
     kind: 'memory',
     async list(userId) { return [...rows.values()].filter(r => r.requester_id === userId || r.target_id === userId); },
+    async findByName() { return null; },
     async put(row) { rows.set(key(row.requester_id, row.target_id), { ...row, updated_at: new Date().toISOString() }); },
     async remove(a, b) { rows.delete(key(a, b)); },
   };
@@ -38,7 +39,12 @@ export function createSupabaseSocialStore(env = process.env) {
     kind: 'supabase',
     async list(userId) {
       const q = new URLSearchParams({ select: '*', or: `(requester_id.eq.${userId},target_id.eq.${userId})` });
-      return request(`?${q}`) || [];
+      return (await request(`?${q}`)) || [];
+    },
+    async findByName(name) {
+      const q = new URLSearchParams({ select: 'user_id,name', name: `ilike.${name}`, limit: '1' });
+      const rows = await request(`/../characters?${q}`).catch(() => []);
+      return Array.isArray(rows) ? rows[0] || null : null;
     },
     async put(row) {
       const q = new URLSearchParams({ on_conflict: 'requester_id,target_id' });
