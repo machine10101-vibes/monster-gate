@@ -1502,8 +1502,10 @@ export class Monster {
       else if (winding) neckX = this.atk === 'breath' ? -0.08 : -0.18;
       // Neck follows the target more slowly; the head adds its own counter-look
       // and small exploratory motion, producing two visible independent joints.
-      p.neck.rotation.x += (neckX - p.neck.rotation.x) * Math.min(1, dt * 7);
-      p.neck.rotation.y += (this.lookSm * 0.62 - p.neck.rotation.y) * Math.min(1, dt * 4.5);
+      if (p.neck) {
+        p.neck.rotation.x += (neckX - p.neck.rotation.x) * Math.min(1, dt * 7);
+        p.neck.rotation.y += (this.lookSm * 0.62 - p.neck.rotation.y) * Math.min(1, dt * 4.5);
+      }
       p.head.rotation.x += (headX - p.head.rotation.x) * Math.min(1, dt * 14);
       const headLook = this.lookSm * 0.38 + Math.sin(t * 0.9) * (moving < 0.1 ? 0.045 : 0.012);
       p.head.rotation.y += (headLook - p.head.rotation.y) * Math.min(1, dt * 8);
