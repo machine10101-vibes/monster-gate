@@ -2,19 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <style>html,body{background:#070308}html.at-login #loading{display:none!important}html.at-login #title{display:flex!important}</style>
-    <script>
-      (function () {
-        var raw = null;
-        try {
-          raw = sessionStorage.getItem('monster-gate-account-session')
-            || localStorage.getItem('monster-gate-account-session');
-        } catch (e) {}
-        var signed = false;
-        try { signed = !!(raw && JSON.parse(raw).kind === 'email'); } catch (e) {}
-        if (!signed) document.documentElement.classList.add('at-login');
-      })();
-    </script>
+    <style>html,body{background:#070308}</style>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content"
@@ -40,10 +28,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-CNHXz96N.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/account-CYrBrwpV.js">
-    <link rel="stylesheet" crossorigin href="/assets/account-DToipgfc.css">
-    <link rel="stylesheet" crossorigin href="/assets/index-B4PmgKee.css">
+    <script type="module" crossorigin src="/assets/index-DAlUpSPC.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/account-PyEGE5gG.js">
+    <link rel="stylesheet" crossorigin href="/assets/account-BkS9xlMh.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-BTZveDUp.css">
   </head>
   <body>
     <div id="app">
@@ -141,7 +129,7 @@
             <button id="tb-bolt" class="tbtn" data-act="bolt" aria-label="Skill 1"><i class="ico bolt"></i><b class="tb-num">1</b></button>
             <button id="tb-fury" class="tbtn" data-act="fury" aria-label="Skill 3"><i class="ico fury"></i><b class="tb-num">3</b></button>
             <button id="tb-skill" class="tbtn" data-act="skill" aria-label="Skill 2"><b class="tb-num">2</b>X</button>
-            <button id="tb-talk" class="tbtn talk hidden" type="button" data-act="talk"><i class="ico talk"></i></button>
+            <button id="tb-talk" class="tbtn talk hidden" data-act="talk"><i class="ico talk"></i></button>
           </div>
         </div>
       </div>
@@ -217,11 +205,6 @@
           </div>
         </div>
       </div>
-      <script>
-        if (document.documentElement.classList.contains('at-login')) {
-          document.getElementById('load-video')?.pause();
-        }
-      </script>
 
       <div id="title" class="hidden">
         <div class="title-inner mg-frame">
@@ -262,7 +245,7 @@
           <button id="btn-start" class="start hidden" type="button">Begin the hunt</button>
           <button id="btn-wallet-switch" class="wallet-link hidden" type="button">Sign out</button>
           <div id="wallet-unlinked" class="wallet-unlinked mg-frame hidden" role="alert">
-            <p id="wallet-unlinked-text">This Klever wallet isn't linked yet. Your email account and progress are safe — sign in with email, then press Connect Klever wallet on the character camp.</p>
+            <p id="wallet-unlinked-text">This Klever wallet isn't linked yet. Your email account and progress are safe — sign in with email, then link the wallet in Account settings.</p>
             <button id="wallet-unlinked-email" class="start quiet" type="button">Sign in with email</button>
           </div>
           <div id="wallet-help" class="wallet-help hidden"></div>
@@ -325,17 +308,6 @@
         <div id="cs-enter-wrap" class="cs-enter">
           <div id="cs-name" class="cs-name"></div>
           <small id="cs-save" class="cs-save"></small>
-          <button id="cs-klever" class="cs-klever hidden" type="button">Connect Klever wallet</button>
-          <div id="cs-world" class="cs-world" role="group" aria-label="World">
-            <button id="cs-world1" class="cs-world-btn" type="button" aria-pressed="false">
-              <b>World 1</b>
-              <small id="cs-world1-status">Checking…</small>
-            </button>
-            <button id="cs-solo" class="cs-world-btn" type="button" aria-pressed="false">
-              <b>Solo</b>
-              <small>This device</small>
-            </button>
-          </div>
           <button id="cs-enter" class="cs-btn big" type="button">Enter World</button>
         </div>
         <div id="cs-toggle" class="cs-toggle">
