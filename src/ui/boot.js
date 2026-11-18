@@ -179,6 +179,7 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   let tipTimer = 0;
   let held = false;
   let resolveVideoDone = () => {};
+  let videoWaitTimer = 0;
   const videoDone = new Promise((resolve) => { resolveVideoDone = resolve; });
 
   if (skipRepeat) {
@@ -190,6 +191,7 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     return {
       el, startedAt,
       setProgress(p, t) { return setLoadProgress(fill, text, p, t); },
+      async waitForVideo() { return true; },
       async dismiss() { return true; },
     };
   }
@@ -197,6 +199,14 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   el.classList.toggle('reduced', reduced);
   spawnEmbers(embers, emberCount({ mobile, reduced }), (tag) => doc.createElement(tag));
 
+  const failVideo = () => {
+    if (held) return;
+    held = true;
+    el.classList.add('video-failed', 'held');
+    el.classList.remove('video-playing');
+    try { video?.pause?.(); } catch { /* the decoder may already be stopped */ }
+    resolveVideoDone();
+  };
   const finish = () => {
     if (reduced || held || !finishVideoAtEnd(video)) return false;
     held = true;
@@ -206,19 +216,17 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   };
   if (reduced) {
     try { video?.pause?.(); } catch { /* ignore */ }
+    resolveVideoDone();
   } else if (video) {
     video.loop = false;
     video.muted = true;
     video.playsInline = true;
     video.addEventListener('play', () => el.classList.add('video-playing'));
     video.addEventListener('ended', finish);
+    video.addEventListener('error', failVideo);
+    video.addEventListener('abort', failVideo);
     const play = video.play?.();
-    if (play && typeof play.catch === 'function') play.catch(() => {
-      held = true;
-      el.classList.add('video-failed');
-      el.classList.add('held');
-      resolveVideoDone();
-    });
+    if (play && typeof play.catch === 'function') play.catch(failVideo);
   } else resolveVideoDone();
 
   if (tipEl) {
@@ -238,13 +246,30 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     el,
     startedAt,
     setProgress(p, t) { return setLoadProgress(fill, text, p, t); },
+    async waitForVideo({ timeoutMs } = {}) {
+      if (reduced || held || !video) return true;
+      const duration = Number(video.duration);
+      const fallbackMs = Number.isFinite(duration) && duration > 0
+        ? Math.max(30000, duration * 1000 + 12000)
+        : 45000;
+      const limit = Math.max(1000, Number(timeoutMs ?? opts.videoEndTimeoutMs ?? fallbackMs));
+      await Promise.race([
+        videoDone,
+        new Promise((resolve) => {
+          videoWaitTimer = setTimeout(() => {
+            failVideo();
+            resolve();
+          }, limit);
+        }),
+      ]);
+      if (videoWaitTimer) clearTimeout(videoWaitTimer);
+      videoWaitTimer = 0;
+      return true;
+    },
     async dismiss({ now, wait = remainMinDisplay } = {}) {
       const delay = wait(startedAt, now ?? Date.now());
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-      if (!reduced && video && !video.ended && !el.classList.contains('video-failed')) {
-        const timeout = Math.max(0, Number(opts.videoEndTimeoutMs ?? 10000));
-        await Promise.race([videoDone, new Promise((resolve) => setTimeout(resolve, timeout))]);
-      }
+      await this.waitForVideo();
       el.classList.add('fading');
       if (fadeMs > 0) await new Promise((r) => setTimeout(r, fadeMs));
       el.classList.add('hidden');
