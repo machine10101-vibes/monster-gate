@@ -211,6 +211,7 @@ export async function readKleverHandoff() {
 export async function pollKleverHandoff(handoff) {
   if (!handoff?.id || !handoff?.pollToken) throw fail('handoff-expired', 'The Klever sign-in request expired. Please try again.');
   const res = await walletPost({ op: 'handoff_poll', id: handoff.id, pollToken: handoff.pollToken });
+  if (res.status === 0 || res.status >= 500) return null;
   if (res.status !== 200) {
     try { localStorage.removeItem(KLEVER_HANDOFF_KEY); } catch { /* ignore */ }
     throw fail(res.json?.code || 'unavailable', res.json?.error || 'Could not check Klever sign-in.');
