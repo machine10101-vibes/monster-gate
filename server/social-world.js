@@ -134,10 +134,13 @@ export class SocialWorld {
         if (!find(id,s.userId,'pending')) return fail('not_found','Request not found.');
         await this.store.remove(id,s.userId);
       } else if (m.type === 'friend_remove') {
+        if (!find(s.userId,id,'accepted')) return fail('not_found','Friend not found.');
         await this.store.remove(s.userId,id); await this.store.remove(id,s.userId);
       } else if (m.type === 'block' || m.type === 'ignore') {
+        const status = m.type === 'block' ? 'blocked' : 'ignored';
+        if (!find(s.userId,id,status) && rows.filter(r => r.requester_id === s.userId && ['blocked','ignored'].includes(r.status)).length >= 100) return fail('full','Block and ignore list is full (100).');
         await this.store.remove(s.userId,id); await this.store.remove(id,s.userId);
-        await this.store.put({ requester_id:s.userId,target_id:id,status:m.type==='block'?'blocked':'ignored',requester_name:s.name,target_name:find(id,s.userId)?.requester_name || 'Hunter' });
+        await this.store.put({ requester_id:s.userId,target_id:id,status,requester_name:s.name,target_name:find(id,s.userId)?.requester_name || 'Hunter' });
       } else if (m.type === 'unblock' || m.type === 'unignore') {
         await this.store.remove(s.userId,id);
       }
