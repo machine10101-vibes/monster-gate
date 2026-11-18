@@ -1258,11 +1258,13 @@ export class WorldView {
     const msg = cleanText(text);
     if (!msg) return false;
     const whisper = msg.match(/^\/w(?:hisper)?\s+(\S+)\s+(.+)$/i);
-    if (whisper && this.game?.social?.caps?.whisper) {
-      this.game.social.whisper(whisper[1], whisper[2]);
+    if (whisper) {
+      if (this.game?.social?.caps?.whisper) this.game.social.whisper(whisper[1], whisper[2]);
+      else this.game?.hud?.toast?.('Private whispers are unavailable on this connection.', 2200);
       return true;
     }
-    const payload = { channel: channel === 'zone' ? 'zone' : 'world', text: msg };
+    const allowed = ['world','zone','party'];
+    const payload = { channel: allowed.includes(channel) ? channel : 'world', text: msg };
     this._onChatSend?.(payload);
     this.emit({ type: 'chat', ...payload });
     return true;
@@ -1296,6 +1298,7 @@ export class WorldView {
         <div class="wc-tabs">
           <button type="button" data-ch="world">World</button>
           <button type="button" data-ch="zone">Zone</button>
+          <button type="button" data-ch="party">Party</button>
         </div>
         <div class="wc-stack">
           <div class="wc-log" role="log" aria-live="polite"></div>
@@ -1328,7 +1331,7 @@ export class WorldView {
     });
     chat.querySelectorAll('.wc-tabs button').forEach((b) => {
       b.addEventListener('click', () => {
-        this.channel = b.dataset.ch === 'zone' ? 'zone' : 'world';
+        this.channel = ['world','zone','party'].includes(b.dataset.ch) ? b.dataset.ch : 'world';
         this.paintChat();
         this.ui.input?.focus();
       });
@@ -1431,6 +1434,7 @@ export class WorldView {
     const rows = this.chat.filter((m) => {
       if (m.channel === 'whisper') return true;
       if (this.channel === 'world') return m.channel === 'world';
+      if (this.channel === 'party') return m.channel === 'party';
       return m.channel === 'zone' && (!m.zone || !zone || m.zone === zone);
     });
     this.ui.log.innerHTML = rows.slice(-40).map((m) => {
