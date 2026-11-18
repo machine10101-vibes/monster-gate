@@ -209,7 +209,7 @@ test('rotation recovery is one-shot, short-lived, and only follows a real orient
 
 test('video playback failure restores the poster and releases boot instead of leaving a black frame', async () => {
   const doc = fakeDoc();
-  const ui = mountLoading(doc, { reduced: false, mobile: true, fadeMs: 0 });
+  const ui = mountLoading(doc, { reduced: false, mobile: true, fadeMs: 0, setInterval: () => 0 });
   const waiting = ui.waitForVideo({ timeoutMs: 1000 });
   doc.map['load-video'].listeners.error();
   await waiting;
