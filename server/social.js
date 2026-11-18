@@ -339,6 +339,7 @@ export function createSocialRuntime(world, opts = {}) {
     const type=msg.type, requestId=msg.request_id;
     try {
       if (type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type)) assertAuthed(session);
+      if (type === 'whisper') assertAuthed(session);
       if (type !== 'friend_list' && type !== 'party_leave' && session.limiter && !session.limiter.allowSocial()) {
         throw new ProtocolError('rate','Slow down.');
       }
