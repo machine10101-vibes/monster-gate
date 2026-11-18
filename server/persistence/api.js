@@ -129,6 +129,16 @@ export function createPersistence(options = {}) {
       return adapter.listFriends(requireUserId(userId));
     },
 
+    async listRelations(userId) {
+      if (typeof adapter.listRelations !== 'function') return [];
+      return adapter.listRelations(requireUserId(userId));
+    },
+
+    async setRelation(userId, targetUserId, status) {
+      if (typeof adapter.setRelation !== 'function') throw new Error('Social relations are not supported by this persistence adapter.');
+      return adapter.setRelation(requireUserId(userId), requireUserId(targetUserId), status);
+    },
+
     async requestFriend(fromUserId, toUserIdOrName) {
       requireUserId(fromUserId);
       return adapter.requestFriend(fromUserId, toUserIdOrName);
