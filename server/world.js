@@ -195,8 +195,10 @@ export class World {
       at: this.now(),
       zone: session.zone,
     };
+    if (channel === 'party' && !this.social.partyFor(session)) { send(session.ws, errorFrame('not_in_party', 'You are not in a party.')); return; }
     for (const other of this.players.values()) {
       if (channel === 'zone' && other.zone !== session.zone) continue;
+      if (channel === 'party' && !this.social.partyFor(session)?.members.includes(other)) continue;
       if (channel === 'zone' && other.zone !== session.zone) continue;
       if (this.social.store && !session.guest && !other.guest) {
         const hidden = await this.social.blocked(session.userId, other.userId).catch(() => false)
