@@ -11,11 +11,14 @@ import {
   roomForCount,
   stackSlots,
   storageStackSlots,
+  STORAGE_MAX_STACK,
 } from './stacks.js';
 
 export const ANON_KEY = 'monster-gate-hunter-v1';
 
-export const STORAGE_SLOTS = 30;
+export const STORAGE_SLOTS = 120;
+export const STORAGE_PAGE_SLOTS = 40;
+export const STORAGE_TABS = 3;
 export { BAG_SLOTS, MAX_STACK } from './stacks.js';
 const POTION_IDS = new Set(['potion', 'manapotion']);
 
@@ -827,12 +830,14 @@ export class Progress {
       if (!this.data.storage.some((s) => !s)) return false;
       return this.storageUsed() < STORAGE_SLOTS;
     }
-    const have = this.data.storage.find((s) => s && s.k === k && s.id === id);
-    const current = have?.n | 0;
-    const extra = stackSlots(current + n) - stackSlots(current);
-    if (!have && !this.data.storage.some((s) => !s)) return false;
-    if (extra < 1) return true;
-    return this.storageUsed() + extra <= STORAGE_SLOTS;
+    let remaining = n;
+    for (const s of this.data.storage) {
+      if (!s || s.k !== k || s.id !== id) continue;
+      remaining -= Math.max(0, STORAGE_MAX_STACK - (s.n | 0));
+      if (remaining <= 0) return true;
+    }
+    const empty = this.data.storage.filter((s) => !s).length;
+    return Math.ceil(remaining / STORAGE_MAX_STACK) <= empty;
   }
 
   /** Merge into an existing stack, or take the first empty slot. Gear always uses its own slot. */
@@ -840,16 +845,25 @@ export class Progress {
     n = n | 0;
     if (n < 1 || !this.canFitStorage(k, id, n)) return false;
     const slots = this.data.storage;
-    if (k !== 'gear') {
-      const have = slots.find((s) => s && s.k === k && s.id === id);
-      if (have) {
-        have.n += n;
-        this.save();
-        return true;
+    if (k === 'gear') {
+      const at = slots.findIndex((s) => !s);
+      slots[at] = { k, id, n: 1 };
+    } else {
+      let remaining = n;
+      for (const s of slots) {
+        if (!s || s.k !== k || s.id !== id || s.n >= STORAGE_MAX_STACK) continue;
+        const add = Math.min(remaining, STORAGE_MAX_STACK - s.n);
+        s.n += add;
+        remaining -= add;
+        if (!remaining) break;
+      }
+      while (remaining > 0) {
+        const at = slots.findIndex((s) => !s);
+        const add = Math.min(remaining, STORAGE_MAX_STACK);
+        slots[at] = { k, id, n: add };
+        remaining -= add;
       }
     }
-    const at = slots.findIndex((s) => !s);
-    slots[at] = { k, id, n: k === 'gear' ? 1 : n };
     this.save();
     return true;
   }
@@ -980,29 +994,29 @@ function storageEntry(item) {
 function normalizeStorage(raw) {
   const slots = emptyStorage();
   if (!Array.isArray(raw)) return slots;
-  const positioned = raw.length === STORAGE_SLOTS;
-  let cursor = 0;
-  for (let i = 0; i < raw.length && cursor < STORAGE_SLOTS; i++) {
+  const positioned = raw.length === 30 || raw.length === STORAGE_SLOTS;
+  for (let i = 0; i < raw.length; i++) {
     const entry = storageEntry(raw[i]);
-    if (!entry) {
-      if (positioned) cursor = i + 1;
+    if (!entry) continue;
+    if (entry.k === 'gear') {
+      if (slots.some((s) => s && s.k === 'gear' && s.id === entry.id)) continue;
+      const at = positioned ? i : slots.findIndex((s) => !s);
+      if (at < 0 || at >= STORAGE_SLOTS) continue;
+      slots[at] = entry;
       continue;
     }
-    if (entry.k !== 'gear') {
-      const have = slots.find((s) => s && s.k === entry.k && s.id === entry.id);
-      if (have) {
-        have.n = Math.min(99999, have.n + entry.n);
-        if (positioned) cursor = i + 1;
-        continue;
-      }
-    } else if (slots.some((s) => s && s.k === 'gear' && s.id === entry.id)) {
-      if (positioned) cursor = i + 1;
-      continue;
+    let remaining = entry.n;
+    let first = true;
+    while (remaining > 0) {
+      let at = first && positioned && i < STORAGE_SLOTS && !slots[i]
+        ? i
+        : slots.findIndex((s) => !s);
+      if (at < 0) break;
+      const n = Math.min(remaining, STORAGE_MAX_STACK);
+      slots[at] = { k: entry.k, id: entry.id, n };
+      remaining -= n;
+      first = false;
     }
-    const at = positioned ? i : slots.findIndex((s) => !s);
-    if (at < 0 || at >= STORAGE_SLOTS) break;
-    slots[at] = entry;
-    cursor = at + 1;
   }
   return slots;
 }
