@@ -186,7 +186,13 @@ test('MG-UI-41: Retry keeps Trying again for 600ms even if the probe fails insta
   assert.equal(GL_FAIL_RETRY_MS, 600);
   const doc = fakeDoc();
   let during = null;
+  let now = 0;
   showGlFailPanel(doc, {
+    now: () => now,
+    setTimeout: (fn, ms) => setTimeout(() => {
+      now += ms;
+      fn();
+    }, ms),
     probe: () => {
       during = { text: doc.btn.textContent, disabled: doc.btn.disabled, status: doc.status.textContent };
       return { ok: false, reason: 'force' };
