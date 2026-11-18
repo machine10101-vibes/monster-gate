@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# A newer push supersedes any stuck verification run for this PR.
+concurrency:
+  group: verify-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
