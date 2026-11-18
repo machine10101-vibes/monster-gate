@@ -106,7 +106,7 @@ export class World {
         return;
       }
       if (msg.type === TYPES.move) this.move(session, msg);
-      else if (msg.type === TYPES.chat) this.chat(session, msg);
+      else if (msg.type === TYPES.chat) await this.chat(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
       else if (await this.social.handle(session, msg)) return;
@@ -181,7 +181,7 @@ export class World {
     this.persistPose(session);
   }
 
-  chat(session, msg) {
+  async chat(session, msg) {
     if (!session.limiter.allowChat()) {
       send(session.ws, errorFrame('rate', 'Slow down.'));
       return;
