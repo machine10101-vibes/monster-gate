@@ -51,9 +51,10 @@ export function finishVideoAtEnd(video) {
 }
 
 function loadWasAlreadyShown(store, persistent, now = Date.now()) {
-  const sessionSeen = !!store?.getItem && store.getItem(LOAD_SEEN_KEY) === '1';
+  let sessionSeen = false;
   let persistentSeen = false;
   try {
+    sessionSeen = !!store?.getItem && store.getItem(LOAD_SEEN_KEY) === '1';
     const at = Number(persistent?.getItem?.(LOAD_SEEN_AT_KEY) || 0);
     persistentSeen = at > 0 && now >= at && now - at < LOAD_SEEN_MAX_AGE_MS;
   } catch {
