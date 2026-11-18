@@ -174,16 +174,6 @@ function pinAccount(kw, address) {
   }
 }
 
-/** The phone app signs the account selected in the browser. Point that at the klv address. */
-async function selectAccount(kw, address) {
-  if (!kw || typeof kw.setWalletAddress !== 'function' || !ADDRESS_RE.test(address || '')) return;
-  try {
-    await kw.setWalletAddress(address);
-  } catch {
-    /* the sign request still names the account */
-  }
-}
-
 /** True when this page already asked the wallet a moment ago. Stops a reload from asking again. */
 export function promptIsCooling() {
   try {
@@ -322,12 +312,100 @@ export function waitForProvider(ms = 2000) {
   });
 }
 
-/** The extension Confirm popup is `connect`. Older builds use `initialize` for the same step. */
+/**
+ * The phone app approves an account with `requestAccount`, or `enable` on older builds.
+ * Those run from the button click. The extension Confirm popup is `connect`, and a
+ * Klever Hub page uses its own initialize.
+ */
 export function connectMethod(kw, hub = typeof window !== 'undefined' ? window.kleverHub : null) {
+  if (kw && typeof kw.requestAccount === 'function') return 'requestAccount';
+  if (kw && typeof kw.enable === 'function') return 'enable';
   if (kw && typeof kw.connect === 'function') return 'connect';
   if (hub && typeof hub.initialize === 'function') return 'hub';
   if (kw && typeof kw.initialize === 'function') return 'initialize';
   return '';
+}
+
+function invokeAccountRequest(kw) {
+  const method = connectMethod(kw);
+  if (method === 'requestAccount') return kw.requestAccount();
+  if (method === 'enable') return kw.enable();
+  if (method === 'connect') return kw.connect();
+  if (method === 'hub') return window.kleverHub.initialize();
+  if (method === 'initialize') return kw.initialize();
+  return undefined;
+}
+
+let pendingAccount = null;
+
+/** Starts the account prompt in this turn, before any await can drop the click. */
+export function primeKleverConnect() {
+  if (typeof window === 'undefined' || !window.kleverWeb || pendingAccount) return pendingAccount;
+  const kw = window.kleverWeb;
+  let pending;
+  try {
+    pending = invokeAccountRequest(kw);
+  } catch (err) {
+    pending = Promise.reject(err);
+  }
+  pendingAccount = { kw, pending: Promise.resolve(pending) };
+  return pendingAccount;
+}
+
+function accountRequest(kw) {
+  if (pendingAccount && pendingAccount.kw === kw) {
+    const held = pendingAccount;
+    pendingAccount = null;
+    return held.pending;
+  }
+  pendingAccount = null;
+  try {
+    return Promise.resolve(invokeAccountRequest(kw));
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * The approved klv address arrives on the provider after the prompt, not before it.
+ * A stale address already sitting on the provider is kept only once the prompt finishes.
+ */
+export async function approvedKleverAddress(kw, pending, timeoutMs = 20000) {
+  const before = addressFromWallet(kw);
+  let returned;
+  let settled = false;
+  let failure = null;
+  Promise.resolve(pending).then(
+    (value) => {
+      returned = value;
+      settled = true;
+    },
+    (err) => {
+      failure = err;
+      settled = true;
+    },
+  );
+  const start = Date.now();
+  while (Date.now() - start <= timeoutMs) {
+    const address = addressFromWallet(kw, returned);
+    if (address && (settled || address !== before)) return address;
+    if (settled && failure && connectionClosed(failure) && !address) {
+      throw fail('rejected', 'The Klever app closed the connection.');
+    }
+    if (settled && !address && Date.now() - start > 800) break;
+    await delay(80);
+  }
+  const address = addressFromWallet(kw, returned);
+  if (address) return address;
+  if (failure && connectionClosed(failure)) throw fail('rejected', 'The Klever app closed the connection.');
+  throw fail(
+    'no-account',
+    'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.',
+  );
 }
 
 function addressText(value) {
@@ -363,38 +441,18 @@ function connectionClosed(err) {
   return /reject|declin|cancel|denied|closed/.test(text);
 }
 
-async function connectProvider(kw, mobile) {
-  let address = addressFromWallet(kw);
-  if (!address) {
-    const method = connectMethod(kw);
-    let returned;
-    try {
-      if (method === 'connect') returned = await kw.connect();
-      else if (method === 'hub') returned = await window.kleverHub.initialize();
-      else if (method === 'initialize') returned = await kw.initialize();
-    } catch (err) {
-      if (connectionClosed(err)) {
-        throw fail(
-          'rejected',
-          mobile ? 'The Klever app closed the connection.' : 'The Klever extension closed the connection.',
-        );
-      }
-      /* A wallet that is already connected rejects a second initialize. */
-    }
-    address = addressFromWallet(kw, returned);
+async function connectProvider(kw) {
+  const method = connectMethod(kw);
+  if (!method) {
+    const address = addressFromWallet(kw);
+    if (address) return address;
+    throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
   }
-  if (!address) {
-    throw fail(
-      'no-account',
-      mobile
-        ? 'Choose a Klever account in the app, then sign in again.'
-        : 'Open the Klever extension, choose an account, then sign in again.',
-    );
-  }
-  return address;
+  return approvedKleverAddress(kw, accountRequest(kw));
 }
 
 export async function connectWallet() {
+  primeKleverConnect();
   const mobile = isMobile();
   const kw = await waitForProvider(mobile ? (inKleverHandoff() ? 4000 : 900) : 2500);
   if (!kw) {
@@ -405,7 +463,7 @@ export async function connectWallet() {
         : 'Install the Klever Wallet extension, then sign in from this page.',
     );
   }
-  const address = await connectProvider(kw, mobile);
+  const address = await connectProvider(kw);
   return { kw, address, mobile };
 }
 
@@ -424,9 +482,9 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     await paintSettled();
   }
   // The extension popup signs whichever account is named on the provider.
-  // The phone app has a setter for the same choice, and a property write opens a transaction.
+  // The phone already approved its klv account through requestAccount. A property
+  // write there opens a transaction, so the address stays in the message.
   if (plan === 'extension' && !mobile) pinAccount(kw, address);
-  else await selectAccount(kw, address);
   const message = signedMessage({
     purpose,
     address,

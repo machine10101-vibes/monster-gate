@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
 import { keccak_256 as keccak } from '@noble/hashes/sha3.js';
-import { addressForSignature, addressFromWallet, connectMethod, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
+import { addressForSignature, addressFromWallet, approvedKleverAddress, connectMethod, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -15,7 +15,9 @@ const FORUM_ADDRESS = 'klv159vrgc50hqnr44zn25cdndmdwgrqvdsajax58asmslmqhcjfunwqk
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
-test('the extension Confirm popup is connect, and older wallets use initialize', () => {
+test('the phone approves the klv account with requestAccount or enable', () => {
+  assert.equal(connectMethod({ requestAccount() {}, connect() {}, initialize() {} }), 'requestAccount');
+  assert.equal(connectMethod({ enable() {}, connect() {} }), 'enable');
   assert.equal(connectMethod({ connect() {}, initialize() {} }), 'connect');
   assert.equal(connectMethod({ initialize() {} }, { initialize() {} }), 'hub');
   assert.equal(connectMethod({ initialize() {} }), 'initialize');
@@ -25,6 +27,20 @@ test('the extension Confirm popup is connect, and older wallets use initialize',
   assert.equal(addressFromWallet({}, [FORUM_ADDRESS]), FORUM_ADDRESS);
   assert.equal(addressFromWallet({ address: 'klv1qpzry9x8gf2tvdw0s3jn' }), '');
   assert.equal(addressFromWallet({}), '');
+});
+
+test('the page waits for the klv account the prompt approves', async () => {
+  const stale = 'klv1fr724pjdjp3l8unuvgda0k6vt06d875hj7t5ggrxymzcg3jcveysejzljc';
+  const kw = { address: stale };
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const waiting = approvedKleverAddress(kw, pending, 1500);
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  kw.address = FORUM_ADDRESS;
+  release();
+  assert.equal(await waiting, FORUM_ADDRESS);
+  const same = { address: FORUM_ADDRESS };
+  assert.equal(await approvedKleverAddress(same, Promise.resolve(FORUM_ADDRESS), 400), FORUM_ADDRESS);
 });
 
 test('a signature KleverScan accepted verifies for that address', () => {
@@ -88,6 +104,9 @@ test('one Klever prompt stays open until it is signed', () => {
   const srcText = src('../src/wallet/klever.js');
   assert.equal(srcText.includes('kw.signMessage(message)'), true);
   assert.equal(srcText.includes('kw.signMessage(message, address)'), false);
+  assert.equal(srcText.includes('kw.requestAccount()'), true);
+  assert.equal(srcText.includes('kw.enable()'), true);
+  assert.equal(srcText.includes('setWalletAddress'), false);
   assert.equal(srcText.includes('if (plan === \'extension\' && !mobile) pinAccount(kw, address)'), true);
   assert.equal(srcText.includes('activeElement.blur'), false);
   assert.equal(sheetResultAccepted({ status: 'ACCEPTED', signature: FORUM_SIGNATURE }), true);
