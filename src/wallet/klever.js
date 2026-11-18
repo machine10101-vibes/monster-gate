@@ -11,42 +11,46 @@ export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=fin
 export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-crypto/id1615064243';
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
+const ADDRESS_SPACE_RE = /[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g;
+const ADDRESS_KEYS = ['address', 'addr', 'walletAddress', 'account'];
 
 /**
  * The account Klever will sign with. The app sometimes wraps it, capitalizes
  * it, or puts a space in the middle. The proof needs the 62-character klv1
  * address and nothing else.
  */
-export function klvAddress(value) {
-  const raw = looseText(value);
-  if (!raw) return '';
-  const compact = raw
-    .replace(/[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g, '')
-    .toLowerCase();
-  const match = /klv1[02-9ac-hj-np-z]{58}/.exec(compact);
-  if (!match || !publicKeyFromAddress(match[0])) return '';
-  return match[0];
-}
-
-function looseText(value) {
-  if (typeof value === 'string') return value;
+export function normalizeKleverAddress(value, depth = 0) {
+  if (value == null || depth > 4) return '';
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = klvAddress(item);
+      const found = normalizeKleverAddress(item, depth + 1);
       if (found) return found;
     }
     return '';
   }
-  if (value && typeof value === 'object') {
-    for (const key of ['address', 'addr', 'walletAddress', 'account']) {
-      if (typeof value[key] === 'string') return value[key];
-      if (value[key] && typeof value[key] === 'object') {
-        const found = klvAddress(value[key]);
+  if (typeof value === 'object') {
+    for (const key of ADDRESS_KEYS) {
+      if (value[key] != null) {
+        const found = normalizeKleverAddress(value[key], depth + 1);
         if (found) return found;
       }
     }
+    for (const key of Object.keys(value)) {
+      if (ADDRESS_KEYS.includes(key) || typeof value[key] === 'function') continue;
+      const found = normalizeKleverAddress(value[key], depth + 1);
+      if (found) return found;
+    }
+    return '';
   }
-  return '';
+  if (typeof value !== 'string') return '';
+  const compact = value.replace(ADDRESS_SPACE_RE, '').toLowerCase();
+  const match = compact.match(/klv1[02-9ac-hj-np-z]{58}/);
+  if (!match || !ADDRESS_RE.test(match[0]) || !publicKeyFromAddress(match[0])) return '';
+  return match[0];
+}
+
+export function klvAddress(value) {
+  return normalizeKleverAddress(value);
 }
 
 export function isMobile() {
@@ -387,7 +391,14 @@ export function waitForProvider(ms = 2000) {
 export function providerAddress(kw) {
   if (!kw) return '';
   const found = kw.selectedAddress || kw.address || kw.accounts?.[0] || null;
-  return klvAddress(found);
+  const selected = klvAddress(found) || klvAddress(kw.accounts);
+  if (selected) return selected;
+  try {
+    if (typeof kw.getWalletAddress === 'function') return klvAddress(kw.getWalletAddress());
+  } catch {
+    /* a provider without an account */
+  }
+  return '';
 }
 
 /** The account whose key signed the last attempt. The next proof names that account. */
@@ -427,13 +438,14 @@ export function signingAddress(kw, approved = '', prompted = false) {
   const picked = klvAddress(approved);
   // The account the user just approved is the one the signature sheet signs.
   if (prompted && picked) return picked;
+  // selectedAddress is the account Klever will sign. getWalletAddress can
+  // still be the previous account.
+  const selected = providerAddress(kw);
+  if (selected) return selected;
   const noted = notedSigner();
   const accounts = providerAccounts(kw);
   if (ADDRESS_RE.test(noted) && (accounts.length === 0 || accounts.includes(noted))) return noted;
-  const own = klvAddress(kw?.address);
-  if (own) return own;
-  if (picked) return picked;
-  return providerAddress(kw);
+  return picked;
 }
 
 /** Every klv account on the provider. The signer is first. */
@@ -713,17 +725,19 @@ export function readSession() {
   try {
     const raw = storedSession();
     if (!raw) return null;
-    const ok = ADDRESS_RE.test(raw.address)
+    const address = normalizeKleverAddress(raw.address);
+    const ok = !!address
       && typeof raw.message === 'string'
       && typeof raw.signature === 'string'
-      && raw.message.includes(`Address: ${raw.address}`)
-      && verifyKleverSignature(raw.message, raw.signature, raw.address);
+      && raw.message.includes(`Address: ${address}`)
+      && verifyKleverSignature(raw.message, raw.signature, address);
     if (!ok) {
       for (const store of [sessionStorage, localStorage]) {
         try { store.removeItem(SESSION_KEY); } catch { /* already gone */ }
       }
       return null;
     }
+    raw.address = address;
     saveSession(raw);
     return raw;
   } catch {

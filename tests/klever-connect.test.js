@@ -35,7 +35,7 @@ test('the connect reads selectedAddress, then address, then the first account', 
   assert.equal(addressFromWallet({}, [FORUM_ADDRESS]), FORUM_ADDRESS);
   assert.equal(addressFromWallet({ address: 'klv1qpzry9x8gf2tvdw0s3jn' }), '');
   assert.equal(addressFromWallet({}), '');
-  assert.equal(signingAddress({ address: other, selectedAddress: FORUM_ADDRESS }), other);
+  assert.equal(signingAddress({ address: other, selectedAddress: FORUM_ADDRESS }), FORUM_ADDRESS);
   assert.equal(signingAddress({ address: other }, FORUM_ADDRESS, true), FORUM_ADDRESS);
   assert.equal(signingAddress({ address: other }, FORUM_ADDRESS, false), other);
   assert.equal(accountFromPrompt({ address: FORUM_ADDRESS }, other), FORUM_ADDRESS);
