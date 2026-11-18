@@ -105,15 +105,18 @@ export class SocialWorld {
     if (m.type === 'friend_list') { await this.friendList(s); return; }
     if (m.type === 'friend_request') {
       const name = clean(m.name);
-      const target = this.findOnline(name);
       if (!name) return fail('name', 'Enter a hunter name.');
-      if (!target || target.guest) return fail('not_found', 'No online signed-in hunter by that name.');
-      if (target.userId === s.userId) return fail('self', 'That hunter is you.');
-      if (await this.blocked(s.userId, target.userId) || await this.blocked(target.userId, s.userId)) return fail('blocked', 'Friend request unavailable.');
+      const target = this.findOnline(name);
+      const found = target && !target.guest ? { user_id: target.userId, name: target.name } : await this.store.findByName?.(name);
+      if (!found?.user_id) return fail('not_found', 'No hunter by that name.');
+      const targetId = String(found.user_id);
+      if (targetId === s.userId) return fail('self', 'That hunter is you.');
+      if (await this.blocked(s.userId, targetId) || await this.blocked(targetId, s.userId)) return fail('blocked', 'Friend request unavailable.');
       if (rows.filter(r => r.requester_id === s.userId && ['pending','accepted'].includes(r.status)).length >= 100) return fail('full', 'Friends list is full.');
-      if (rows.some(r => r.requester_id === s.userId && r.target_id === target.userId && ['pending','accepted'].includes(r.status))) return fail('pending', 'Already waiting or friends.');
-      await this.store.put({ requester_id:s.userId,target_id:target.userId,status:'pending',requester_name:s.name,target_name:target.name });
-      this.send(target, 'friend_request', { from:{ user_id:s.userId, id:s.id, name:s.name } });
+      if (rows.some(r => r.requester_id === s.userId && r.target_id === targetId && ['pending','accepted'].includes(r.status))
+        || rows.some(r => r.requester_id === targetId && r.target_id === s.userId && r.status === 'pending')) return fail('pending', 'Already waiting or friends.');
+      await this.store.put({ requester_id:s.userId,target_id:targetId,status:'pending',requester_name:s.name,target_name:found.name || 'Hunter' });
+      if (target) this.send(target, 'friend_request', { from:{ user_id:s.userId, id:s.id, name:s.name } });
     } else {
       const rawId = String(m.user_id || m.id || '');
       const id = rawId.startsWith('u_') ? rawId.slice(2) : rawId;
