@@ -32,6 +32,7 @@ function spawnPose(name, extra = {}) {
     armor: extra.armor || {},
     zone: extra.zone || 'Oakhollow',
     hp: extra.hp ?? 20,
+    max_hp: extra.max_hp ?? 20,
     movedAt: 0,
   };
 }
