@@ -1407,9 +1407,7 @@ class Game {
     window.addEventListener('resize', sync);
     window.addEventListener('orientationchange', () => {
       this.tucked = false;
-      sync();
-      setTimeout(sync, 80);
-      setTimeout(sync, 350);
+      setTimeout(sync, 120);
     });
     screen.orientation?.addEventListener?.('change', () => {
       this.tucked = false;
@@ -1418,7 +1416,7 @@ class Game {
     const onViewport = () => {
       // A Klever confirm sheet resizes the page. Resizing back dismisses that sheet.
       if (!this.started || this.walletBusy) return;
-      this.resize();
+      this.scheduleResize();
     };
     window.visualViewport?.addEventListener('resize', onViewport);
     window.visualViewport?.addEventListener('scroll', onViewport);
@@ -1445,7 +1443,7 @@ class Game {
   syncImmersive() {
     if (this.walletBusy || !this.started) return;
     if (!this.input.touch) {
-      this.resize();
+      this.scheduleResize();
       return;
     }
     if (this.isLandscape() || isTablet()) this.enterImmersive();
@@ -1453,12 +1451,12 @@ class Game {
       document.documentElement.classList.remove('landscape-full');
       this.tucked = false;
       this.clearTuck();
-      this.resize();
+      this.scheduleResize();
     }
   }
 
   /**
-   * Landscape phones: hide the browser toolbar and stretch the game to the screen.
+   * Landscape phones: adapt the game viewport without forcing page scroll or toolbar hacks.
    * `gesture` is set when this runs inside a tap, which is when browsers allow fullscreen.
    */
   enterImmersive({ gesture = false, lock = false } = {}) {
@@ -1476,14 +1474,13 @@ class Game {
           this.tucked = true;
           this.tuckChrome();
         }
-        this.resize();
+        this.scheduleResize();
       });
     }
-    if (!tablet && (gesture || !this.tucked)) {
-      this.tucked = true;
-      this.tuckChrome();
-    }
-    this.resize();
+    // Do not change document height or scroll position on orientation changes.
+    // Klever's Android WebView emits several viewport events while rotating; page
+    // scrolling here causes repeated canvas reallocations during the transition.
+    this.scheduleResize();
   }
 
   /** Scroll the mobile URL bar off, then pin the game to the visible screen. */
@@ -1551,6 +1548,14 @@ class Game {
     cam.updateProjectionMatrix();
     this.resScale = 1;
     this.resize();
+  }
+
+  scheduleResize() {
+    if (this.resizeFrame) cancelAnimationFrame(this.resizeFrame);
+    this.resizeFrame = requestAnimationFrame(() => {
+      this.resizeFrame = 0;
+      this.resize();
+    });
   }
 
   resize() {
