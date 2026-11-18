@@ -805,17 +805,10 @@ class Game {
 
   continueAfterAccount() {
     if (this.started) return;
-    // Klever's Android WebView can kill and recreate the page during rotation.
-    // Restore the character selected immediately before that renderer restart.
-    const resumeId = readResumeCharacter(this.wallet?.address);
-    if (resumeId) {
-      const resumeChar = this.roster?.get(resumeId);
-      if (resumeChar) {
-        this.enterWorld(resumeChar);
-        return;
-      }
-      clearResumeCharacter();
-    }
+    // Always restore the hunter camp first. Auto-entering a saved character here
+    // can close character selection before cloud sync/world startup is ready,
+    // leaving Klever's recreated WebView on a blank or inaccessible screen.
+    clearResumeCharacter();
     const signed = !!(this.wallet && this.wallet.kind === 'email');
     // Email authentication always returns to the hunter camp first.
     if (signed) {
