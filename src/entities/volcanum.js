@@ -150,17 +150,7 @@ function paintBody() {
     blob(B, cx + s * 6.6, 8.4, 10.5, 3.7, 4.9, 5.6, plate, 21, 0.2);
     blob(B, cx + s * 6.4, 14.2, 25.5, 3.4, 3.8, 4.4, plate, 22, 0.2);
   }
-  const neck = [
-    [15.5, 33.2, 4.7, 4.9, 4.3, 10],
-    [19.5, 36.8, 4.1, 4.3, 3.9, 11],
-    [23.5, 39.8, 3.7, 3.9, 3.7, 12],
-    [27, 42.6, 3.4, 3.7, 3.5, 13],
-  ];
-  for (const [cy, cz, rx, ry, rz, seed] of neck) {
-    blob(B, cx, cy, cz, rx, ry, rz, (x, y, z, d, dx, dy, dz) => (dz > 0.4 ? bellyRing(x, y, z) : plate(x, y, z, seed)), seed, 0.14);
-  }
-
-  for (let z = 4; z <= 43; z += 2) {
+  for (let z = 4; z <= 30; z += 2) {
     const top = topY(B, cx, z);
     if (top < 0) continue;
     const h = z > 32 ? 3 : 4 + Math.round(1.4 * Math.sin(z * 0.45));
@@ -214,6 +204,22 @@ function paintBody() {
   for (const s of [-1, 1]) stroke(B, cx + s * 2, 9, 18, cx + s * 4, 16, 32, 1, () => C.glow, 0.4, true);
   ignite(B);
   return B;
+}
+
+/* ------------------------------- neck -------------------------------- */
+function paintNeck() {
+  const N = new VoxelModel(30, 40, 58);
+  const cx = 14;
+  const neck = [
+    [15.5, 33.2, 4.7, 4.9, 4.3, 10],
+    [19.5, 36.8, 4.1, 4.3, 3.9, 11],
+    [23.5, 39.8, 3.7, 3.9, 3.7, 12],
+    [27, 42.6, 3.4, 3.7, 3.5, 13],
+  ];
+  for (const [cy, cz, rx, ry, rz, seed] of neck) {
+    blob(N, cx, cy, cz, rx, ry, rz, (x, y, z, d, dx, dy, dz) => (dz > 0.4 ? bellyRing(x, y, z) : plate(x, y, z, seed)), seed, 0.14);
+  }
+  return N;
 }
 
 /* -------------------------------- head -------------------------------- */
@@ -549,6 +555,7 @@ export function buildVolcanumDragon() {
   // counter-steer, look around, and pitch independently.
   const neck = new THREE.Group();
   neck.position.set(0, (23 - BO.y) * S, (34 - BO.z) * S);
+  neck.add(meshFrom(paintNeck(), BO.x, 23, 34, mat));
   bodyG.add(neck);
   const head = new THREE.Group();
   head.position.set(0, (27 - 23) * S, (42.8 - 34) * S);
