@@ -1,4 +1,4 @@
-import { verifyKleverSignature } from './verify.js';
+import { publicKeyFromAddress, verifyKleverSignature } from './verify.js';
 import { signedMessage } from '../../supabase/functions/_shared/linkAuth.js';
 
 export const SESSION_KEY = 'monster-gate-klever-session';
@@ -8,7 +8,55 @@ export const KLEVER_EXTENSION = 'https://chromewebstore.google.com/detail/klever
 export const KLEVER_ANDROID = 'https://play.google.com/store/apps/details?id=finance.klever.bitcoin.wallet';
 export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-crypto/id1615064243';
 
-const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{20,}$/;
+const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
+
+const ADDRESS_SPACE_RE = /[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g;
+
+/**
+ * Klever's in-app provider can wrap the selected account in text or return
+ * whitespace/capitalization around it. Only pass a canonical, valid Bech32
+ * address into the message that the wallet signs.
+ */
+export function normalizeKleverAddress(value, depth = 0) {
+  if (value == null || depth > 4) return '';
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = normalizeKleverAddress(item, depth + 1);
+      if (found) return found;
+    }
+    return '';
+  }
+  if (typeof value === 'object') {
+    for (const key of ['address', 'addr', 'walletAddress', 'account']) {
+      if (value[key] != null) {
+        const found = normalizeKleverAddress(value[key], depth + 1);
+        if (found) return found;
+      }
+    }
+    return '';
+  }
+  if (typeof value !== 'string') return '';
+  const compact = value.replace(ADDRESS_SPACE_RE, '').toLowerCase();
+  const match = compact.match(/klv1[02-9ac-hj-np-z]{58}/);
+  if (!match || !ADDRESS_RE.test(match[0])) return '';
+  return publicKeyFromAddress(match[0]) ? match[0] : '';
+}
+
+/** Read the account the provider has selected before falling back to its getter. */
+export function providerAddress(kw) {
+  if (!kw) return '';
+  const candidates = [kw.selectedAddress, kw.address, kw.accounts?.[0], kw.accounts];
+  try {
+    if (typeof kw.getWalletAddress === 'function') candidates.push(kw.getWalletAddress());
+  } catch {
+    /* A provider without a readable account can still expose selectedAddress. */
+  }
+  for (const candidate of candidates) {
+    const address = normalizeKleverAddress(candidate);
+    if (address) return address;
+  }
+  return '';
+}
 
 export function isMobile() {
   const ua = navigator.userAgent || '';
@@ -159,16 +207,16 @@ async function connectProvider(kw, mobile) {
   } catch {
     /* A wallet that is already connected rejects a second initialize. */
   }
-  const address = typeof kw.getWalletAddress === 'function' ? kw.getWalletAddress() : kw.address;
-  if (!ADDRESS_RE.test(address || '')) {
-    throw fail(
-      'no-account',
-      mobile
-        ? 'Choose a Klever account in the app, then sign in again.'
-        : 'Open the Klever extension, choose an account, then sign in again.',
-    );
-  }
-  return address;
+
+  const address = providerAddress(kw);
+  if (address) return address;
+
+  throw fail(
+    'no-account',
+    mobile
+      ? 'Choose a Klever account in the app, then sign in again.'
+      : 'Open the Klever extension, choose an account, then sign in again.',
+  );
 }
 
 export async function connectWallet() {
@@ -191,10 +239,14 @@ export async function connectWallet() {
  * checked against the address before it is sent. This never creates an account.
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
+  const cleanAddress = normalizeKleverAddress(address);
+  if (!cleanAddress) {
+    throw fail('no-account', 'Choose a valid Klever account, then sign in again.');
+  }
   holdPageStill();
   const message = signedMessage({
     purpose,
-    address,
+    address: cleanAddress,
     nonce,
     issued: new Date().toISOString(),
   });
@@ -209,19 +261,19 @@ export async function signProof(purpose, nonce, address, kw, mobile = isMobile()
     releasePageHold();
   }
   const signature = signatureText(signed);
-  let ok = verifyKleverSignature(message, signature, address);
+  let ok = verifyKleverSignature(message, signature, cleanAddress);
   if (!ok && typeof kw.validateSignature === 'function') {
     try {
-      const res = await kw.validateSignature(message, signature, address);
+      const res = await kw.validateSignature(message, signature, cleanAddress);
       const signer = typeof res === 'object' ? res.signer || res.address : '';
       ok = res === true || res?.isValid === true;
-      if (ok && signer && signer !== address) ok = false;
+      if (ok && signer && normalizeKleverAddress(signer) !== cleanAddress) ok = false;
     } catch {
       ok = false;
     }
   }
   if (!ok) throw fail('bad-signature', 'The signature does not match this Klever address.');
-  return { address, message, signature, nonce };
+  return { address: cleanAddress, message, signature, nonce };
 }
 
 /**
@@ -263,17 +315,19 @@ export function readSession() {
   try {
     const raw = storedSession();
     if (!raw) return null;
-    const ok = ADDRESS_RE.test(raw.address)
+    const address = normalizeKleverAddress(raw.address);
+    const ok = !!address
       && typeof raw.message === 'string'
       && typeof raw.signature === 'string'
-      && raw.message.includes(`Address: ${raw.address}`)
-      && verifyKleverSignature(raw.message, raw.signature, raw.address);
+      && raw.message.includes(`Address: ${address}`)
+      && verifyKleverSignature(raw.message, raw.signature, address);
     if (!ok) {
       for (const store of [sessionStorage, localStorage]) {
         try { store.removeItem(SESSION_KEY); } catch { /* already gone */ }
       }
       return null;
     }
+    raw.address = address;
     saveSession(raw);
     return raw;
   } catch {
