@@ -132,25 +132,26 @@ test('a repeat boot in the same tab skips the duplicate splash, but interrupted 
     removeItem(key) { values.delete(key); },
   };
   const first = fakeDoc();
-  const firstUi = mountLoading(first, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  const noTimers = { setInterval: () => 0, clearInterval: () => {} };
+  const firstUi = mountLoading(first, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
   assert.equal(first.map.loading.classList.contains('hidden'), false);
   assert.equal(values.get('mg-load-seen'), '1');
   firstUi.clearSkip();
 
   const second = fakeDoc();
-  const secondUi = mountLoading(second, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  const secondUi = mountLoading(second, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
   assert.equal(second.map.loading.classList.contains('hidden'), false, 'cleared after entering the world');
   secondUi.clearSkip();
 
   values.set('mg-load-seen', '1');
   const repeat = fakeDoc();
-  mountLoading(repeat, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  mountLoading(repeat, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
   assert.equal(repeat.map.loading.classList.contains('hidden'), true);
   assert.equal(repeat.map['load-video'].paused, true);
 
   values.set('mg-boot', '1');
   const interrupted = fakeDoc();
-  mountLoading(interrupted, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  mountLoading(interrupted, { ...noTimers, sessionStorage: store, reduced: false, fadeMs: 0 });
   assert.equal(interrupted.map.loading.classList.contains('hidden'), false, 'an interrupted boot still gets its recovery screen');
 });
 
