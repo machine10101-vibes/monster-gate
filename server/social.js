@@ -185,6 +185,7 @@ export function createSocialRuntime(world, opts = {}) {
 
   async function pushFriendList(session) {
     if (!session?.userId) return;
+    await loadRelations(session.userId);
     const body = await snapshot(session.userId);
     session.friendIds = new Set((body.friends || []).map((f) => f.user_id));
     sender(session, 'friend_list', body);
