@@ -95,8 +95,7 @@ test('world persist exposes friends and maps cap / already / self', async () => 
 test('welcome advertises social features and you.user_id', async (t) => {
   const srv = await start(t);
   const { welcome, ws } = await join(srv, 'ann', 'Ann');
-  assert.deepEqual(welcome.features, WELCOME_FEATURES);
-  assert.deepEqual(welcome.features, ['friends', 'party', 'whisper', 'block']);
+  assert.deepEqual(welcome.features, ['party'], 'memory persistence must not advertise database-backed social features');
   assert.equal(welcome.you.user_id, ANN);
   assert.equal(welcome.you.guest, false);
   ws.close();
