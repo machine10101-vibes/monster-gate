@@ -10,7 +10,7 @@ export const KLEVER_IOS = 'https://apps.apple.com/app/klever-wallet-bitcoin-cryp
 
 const ADDRESS_RE = /^klv1[02-9ac-hj-np-z]{58}$/;
 
-const ADDRESS_SPACE_RE = /[\\u0000-\\u0020\\u007f\\u00a0\\u1680\\u2000-\\u200a\\u200b\\u200c\\u200d\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+/g;
+const ADDRESS_SPACE_RE = /[\u0000-\u0020\u007f\u00a0\u1680\u2000-\u200a\u200b\u200c\u200d\u2028\u2029\u202f\u205f\u3000\ufeff]+/g;
 
 /**
  * Klever's in-app provider can wrap the selected account in text or return
