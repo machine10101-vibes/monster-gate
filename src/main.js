@@ -114,6 +114,31 @@ const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && show
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
+const RESUME_CHARACTER_KEY = 'mg-resume-character';
+
+function rememberResumeCharacter(id) {
+  try {
+    sessionStorage.setItem(RESUME_CHARACTER_KEY, String(id));
+  } catch {
+    /* private mode */
+  }
+}
+
+function readResumeCharacter() {
+  try {
+    return sessionStorage.getItem(RESUME_CHARACTER_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function clearResumeCharacter() {
+  try {
+    sessionStorage.removeItem(RESUME_CHARACTER_KEY);
+  } catch {
+    /* private mode */
+  }
+}
 
 function bootWasKilled() {
   try {
@@ -752,6 +777,17 @@ class Game {
 
   continueAfterAccount() {
     if (this.started) return;
+    // Klever's Android WebView can kill and recreate the page during rotation.
+    // Restore the character selected immediately before that renderer restart.
+    const resumeId = readResumeCharacter();
+    if (resumeId) {
+      const resumeChar = this.roster?.get(resumeId);
+      if (resumeChar) {
+        this.enterWorld(resumeChar);
+        return;
+      }
+      clearResumeCharacter();
+    }
     const signed = !!(this.wallet && this.wallet.kind === 'email');
     // Email authentication always returns to the hunter camp first.
     if (signed) {
@@ -959,12 +995,16 @@ class Game {
   }
 
   leaveCharacterSelect() {
+    clearResumeCharacter();
     this.signOut(false);
   }
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
   enterWorld(char) {
     if (this.started || !this.roster?.get(char.id)) return;
+    // Keep this for the tab lifetime: if Klever kills the WebView on a later
+    // orientation change, account restore can resume directly into this hunt.
+    rememberResumeCharacter(char.id);
     this.character = char;
     this.roster.played(char.id);
     this.progress.useCharacter(this.roster.charKey(char.id));
