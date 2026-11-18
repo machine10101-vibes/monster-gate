@@ -4,14 +4,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import {
-  LOAD_CROP_AT,
-  LOAD_HOLD_AT,
+  finishVideoAtEnd,
   LOAD_KEY_CHROMA,
   LOAD_KEY_HI,
   LOAD_KEY_LO,
   LOAD_MIN_MS,
   emberCount,
-  holdVideoAtLogo,
   lumaKeyRgba,
   lumaOf,
   mountLoading,
@@ -75,30 +73,20 @@ function fakeDoc() {
   };
 }
 
-test('boot helpers hold the fire-eyes logo frame and honor the min display', () => {
+test('boot helpers let the logo clip finish naturally and honor the min display', () => {
   assert.equal(remainMinDisplay(1000, 1200, 1500), 1300);
   assert.equal(remainMinDisplay(1000, 4000, 1500), 0);
   assert.equal(LOAD_MIN_MS, 1500);
-  assert.ok(LOAD_HOLD_AT >= 3 && LOAD_HOLD_AT <= 4);
-  assert.ok(LOAD_CROP_AT > LOAD_HOLD_AT && LOAD_CROP_AT < 5);
 
-  const early = { currentTime: 2.1, pause() { this.paused = true; } };
-  assert.equal(holdVideoAtLogo(early), false);
-  assert.equal(early.paused, undefined);
+  const playing = { currentTime: 3.6, ended: false, pause() { this.paused = true; } };
+  assert.equal(finishVideoAtEnd(playing), false);
+  assert.equal(playing.paused, undefined);
+  assert.equal(playing.currentTime, 3.6);
 
-  const mid = { currentTime: 3.6, pause() { this.paused = true; } };
-  assert.equal(holdVideoAtLogo(mid), true);
-  assert.equal(mid.paused, true);
-  assert.equal(mid.currentTime, LOAD_HOLD_AT);
-
-  const cropped = { currentTime: 4.4, pause() { this.paused = true; } };
-  assert.equal(holdVideoAtLogo(cropped), true);
-  assert.equal(cropped.paused, true);
-  assert.equal(cropped.currentTime, LOAD_HOLD_AT);
-
-  const ended = { currentTime: 6, ended: true, pause() { this.paused = true; } };
-  assert.equal(holdVideoAtLogo(ended), true);
-  assert.equal(ended.currentTime, LOAD_HOLD_AT);
+  const ended = { currentTime: 6.2, ended: true, pause() { this.paused = true; } };
+  assert.equal(finishVideoAtEnd(ended), true);
+  assert.equal(ended.paused, true);
+  assert.equal(ended.currentTime, 6.2, 'the final frame is not rewound');
 
   assert.equal(nextTip(0), 'A Monster Gate opened in the northern forest.');
   assert.equal(nextTip(5), nextTip(0));
@@ -121,13 +109,49 @@ test('loading screen mounts, tracks progress, and dismisses', async () => {
   assert.equal(doc.map['load-text'].textContent, 'carving the gate');
 
   doc.map['load-video'].currentTime = 3.7;
-  doc.map['load-video'].listeners.timeupdate();
+  assert.equal(doc.map.loading.classList.contains('held'), false, 'the clip keeps playing while progress changes');
+  assert.equal(doc.map['load-video'].paused, false);
+
+  doc.map['load-video'].currentTime = 6.2;
+  doc.map['load-video'].ended = true;
+  doc.map['load-video'].listeners.ended();
   assert.equal(doc.map.loading.classList.contains('held'), true);
   assert.equal(doc.map['load-video'].paused, true);
+  assert.equal(doc.map['load-video'].currentTime, 6.2);
 
   await ui.dismiss({ now: 4000, wait: () => 0 });
   assert.equal(doc.map.loading.classList.contains('fading'), true);
   assert.equal(doc.map.loading.classList.contains('hidden'), true);
+});
+
+test('a repeat boot in the same tab skips the duplicate splash, but interrupted boots replay it', () => {
+  const values = new Map();
+  const store = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+  const first = fakeDoc();
+  const firstUi = mountLoading(first, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  assert.equal(first.map.loading.classList.contains('hidden'), false);
+  assert.equal(values.get('mg-load-seen'), '1');
+  firstUi.clearSkip();
+
+  const second = fakeDoc();
+  const secondUi = mountLoading(second, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  assert.equal(second.map.loading.classList.contains('hidden'), false, 'cleared after entering the world');
+  secondUi.clearSkip();
+
+  values.set('mg-load-seen', '1');
+  const repeat = fakeDoc();
+  mountLoading(repeat, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  assert.equal(repeat.map.loading.classList.contains('hidden'), true);
+  assert.equal(repeat.map['load-video'].paused, true);
+
+  values.set('mg-boot', '1');
+  const interrupted = fakeDoc();
+  mountLoading(interrupted, { sessionStorage: store, reduced: false, fadeMs: 0 });
+  assert.equal(interrupted.map.loading.classList.contains('hidden'), false, 'an interrupted boot still gets its recovery screen');
 });
 
 test('reduced motion skips the clip and embers', () => {
@@ -240,6 +264,7 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
 
   assert.match(main, /mountLoading/);
   assert.match(main, /loadingScreen\.dismiss/);
+  assert.match(main, /loadingScreen\?\.clearSkip\?\.\(\)/);
   assert.match(theme, /#loading\.held \.load-glow/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
   assert.match(theme, /mask-image:\s*radial-gradient/);

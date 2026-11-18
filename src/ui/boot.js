@@ -1,11 +1,11 @@
 /**
- * Brand loading screen. The clip already carries the MONSTERGATE .online logo,
- * so we play it once and hold a clean mid-shot instead of looping the crop.
+ * Brand loading screen. The clip carries the MONSTERGATE .online logo;
+ * play it once through its final frame, independently of world-build progress.
  */
 
 export const LOAD_MIN_MS = 1500;
-export const LOAD_HOLD_AT = 3.55;
-export const LOAD_CROP_AT = 4.25;
+const LOAD_SEEN_KEY = 'mg-load-seen';
+const BOOT_IN_PROGRESS_KEY = 'mg-boot';
 export const LOAD_FADE_MS = 420;
 export const LOAD_TIP_MS = 3200;
 export const LOAD_EMBER_MAX = 22;
@@ -41,19 +41,24 @@ export function nextTip(index, tips = LOAD_TIPS) {
   return list[((index >>> 0) % list.length + list.length) % list.length];
 }
 
-/** Pause on the full-logo fire-eyes frame before the camera crops the wordmark. */
-export function holdVideoAtLogo(video, { holdAt = LOAD_HOLD_AT, cropAt = LOAD_CROP_AT } = {}) {
-  if (!video) return false;
-  const t = Number(video.currentTime) || 0;
-  const ended = !!video.ended;
-  if (!ended && t + 0.04 < holdAt && t + 0.04 < cropAt) return false;
-  try {
-    video.pause();
-    if (typeof video.currentTime === 'number') video.currentTime = holdAt;
-  } catch {
-    /* some browsers reject seeks while HAVE_NOTHING */
-  }
+/** Stop only after the clip reaches its natural final frame; never seek or loop it. */
+export function finishVideoAtEnd(video) {
+  if (!video?.ended) return false;
+  try { video.pause(); } catch { /* the browser may already have stopped it */ }
   return true;
+}
+
+function loadWasAlreadyShown(store) {
+  if (!store?.getItem || !store?.setItem) return false;
+  try {
+    const seen = store.getItem(LOAD_SEEN_KEY) === '1';
+    const interrupted = store.getItem(BOOT_IN_PROGRESS_KEY) === '1';
+    if (seen && !interrupted) return true;
+    store.setItem(LOAD_SEEN_KEY, '1');
+  } catch {
+    /* private browsing can disable session storage */
+  }
+  return false;
 }
 
 export function setLoadProgress(fill, textEl, p, t) {
@@ -136,6 +141,11 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   const doc = root?.getElementById ? root : root?.document;
   const el = doc?.getElementById?.('loading');
   if (!el) return null;
+  let session = opts.sessionStorage;
+  if (session === undefined) {
+    try { session = globalThis.sessionStorage; } catch { session = null; }
+  }
+  const skipRepeat = loadWasAlreadyShown(session);
   const video = doc.getElementById('load-video');
   const poster = el.querySelector?.('.load-poster') || doc.querySelector?.('.load-poster');
   const canvas = doc.getElementById('load-key');
@@ -153,6 +163,25 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   let held = false;
   let rafId = 0;
   let keyed = false;
+  let resolveVideoDone = () => {};
+  const videoDone = new Promise((resolve) => { resolveVideoDone = resolve; });
+
+  const clearSkip = () => {
+    try { session?.removeItem?.(LOAD_SEEN_KEY); } catch { /* storage is optional */ }
+  };
+  if (skipRepeat) {
+    el.classList.add('hidden');
+    el.setAttribute('aria-hidden', 'true');
+    try { video?.pause?.(); } catch { /* ignore */ }
+    const fill = doc.getElementById('load-fill');
+    const text = doc.getElementById('load-text');
+    return {
+      el, startedAt,
+      setProgress(p, t) { return setLoadProgress(fill, text, p, t); },
+      async dismiss() { return true; },
+      clearSkip,
+    };
+  }
 
   el.classList.toggle('reduced', reduced);
   spawnEmbers(embers, emberCount({ mobile, reduced }), (tag) => doc.createElement(tag));
@@ -172,19 +201,22 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     return paint(poster);
   };
 
-  const hold = () => {
-    if (reduced || held) return;
-    if (holdVideoAtLogo(video)) {
-      held = true;
-      el.classList.add('held');
-      paint(video);
-    }
+  const finish = () => {
+    if (reduced || held || !finishVideoAtEnd(video)) return false;
+    held = true;
+    el.classList.add('held');
+    paint(video);
+    resolveVideoDone();
+    if (rafId && typeof caf === 'function') caf(rafId);
+    rafId = 0;
+    return true;
   };
 
   const tick = () => {
     rafId = 0;
-    if (held || reduced) {
-      paintVideo();
+    if (held || reduced) return;
+    if (video?.ended) {
+      finish();
       return;
     }
     paintVideo();
@@ -201,13 +233,19 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     video.loop = false;
     video.muted = true;
     video.playsInline = true;
-    video.addEventListener('timeupdate', hold);
-    video.addEventListener('ended', hold);
+    video.addEventListener('ended', finish);
     video.addEventListener('seeked', () => paint(video));
     video.addEventListener('play', () => { if (!rafId && typeof raf === 'function') rafId = raf(tick); });
     const play = video.play?.();
-    if (play && typeof play.catch === 'function') play.catch(() => { el.classList.add('held'); paintVideo(); });
+    if (play && typeof play.catch === 'function') play.catch(() => {
+      held = true;
+      el.classList.add('held');
+      paintVideo();
+      resolveVideoDone();
+    });
     if (typeof raf === 'function') rafId = raf(tick);
+  } else {
+    resolveVideoDone();
   }
 
   if (tipEl) {
@@ -230,6 +268,10 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     async dismiss({ now, wait = remainMinDisplay } = {}) {
       const delay = wait(startedAt, now ?? Date.now());
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+      if (!reduced && video && !video.ended && !video.paused) {
+        const timeout = Math.max(0, Number(opts.videoEndTimeoutMs ?? 10000));
+        await Promise.race([videoDone, new Promise((resolve) => setTimeout(resolve, timeout))]);
+      }
       el.classList.add('fading');
       if (fadeMs > 0) await new Promise((r) => setTimeout(r, fadeMs));
       el.classList.add('hidden');
@@ -239,5 +281,6 @@ export function mountLoading(root = globalThis.document, opts = {}) {
       if (tipTimer) (opts.clearInterval || clearInterval)(tipTimer);
       return true;
     },
+    clearSkip,
   };
 }
