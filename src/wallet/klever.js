@@ -313,25 +313,30 @@ export function waitForProvider(ms = 2000) {
 }
 
 /**
- * The phone app approves an account with `requestAccount`, or `enable` on older builds.
- * Those run from the button click. The extension Confirm popup is `connect`, and a
- * Klever Hub page uses its own initialize.
+ * Klever Hub selects the chain. `initialize('KLV')` is the wallet's own call for the
+ * account that starts with klv1. A provider `requestAccount` can approve a different
+ * chain, so the hub comes first. The extension Confirm popup is `connect`.
  */
 export function connectMethod(kw, hub = typeof window !== 'undefined' ? window.kleverHub : null) {
+  if (hub && typeof hub.initialize === 'function') return 'hub';
   if (kw && typeof kw.requestAccount === 'function') return 'requestAccount';
   if (kw && typeof kw.enable === 'function') return 'enable';
   if (kw && typeof kw.connect === 'function') return 'connect';
-  if (hub && typeof hub.initialize === 'function') return 'hub';
   if (kw && typeof kw.initialize === 'function') return 'initialize';
   return '';
 }
 
+function klvChain(chain) {
+  const name = `${chain ?? ''}`.trim().toUpperCase();
+  return name === 'KLV' || name === '1';
+}
+
 function invokeAccountRequest(kw) {
   const method = connectMethod(kw);
+  if (method === 'hub') return window.kleverHub.initialize('KLV');
   if (method === 'requestAccount') return kw.requestAccount();
   if (method === 'enable') return kw.enable();
   if (method === 'connect') return kw.connect();
-  if (method === 'hub') return window.kleverHub.initialize();
   if (method === 'initialize') return kw.initialize();
   return undefined;
 }
@@ -448,7 +453,28 @@ async function connectProvider(kw) {
     if (address) return address;
     throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
   }
-  return approvedKleverAddress(kw, accountRequest(kw));
+  let address = '';
+  try {
+    address = await approvedKleverAddress(kw, accountRequest(kw));
+  } catch (err) {
+    if (err?.code === 'rejected') throw err;
+  }
+  const hub = typeof window !== 'undefined' ? window.kleverHub : null;
+  const chain = hub?.account?.chain;
+  if (hub && typeof hub.switchBlockchain === 'function' && chain != null && `${chain}` !== '' && !klvChain(chain)) {
+    let switched;
+    try {
+      switched = await hub.switchBlockchain('KLV');
+    } catch (err) {
+      if (connectionClosed(err)) throw fail('rejected', 'The Klever app closed the connection.');
+    }
+    const next = addressFromWallet(kw, switched);
+    if (next) return next;
+  }
+  if (address) return address;
+  const again = addressFromWallet(kw);
+  if (again) return again;
+  throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
 }
 
 export async function connectWallet() {

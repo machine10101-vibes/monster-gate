@@ -15,13 +15,18 @@ const FORUM_ADDRESS = 'klv159vrgc50hqnr44zn25cdndmdwgrqvdsajax58asmslmqhcjfunwqk
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
-test('the phone approves the klv account with requestAccount or enable', () => {
+test('Klever Hub selects the klv account before any other connect call', () => {
+  const hub = { initialize() {} };
+  assert.equal(connectMethod({ requestAccount() {}, connect() {}, initialize() {} }, hub), 'hub');
   assert.equal(connectMethod({ requestAccount() {}, connect() {}, initialize() {} }), 'requestAccount');
   assert.equal(connectMethod({ enable() {}, connect() {} }), 'enable');
   assert.equal(connectMethod({ connect() {}, initialize() {} }), 'connect');
-  assert.equal(connectMethod({ initialize() {} }, { initialize() {} }), 'hub');
+  assert.equal(connectMethod({ initialize() {} }, hub), 'hub');
   assert.equal(connectMethod({ initialize() {} }), 'initialize');
   assert.equal(connectMethod({}), '');
+  const srcText = src('../src/wallet/klever.js');
+  assert.equal(srcText.includes("kleverHub.initialize('KLV')"), true);
+  assert.equal(srcText.includes("switchBlockchain('KLV')"), true);
   assert.equal(addressFromWallet({ address: FORUM_ADDRESS }), FORUM_ADDRESS);
   assert.equal(addressFromWallet({ getWalletAddress: () => 'short' }, FORUM_ADDRESS), FORUM_ADDRESS);
   assert.equal(addressFromWallet({}, [FORUM_ADDRESS]), FORUM_ADDRESS);
