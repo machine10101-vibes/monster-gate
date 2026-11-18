@@ -138,6 +138,7 @@ export function mountLoading(root = globalThis.document, opts = {}) {
     try { session?.setItem?.(BOOT_IN_PROGRESS_KEY, '1'); } catch { /* storage is optional */ }
   }
   const video = doc.getElementById('load-video');
+  const freezeFrame = doc.getElementById('load-freeze');
   const tipEl = doc.getElementById('load-tip');
   const embers = doc.getElementById('load-embers');
   const reduced = opts.reduced ?? prefersReducedMotion(opts.win || globalThis);
@@ -165,6 +166,10 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   }
 
   el.classList.toggle('reduced', reduced);
+  const fill = doc.getElementById('load-fill');
+  const text = doc.getElementById('load-text');
+  // Show real loading feedback immediately; world progress replaces this as soon as it starts.
+  setLoadProgress(fill, text, 0.02, 'Starting game…');
   spawnEmbers(embers, emberCount({ mobile, reduced }), (tag) => doc.createElement(tag));
 
   const failVideo = () => {
@@ -177,6 +182,17 @@ export function mountLoading(root = globalThis.document, opts = {}) {
   };
   const finish = () => {
     if (reduced || held || !finishVideoAtEnd(video)) return false;
+    // Android WebViews can replace an ended <video> with its poster. Snapshot
+    // the actual final decoded frame so the branded intro cannot jump to the logo.
+    try {
+      const context = freezeFrame?.getContext?.('2d');
+      if (context && video?.videoWidth > 0 && video?.videoHeight > 0) {
+        freezeFrame.width = video.videoWidth;
+        freezeFrame.height = video.videoHeight;
+        context.drawImage(video, 0, 0, freezeFrame.width, freezeFrame.height);
+        el.classList.add('frame-frozen');
+      }
+    } catch { /* retain the paused video if frame capture is unavailable */ }
     held = true;
     el.classList.add('held');
     resolveVideoDone();
@@ -206,9 +222,6 @@ export function mountLoading(root = globalThis.document, opts = {}) {
       }, LOAD_TIP_MS);
     }
   }
-
-  const fill = doc.getElementById('load-fill');
-  const text = doc.getElementById('load-text');
 
   return {
     el,

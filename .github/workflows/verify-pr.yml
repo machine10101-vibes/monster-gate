@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# A newer push supersedes any stuck verification run for this PR.
+concurrency:
+  group: verify-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
@@ -22,6 +27,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run tests
-        run: npm test
+        timeout-minutes: 10
+        run: npm test -- --test-force-exit
       - name: Build production site
         run: env -u VITE_BASE npm run build

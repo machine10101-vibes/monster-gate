@@ -414,6 +414,11 @@ class Game {
         if (text) text.textContent = t;
       }
     };
+    // Paint a visible loading state before synchronous world setup begins.
+    // Klever's Android WebView can otherwise leave the bar looking idle until
+    // the first generation milestone several frames into the build.
+    progress(0.06, 'Preparing the world');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     this.world = new World(this.quality);
     await this.world.build(progress);
     this.scene.add(this.world.group);
@@ -3738,9 +3743,8 @@ async function startGame() {
     location.replace(adminHref());
     return;
   }
-  // Let the branded intro finish before WebGL and world generation compete
-  // with the mobile WebView video decoder for graphics resources.
-  if (loadingScreen) await loadingScreen.waitForVideo();
+  // Start WebGL and world generation immediately alongside the branded intro.
+  // The intro is only awaited when the game is ready to dismiss the loading UI.
   const bootSearch = typeof location !== 'undefined' ? location.search : '';
   if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
     dropOnlineWithoutSession({ search: bootSearch });

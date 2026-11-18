@@ -335,7 +335,7 @@ export class World {
   /* ------------------------------- build ------------------------------- */
   async build(progress = () => {}) {
     const q = this.quality;
-    progress(0.02, 'Shaping the land');
+    progress(0.1, 'Shaping the land');
     await nextFrame();
     this.tiles = TILES;
     this.activeTile = STARTER;
