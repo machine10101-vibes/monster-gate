@@ -178,8 +178,8 @@ export async function loginWithKlever() {
 
 export async function linkKleverWallet(session) {
   if (!session?.userId) throw fail('rejected', 'Sign in with email first.');
-  const current = await refreshAccountSession(session);
-  if (!current?.accessToken) {
+  const current = isMockWallet() ? session : await refreshAccountSession(session);
+  if (!isMockWallet() && !current?.accessToken) {
     throw fail('rejected', 'This email account has no cloud sign-in session. Create or sign in to a cloud email account before connecting Klever.');
   }
   const proof = await signFor('link', current);
@@ -212,8 +212,8 @@ export async function linkKleverWallet(session) {
 
 export async function unlinkKleverWallet(session) {
   if (!session?.userId) throw fail('rejected', 'Sign in with email first.');
-  const current = await refreshAccountSession(session);
-  if (!current?.accessToken) {
+  const current = isMockWallet() ? session : await refreshAccountSession(session);
+  if (!isMockWallet() && !current?.accessToken) {
     throw fail('rejected', 'This email account has no cloud sign-in session. Create or sign in to a cloud email account before connecting Klever.');
   }
   if (isMockWallet()) {
