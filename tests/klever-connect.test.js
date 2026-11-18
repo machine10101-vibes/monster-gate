@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import * as ed from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha2.js';
 import { keccak_256 as keccak } from '@noble/hashes/sha3.js';
-import { addressForSignature, addressFromWallet, approvedKleverAddress, connectMethod, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
+import { addressForSignature, addressFromWallet, connectMethod, pollProviderAddress, providerAddress, sheetResultAccepted, signatureCandidates, signaturePlan } from '../src/wallet/klever.js';
 import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
 
 ed.hashes.sha512 = sha512;
@@ -15,18 +15,20 @@ const FORUM_ADDRESS = 'klv159vrgc50hqnr44zn25cdndmdwgrqvdsajax58asmslmqhcjfunwqk
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
-test('Klever Hub selects the klv account before any other connect call', () => {
-  const hub = { initialize() {} };
-  assert.equal(connectMethod({ requestAccount() {}, connect() {}, initialize() {} }, hub), 'hub');
-  assert.equal(connectMethod({ requestAccount() {}, connect() {}, initialize() {} }), 'requestAccount');
-  assert.equal(connectMethod({ enable() {}, connect() {} }), 'enable');
-  assert.equal(connectMethod({ connect() {}, initialize() {} }), 'connect');
-  assert.equal(connectMethod({ initialize() {} }, hub), 'hub');
-  assert.equal(connectMethod({ initialize() {} }), 'initialize');
-  assert.equal(connectMethod({}), '');
+test('the connect reads selectedAddress, then address, then the first account', () => {
+  const other = 'klv1fr724pjdjp3l8unuvgda0k6vt06d875hj7t5ggrxymzcg3jcveysejzljc';
+  assert.equal(connectMethod({ requestAccount() {}, enable() {} }), 'requestAccount');
+  assert.equal(connectMethod({ enable() {} }), 'enable');
+  assert.equal(connectMethod({}), 'sdk');
   const srcText = src('../src/wallet/klever.js');
-  assert.equal(srcText.includes("kleverHub.initialize('KLV')"), true);
-  assert.equal(srcText.includes("switchBlockchain('KLV')"), true);
+  assert.equal(srcText.includes('kw.requestAccount()'), true);
+  assert.equal(srcText.includes('kw.enable()'), true);
+  assert.equal(srcText.includes('web.initialize({ timeout: 20_000, accountChangeCallback: () => undefined })'), true);
+  assert.equal(srcText.includes('kw.selectedAddress || kw.address || kw.accounts?.[0]'), true);
+  assert.equal(providerAddress({ selectedAddress: FORUM_ADDRESS, address: other }), FORUM_ADDRESS);
+  assert.equal(providerAddress({ address: FORUM_ADDRESS }), FORUM_ADDRESS);
+  assert.equal(providerAddress({ accounts: [FORUM_ADDRESS] }), FORUM_ADDRESS);
+  assert.equal(addressFromWallet({ selectedAddress: FORUM_ADDRESS, getWalletAddress: () => other }), FORUM_ADDRESS);
   assert.equal(addressFromWallet({ address: FORUM_ADDRESS }), FORUM_ADDRESS);
   assert.equal(addressFromWallet({ getWalletAddress: () => 'short' }, FORUM_ADDRESS), FORUM_ADDRESS);
   assert.equal(addressFromWallet({}, [FORUM_ADDRESS]), FORUM_ADDRESS);
@@ -34,18 +36,11 @@ test('Klever Hub selects the klv account before any other connect call', () => {
   assert.equal(addressFromWallet({}), '');
 });
 
-test('the page waits for the klv account the prompt approves', async () => {
-  const stale = 'klv1fr724pjdjp3l8unuvgda0k6vt06d875hj7t5ggrxymzcg3jcveysejzljc';
-  const kw = { address: stale };
-  let release;
-  const pending = new Promise((resolve) => { release = resolve; });
-  const waiting = approvedKleverAddress(kw, pending, 1500);
-  await new Promise((resolve) => setTimeout(resolve, 40));
-  kw.address = FORUM_ADDRESS;
-  release();
+test('the page polls the provider until the klv account is approved', async () => {
+  const kw = {};
+  const waiting = pollProviderAddress(kw, 10, 20);
+  setTimeout(() => { kw.selectedAddress = FORUM_ADDRESS; }, 30);
   assert.equal(await waiting, FORUM_ADDRESS);
-  const same = { address: FORUM_ADDRESS };
-  assert.equal(await approvedKleverAddress(same, Promise.resolve(FORUM_ADDRESS), 400), FORUM_ADDRESS);
 });
 
 test('a signature KleverScan accepted verifies for that address', () => {
@@ -172,6 +167,6 @@ test('an email account connects Klever from the character camp', () => {
   const shell = main.slice(main.indexOf('async function shellKlever'), main.indexOf('function armLogin'));
   assert.match(shell, /UNLINKED_CODE[\s\S]*showUnlinkedNotice/);
   assert.match(src('../src/ui/charselect.js'), /paintKlever/);
-  assert.match(src('../src/wallet/klever.js'), /kw\.connect/);
+  assert.match(src('../src/wallet/klever.js'), /kw\.requestAccount\(\)/);
   assert.match(src('../src/wallet/settings.js'), /does not send any coins/);
 });

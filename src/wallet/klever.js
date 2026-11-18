@@ -1,3 +1,4 @@
+import { web } from '@klever/sdk-web';
 import { verifyKleverSignature } from './verify.js';
 import { signedMessage } from '../../supabase/functions/_shared/linkAuth.js';
 
@@ -313,48 +314,57 @@ export function waitForProvider(ms = 2000) {
 }
 
 /**
- * Klever Hub selects the chain. `initialize('KLV')` is the wallet's own call for the
- * account that starts with klv1. A provider `requestAccount` can approve a different
- * chain, so the hub comes first. The extension Confirm popup is `connect`.
+ * The address the Klever provider has approved.
+ * Order matches the working connect: selectedAddress, then address, then accounts[0].
  */
-export function connectMethod(kw, hub = typeof window !== 'undefined' ? window.kleverHub : null) {
-  if (hub && typeof hub.initialize === 'function') return 'hub';
+export function providerAddress(kw) {
+  if (!kw) return '';
+  const found = kw.selectedAddress || kw.address || kw.accounts?.[0] || null;
+  return typeof found === 'string' && found.length > 10 ? found.trim() : '';
+}
+
+/** requestAccount, or enable, or the SDK initialize. Same order as the working connect. */
+export function connectMethod(kw) {
   if (kw && typeof kw.requestAccount === 'function') return 'requestAccount';
   if (kw && typeof kw.enable === 'function') return 'enable';
-  if (kw && typeof kw.connect === 'function') return 'connect';
-  if (kw && typeof kw.initialize === 'function') return 'initialize';
-  return '';
-}
-
-function klvChain(chain) {
-  const name = `${chain ?? ''}`.trim().toUpperCase();
-  return name === 'KLV' || name === '1';
-}
-
-function invokeAccountRequest(kw) {
-  const method = connectMethod(kw);
-  if (method === 'hub') return window.kleverHub.initialize('KLV');
-  if (method === 'requestAccount') return kw.requestAccount();
-  if (method === 'enable') return kw.enable();
-  if (method === 'connect') return kw.connect();
-  if (method === 'initialize') return kw.initialize();
-  return undefined;
+  return 'sdk';
 }
 
 let pendingAccount = null;
 
-/** Starts the account prompt in this turn, before any await can drop the click. */
+/**
+ * Starts the account prompt in this turn, before any await can drop the click.
+ * The promise is not awaited here. The page polls the provider for the address.
+ */
 export function primeKleverConnect() {
   if (typeof window === 'undefined' || !window.kleverWeb || pendingAccount) return pendingAccount;
   const kw = window.kleverWeb;
-  let pending;
-  try {
-    pending = invokeAccountRequest(kw);
-  } catch (err) {
-    pending = Promise.reject(err);
-  }
-  pendingAccount = { kw, pending: Promise.resolve(pending) };
+  pendingAccount = { kw, pending: beginProviderConnect(kw) };
   return pendingAccount;
+}
+
+function beginProviderConnect(kw) {
+  const immediate = providerAddress(kw);
+  if (ADDRESS_RE.test(immediate)) return Promise.resolve(immediate);
+  try {
+    if (typeof kw.requestAccount === 'function') {
+      const req = kw.requestAccount();
+      if (req && typeof req.then === 'function') Promise.resolve(req).catch(() => undefined);
+    } else if (typeof kw.enable === 'function') {
+      const req = kw.enable();
+      if (req && typeof req.then === 'function') Promise.resolve(req).catch(() => undefined);
+    } else {
+      try {
+        const pending = web.initialize({ timeout: 20_000, accountChangeCallback: () => undefined });
+        if (pending && typeof pending.then === 'function') Promise.resolve(pending).catch(() => undefined);
+      } catch {
+        /* Extension bridge may not be ready yet. */
+      }
+    }
+  } catch {
+    /* Continue to poll for the extension's response. */
+  }
+  return pollProviderAddress(kw);
 }
 
 function accountRequest(kw) {
@@ -364,53 +374,30 @@ function accountRequest(kw) {
     return held.pending;
   }
   pendingAccount = null;
-  try {
-    return Promise.resolve(invokeAccountRequest(kw));
-  } catch (err) {
-    return Promise.reject(err);
-  }
+  return beginProviderConnect(kw);
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * The approved klv address arrives on the provider after the prompt, not before it.
- * A stale address already sitting on the provider is kept only once the prompt finishes.
- */
-export async function approvedKleverAddress(kw, pending, timeoutMs = 20000) {
-  const before = addressFromWallet(kw);
-  let returned;
-  let settled = false;
-  let failure = null;
-  Promise.resolve(pending).then(
-    (value) => {
-      returned = value;
-      settled = true;
-    },
-    (err) => {
-      failure = err;
-      settled = true;
-    },
-  );
-  const start = Date.now();
-  while (Date.now() - start <= timeoutMs) {
-    const address = addressFromWallet(kw, returned);
-    if (address && (settled || address !== before)) return address;
-    if (settled && failure && connectionClosed(failure) && !address) {
-      throw fail('rejected', 'The Klever app closed the connection.');
-    }
-    if (settled && !address && Date.now() - start > 800) break;
-    await delay(80);
-  }
-  const address = addressFromWallet(kw, returned);
-  if (address) return address;
-  if (failure && connectionClosed(failure)) throw fail('rejected', 'The Klever app closed the connection.');
-  throw fail(
-    'no-account',
-    'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.',
-  );
+/** Poll the injected provider until the klv account is approved. Forty checks, half a second apart. */
+export function pollProviderAddress(kw, maxPolls = 40, intervalMs = 500) {
+  return new Promise((resolve, reject) => {
+    let pollCount = 0;
+    const timer = setInterval(() => {
+      const found = providerAddress(kw);
+      if (ADDRESS_RE.test(found)) {
+        clearInterval(timer);
+        resolve(found);
+        return;
+      }
+      pollCount += 1;
+      if (pollCount >= maxPolls) {
+        clearInterval(timer);
+        reject(fail(
+          'no-account',
+          'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.',
+        ));
+      }
+    }, intervalMs);
+  });
 }
 
 function addressText(value) {
@@ -427,6 +414,8 @@ function addressText(value) {
 }
 
 export function addressFromWallet(kw, returned) {
+  const provided = providerAddress(kw);
+  if (ADDRESS_RE.test(provided)) return provided;
   let fromGetter = '';
   try {
     if (typeof kw?.getWalletAddress === 'function') fromGetter = kw.getWalletAddress();
@@ -447,33 +436,14 @@ function connectionClosed(err) {
 }
 
 async function connectProvider(kw) {
-  const method = connectMethod(kw);
-  if (!method) {
-    const address = addressFromWallet(kw);
-    if (address) return address;
-    throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
-  }
-  let address = '';
   try {
-    address = await approvedKleverAddress(kw, accountRequest(kw));
+    const address = await accountRequest(kw);
+    if (ADDRESS_RE.test(address)) return address;
   } catch (err) {
-    if (err?.code === 'rejected') throw err;
+    if (err?.code === 'rejected' || err?.code === 'no-account') throw err;
   }
-  const hub = typeof window !== 'undefined' ? window.kleverHub : null;
-  const chain = hub?.account?.chain;
-  if (hub && typeof hub.switchBlockchain === 'function' && chain != null && `${chain}` !== '' && !klvChain(chain)) {
-    let switched;
-    try {
-      switched = await hub.switchBlockchain('KLV');
-    } catch (err) {
-      if (connectionClosed(err)) throw fail('rejected', 'The Klever app closed the connection.');
-    }
-    const next = addressFromWallet(kw, switched);
-    if (next) return next;
-  }
+  const address = addressFromWallet(kw);
   if (address) return address;
-  const again = addressFromWallet(kw);
-  if (again) return again;
   throw fail('no-account', 'In Klever, select the account that starts with klv1, then press Connect Klever wallet again.');
 }
 
