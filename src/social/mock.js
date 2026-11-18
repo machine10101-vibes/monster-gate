@@ -54,6 +54,7 @@ export class MockSocial {
     this.ignored = new Set();
     this.party = null;
     this.invites = [];
+    this.outgoingInvites = [];
     this.whispers = [];
     this.listeners = new Set();
     this.elapsed = 0;
@@ -83,6 +84,7 @@ export class MockSocial {
       ignored: [...this.ignored].map((id) => publicPerson(this.people.get(id))).filter(Boolean),
       party: this.party ? cloneParty(this.party) : null,
       invites: this.invites.map((inv) => ({ ...inv, from: { ...inv.from } })),
+      outgoingInvites: this.outgoingInvites.map(inv => ({ ...inv, to: { ...inv.to } })),
     };
   }
 
@@ -135,9 +137,11 @@ export class MockSocial {
       case 'friend_request': return this.friendRequest(a);
       case 'friend_accept': return this.friendAccept(a);
       case 'friend_decline': return this.friendDecline(a);
+      case 'friend_cancel': return this.friendCancel(a);
       case 'friend_remove': return this.friendRemove(a);
       case 'block': return this.block(a);
       case 'unblock': return this.unblock(a);
+      case 'unignore': return this.unignore(a);
       case 'ignore': return this.ignore(a);
       case 'party_invite': return this.partyInvite(a);
       case 'party_accept': return this.partyAccept(a);
@@ -145,6 +149,7 @@ export class MockSocial {
       case 'party_leave': return this.partyLeave();
       case 'party_kick': return this.partyKick(a);
       case 'party_promote': return this.partyPromote(a);
+      case 'party_loot': return this.partyLoot(a);
       case 'whisper': return this.whisper(a, b);
       case 'friend_list':
         this.emit('friend_list');
@@ -178,6 +183,12 @@ export class MockSocial {
     this.friends.add(p.id);
     this.emit('friend_accept', { user_id: p.id });
     return { ok: true };
+  }
+
+  friendCancel(ref) {
+    const p = this.resolve(ref);
+    if (!p || !this.pendingOut.has(p.id)) return this.fail(ERRORS.not_found);
+    this.pendingOut.delete(p.id); this.emit('friend_cancel'); return { ok: true };
   }
 
   friendDecline(ref) {
@@ -218,6 +229,12 @@ export class MockSocial {
     return { ok: true };
   }
 
+  unignore(ref) {
+    const p = this.resolve(ref);
+    if (!p || !this.ignored.has(p.id)) return this.fail(ERRORS.not_found);
+    this.ignored.delete(p.id); this.emit('unignore'); return { ok: true };
+  }
+
   ignore(ref) {
     const p = this.resolve(ref);
     if (!p) return this.fail(ERRORS.not_found);
@@ -239,9 +256,11 @@ export class MockSocial {
     if (this.inParty(p.id)) return this.fail(ERRORS.already);
     if (!this.party) this.ensureParty();
     if (this.party.members.length >= MAX_PARTY) return this.fail(ERRORS.full, 'Party is full (4).');
-    this.addMember(p);
-    this.emit('party_state');
-    return { ok: true, party: cloneParty(this.party) };
+    const invite = { invite_id: `pout_${inviteSeq++}`, to: { id: p.id, name: p.name }, expires_at: this.now() + this.ttl };
+    this.outgoingInvites = this.outgoingInvites.filter(i => i.to.id !== p.id);
+    this.outgoingInvites.push(invite);
+    this.emit('party_invite_sent', { invite });
+    return { ok: true, pending: true, invite_id: invite.invite_id };
   }
 
   /** Incoming invite from another hunter (UI + tests). */
@@ -316,6 +335,21 @@ export class MockSocial {
     return { ok: true };
   }
 
+  resolveOutgoingInvite(inviteId, accepted = true) {
+    const inv = this.outgoingInvites.find(i => i.invite_id === inviteId);
+    if (!inv || this.now() > inv.expires_at) return this.fail(ERRORS.expired);
+    this.outgoingInvites = this.outgoingInvites.filter(i => i !== inv);
+    if (accepted) {
+      const p = this.resolve(inv.to.id);
+      if (p && this.party?.members.length < MAX_PARTY) this.addMember(p);
+      this.emit('party_state');
+    } else {
+      if (this.party?.members.length === 1) this.party = null;
+      this.emit('party_decline');
+    }
+    return { ok: true };
+  }
+
   partyPromote(ref) {
     if (!this.party) return this.fail(ERRORS.not_in_party);
     if (!this.isLeader()) return this.fail(ERRORS.not_leader);
@@ -324,6 +358,13 @@ export class MockSocial {
     this.party.leader = p.id;
     this.emit('party_state');
     return { ok: true };
+  }
+
+  partyLoot(mode) {
+    if (!this.party) return this.fail(ERRORS.not_in_party);
+    if (!this.isLeader()) return this.fail(ERRORS.not_leader);
+    if (![LOOT_MODE.roundRobin, LOOT_MODE.needGreed].includes(mode)) return this.fail(ERRORS.protocol);
+    this.party.loot = mode; this.emit('party_state'); return { ok: true };
   }
 
   whisper(ref, text) {
@@ -381,6 +422,12 @@ export class MockSocial {
 
   expireInvites(now = this.now()) {
     const keep = this.invites.filter((i) => now <= i.expires_at);
+    const outgoing = this.outgoingInvites.filter(i => now <= i.expires_at);
+    if (outgoing.length !== this.outgoingInvites.length) {
+      this.outgoingInvites = outgoing;
+      if (this.party?.members.length === 1) this.party = null;
+      this.emit('outgoing_invite_expired');
+    }
     if (keep.length !== this.invites.length) {
       this.invites = keep;
       this.emit('invite_expired');
