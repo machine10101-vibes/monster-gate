@@ -16,7 +16,6 @@ export const SOCIAL_TYPES = new Set([
   'friend_request', 'friend_accept', 'friend_decline', 'friend_cancel', 'friend_remove', 'friend_list',
   'block', 'unblock', 'ignore', 'unignore',
   'party_invite', 'party_accept', 'party_decline', 'party_leave', 'party_kick', 'party_promote', 'party_loot', 'whisper',
-  'whisper',
 ]);
 
 const BLOCK_CAP = 100;
