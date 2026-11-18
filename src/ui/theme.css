@@ -507,10 +507,10 @@ h1 em,
 #load-key { display: none !important; }
 #loading.video-failed #load-video { opacity: 0; }
 #loading.video-playing .load-poster { opacity: 0; }
-/* The clip ends before world generation on slower phones. Show the poster
-   while the progress bar continues instead of freezing a dark final frame. */
-#loading.held #load-video { opacity: 0; }
-#loading.held .load-poster { opacity: 1; }
+/* Freeze the native video on its final frame while world generation finishes.
+   Keep the poster hidden: it is only the pre-playback / decode-failure fallback. */
+#loading.held #load-video { opacity: 1; }
+#loading.held .load-poster { opacity: 0; }
 @keyframes load-pulse {
   0%, 100% { opacity: 0.42; transform: scale(1); }
   50% { opacity: 0.95; transform: scale(1.05); }
