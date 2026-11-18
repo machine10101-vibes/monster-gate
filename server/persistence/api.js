@@ -153,7 +153,8 @@ export function createPersistence(options = {}) {
     },
 
     async cancelFriend(userId, otherUserId) {
-      return adapter.declineFriend(requireUserId(otherUserId), requireUserId(userId));
+      if (typeof adapter.cancelFriend !== 'function') throw new Error('Friend request cancellation is not supported by this persistence adapter.');
+      return adapter.cancelFriend(requireUserId(userId), requireUserId(otherUserId));
     },
 
     async removeFriend(userId, otherUserId) {
