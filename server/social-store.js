@@ -15,7 +15,7 @@ export function createMemorySocialStore() {
 
 export function createSupabaseSocialStore(env = process.env) {
   const url = String(env.SUPABASE_URL || '').replace(/\/$/, '');
-  const key = String(env.SUPABASE_SERVICE_ROLE_KEY || '');
+  const key = String(env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '');
   if (!url || !key) return null;
   const request = async (path, init = {}, table = TABLE) => {
     const res = await fetch(`${url}/rest/v1/${table}${path}`, {
