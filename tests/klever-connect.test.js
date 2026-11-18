@@ -112,6 +112,8 @@ test('one Klever prompt stays open until it is signed', () => {
   assert.equal(srcText.includes('kw.enable()'), true);
   assert.equal(srcText.includes('setWalletAddress'), false);
   assert.equal(srcText.includes('if (plan === \'extension\' && !mobile) pinAccount(kw, address)'), true);
+  assert.equal(srcText.includes('if (mobile) await pageSettledAfterSign()'), true);
+  assert.equal(srcText.includes("const lockPage = plan === 'sheet' || mobile"), true);
   assert.equal(srcText.includes('activeElement.blur'), false);
   assert.equal(sheetResultAccepted({ status: 'ACCEPTED', signature: FORUM_SIGNATURE }), true);
   assert.equal(sheetResultAccepted({ data: FORUM_SIGNATURE }), true);

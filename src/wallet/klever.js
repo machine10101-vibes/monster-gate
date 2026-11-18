@@ -295,6 +295,32 @@ function paintSettled() {
   });
 }
 
+/**
+ * The Klever app closes a new signature sheet when it opens while the previous
+ * sheet is still changing the page height. Wait until that height stays put.
+ */
+function pageSettledAfterSign(quietMs = 600, maxMs = 2000) {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    let height = window.innerHeight;
+    let stableSince = start;
+    const tick = () => {
+      const now = performance.now();
+      const next = window.innerHeight;
+      if (next !== height) {
+        height = next;
+        stableSince = now;
+      }
+      if (now - stableSince >= quietMs || now - start >= maxMs) {
+        resolve();
+        return;
+      }
+      setTimeout(tick, 50);
+    };
+    setTimeout(tick, 50);
+  });
+}
+
 export function waitForProvider(ms = 2000) {
   const start = performance.now();
   return new Promise((resolve) => {
@@ -505,10 +531,12 @@ export async function connectWallet() {
  */
 export async function signProof(purpose, nonce, address, kw, mobile = isMobile()) {
   const plan = signaturePlan(kw);
-  // The in-app sheet closes if the page changes size. Lock the size and let that
-  // paint before the sheet opens. The extension's window is separate: locking the
-  // page under it closes that window, so the page stays as it is.
-  const lockPage = plan === 'sheet';
+  // The in-app sheet closes if the page changes size. On the phone, signMessage
+  // is that sheet: wait for the previous confirm to finish closing, pin the
+  // height, and let that paint before the signature opens. The desktop
+  // extension's window is separate, and locking the page under it closes it.
+  if (mobile) await pageSettledAfterSign();
+  const lockPage = plan === 'sheet' || mobile;
   if (lockPage) {
     holdPageStill();
     await paintSettled();
