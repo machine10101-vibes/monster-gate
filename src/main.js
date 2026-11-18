@@ -13,6 +13,7 @@ import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
 import { hideRadiusPx, hideUniforms } from './engine/materials.js';
+import { nextResScale, renderPixelRatio } from './engine/pixels.js';
 import { Player } from './entities/player.js';
 import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
@@ -141,7 +142,7 @@ function clearBoot() {
 
 const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
-  { id: 'medium', label: 'Medium', density: 0.8, motes: 220, gateMotes: 160, shadowSize: 2048, shadowExtent: 30, dpr: 1.25, shadows: true },
+  { id: 'medium', label: 'Medium', density: 0.8, motes: 220, gateMotes: 160, shadowSize: 2048, shadowExtent: 30, dpr: 2, shadows: true },
   { id: 'high', label: 'High', density: 1, motes: 380, gateMotes: 260, shadowSize: 3072, shadowExtent: 34, dpr: 2, shadows: true },
 ];
 
@@ -184,9 +185,6 @@ function pickQuality() {
  * drawing that scene three times, is what turned one restart into a loop.
  */
 function survivalBudget(q, heavy) {
-  const w = Math.max(window.screen?.width || 0, window.innerWidth || 1);
-  const h = Math.max(window.screen?.height || 0, window.innerHeight || 1);
-  const dprCap = heavy ? Math.max(0.6, Math.min(1, Math.sqrt(800000 / (w * h)))) : 1;
   return {
     ...q,
     id: heavy ? 'low' : q.id,
@@ -194,7 +192,7 @@ function survivalBudget(q, heavy) {
     density: heavy ? Math.min(q.density, 0.45) : q.density,
     motes: heavy ? Math.min(q.motes, 80) : q.motes,
     gateMotes: heavy ? Math.min(q.gateMotes, 60) : q.gateMotes,
-    dpr: Math.min(q.dpr, Math.round(dprCap * 100) / 100),
+    dpr: heavy ? 1 : q.dpr,
     shadowSize: heavy ? 512 : Math.min(q.shadowSize, 1024),
     shadows: heavy ? false : q.shadows,
   };
@@ -1581,7 +1579,7 @@ class Game {
     w = Math.round(w);
     h = Math.round(h);
     if (w < 2 || h < 2) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, this.quality.dpr) * this.resScale;
+    const dpr = renderPixelRatio(window.devicePixelRatio, this.quality.dpr, this.resScale);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -1603,9 +1601,7 @@ class Game {
     const avg = this.frameAcc / this.frameCnt;
     this.frameAcc = 0;
     this.frameCnt = 0;
-    let s = this.resScale;
-    if (avg > 24 && s > 0.55) s = Math.max(0.55, s - 0.15);
-    else if (avg < 12.5 && s < 1) s = Math.min(1, s + 0.1);
+    const s = nextResScale(this.resScale, avg, { allowDrop: !!this.heavyBoot });
     if (s !== this.resScale) {
       this.resScale = s;
       this.resize();
