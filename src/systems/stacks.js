@@ -3,6 +3,7 @@
 import { gearById } from '../data/catalog.js';
 
 export const MAX_STACK = 20;
+export const STORAGE_MAX_STACK = 99;
 export const BAG_SLOTS = 40;
 export const INVENTORY_FULL = 'Inventory full';
 
@@ -46,7 +47,20 @@ export function bagSlotsFrom({ goods = {}, materials = {}, crafted = {}, storedG
   return n;
 }
 
-/** Visual crate cells from saved `{k,id,n}` entries. Over-capacity hunts still list every stack. */
+/** Storage crate stacks hold up to 99 gathered items, independently of bag stacks. */
+export function splitStorageStacks(n) {
+  n = n | 0;
+  if (n < 1) return [];
+  const out = [];
+  while (n > 0) {
+    const take = Math.min(n, STORAGE_MAX_STACK);
+    out.push(take);
+    n -= take;
+  }
+  return out;
+}
+
+/** Visual crate cells from saved {k,id,n} entries. */
 export function storageVisual(slots, cap) {
   const cells = [];
   (slots || []).forEach((s, src) => {
@@ -55,7 +69,7 @@ export function storageVisual(slots, cap) {
       cells.push({ k: s.k, id: s.id, n: 1, src });
       return;
     }
-    for (const part of splitStacks(s.n)) cells.push({ k: s.k, id: s.id, n: part, src });
+    for (const part of splitStorageStacks(s.n)) cells.push({ k: s.k, id: s.id, n: part, src });
   });
   const size = Math.max(cap | 0, cells.length);
   while (cells.length < size) cells.push(null);
@@ -64,5 +78,5 @@ export function storageVisual(slots, cap) {
 
 export function storageStackSlots(s) {
   if (!s) return 0;
-  return s.k === 'gear' ? 1 : stackSlots(s.n);
+  return s.k === 'gear' ? 1 : Math.ceil(Math.max(0, s.n | 0) / STORAGE_MAX_STACK);
 }
