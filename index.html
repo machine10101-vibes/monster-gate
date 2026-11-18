@@ -28,10 +28,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-B4VvRaFM.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/account-Dl93bBou.js">
-    <link rel="stylesheet" crossorigin href="/assets/account-BdanKPOq.css">
-    <link rel="stylesheet" crossorigin href="/assets/index-Cqy_gAPr.css">
+    <script type="module" crossorigin src="/assets/index-CH2W9CKB.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/account-7YGlr-nK.js">
+    <link rel="stylesheet" crossorigin href="/assets/account-Cqw77ZdZ.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-BkplxWYZ.css">
   </head>
   <body>
     <div id="app">
@@ -311,7 +311,22 @@
           <small id="cs-save" class="cs-save"></small>
           <button id="cs-wallet-connect" class="cs-btn cs-wallet-connect hidden" type="button">Connect Klever Wallet</button>
           <small id="cs-wallet-status" class="cs-wallet-status" role="status"></small>
-          <button id="cs-enter" class="cs-btn big" type="button">Enter World</button>
+          <div class="cs-enter-actions">
+            <button id="cs-choose-world" class="cs-btn big" type="button">Choose world</button>
+            <button id="cs-play-solo" class="cs-btn big quiet" type="button">Play solo</button>
+          </div>
+        </div>
+        <div id="cs-worlds" class="cs-worlds hidden" hidden role="dialog" aria-modal="true" aria-label="Choose a world">
+          <div class="cs-worlds-box mg-frame">
+            <p class="cs-worlds-title">Choose a world</p>
+            <div id="cs-world-list" class="cs-world-list">
+              <button id="cs-world-1" class="cs-btn big cs-world" type="button">
+                <b>World 1</b>
+                <small id="cs-world-1-status">Checking…</small>
+              </button>
+            </div>
+            <button id="cs-worlds-back" class="cs-btn quiet" type="button">Back</button>
+          </div>
         </div>
         <div id="cs-toggle" class="cs-toggle">
           <span>CHARACTER LIST</span>
