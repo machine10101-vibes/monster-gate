@@ -107,10 +107,15 @@ test('mock party invite, leave, kick, promote', async () => {
   const s = mock();
   const inv = await s.act('party_invite', 'Bram');
   assert.equal(inv.ok, true);
+  assert.equal(inv.pending, true);
+  assert.equal(s.party.members.length, 1, 'invited hunter must accept before joining');
+  assert.equal(s.resolveOutgoingInvite(inv.invite_id).ok, true);
   assert.equal(s.party.members.length, 2);
   assert.equal(s.party.leader, 'u_you');
   const second = await s.act('party_invite', 'wv:lira');
   assert.equal(second.ok, true);
+  assert.equal(s.party.members.length, 2);
+  assert.equal(s.resolveOutgoingInvite(second.invite_id).ok, true);
   assert.equal(s.party.members.length, 3);
   const promo = await s.act('party_promote', 'Bram');
   assert.equal(promo.ok, true);
@@ -316,9 +321,9 @@ test('social error codes map to friendly friends/party copy', () => {
 
 test('nameplate menu lists whisper and block only when welcome.features includes them', () => {
   const none = hunterMenuItems({ friends: true, party: true, whisper: false, block: false });
-  assert.deepEqual(none.map((i) => i.act), ['friend', 'party']);
+  assert.deepEqual(none.map((i) => i.act), ['friend', 'party', 'mute']);
   const all = hunterMenuItems({ friends: true, party: true, whisper: true, block: true });
-  assert.deepEqual(all.map((i) => i.act), ['friend', 'party', 'whisper', 'block']);
+  assert.deepEqual(all.map((i) => i.act), ['friend', 'party', 'mute', 'whisper', 'block', 'ignore']);
   const offline = hunterMenuItems({ whisper: true, block: true }, { offline: true });
   assert.deepEqual(offline.map((i) => i.act), ['friend', 'party']);
 });
@@ -373,7 +378,8 @@ test('friends cap constant and SOCIAL_SPEC cover the protocol', () => {
   assert.match(spec, /0\.08/);
   const mmo = src('../src/net/mmo.js');
   assert.match(mmo, /export class MmoClient/);
-  assert.doesNotMatch(mmo, /friendRequest/);
+  assert.match(mmo, /friendRequest\(name\)/);
+  assert.match(mmo, /sendWhisper\(to, text\)/);
   const proto = src('../PROTOCOL.md');
-  assert.doesNotMatch(proto, /friend_request/);
+  assert.match(proto, /friend_request/);
 });

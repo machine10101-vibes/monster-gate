@@ -81,7 +81,11 @@ export function mountFriends(body, game) {
     if (snap.pendingOut?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Sent'));
       for (const p of snap.pendingOut) {
-        const row = personRow(p, 'Waiting');
+        const row = personRow(p, 'Request sent');
+        const cancel = el('button', 'mg-btn quiet', 'Cancel');
+        cancel.type = 'button';
+        cancel.onclick = async () => { await report(game, await social.cancelFriend(p.user_id || p.id)); paint(); };
+        row.appendChild(cancel);
         root.appendChild(row);
       }
     }
@@ -91,6 +95,18 @@ export function mountFriends(body, game) {
       root.appendChild(el('p', 'mg-social-empty', 'No friends yet. Add a hunter by name, or tap a nameplate.'));
     }
     for (const p of snap.friends) root.appendChild(friendRow(game, social, p, snap, paint));
+
+    if (snap.ignored?.length) {
+      root.appendChild(el('div', 'mg-social-h', 'Ignored'));
+      for (const p of snap.ignored) {
+        const row = personRow(p, 'Ignored');
+        const un = el('button', 'mg-btn quiet', 'Unignore');
+        un.type = 'button';
+        un.onclick = async () => { await report(game, await social.unignorePlayer(p.user_id || p.id)); paint(); };
+        row.appendChild(un);
+        root.appendChild(row);
+      }
+    }
 
     if (snap.blocked?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Blocked'));
@@ -157,16 +173,19 @@ function friendRow(game, social, p, snap, paint) {
     invite.title = !leader ? 'Only the leader can invite' : p.presence === PRESENCE.online ? 'Invite to party' : 'They are offline';
   invite.onclick = async () => {
     const res = await report(game, await social.inviteToParty(p.id || p.name));
-    if (res?.ok) toast(game, `${p.name} joined the party`, 1600);
     paint();
   };
+  const whisper = el('button', 'mg-btn quiet', 'Whisper');
+  whisper.type = 'button';
+  whisper.disabled = !snap.caps?.whisper;
+  whisper.onclick = () => focusWhisper(game, p);
   const more = el('button', 'mg-btn quiet', 'Remove');
   more.type = 'button';
   more.onclick = async () => {
     await report(game, await social.removeFriend(p.user_id || p.id));
     paint();
   };
-  row.append(invite, more);
+  row.append(invite, whisper, more);
   return row;
 }
 
@@ -242,8 +261,18 @@ export function mountSocialHud(game) {
     };
     actions.appendChild(leave);
     if (leader === you) {
+      const loot = el('select', 'mg-btn');
+      loot.setAttribute('aria-label', 'Party loot mode');
+      loot.innerHTML = '<option value="round_robin">Round robin loot</option><option value="need_greed">Need / greed loot</option>';
+      loot.value = party.loot || 'round_robin';
+      loot.onchange = async () => report(game, await social.setLootMode(loot.value));
+      actions.appendChild(loot);
       for (const m of party.members) {
         if (m.id === you) continue;
+        const promote = el('button', 'mg-btn quiet', `Make leader: ${m.name}`);
+        promote.type = 'button';
+        promote.onclick = async () => report(game, await social.promote(m.id));
+        actions.appendChild(promote);
         const kick = el('button', 'mg-btn quiet', `Kick ${m.name}`);
         kick.type = 'button';
         kick.onclick = async () => report(game, await social.kick(m.id));
@@ -310,8 +339,9 @@ export function mountSocialHud(game) {
     const isSelf = player.id && snap.self?.id && player.id === snap.self.id;
     const isFriend = (snap.friends || []).some((f) => matchPerson(f, player));
     const inParty = social?.isPartyMember?.(player.id, player.name);
+    const isMuted = game?.worldView?.isPlayerMuted?.(player.id, player.name) || false;
     menu.hidden = false;
-    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty });
+    const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty, isMuted });
     menu.innerHTML = `
       <b>${escapeHtml(player.name)}</b>
       ${offline ? `<p class="mg-social-note">${escapeHtml(socialOfflinePrompt({
@@ -335,7 +365,7 @@ export function mountSocialHud(game) {
     menu.querySelector('[data-act="party"]').onclick = async () => {
       hideMenu();
       const res = await report(game, await social.inviteToParty(player.id || player.name));
-      if (res?.ok) toast(game, `${player.name} joined the party`, 1600);
+      if (res?.ok && res.pending) toast(game, 'Party invitation sent', 1400);
     };
     const whisperBtn = menu.querySelector('[data-act="whisper"]');
     if (whisperBtn) {
@@ -349,6 +379,21 @@ export function mountSocialHud(game) {
       blockBtn.onclick = async () => {
         hideMenu();
         await report(game, await social.blockPlayer(player.id || player.name));
+      };
+    }
+    const muteBtn = menu.querySelector('[data-act="mute"]');
+    if (muteBtn) {
+      muteBtn.onclick = () => {
+        hideMenu();
+        const muted = game?.worldView?.toggleMutePlayer?.(player.id, player.name);
+        toast(game, muted ? `Muted ${player.name}` : `Unmuted ${player.name}`, 1400);
+      };
+    }
+    const ignoreBtn = menu.querySelector('[data-act="ignore"]');
+    if (ignoreBtn) {
+      ignoreBtn.onclick = async () => {
+        hideMenu();
+        await report(game, await social.ignorePlayer(player.id || player.name));
       };
     }
   };
@@ -431,6 +476,8 @@ function focusWhisper(game, player) {
   const chat = document.getElementById('world-chat');
   const input = chat?.querySelector('.wc-in');
   if (chat) chat.classList.remove('collapsed');
+  const whisperTab = chat?.querySelector('[data-ch="whisper"]');
+  whisperTab?.click();
   if (input) {
     input.value = `/w ${player.name} `;
     input.focus();
@@ -456,13 +503,17 @@ function observeChat(onChat) {
 }
 
 /** Nameplate actions. Whisper and block appear only when welcome.features lists them. */
-export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false } = {}) {
+export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, isFriend = false, inParty = false, isMuted = false } = {}) {
   const items = [
     { act: 'friend', label: isFriend ? 'Friends' : 'Add friend', disabled: !!(offline || isSelf || isFriend) },
     { act: 'party', label: inParty ? 'In party' : 'Invite to party', disabled: !!(offline || isSelf || inParty) },
   ];
+  if (!offline) items.push({ act: 'mute', label: isMuted ? 'Unmute chat' : 'Mute chat', disabled: !!isSelf });
   if (!offline && caps.whisper) items.push({ act: 'whisper', label: 'Whisper', disabled: !!isSelf });
-  if (!offline && caps.block) items.push({ act: 'block', label: 'Block', disabled: !!isSelf });
+  if (!offline && caps.block) {
+    items.push({ act: 'block', label: 'Block', disabled: !!isSelf });
+    items.push({ act: 'ignore', label: 'Ignore', disabled: !!isSelf });
+  }
   return items;
 }
 

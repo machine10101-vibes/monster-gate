@@ -67,6 +67,7 @@ test('chat events keep world/zone and length limits', () => {
   assert.equal(msg.text.length, CHAT_MAX);
   assert.equal(normalizeChat({ channel: 'world', text: 'hi' }).channel, 'world');
   assert.equal(normalizeChat({ channel: 'whisper', text: 'psst', from: { id: 'a', name: 'Ann' } }).channel, 'whisper');
+  assert.equal(normalizeChat({ channel: 'party', text: 'ready?' }).channel, 'party');
 });
 
 test('snapshot buffer interpolates position and wraps yaw', () => {
@@ -163,6 +164,15 @@ test('WorldView snapshots spawn remotes, emit move/chat, and drop leavers', () =
   assert.equal(view.nearbyCount(), 1);
   view.pushChat({ channel: 'world', from: { id: 'c', name: 'Cal' }, text: 'Hello town' });
   assert.equal(view.chat[0].text, 'Hello town');
+  view.toggleMutePlayer('c', 'Cal');
+  view.pushChat({ channel: 'world', from: { id: 'c', name: 'Cal' }, text: 'Muted message' });
+  assert.equal(view.chat.length, 1, 'muted players should not enter chat history');
+  view.toggleMutePlayer('c', 'Cal');
+  game.social = { caps: { whisper: false } };
+  view.sendChat('/w Cal this is private', 'world');
+  assert.equal(chats.length, 0, 'private command must never fall through to public chat');
+  view.pushChat({ channel: 'party', from: { id: 'b', name: 'Bea' }, text: 'Party ready' });
+  assert.equal(view.chat.at(-1).channel, 'party');
   view.sendChat('  hi zone  ', 'zone');
   assert.equal(chats.at(-1).channel, 'zone');
   assert.equal(chats.at(-1).text, 'hi zone');
@@ -172,6 +182,8 @@ test('WorldView snapshots spawn remotes, emit move/chat, and drop leavers', () =
   view.emitMove();
   assert.equal(moves[0].x, 72);
   assert.equal(moves[0].held, 'blade');
+  assert.equal(moves[0].hp, 20);
+  assert.equal(moves[0].max_hp, 20);
   assert.equal(view.status, STATUS.online);
   assert.equal(view.online, 9);
 });
