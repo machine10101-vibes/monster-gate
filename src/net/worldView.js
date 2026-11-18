@@ -1433,7 +1433,7 @@ export class WorldView {
     if (!this.ui?.log) return;
     const zone = this.zone;
     const rows = this.chat.filter((m) => {
-      if (m.channel === 'whisper') return true;
+      if (m.channel === 'whisper') return this.channel === 'whisper';
       if (this.channel === 'world') return m.channel === 'world';
       if (this.channel === 'party') return m.channel === 'party';
       if (this.channel === 'whisper') return m.channel === 'whisper';
