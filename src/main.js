@@ -92,7 +92,7 @@ import {
 } from './wallet/account.js';
 import { adminHref, isAdminAccount } from './admin/gate.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
-import { loginWithKlever } from './wallet/link.js';
+import { completeKleverHandoff, loginWithKlever, pollKleverHandoff, startKleverHandoff } from './wallet/link.js';
 import { UNLINKED_CODE, UNLINKED_HINT } from '../supabase/functions/_shared/linkAuth.js';
 import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
@@ -1190,39 +1190,61 @@ class Game {
     this.refreshWalletUi();
   }
 
-  handOffToWallet() {
+  async handOffToWallet() {
     const sign = document.getElementById('btn-wallet');
     const status = document.getElementById('wallet-status');
     if (sign) sign.disabled = true;
-    if (status) status.textContent = 'Opening Klever Wallet…';
-    launchKleverApp();
+    if (status) status.textContent = 'Preparing secure Klever sign-in…';
     document.getElementById('account-choices')?.classList.add('hidden');
-    const finish = () => {
+    try {
+      const handoff = await startKleverHandoff();
+      if (status) status.textContent = 'Opening Klever Wallet… approve the sign-in there, then return here.';
+      launchKleverApp(handoff.id);
+      const deadline = Date.now() + 5 * 60 * 1000;
+      while (Date.now() < deadline && !this.wallet?.address) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1800));
+        const session = await pollKleverHandoff(handoff);
+        if (session) {
+          this.hideWalletUnlinked();
+          await this.applyWallet(session);
+          this.watchAccount();
+          if (status) status.textContent = 'Klever sign-in complete.';
+          return;
+        }
+      }
+      if (!this.wallet?.address && status) status.textContent = 'Still waiting for Klever. Approve the request in Klever Wallet, then return to this browser.';
+    } catch (err) {
+      if (status) status.textContent = err.message || 'Klever sign-in could not be completed.';
+    } finally {
       this.walletBusy = false;
       if (sign) sign.disabled = false;
-      if (this.wallet?.address) return;
-      document.getElementById('account-choices')?.classList.remove('hidden');
-      // Coming back from the wallet must not open it again. The hunter taps Sign in to retry.
-      const help = document.getElementById('wallet-help');
-      if (help) showWalletHelp(help, 'mobile-app');
-      if (status) status.textContent = 'Klever Wallet is open. Tap Sign in there, then approve the signature.';
-    };
-    window.setTimeout(() => {
-      if (!document.hidden) {
-        finish();
-        return;
-      }
-      const onBack = () => {
-        if (document.hidden) return;
-        document.removeEventListener('visibilitychange', onBack);
-        finish();
-      };
-      document.addEventListener('visibilitychange', onBack);
-    }, 1500);
+      if (!this.wallet?.address) document.getElementById('account-choices')?.classList.remove('hidden');
+    }
   }
 
   async onWallet(automatic = false) {
     if (this.walletBusy) return;
+    const handoffId = new URLSearchParams(location.search).get('handoff');
+    if (handoffId && inKleverHandoff()) {
+      this.walletBusy = true;
+      const sign = document.getElementById('btn-wallet');
+      const status = document.getElementById('wallet-status');
+      if (sign) sign.disabled = true;
+      if (status) status.textContent = 'Approve the sign-in request in Klever Wallet…';
+      document.getElementById('account-choices')?.classList.add('hidden');
+      try {
+        await completeKleverHandoff(handoffId);
+        if (status) status.textContent = 'Sign-in complete — return to your original browser.';
+        if (sign) sign.textContent = 'Sign-in complete';
+      } catch (err) {
+        if (status) status.textContent = err.message || 'Klever sign-in could not be completed.';
+        document.getElementById('account-choices')?.classList.remove('hidden');
+      } finally {
+        this.walletBusy = false;
+        if (sign && !sign.textContent.includes('complete')) sign.disabled = false;
+      }
+      return;
+    }
     if (automatic && (this.wallet?.address || promptIsCooling())) return;
     if (isMobile() && !window.kleverWeb && !inKleverHandoff()) {
       markPrompt();
