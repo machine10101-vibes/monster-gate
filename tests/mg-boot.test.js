@@ -272,6 +272,7 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /this\.bootFrames === 600/);
   assert.match(main, /this\.enterImmersive\(\{ gesture: false, lock: false \}\)/);
   assert.doesNotMatch(main, /requestGameFullscreen\(true\)/);
+  assert.doesNotMatch(main, /lock:\s*this\.isLandscape\(\)\s*&&\s*!tablet/, 'generic touch/click handler must not request orientation lock');
   assert.doesNotMatch(main, /clearSkip/);
   assert.doesNotMatch(src('src/ui/boot.js'), /requestAnimationFrame|keySourceToCanvas\(video/);
   assert.match(theme, /#load-key \{ display: none !important; \}/);

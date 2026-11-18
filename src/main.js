@@ -1430,7 +1430,7 @@ class Game {
       if (e.target.closest?.('input, textarea, select, #btn-fs, #title, #wallet-help, #loading, #account-panel')) return;
       const tablet = isTablet();
       if (!this.input.touch && !tablet) return;
-      if (this.isLandscape() || tablet) this.enterImmersive({ gesture: true, lock: this.isLandscape() && !tablet });
+      if (this.isLandscape() || tablet) this.enterImmersive({ gesture: true, lock: false });
       else if (e.target.closest?.('#rotate-overlay')) this.enterImmersive({ gesture: false, lock: false });
     };
     window.addEventListener('touchend', ask, { capture: true });
