@@ -18,3 +18,7 @@ alter table public.friendships enable row level security;
 drop policy if exists friendships_select_own on public.friendships;
 create policy friendships_select_own on public.friendships for select to authenticated
 using (requester_id = auth.uid() or target_id = auth.uid());
+
+grant select, insert, update, delete on public.friendships to service_role;
+grant select on public.friendships to authenticated;
+grant select on public.characters to service_role;
