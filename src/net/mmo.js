@@ -163,6 +163,7 @@ export class MmoClient {
   friendRequest(name) { return this.send('friend_request', { name }); }
   friendAccept(user_id) { return this.send('friend_accept', { user_id }); }
   friendDecline(user_id) { return this.send('friend_decline', { user_id }); }
+  friendCancel(user_id) { return this.send('friend_cancel', { user_id }); }
   friendRemove(user_id) { return this.send('friend_remove', { user_id }); }
   friendList() { return this.send('friend_list'); }
   blockPlayer(user_id) { return this.send('block', { user_id }); }
@@ -178,6 +179,7 @@ export class MmoClient {
   partyLeave() { return this.send('party_leave'); }
   partyKick(id) { return this.send('party_kick', { id }); }
   partyPromote(id) { return this.send('party_promote', { id }); }
+  partyLoot(loot) { return this.send('party_loot', { loot }); }
   partyLoot(loot) { return this.send('party_loot', { loot }); }
   sendWhisper(to, text) { return this.send('whisper', { to, text }); }
 
