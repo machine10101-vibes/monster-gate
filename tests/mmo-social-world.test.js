@@ -39,8 +39,10 @@ test('World 1 parties require acceptance, broadcast authoritative state, promote
   const b = await open(`ws://127.0.0.1:${srv.port}`);
   const am = collect(a), bm = collect(b);
   await hello(a, 'Ann'); await hello(b, 'Bea');
-  a.send(encode('party_invite', { name: 'Bea' }));
+  const inviteAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'party-1');
+  a.send(encode('party_invite', { name: 'Bea', request_id: 'party-1' }));
   const invite = await waitFor(b, m => m.type === 'party_invite');
+  assert.equal((await inviteAck).pending, true);
   assert.equal(am.some(m => m.type === 'party_state'), false, 'invite does not silently add target');
   const aParty = waitFor(a, m => m.type === 'party_state' && m.party?.members?.length === 2);
   const bParty = waitFor(b, m => m.type === 'party_state' && m.party?.members?.length === 2);
@@ -74,15 +76,19 @@ test('signed-in friends persist in social store and whispers are private', async
   globalThis.__socialTestUser = 'id-bea'; await hello(b, 'Bea', 'token-bea');
   globalThis.__socialTestUser = 'id-cal'; await hello(c, 'Cal', 'token-cal');
 
-  a.send(encode('friend_request', { name: 'Bea' }));
+  const requestAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'friend-1');
+  a.send(encode('friend_request', { name: 'Bea', request_id: 'friend-1' }));
   await waitFor(b, m => m.type === 'friend_request');
+  assert.equal((await requestAck).pending, true);
   const aFriends = waitFor(a, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-bea'));
   const bFriends = waitFor(b, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-ann'));
   b.send(encode('friend_accept', { user_id: 'id-ann' }));
   await Promise.all([aFriends, bFriends]);
 
-  a.send(encode('whisper', { to: 'u_id-bea', text: 'Meet at the gate.' }));
+  const whisperAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'whisper-1');
+  a.send(encode('whisper', { to: 'u_id-bea', text: 'Meet at the gate.', request_id: 'whisper-1' }));
   const privateMsg = await waitFor(b, m => m.type === 'chat' && m.channel === 'whisper');
+  assert.equal((await whisperAck).ok, true);
   assert.equal(privateMsg.text, 'Meet at the gate.');
   assert.equal(cm.some(m => m.type === 'chat' && m.channel === 'whisper'), false);
 
