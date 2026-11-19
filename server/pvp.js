@@ -187,6 +187,8 @@ export function createPvpRuntime(world, opts = {}) {
     const remaining = match.teams.map(team => team.some(id => { const p = live(world, id); return p && !p.pvpDead; }));
     if (!remaining[0] || !remaining[1]) {
       const winner = remaining[0] ? 0 : 1;
+      match.winner = winner;
+      match.reason = 'complete';
       for (const id of match.players) { const p = live(world, id); if (p) send(p, 'pvp_result', { match_id: match.id, winner, winning_team: match.teams[winner] }); }
       setTimeout(() => restore(match, winner), 8000).unref?.();
     }
@@ -206,6 +208,7 @@ export function createPvpRuntime(world, opts = {}) {
   function leave(session) {
     const match = matches.get(session.pvpMatchId);
     if (!match) return cancel(session);
+    if (match.winner !== undefined) { restore(match, match.winner); return true; }
     const winner = match.teams[0].includes(session.id) ? 1 : 0;
     for (const id of match.players) { const p = live(world, id); if (p) send(p, 'pvp_result', { match_id: match.id, winner, reason: 'forfeit' }); }
     restore(match, winner);
@@ -215,7 +218,7 @@ export function createPvpRuntime(world, opts = {}) {
     cancel(session);
     const match = matches.get(session.pvpMatchId);
     if (match) {
-      const winner = match.teams[0].includes(session.id) ? 1 : 0;
+      const winner = match.winner !== undefined ? match.winner : (match.teams[0].includes(session.id) ? 1 : 0);
       restore(match, winner);
     }
   }
