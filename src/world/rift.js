@@ -160,6 +160,7 @@ export function restoreOverworldRealms(game) {
 }
 
 export function enterRift(game, opts = {}) {
+  const serverOwned = opts.serverOwned ?? (game.mmo?.enterRift?.() === true);
   const w = game.world;
   const r = w.rift;
   if (!r || !game.player) return false;
@@ -175,7 +176,7 @@ export function enterRift(game, opts = {}) {
   w.group.visible = false;
   r.group.visible = true;
   r.cool = 1.2;
-  game.riftRun = { party, scale, wave: 0, follow, looted: false };
+  game.riftRun = { party, scale, wave: 0, follow, looted: false, serverOwned };
   // Spawn just inside the arena, not on the south-side exit threshold.
   // Clear momentum from the overworld so it cannot carry the player straight back out.
   const spawnZ = r.spawn.z - 1.5;
@@ -216,6 +217,7 @@ export function startWave(game, wave) {
     const m = game.spawner.spawn(type, cx + Math.cos(a) * rad, cz + Math.sin(a) * rad, true);
     scaleSpawn(m, run.scale);
   });
+  game.mmo?.syncAuthoritativeMonsters?.();
   game.hud.banner(spec?.title || `Wave ${wave}`, `${types.length} in the tear`, 2400);
   game.hud.toast(`Wave ${wave} of ${RIFT_WAVES.length}. Party ${run.party}.`, 2800);
 }
@@ -259,6 +261,15 @@ export function lootRiftChest(game) {
   const r = game.world?.rift;
   const run = game.riftRun;
   if (!r?.chest?.ready || r.chest.looted || !run || run.looted) return { ok: false };
+  if (run.serverOwned) {
+    if (game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
+      game.mmo.claimRiftChest?.();
+      game.hud.toast('Claiming Rift rewards…', 2200);
+    } else {
+      game.hud.toast('Reconnect to claim this server Rift chest.', 2600);
+    }
+    return { ok: false, pending: true };
+  }
   r.chest.looted = true;
   run.looted = true;
   game.progress.data.riftClearAt = Date.now();
@@ -277,6 +288,7 @@ export function lootRiftChest(game) {
 }
 
 export function leaveRift(game) {
+  game.mmo?.leaveRift?.();
   const w = game.world;
   const r = w.rift;
   if (!r) return;
