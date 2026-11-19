@@ -196,12 +196,14 @@ export function waitForProvider(ms = 2000) {
 
 async function connectProvider(kw, mobile) {
   try {
-    if (window.kleverHub && typeof window.kleverHub.initialize === 'function') await window.kleverHub.initialize();
-    else if (typeof kw.initialize === 'function') await kw.initialize();
+    // Match the GRT DAO Final SDK flow: initialize the KleverWeb provider,
+    // then await its asynchronous wallet-address lookup.
+    if (typeof kw.initialize === 'function') await kw.initialize();
+    else if (typeof window.kleverHub?.initialize === 'function') await window.kleverHub.initialize();
   } catch {
     /* A wallet that is already connected rejects a second initialize. */
   }
-  const address = typeof kw.getWalletAddress === 'function' ? kw.getWalletAddress() : kw.address;
+  const address = typeof kw.getWalletAddress === 'function' ? await kw.getWalletAddress() : kw.address;
   if (!ADDRESS_RE.test(address || '')) {
     throw fail(
       'no-account',
