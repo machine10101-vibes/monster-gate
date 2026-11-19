@@ -160,7 +160,7 @@ export function restoreOverworldRealms(game) {
 }
 
 export function enterRift(game, opts = {}) {
-  const serverOwned = game.mmo?.enterRift?.() === true;
+  const serverOwned = opts.serverOwned ?? (game.mmo?.enterRift?.() === true);
   const w = game.world;
   const r = w.rift;
   if (!r || !game.player) return false;
