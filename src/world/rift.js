@@ -254,7 +254,7 @@ export function lootRiftChest(game) {
   const r = game.world?.rift;
   const run = game.riftRun;
   if (!r?.chest?.ready || r.chest.looted || !run || run.looted) return { ok: false };
-  if (game.mmo?.ws?.readyState === 1) {
+  if (game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
     game.mmo.claimRiftChest?.();
     game.hud.toast('Claiming Rift rewards…', 2200);
     return { ok: false, pending: true };
