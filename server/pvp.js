@@ -62,6 +62,7 @@ export function createPvpRuntime(world, opts = {}) {
         p.pvpReturnPose = { x: p.x, y: p.y, z: p.z, yaw: p.yaw, zone: p.zone };
         p.pvpReturnHp = p.hp;
         p.pvpMatchId = id;
+        p.pvpQueued = null;
         p.pvpTeam = team;
         p.pvpDead = false;
         p.zone = `colosseum:${id}`;
@@ -75,6 +76,7 @@ export function createPvpRuntime(world, opts = {}) {
         p.anim = 0;
         world.dirty.add(p.id);
         world.sendSnapshot(p);
+        send(p, 'pvp_queue', { mode, status: 'matched' });
         world.social.onZone(p, match.teams[team][index] === p.id ? p.pvpReturnPose.zone : p.zone);
         send(p, 'pvp_match_start', { match_id: id, mode, team, arena: 'Gilantre Colosseum', pose: { x: p.x, y: p.y, z: p.z, yaw: p.yaw }, hp: p.hp, max_hp: p.maxHp || 20 });
       }
