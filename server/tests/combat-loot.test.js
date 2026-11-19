@@ -8,7 +8,7 @@ function fixture(mode = 'round_robin') {
   const a = { id: 'a', userId: 'ua', zone: 'Oakhollow', x: 0, z: 0, serverDamage: 20 };
   const b = { id: 'b', userId: 'ub', zone: 'Oakhollow', x: 1, z: 0, serverDamage: 20 };
   const players = new Map([['a', a], ['b', b]]);
-  const party = { id: 'p', loot: mode, members: [{ id: 'a', joinedAt: 1 }, { id: 'b', joinedAt: 2 }] };
+  const party = { id: 'p', loot: mode, members: [{ id: 'a', joinedAt: 1 }, { id: 'b', joinedAt: 1 }] };
   const parties = {
     partyOf: (id) => ['a','b'].includes(id) ? party : null,
     get: (id) => id === 'p' ? party : null,
@@ -128,6 +128,15 @@ test('Rift chest items honour Need/Greed when party loot mode is enabled', async
   const roll = f.messages.find((m) => m.type === 'loot_roll');
   assert.ok(roll);
   await f.engine.choose(f.b, roll.roll_id, 'greed');
+  await f.engine.choose(f.a, roll.roll_id, 'need');
+  assert.equal(f.grants.find((g) => g.kind === 'good').userId, 'ua');
+});
+
+test('equal Need rolls break ties by original party insertion order', async () => {
+  const f = fixture('need_greed');
+  await f.engine.attack(f.a, 'm1');
+  const roll = f.messages.find((m) => m.type === 'loot_roll');
+  await f.engine.choose(f.b, roll.roll_id, 'need');
   await f.engine.choose(f.a, roll.roll_id, 'need');
   assert.equal(f.grants.find((g) => g.kind === 'good').userId, 'ua');
 });
