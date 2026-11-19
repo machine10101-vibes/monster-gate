@@ -407,7 +407,10 @@ export class World {
     }
     this.dirty.add(session.id);
     const zoneChanged = session.zone !== prevZone;
-    if (zoneChanged) this.sendSnapshot(session);
+    if (zoneChanged) {
+      for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
+      this.sendSnapshot(session);
+    }
     this.social.onZone(session, prevZone);
     this.social.onHp(session, prevHp);
     this.social.onPose?.(session);
@@ -427,7 +430,10 @@ export class World {
     const maxStep = (monster.speed || 2.8) * dt + 0.9;
     if (Math.hypot(x - monster.x, z - monster.z) > maxStep) return;
     if (Math.hypot(x - monster.homeX, z - monster.homeZ) > 36) return;
-    if (Math.hypot(x - session.x, z - session.z) > (monster.aggro || 12) + 14) return;
+    if (Math.hypot(x - session.x, z - session.z) > (monster.aggro || 12) + 14) {
+      if (monster.controllerId === session.id) monster.controllerId = null;
+      return;
+    }
     if (Math.abs(y - monster.y) > 3) return;
     monster.controllerId = session.id;
     monster.lastMoveAt = t;
