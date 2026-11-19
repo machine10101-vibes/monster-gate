@@ -78,9 +78,12 @@ export class World {
       xpFor: (monster) => Math.max(5, monster.level * 18),
       goldFor: (monster) => Math.max(2, monster.level * 5),
       dropsFor: (monster) => [{ kind: 'good', id: 'copper_ore', amount: monster.level >= 10 ? 3 : 1 }],
-      broadcast: (frame) => {
-        for (const player of this.players.values()) {
-          if (frame.id && frame.type === 'monster_state' && !inAoi(player, this.monsters.find((m) => m.id === frame.id), this.aoi)) continue;
+      broadcast: (frame, audience) => {
+        const targets = Array.isArray(audience) ? audience : [...this.players.values()];
+        for (const player of targets) {
+          if (!player?.ws || player.gone) continue;
+          if (!Array.isArray(audience) && frame.id && frame.type === 'monster_state'
+              && !inAoi(player, this.monsters.find((m) => m.id === frame.id), this.aoi)) continue;
           this._send(player.ws, frame.type, frame);
         }
       },
@@ -196,8 +199,8 @@ export class World {
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
-      else if (msg.type === 'attack') void this.combatAction(session, msg);
-      else if (msg.type === 'loot_roll_choice') void this.lootChoice(session, msg);
+      else if (msg.type === 'attack') this.combatAction(session, msg).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
     } catch (err) {
@@ -385,15 +388,22 @@ export class World {
     this.persistPose(session);
   }
 
+  actionError(session, err) {
+    const code = err instanceof ProtocolError ? err.code : 'combat';
+    send(session.ws, errorFrame(code, err?.message || 'That action could not be completed.'));
+  }
+
   async combatAction(session, msg) {
     if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to fight online.');
     if (!session.limiter.allowMove()) throw new ProtocolError('rate', 'Slow down.');
+    if (typeof msg.monster_id !== 'string' || msg.monster_id.length > 64) throw new ProtocolError('combat', 'Invalid monster.');
     const result = await this.combatLoot.attack(session, msg.monster_id);
     send(session.ws, 'combat_result', { request_id: String(msg.request_id || ''), ...result });
   }
 
   async lootChoice(session, msg) {
     if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to roll for loot.');
+    if (typeof msg.roll_id !== 'string' || msg.roll_id.length > 64) throw new ProtocolError('loot', 'Invalid loot roll.');
     const result = await this.combatLoot.choose(session, msg.roll_id, msg.choice);
     send(session.ws, 'loot_choice_result', { request_id: String(msg.request_id || ''), ...result });
   }
