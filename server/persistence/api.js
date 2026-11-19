@@ -24,12 +24,23 @@ export function createPersistence(options = {}) {
 
   const signals = [];
 
-  async function write(userId, state, { expectedVersion, importedAt } = {}) {
+  async function write(userId, patch, { importedAt } = {}) {
     const id = requireUserId(userId);
-    const version = expectedVersion ?? versions.get(id);
-    const saved = await adapter.save(id, withSeen(state), { expectedVersion: version, importedAt });
-    versions.set(id, saved.version);
-    return saved;
+    let lastError;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const current = await adapter.load(id);
+      if (!current) throw new PersistenceError('Character not found.', 'not_found');
+      const next = sanitizeState(mergeState(current.state || {}, withSeen(patch)));
+      try {
+        const saved = await adapter.save(id, next, { expectedVersion: current.version, importedAt });
+        versions.set(id, Math.max(versions.get(id) || 0, saved.version));
+        return saved;
+      } catch (err) {
+        lastError = err;
+        if (err?.code !== 'conflict' || attempt === 3) throw err;
+      }
+    }
+    throw lastError;
   }
 
   function remember(row) {
@@ -47,6 +58,8 @@ export function createPersistence(options = {}) {
       const id = requireUserId(reward.userId);
       if (Number.isFinite(result?.version)) {
         versions.set(id, Math.max(versions.get(id) || 0, result.version));
+        const pending = queue.peek(id);
+        if (pending) queue.enqueue(id, pending.state);
       }
       return result;
     },
@@ -66,8 +79,8 @@ export function createPersistence(options = {}) {
     async saveCharacter(userId, state, opts = {}) {
       const id = requireUserId(userId);
       const queued = queue.peek(id)?.state;
-      const next = sanitizeState(mergeState(queued || (await peekState(adapter, id)), state));
-      queue.enqueue(id, next, { expectedVersion: opts.expectedVersion ?? versions.get(id) });
+      const next = mergeState(queued || {}, state);
+      queue.enqueue(id, next);
       if (opts.immediate) return queue.flush(id);
       return { ok: true, queued: true, userId: id };
     },
