@@ -1,5 +1,5 @@
 import { decorateFrame } from '../ui/theme.js';
-import { PRESENCE, errorMessage, cleanHunterName, socialOfflinePrompt } from './constants.js';
+import { PRESENCE, errorMessage, cleanHunterName } from './constants.js';
 
 const CORNERS = ['nw', 'ne', 'sw', 'se'];
 
@@ -37,17 +37,7 @@ export function mountFriends(body, game) {
     const snap = social?.snapshot?.() || { mode: 'offline', friends: [], pendingIn: [], pendingOut: [], party: null };
     root.innerHTML = '';
     if (!social || snap.mode === 'offline' || !snap.online) {
-      const guest = game?.wallet?.kind === 'guest' || !game?.wallet?.address;
-      const prompt = socialOfflinePrompt({ guest, signedIn: !guest });
-      root.appendChild(el('p', 'mg-social-note', prompt.note));
-      const go = el('button', 'mg-btn', prompt.label);
-      go.type = 'button';
-      go.id = prompt.action === 'signin' ? 'mg-social-signin' : 'mg-social-join-world';
-      go.addEventListener('click', () => {
-        if (prompt.action === 'signin') game?.openSocialSignIn?.() || game?.openAccount?.('signin');
-        else game?.joinWorld1?.();
-      });
-      root.appendChild(go);
+      root.appendChild(el('p', 'mg-social-note', 'Friends and parties are <b>Online only</b>. Load the hunt with <code>?mmo=1</code> to add hunters and form a party of four.'));
       return;
     }
     if (snap.mode === 'mmo' && !snap.caps.friends && !snap.caps.party) {
@@ -99,15 +89,12 @@ export function mountFriends(body, game) {
     if (snap.ignored?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Ignored'));
       for (const p of snap.ignored) {
-        const row = personRow(p, 'Ignored');
-        const un = el('button', 'mg-btn quiet', 'Unignore');
-        un.type = 'button';
-        un.onclick = async () => { await report(game, await social.unignorePlayer(p.user_id || p.id)); paint(); };
-        row.appendChild(un);
-        root.appendChild(row);
+        const row=personRow(p,'Ignored');
+        const un=el('button','mg-btn quiet','Unignore');un.type='button';
+        un.onclick=async()=>{await report(game,await social.unignorePlayer(p.user_id||p.id));paint();};
+        row.appendChild(un);root.appendChild(row);
       }
     }
-
     if (snap.blocked?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Blocked'));
       for (const p of snap.blocked) {
@@ -173,6 +160,7 @@ function friendRow(game, social, p, snap, paint) {
     invite.title = !leader ? 'Only the leader can invite' : p.presence === PRESENCE.online ? 'Invite to party' : 'They are offline';
   invite.onclick = async () => {
     const res = await report(game, await social.inviteToParty(p.id || p.name));
+    if (res?.ok && res.pending) toast(game, 'Party invitation sent', 1600);
     paint();
   };
   const whisper = el('button', 'mg-btn quiet', 'Whisper');
@@ -261,18 +249,12 @@ export function mountSocialHud(game) {
     };
     actions.appendChild(leave);
     if (leader === you) {
-      const loot = el('select', 'mg-btn');
-      loot.setAttribute('aria-label', 'Party loot mode');
-      loot.innerHTML = '<option value="round_robin">Round robin loot</option><option value="need_greed">Need / greed loot</option>';
-      loot.value = party.loot || 'round_robin';
-      loot.onchange = async () => report(game, await social.setLootMode(loot.value));
-      actions.appendChild(loot);
+      const loot=el('select','mg-btn');loot.setAttribute('aria-label','Party loot mode');
+      loot.innerHTML='<option value="round_robin">Round robin loot</option><option value="need_greed">Need / greed loot</option>';
+      loot.value=party.loot||'round_robin';loot.onchange=async()=>report(game,await social.setLootMode(loot.value));actions.appendChild(loot);
       for (const m of party.members) {
         if (m.id === you) continue;
-        const promote = el('button', 'mg-btn quiet', `Make leader: ${m.name}`);
-        promote.type = 'button';
-        promote.onclick = async () => report(game, await social.promote(m.id));
-        actions.appendChild(promote);
+        const promote=el('button','mg-btn quiet',`Make leader: ${m.name}`);promote.type='button';promote.onclick=async()=>report(game,await social.promote(m.id));actions.appendChild(promote);
         const kick = el('button', 'mg-btn quiet', `Kick ${m.name}`);
         kick.type = 'button';
         kick.onclick = async () => report(game, await social.kick(m.id));
@@ -345,10 +327,7 @@ export function mountSocialHud(game) {
     const items = hunterMenuItems(caps, { offline, isSelf, isFriend, inParty, isMuted, isGuest });
     menu.innerHTML = `
       <b>${escapeHtml(player.name)}</b>
-      ${offline ? `<p class="mg-social-note">${escapeHtml(socialOfflinePrompt({
-        guest: game?.wallet?.kind === 'guest' || !game?.wallet?.address,
-        signedIn: !!(game?.wallet && game.wallet.kind !== 'guest'),
-      }).note)}</p>` : ''}
+      ${offline ? '<p class="mg-social-note">Friends and parties are <b>Online only</b>.</p>' : ''}
       ${items.map((it) => `<button type="button" data-act="${it.act}" ${it.disabled ? 'disabled' : ''}>${it.label}</button>`).join('')}`;
     for (const c of CORNERS) {
       if (menu.querySelector(`:scope > .mg-corner.${c}`)) continue;
@@ -361,12 +340,12 @@ export function mountSocialHud(game) {
     menu.querySelector('[data-act="friend"]').onclick = async () => {
       hideMenu();
       const res = await report(game, await social.requestFriend(player.name));
-      if (res?.ok) toast(game, `Request sent to ${player.name}`, 1600);
+      if (res?.ok && res.pending) toast(game, `Request sent to ${player.name}`, 1600);
     };
     menu.querySelector('[data-act="party"]').onclick = async () => {
       hideMenu();
       const res = await report(game, await social.inviteToParty(player.id || player.name));
-      if (res?.ok && res.pending) toast(game, 'Party invitation sent', 1400);
+      if (res?.ok && res.pending) toast(game, 'Party invitation sent', 1600);
     };
     const whisperBtn = menu.querySelector('[data-act="whisper"]');
     if (whisperBtn) {
@@ -375,6 +354,12 @@ export function mountSocialHud(game) {
         focusWhisper(game, player);
       };
     }
+    const muteBtn = menu.querySelector('[data-act="mute"]');
+    if (muteBtn) muteBtn.onclick = () => {
+      hideMenu();
+      const muted=game?.worldView?.toggleMutePlayer?.(player.id,player.name);
+      toast(game, muted ? `Muted ${player.name}` : `Unmuted ${player.name}`, 1400);
+    };
     const blockBtn = menu.querySelector('[data-act="block"]');
     if (blockBtn) {
       blockBtn.onclick = async () => {
@@ -382,21 +367,8 @@ export function mountSocialHud(game) {
         await report(game, await social.blockPlayer(player.id || player.name));
       };
     }
-    const muteBtn = menu.querySelector('[data-act="mute"]');
-    if (muteBtn) {
-      muteBtn.onclick = () => {
-        hideMenu();
-        const muted = game?.worldView?.toggleMutePlayer?.(player.id, player.name);
-        toast(game, muted ? `Muted ${player.name}` : `Unmuted ${player.name}`, 1400);
-      };
-    }
-    const ignoreBtn = menu.querySelector('[data-act="ignore"]');
-    if (ignoreBtn) {
-      ignoreBtn.onclick = async () => {
-        hideMenu();
-        await report(game, await social.ignorePlayer(player.id || player.name));
-      };
-    }
+    const ignoreBtn=menu.querySelector('[data-act="ignore"]');
+    if(ignoreBtn)ignoreBtn.onclick=async()=>{hideMenu();await report(game,await social.ignorePlayer(player.id||player.name));};
   };
 
   const onPlate = (e) => {
@@ -477,8 +449,7 @@ function focusWhisper(game, player) {
   const chat = document.getElementById('world-chat');
   const input = chat?.querySelector('.wc-in');
   if (chat) chat.classList.remove('collapsed');
-  const whisperTab = chat?.querySelector('[data-ch="whisper"]');
-  whisperTab?.click();
+  chat?.querySelector('[data-ch="whisper"]')?.click();
   if (input) {
     input.value = `/w ${player.name} `;
     input.focus();
@@ -509,7 +480,7 @@ export function hunterMenuItems(caps = {}, { offline = false, isSelf = false, is
     { act: 'friend', label: isFriend ? 'Friends' : 'Add friend', disabled: !!(offline || isSelf || isFriend) },
     { act: 'party', label: inParty ? 'In party' : 'Invite to party', disabled: !!(offline || isSelf || inParty) },
   ];
-  if (!offline) items.push({ act: 'mute', label: isMuted ? 'Unmute chat' : 'Mute chat', disabled: !!isSelf });
+  if (!offline) items.push({ act:'mute', label:isMuted?'Unmute chat':'Mute chat', disabled:!!isSelf });
   if (!offline && caps.whisper) items.push({ act: 'whisper', label: 'Whisper', disabled: !!isSelf });
   if (!offline && caps.block && !isGuest) {
     items.push({ act: 'block', label: 'Block', disabled: !!isSelf });

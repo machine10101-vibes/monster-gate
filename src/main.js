@@ -24,47 +24,8 @@ import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
-import {
-  consumeWorldAuth,
-  consumeWorldJoin,
-  disposeMmoClient,
-  dropOnlineWithoutSession,
-  enterOnlineWorld,
-  fetchWorldHealth,
-  hasWorldSessionToken,
-  healthzUrl,
-  hrefWithSearch,
-  isWorldOnline,
-  lastWorldMode,
-  leaveOnlineWorld,
-  markWorldJoin,
-  offlineSearch,
-  onlineSearch,
-  paintWorldModePill,
-  paintWorldPicker,
-  rememberWorldMode,
-  remountMmoClient,
-  shouldDropOnlineWithoutSession,
-  shouldForceWorldPick,
-  shouldFreshMmoClient,
-  shouldMountOnline,
-  signedInWorldContinue,
-  worldJoinContinue,
-  worldPickerState,
-  worldServerConfigured,
-  worldWsUrl,
-} from './net/worldPlay.js';
 import { BUILD_ID } from './ui/buildId.js';
 import { mountLoading } from './ui/boot.js';
-import {
-  armContextLost,
-  defaultGlProbe,
-  isWebGLFailure,
-  probeWebGL,
-  shouldForceNoGL,
-  showGlFailIfNeeded,
-  showGlFailPanel,
-} from './ui/glFail.js';
 import { applyWeaponCursor } from './ui/weaponCursor.js';
 import { Progress } from './systems/progress.js';
 import { BAG_TOSS_SIT, tossFrom } from './systems/bagDrop.js';
@@ -82,54 +43,24 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
-import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
-import {
-  accountAddress,
-  checkDevice,
-  clearAccount,
-  consumeTakenNotice,
-  createAccount,
-  legacyUserId,
-  markTakenNotice,
-  readAccount,
-  SESSION_TAKEN,
-  signInAccount,
-} from './wallet/account.js';
-import { adminHref, isAdminAccount } from './admin/gate.js';
+import { updateRift, enterRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
+import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
-import { completeKleverHandoff, loginWithKlever, pollKleverHandoff, startKleverHandoff } from './wallet/link.js';
-import { UNLINKED_CODE, UNLINKED_HINT } from '../supabase/functions/_shared/linkAuth.js';
+import { loginWithKlever } from './wallet/link.js';
+import { UNLINKED_CODE, UNLINKED_MESSAGE } from '../supabase/functions/_shared/linkAuth.js';
 import { installMockWallet } from './wallet/mock.js';
 import { clearCloudToken, flushCloud, schedulePush, syncHunt } from './wallet/cloud.js';
 import { clamp, lerp } from './engine/voxel.js';
 import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, isTablet, requestGameFullscreen } from './engine/immersive.js';
-import { clearRotationRecovery, consumeRotationRecovery, isRotationRecoveryPending, rememberRotationRecovery, screenOrientation } from './engine/rotationRecovery.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
-const DEVICE_CHECK_MS = 4000;
-const sendingToLedger = typeof location !== 'undefined' && isAdminAccount(readAccount());
-if (sendingToLedger) location.replace(adminHref());
-let rotationReload = false;
-try {
-  rotationReload = !sendingToLedger && typeof window !== 'undefined'
-    && isRotationRecoveryPending(
-      globalThis.localStorage,
-      screenOrientation(window.innerWidth, window.innerHeight),
-    );
-} catch { /* unavailable storage means show the normal launch splash */ }
-const loadingScreen = !sendingToLedger && typeof document !== 'undefined'
-  ? mountLoading(document, { skip: rotationReload })
-  : null;
-/** Paint the WebGL fallback before Game/save-bridge so a hung hop cannot hide it. */
-const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && showGlFailIfNeeded({
-  probe: defaultGlProbe,
-  onSuccess: resumeAfterGlFail,
-});
+const loadingScreen = typeof document !== 'undefined' ? mountLoading() : null;
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
 const BOOT_KEY = 'mg-boot';
+
 function bootWasKilled() {
   try {
     return sessionStorage.getItem(BOOT_KEY) === '1';
@@ -222,9 +153,7 @@ class Game {
     markBoot();
     // iPad Chrome and Brave both pretend to be a desktop. The first boot has to
     // be the small one: a crash-then-retry still dies if every boot draws the whole world.
-    // Touch phones can lose the WebGL context when the game first expands to landscape.
-    // Start them on the same conservative scene budget as iOS/tablets, then let them upgrade later.
-    this.safeBoot = isIOS() || isTablet() || !isDesktopGraphics() || killed;
+    this.safeBoot = isIOS() || isTablet() || killed;
     this.heavyBoot = this.safeBoot;
     this.lightBoot = this.safeBoot;
     const base = this.safeBoot ? QUALITIES[0] : pickQuality();
@@ -288,21 +217,16 @@ class Game {
     this.cloudConflict = false;
     this.cloudGate = null;
     this.autosaveTimer = 0;
-    this.deviceTimer = 0;
     this.autosaveMs = CLOUD_AUTOSAVE_MS;
     this.cloudFailAt = 0;
     this.cloudSavedAt = 0;
     this.cloudReachable = false;
-    this.staffRole = '';
     this.saveAcc = 0;
     this.accountWatch = false;
     this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
     this.uiBlocking = false;
 
-    if (!this.initRenderer()) {
-      this.glFailed = true;
-      return;
-    }
+    this.initRenderer();
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.3, 320);
     this.tmpV = new THREE.Vector3();
@@ -315,35 +239,24 @@ class Game {
   initRenderer() {
     // iPad Safari and Brave reload the tab when the framebuffer peaks at the end of loading.
     // No multisample buffer, and no preserved backbuffer, on that browser.
-    const scratch = typeof document !== 'undefined' ? document.createElement('canvas') : this.canvas;
-    const probe = probeWebGL(scratch, { force: shouldForceNoGL() });
-    if (!probe.ok) {
-      showBootGlFail();
-      return false;
-    }
-    try {
-      const lite = this.lightBoot;
-      const r = new THREE.WebGLRenderer({
-        canvas: this.canvas,
-        antialias: !lite,
-        alpha: false,
-        powerPreference: lite ? 'default' : 'high-performance',
-        preserveDrawingBuffer: false,
-      });
-      r.outputColorSpace = THREE.SRGBColorSpace;
-      r.toneMapping = THREE.NoToneMapping;
-      r.setClearColor(0x0b0d10, 1);
-      r.shadowMap.enabled = true;
-      r.shadowMap.type = THREE.PCFShadowMap;
-      this.renderer = r;
-      this.glWatch = armContextLost(this.canvas, {
-        onFail: () => showBootGlFail(),
-      });
-      return true;
-    } catch {
-      showBootGlFail();
-      return false;
-    }
+    const lite = this.lightBoot;
+    const r = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: !lite,
+      alpha: false,
+      powerPreference: lite ? 'default' : 'high-performance',
+      preserveDrawingBuffer: false,
+    });
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    r.toneMapping = THREE.NoToneMapping;
+    r.setClearColor(0x0b0d10, 1);
+    r.shadowMap.enabled = true;
+    r.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer = r;
+    this.canvas.addEventListener('webglcontextlost', (ev) => {
+      ev.preventDefault();
+      this.reportFault(new Error('This device ran out of graphics memory. Refresh the page.'));
+    });
   }
 
   /** Say what broke, once, on the loading screen or the character camp. */
@@ -419,11 +332,6 @@ class Game {
         if (text) text.textContent = t;
       }
     };
-    // Paint a visible loading state before synchronous world setup begins.
-    // Klever's Android WebView can otherwise leave the bar looking idle until
-    // the first generation milestone several frames into the build.
-    progress(0.06, 'Preparing the world');
-    await new Promise((resolve) => requestAnimationFrame(resolve));
     this.world = new World(this.quality);
     await this.world.build(progress);
     this.scene.add(this.world.group);
@@ -465,42 +373,23 @@ class Game {
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.player.yaw, [], [], 0);
     this.bindUI();
     progress(0.98, 'Ready');
-    // Every fresh page boot returns to the login gate. Do not silently restore
-    // a saved email session here: that skips the required login step and can
-    // drop returning players straight into the character/world flow.
-    clearSession();
-    this.refreshWalletUi();
-    const taken = consumeTakenNotice();
-    if (taken && !this.wallet) {
-      const status = document.getElementById('wallet-status');
-      if (status) status.textContent = taken;
+    const account = readAccount();
+    if (account?.kind === 'email') {
+      await this.applyWallet(account);
+      this.watchAccount();
+    } else {
+      clearSession();
     }
+    this.refreshWalletUi();
     this.applyQuality();
+    this.mmo?.syncAuthoritativeMonsters?.();
+    this.mmo?.applyRewardSnapshot?.();
     if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
     if (loadingScreen) await loadingScreen.dismiss();
     else document.getElementById('loading')?.classList.add('hidden');
-
-    // Klever can recreate its Android WebView during a physical rotation. Only
-    // restore a hunt when Enter World was tapped moments earlier and the
-    // orientation actually changed; ordinary launches still stop at login.
-    const rotationRecovery = consumeRotationRecovery(
-      localStorage,
-      screenOrientation(window.innerWidth, window.innerHeight),
-    );
-    if (rotationRecovery) {
-      const account = readAccount();
-      if (account) {
-        await this.applyWallet(account);
-        const selected = this.roster?.get(rotationRecovery.characterId);
-        if (selected) this.enterWorld(selected);
-      }
-    }
-    consumeWorldAuth();
-    if (shouldForceWorldPick() && !this.started) this.showWorldPicker({ force: true });
-    if (this.started) document.getElementById('title')?.classList.add('hidden');
-    else if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
+    if (!this.charSelect.active) document.getElementById('title').classList.remove('hidden');
     this.last = performance.now();
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
@@ -512,12 +401,9 @@ class Game {
     if (this.wallet.kind === 'guest') this.cloudState = 'off';
     document.body.classList.add('hunting');
     if (this.input.touch && (this.isLandscape() || isTablet())) {
-      // Avoid requesting a native orientation lock during the first world entry.
-      // Some Android in-app WebViews restart their renderer while changing orientation.
-      this.enterImmersive({ gesture: false, lock: false });
+      this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
     }
     this.started = true;
-    // Keep the one-shot splash marker for this tab so auth/session reloads do not replay it.
     if (this.wakeWorld) {
       this.wakeWorld = false;
       this.ambient = createAmbient(this);
@@ -552,10 +438,6 @@ class Game {
 
   onPushed(result) {
     if (!result) return;
-    if (result.taken) {
-      this.dropTakenAccount(result.message);
-      return;
-    }
     if (result.error) {
       this.cloudReachable = false;
       this.noteCloudFailure();
@@ -634,45 +516,11 @@ class Game {
     this.autosaveTimer = setInterval(() => {
       this.autosaveCloud();
     }, this.autosaveMs);
-    this.startDeviceWatch();
   }
 
   stopAutosave() {
     if (this.autosaveTimer) clearInterval(this.autosaveTimer);
     this.autosaveTimer = 0;
-    this.stopDeviceWatch();
-  }
-
-  startDeviceWatch() {
-    this.stopDeviceWatch();
-    if (this.wallet?.kind !== 'email' || !this.wallet.accessToken) return;
-    this.deviceTimer = setInterval(() => {
-      this.watchDevice();
-    }, DEVICE_CHECK_MS);
-  }
-
-  stopDeviceWatch() {
-    if (this.deviceTimer) clearInterval(this.deviceTimer);
-    this.deviceTimer = 0;
-  }
-
-  async watchDevice() {
-    if (!this.wallet || this.wallet.kind !== 'email' || this.cloudSyncing) return;
-    try {
-      await checkDevice(this.wallet);
-    } catch (err) {
-      if (err?.code === 'taken') this.dropTakenAccount(err.message);
-    }
-  }
-
-  dropTakenAccount(message) {
-    if (this.cloudGate) this.cloudGate.open = false;
-    this.stopAutosave();
-    this.stopDeviceWatch();
-    markTakenNotice(message || SESSION_TAKEN);
-    clearAccount();
-    clearCloudToken();
-    location.reload();
   }
 
   /** Write the roster, hunts included, to the guild record. */
@@ -698,10 +546,6 @@ class Game {
   }
 
   async applyWallet(session) {
-    if (isAdminAccount(session)) {
-      location.replace(adminHref());
-      return;
-    }
     if (this.cloudSyncing && this.wallet === session) return;
     if (this.cloudGate) this.cloudGate.open = false;
     const gate = { open: true };
@@ -728,11 +572,7 @@ class Game {
         try {
           result = await syncHunt(session, this.roster, gate);
           if (result?.state !== 'error') break;
-        } catch (err) {
-          if (err?.code === 'taken') {
-            this.dropTakenAccount(err.message);
-            return;
-          }
+        } catch {
           result = { state: 'error', replaced: false };
         }
         if (attempt === 0 && gate.open && this.wallet === session) {
@@ -744,10 +584,6 @@ class Game {
     }
     if (this.cloudGate !== gate || this.wallet !== session || !gate.open) return;
     this.cloudState = result?.abandoned ? 'off' : (result?.state || 'error');
-    this.staffRole = result?.staff === 'moderator' ? 'moderator' : '';
-    if (this.hud && (this.hud.panelId === 'settings' || this.hud.panelId === 'menu')) {
-      this.hud.openPanel(this.hud.panelId, this);
-    }
     if (result?.replaced) this.walletNote = 'loaded';
     if (this.cloudState === 'on') {
       this.cloudReachable = true;
@@ -756,290 +592,7 @@ class Game {
     } else if (this.cloudState === 'error') this.startAutosave();
     this.paintCloudStatus();
     this.refreshWalletUi();
-    if (shouldFreshMmoClient({
-      search: typeof location !== 'undefined' ? location.search : '',
-      signedIn: !!(session && session.kind !== 'guest'),
-      authReject: !!this.worldView?.authReject,
-      mmo: this.mmo,
-    })) {
-      await this.remountOnlineClient();
-      return;
-    }
-    if (!this.started) this.continueAfterAccount();
-  }
-
-  async remountOnlineClient() {
-    const view = this.worldView;
-    const search = typeof location !== 'undefined' ? location.search : '';
-    if (!view || !isWorldOnline(search)) {
-      enterOnlineWorld();
-      return null;
-    }
-    view.clearAuthLatch?.();
-    this.hideWorldAuth();
-    const { attachMmo } = await import('./net/mmo.js');
-    const next = remountMmoClient({ game: this, view, attach: attachMmo, search });
-    if (!this.started) this.continueSignedInHunt();
-    return next;
-  }
-
-  continueAfterAccount() {
-    if (this.started) return;
-    // Always restore the hunter camp first. Auto-entering a saved character here
-    // can close character selection before cloud sync/world startup is ready,
-    // leaving Klever's recreated WebView on a blank or inaccessible screen.
-    const signed = !!(this.wallet && this.wallet.kind === 'email');
-    // Email authentication returns to the hunter camp, unless World 1 was the
-    // button that opened sign-in. That choice has to keep ?mmo=1 or the pill
-    // stays Offline on a solo hunt.
-    if (signed) {
-      const join = consumeWorldJoin();
-      const search = typeof location !== 'undefined' ? location.search : '';
-      if (signedInWorldContinue({
-        join,
-        search,
-        hasToken: hasWorldSessionToken(),
-      }) === 'enter-online') {
-        enterOnlineWorld();
-        return;
-      }
-      this.openCharacterSelect();
-      return;
-    }
-    if (shouldForceWorldPick()) {
-      this.showWorldPicker({ force: true });
-      return;
-    }
-    const join = consumeWorldJoin();
-    const next = worldJoinContinue({
-      signedIn: false,
-      join,
-      hasCharacter: !!this.roster?.chars?.length,
-    });
-    if (next === 'select') {
-      this.openCharacterSelect();
-      return;
-    }
-    if (next === 'signin') {
-      this.openSocialSignIn();
-      return;
-    }
-    if (this.wallet) this.openCharacterSelect();
-  }
-  continueSignedInHunt() {
-    // Signing in restores the account, not the previous character selection.
-    // Always let the hunter choose a character before entering the world.
-    this.hideWorldPicker();
-    this.hideWorldAuth();
-    this.openCharacterSelect();
-  }
-
-  showWorldPicker({ force = false } = {}) {
-    if (this.started) return;
-    this.worldPickOpen = true;
-    this.worldJoining = false;
-    this.hideWorldAuth();
-    this.charSelect?.close?.();
-    document.getElementById('title')?.classList.remove('hidden');
-    document.getElementById('account-choices')?.classList.add('hidden');
-    const root = document.getElementById('world-picker');
-    if (root) {
-      root.hidden = false;
-      root.classList.remove('hidden');
-    }
-    this.paintWorldPickerUi({ force });
-    this.refreshWorldHealth();
-  }
-
-  hideWorldPicker() {
-    this.worldPickOpen = false;
-    this.worldJoining = false;
-    const root = document.getElementById('world-picker');
-    if (root) {
-      root.hidden = true;
-      root.classList.add('hidden');
-    }
-  }
-
-  paintWorldPickerUi({ force = false } = {}) {
-    const signed = !!(this.wallet && this.wallet.kind !== 'guest');
-    const state = worldPickerState({
-      search: typeof location !== 'undefined' ? location.search : '',
-      last: lastWorldMode(),
-      health: this.worldHealth,
-      joining: !!this.worldJoining,
-      signedIn: signed,
-      force: force || shouldForceWorldPick() || this.worldPickOpen,
-    });
-    paintWorldPicker(document.getElementById('world-picker'), state);
-    return state;
-  }
-
-  refreshWorldHealth() {
-    const url = healthzUrl(worldWsUrl(typeof location !== 'undefined' ? location.search : ''));
-    const gen = (this.worldHealthGen = (this.worldHealthGen || 0) + 1);
-    fetchWorldHealth(url).then((health) => {
-      if (gen !== this.worldHealthGen) return;
-      this.worldHealth = health;
-      if (this.worldPickOpen) this.paintWorldPickerUi();
-      if (this.charSelect?.worldsOpen) this.charSelect.paintWorldMenu();
-    }).catch(() => {
-      if (gen !== this.worldHealthGen) return;
-      this.worldHealth = { live: false, label: 'Waking…', players: null };
-      if (this.worldPickOpen) this.paintWorldPickerUi();
-      if (this.charSelect?.worldsOpen) this.charSelect.paintWorldMenu();
-    });
-  }
-
-  worldOneReady() {
-    return worldServerConfigured(typeof location !== 'undefined' ? location.search : '');
-  }
-
-  /** Drop a live World 1 socket without reloading, so the camp can start a solo hunt. */
-  leaveOnlineInPlace() {
-    const search = typeof location !== 'undefined' ? location.search : '';
-    if (isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
-      try { history.replaceState({}, '', hrefWithSearch(offlineSearch(search), location)); } catch { /* ignore */ }
-    }
-    if (this.mmo) disposeMmoClient(this.mmo, this);
-    this.worldView?.dispose?.();
-    this.worldView = null;
-    const pill = typeof document !== 'undefined' ? document.getElementById('world-mode-pill') : null;
-    if (pill?.dataset) delete pill.dataset.connectionState;
-    paintWorldModePill(pill, { search: typeof location !== 'undefined' ? location.search : '' });
-  }
-
-  enterSoloHunt(char) {
-    if (this.started || !char) return;
-    rememberWorldMode('offline');
-    this.charSelect?.hideWorldMenu?.();
-    this.leaveOnlineInPlace();
-    this.enterWorld(char);
-  }
-
-  async ensureOnlineClient() {
-    const search = typeof location !== 'undefined' ? location.search : '';
-    if (!shouldMountOnline({ search })) return null;
-    const worldViewMod = await import('./net/worldView.js');
-    let view = this.worldView;
-    if (!view) view = await worldViewMod.init(this.scene, { game: this, search });
-    if (!this.mmo || this.mmo.closed) {
-      const { attachMmo } = await import('./net/mmo.js');
-      attachMmo(this, view, { search });
-    }
-    return view;
-  }
-
-  async enterWorldOneHunt(char) {
-    if (this.started || this.worldJoining || !char) return;
-    const search = typeof location !== 'undefined' ? location.search : '';
-    if (!worldServerConfigured(search)) {
-      this.charSelect?.note?.('World 1 is not open on this build.', true);
-      return;
-    }
-    if (!hasWorldSessionToken()) {
-      this.charSelect?.hideWorldMenu?.();
-      rememberWorldMode('online');
-      markWorldJoin('online');
-      this.openSocialSignIn();
-      return;
-    }
-    rememberWorldMode('online');
-    if (!isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
-      try { history.replaceState({}, '', hrefWithSearch(onlineSearch(search), location)); } catch { /* ignore */ }
-    }
-    this.hideWorldPicker();
-    this.charSelect?.hideWorldMenu?.();
-    await this.ensureOnlineClient();
-    this.enterWorld(char);
-  }
-
-  pickWorldOnline() {
-    if (this.started || this.worldJoining) return;
-    const search = typeof location !== 'undefined' ? location.search : '';
-    if (!worldServerConfigured(search)) return;
-    if (!hasWorldSessionToken()) {
-      rememberWorldMode('online');
-      markWorldJoin('online');
-      this.openSocialSignIn();
-      return;
-    }
-    this.worldJoining = true;
-    this.paintWorldPickerUi();
-    rememberWorldMode('online');
-    markWorldJoin('online');
-    enterOnlineWorld();
-  }
-
-  pickWorldSolo() {
-    if (this.started || this.worldJoining) return;
-    rememberWorldMode('offline');
-    this.hideWorldPicker();
-    if (isWorldOnline(typeof location !== 'undefined' ? location.search : '')) {
-      leaveOnlineWorld();
-      return;
-    }
-    this.openCharacterSelect();
-  }
-
-  showWorldAuth() {
-    this.hideWorldPicker();
-    const root = document.getElementById('world-auth');
-    if (root) {
-      root.hidden = false;
-      root.classList.remove('hidden');
-    }
-    this.worldView?.latchAuthReject?.('Sign in to hunt online. Guests stay solo.');
-    document.getElementById('title')?.classList.remove('hidden');
-  }
-
-  hideWorldAuth() {
-    const root = document.getElementById('world-auth');
-    if (root) {
-      root.hidden = true;
-      root.classList.add('hidden');
-    }
-    if (this.worldView?.authReject) this.worldView.clearAuthLatch();
-  }
-
-  onWorldAuthSignIn() {
-    this.hideWorldAuth();
-    document.getElementById('title')?.classList.remove('hidden');
-    this.openAccount('signin');
-  }
-
-  onWorldAuthSolo() {
-    this.hideWorldAuth();
-    this.worldView?.clearAuthLatch?.();
-    if (isWorldOnline(typeof location !== 'undefined' ? location.search : '')) leaveOnlineWorld();
-    else this.refreshWalletUi();
-  }
-
-  openSocialSignIn() {
-    document.getElementById('title')?.classList.remove('hidden');
-    this.openAccount('signin');
-  }
-
-  joinWorld1() {
-    const search = typeof location !== 'undefined' ? location.search : '';
-    if (!hasWorldSessionToken()) {
-      this.openSocialSignIn();
-      return;
-    }
-    if (shouldFreshMmoClient({
-      search,
-      signedIn: true,
-      authReject: !!this.worldView?.authReject,
-      mmo: this.mmo,
-    })) {
-      this.remountOnlineClient();
-      return;
-    }
-    if (!this.started && !isWorldOnline(search)) {
-      this.showWorldPicker();
-      return;
-    }
-    enterOnlineWorld();
+    if (!this.started && this.cloudState !== 'error') this.openCharacterSelect();
   }
 
   openCharacterSelect() {
@@ -1057,14 +610,11 @@ class Game {
   playAsGuest() {
     if (this.started || this.walletBusy) return;
     this.closeAccount();
-    this.hideWorldPicker();
-    this.hideWorldAuth();
     this.wallet = { kind: 'guest', address: 'guest:local' };
     this.cloudState = 'off';
     this.cloudSyncing = false;
     this.cloudConflict = false;
     this.cloudReachable = false;
-    this.staffRole = '';
     this.progress.onCloud = null;
     this.stopAutosave();
     this.roster = new Roster(this.wallet.address, 'Guest');
@@ -1080,11 +630,6 @@ class Game {
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
   enterWorld(char) {
     if (this.started || !this.roster?.get(char.id)) return;
-    rememberRotationRecovery(
-      localStorage,
-      char.id,
-      screenOrientation(window.innerWidth, window.innerHeight),
-    );
     this.character = char;
     this.roster.played(char.id);
     this.progress.useCharacter(this.roster.charKey(char.id));
@@ -1094,7 +639,6 @@ class Game {
       this.roster.saveWarning = null;
       queueMicrotask(() => this.hud?.toast('A hunt save was damaged. A backup was kept. Starting a fresh hunt.', 5200));
     }
-    rememberWorldMode(isWorldOnline(location.search) ? 'online' : 'offline');
     if (this.cloudState === 'on' && !this.cloudConflict) this.bindCloudPush();
     this.player.lookOpts = lookOptions(char.look);
     this.player.armorKey = null;
@@ -1121,16 +665,10 @@ class Game {
     const panel = document.getElementById('account-panel');
     const forming = !!panel && !panel.classList.contains('hidden');
     const unlinkedOpen = !!document.getElementById('wallet-unlinked') && !document.getElementById('wallet-unlinked').classList.contains('hidden');
-    const picking = !!this.worldPickOpen;
     const signed = !!this.wallet?.address;
     const email = this.wallet?.kind === 'email';
     const guest = this.wallet?.kind === 'guest';
-    choices?.classList.toggle('hidden', signed || forming || unlinkedOpen || picking);
-    const picker = document.getElementById('world-picker');
-    if (picker && !picking) {
-      picker.hidden = true;
-      picker.classList.add('hidden');
-    }
+    choices?.classList.toggle('hidden', signed || forming || unlinkedOpen);
     sign.classList.toggle('hidden', signed || forming || unlinkedOpen);
     start.classList.add('hidden');
     start.textContent = 'Begin the hunt';
@@ -1146,12 +684,10 @@ class Game {
       return;
     }
     if (guest) {
-      if (!forming) {
-        panel?.classList.add('hidden');
-        status.textContent = 'Playing as guest. The hunt stays on this device.';
-      }
+      panel?.classList.add('hidden');
       help?.classList.add('hidden');
       swap.textContent = 'Leave guest hunt';
+      status.textContent = 'Playing as guest. The hunt stays on this device.';
       return;
     }
     panel?.classList.add('hidden');
@@ -1191,8 +727,6 @@ class Game {
     const error = document.getElementById('account-error');
     if (!panel) return;
     this.hideWalletUnlinked();
-    this.hideWorldPicker();
-    this.hideWorldAuth();
     panel.dataset.mode = mode;
     panel.classList.remove('hidden');
     confirm?.classList.toggle('hidden', mode !== 'create');
@@ -1200,7 +734,6 @@ class Game {
     if (submit) submit.textContent = mode === 'create' ? 'Create account' : 'Sign in';
     if (password) password.setAttribute('autocomplete', mode === 'create' ? 'new-password' : 'current-password');
     document.getElementById('account-pass-hint')?.classList.toggle('hidden', mode !== 'create');
-    document.getElementById('account-retry')?.classList.add('hidden');
     if (error) error.textContent = '';
     if (status) {
       status.textContent = mode === 'create'
@@ -1217,7 +750,6 @@ class Game {
     panel?.classList.add('hidden');
     const error = document.getElementById('account-error');
     if (error) error.textContent = '';
-    document.getElementById('account-retry')?.classList.add('hidden');
     this.hideWalletUnlinked();
   }
 
@@ -1234,21 +766,15 @@ class Game {
     this.walletBusy = true;
     if (submit) submit.disabled = true;
     if (error) error.textContent = '';
-    document.getElementById('account-retry')?.classList.add('hidden');
     try {
       const session = mode === 'create'
         ? await createAccount(email, password, confirm)
         : await signInAccount(email, password);
-      if (isAdminAccount(session)) {
-        location.replace(adminHref());
-        return;
-      }
       this.closeAccount();
       await this.applyWallet(session);
       this.watchAccount();
     } catch (err) {
       if (error) error.textContent = err.message || 'The account could not be created.';
-      document.getElementById('account-retry')?.classList.toggle('hidden', err.code !== 'unavailable');
     } finally {
       this.walletBusy = false;
       if (submit) submit.disabled = false;
@@ -1256,7 +782,6 @@ class Game {
   }
 
   async signOut(repromptKlever) {
-    clearRotationRecovery(localStorage);
     const leaveWorld = this.started;
     this.captureHunter();
     try {
@@ -1266,7 +791,6 @@ class Game {
     }
     if (this.cloudGate) this.cloudGate.open = false;
     this.stopAutosave();
-    this.stopDeviceWatch();
     clearSession();
     clearAccount();
     clearCloudToken();
@@ -1277,75 +801,50 @@ class Game {
     this.walletNote = '';
     this.cloudState = 'off';
     this.cloudReachable = false;
-    this.staffRole = '';
     this.cloudSavedAt = 0;
     if (leaveWorld) {
       location.reload();
       return;
     }
     this.charSelect.close();
-    this.hideWorldPicker();
-    this.hideWorldAuth();
     document.getElementById('title').classList.remove('hidden');
     this.closeAccount();
     this.refreshWalletUi();
   }
 
-  async handOffToWallet() {
+  handOffToWallet() {
     const sign = document.getElementById('btn-wallet');
     const status = document.getElementById('wallet-status');
     if (sign) sign.disabled = true;
-    if (status) status.textContent = 'Preparing secure Klever sign-in…';
+    if (status) status.textContent = 'Opening Klever Wallet…';
+    launchKleverApp();
     document.getElementById('account-choices')?.classList.add('hidden');
-    try {
-      const handoff = await startKleverHandoff();
-      if (status) status.textContent = 'Opening Klever Wallet… approve the sign-in there, then return here.';
-      launchKleverApp(handoff.id);
-      const deadline = Date.now() + 5 * 60 * 1000;
-      while (Date.now() < deadline && !this.wallet?.address) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1800));
-        const session = await pollKleverHandoff(handoff);
-        if (session) {
-          this.hideWalletUnlinked();
-          await this.applyWallet(session);
-          this.watchAccount();
-          if (status) status.textContent = 'Klever sign-in complete.';
-          return;
-        }
-      }
-      if (!this.wallet?.address && status) status.textContent = 'Still waiting for Klever. Approve the request in Klever Wallet, then return to this browser.';
-    } catch (err) {
-      if (status) status.textContent = err.message || 'Klever sign-in could not be completed.';
-    } finally {
+    const finish = () => {
       this.walletBusy = false;
       if (sign) sign.disabled = false;
-      if (!this.wallet?.address) document.getElementById('account-choices')?.classList.remove('hidden');
-    }
+      if (this.wallet?.address) return;
+      document.getElementById('account-choices')?.classList.remove('hidden');
+      // Coming back from the wallet must not open it again. The hunter taps Sign in to retry.
+      const help = document.getElementById('wallet-help');
+      if (help) showWalletHelp(help, 'mobile-app');
+      if (status) status.textContent = 'Klever Wallet is open. Tap Sign in there, then approve the signature.';
+    };
+    window.setTimeout(() => {
+      if (!document.hidden) {
+        finish();
+        return;
+      }
+      const onBack = () => {
+        if (document.hidden) return;
+        document.removeEventListener('visibilitychange', onBack);
+        finish();
+      };
+      document.addEventListener('visibilitychange', onBack);
+    }, 1500);
   }
 
   async onWallet(automatic = false) {
     if (this.walletBusy) return;
-    const handoffId = new URLSearchParams(location.search).get('handoff');
-    if (handoffId && inKleverHandoff()) {
-      this.walletBusy = true;
-      const sign = document.getElementById('btn-wallet');
-      const status = document.getElementById('wallet-status');
-      if (sign) sign.disabled = true;
-      if (status) status.textContent = 'Approve the sign-in request in Klever Wallet…';
-      document.getElementById('account-choices')?.classList.add('hidden');
-      try {
-        await completeKleverHandoff(handoffId);
-        if (status) status.textContent = 'Sign-in complete — return to your original browser.';
-        if (sign) sign.textContent = 'Sign-in complete';
-      } catch (err) {
-        if (status) status.textContent = err.message || 'Klever sign-in could not be completed.';
-        document.getElementById('account-choices')?.classList.remove('hidden');
-      } finally {
-        this.walletBusy = false;
-        if (sign && !sign.textContent.includes('complete')) sign.disabled = false;
-      }
-      return;
-    }
     if (automatic && (this.wallet?.address || promptIsCooling())) return;
     if (isMobile() && !window.kleverWeb && !inKleverHandoff()) {
       markPrompt();
@@ -1393,7 +892,7 @@ class Game {
       if (this.wallet?.kind === 'email') return;
       const next = event?.address;
       if (!next || next === this.wallet?.address) return;
-        this.captureHunter();
+      this.captureHunter();
       clearSession();
       this.wallet = null;
       if (this.started) location.reload();
@@ -1414,12 +913,11 @@ class Game {
     const panel = document.getElementById('wallet-unlinked');
     const status = document.getElementById('wallet-status');
     const text = document.getElementById('wallet-unlinked-text');
-    if (text) text.textContent = UNLINKED_HINT;
+    if (text) text.textContent = UNLINKED_MESSAGE;
     panel?.classList.remove('hidden');
     document.getElementById('account-choices')?.classList.add('hidden');
     document.getElementById('wallet-help')?.classList.add('hidden');
     if (status) status.textContent = '';
-    document.getElementById('wallet-unlinked-email')?.focus();
   }
 
   captureHunter() {
@@ -1484,25 +982,11 @@ class Game {
     });
     sign.addEventListener('click', () => this.onWallet());
     document.getElementById('btn-guest')?.addEventListener('click', () => this.playAsGuest());
-    document.getElementById('pick-world1')?.addEventListener('click', () => this.pickWorldOnline());
-    document.getElementById('pick-solo')?.addEventListener('click', () => this.pickWorldSolo());
-    document.getElementById('world-auth-signin')?.addEventListener('click', () => this.onWorldAuthSignIn());
-    document.getElementById('world-auth-solo')?.addEventListener('click', () => this.onWorldAuthSolo());
-    paintWorldModePill(document.getElementById('world-mode-pill'), {
-      search: typeof location !== 'undefined' ? location.search : '',
-    });
-    if (typeof window !== 'undefined') {
-      window.__mgShowWorldPicker = () => this.showWorldPicker({ force: true });
-    }
     document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
     document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
     document.getElementById('account-cancel')?.addEventListener('click', () => {
       this.closeAccount();
       this.refreshWalletUi();
-      if (this.charSelect?.active) document.getElementById('title')?.classList.add('hidden');
-    });
-    document.getElementById('account-retry')?.addEventListener('click', () => {
-      document.getElementById('account-panel')?.requestSubmit();
     });
     document.getElementById('account-panel')?.addEventListener('submit', (event) => this.onAccountSubmit(event));
     swap.addEventListener('click', () => this.signOut(false));
@@ -1512,9 +996,8 @@ class Game {
     });
     window.addEventListener('keydown', (e) => {
       if (this.started || this.charSelect.active || (e.code !== 'Enter' && e.code !== 'Space')) return;
-      if (e.target?.closest?.('input, textarea, #account-panel, #world-picker, #world-auth')) return;
+      if (e.target?.closest?.('input, textarea, #account-panel')) return;
       if (!document.getElementById('account-panel')?.classList.contains('hidden')) return;
-      if (this.worldPickOpen) return;
       if (this.wallet) {
         e.preventDefault();
         return;
@@ -1543,7 +1026,7 @@ class Game {
 
   toggleFullscreen() {
     if (isFullscreen()) exitGameFullscreen();
-    else this.enterImmersive({ gesture: true, lock: false });
+    else this.enterImmersive({ gesture: true, lock: this.input.touch && !isTablet() });
   }
 
   /* ------------------------- landscape fullscreen ------------------------- */
@@ -1553,7 +1036,9 @@ class Game {
     window.addEventListener('resize', sync);
     window.addEventListener('orientationchange', () => {
       this.tucked = false;
-      setTimeout(sync, 120);
+      sync();
+      setTimeout(sync, 80);
+      setTimeout(sync, 350);
     });
     screen.orientation?.addEventListener?.('change', () => {
       this.tucked = false;
@@ -1562,7 +1047,7 @@ class Game {
     const onViewport = () => {
       // A Klever confirm sheet resizes the page. Resizing back dismisses that sheet.
       if (!this.started || this.walletBusy) return;
-      this.scheduleResize();
+      this.resize();
     };
     window.visualViewport?.addEventListener('resize', onViewport);
     window.visualViewport?.addEventListener('scroll', onViewport);
@@ -1574,8 +1059,8 @@ class Game {
       if (e.target.closest?.('input, textarea, select, #btn-fs, #title, #wallet-help, #loading, #account-panel')) return;
       const tablet = isTablet();
       if (!this.input.touch && !tablet) return;
-      if (this.isLandscape() || tablet) this.enterImmersive({ gesture: true, lock: false });
-      else if (e.target.closest?.('#rotate-overlay')) this.enterImmersive({ gesture: false, lock: false });
+      if (this.isLandscape() || tablet) this.enterImmersive({ gesture: true, lock: this.isLandscape() && !tablet });
+      else if (e.target.closest?.('#rotate-overlay')) requestGameFullscreen(true);
     };
     window.addEventListener('touchend', ask, { capture: true });
     window.addEventListener('click', ask, { capture: true });
@@ -1589,7 +1074,7 @@ class Game {
   syncImmersive() {
     if (this.walletBusy || !this.started) return;
     if (!this.input.touch) {
-      this.scheduleResize();
+      this.resize();
       return;
     }
     if (this.isLandscape() || isTablet()) this.enterImmersive();
@@ -1597,12 +1082,12 @@ class Game {
       document.documentElement.classList.remove('landscape-full');
       this.tucked = false;
       this.clearTuck();
-      this.scheduleResize();
+      this.resize();
     }
   }
 
   /**
-   * Landscape phones: adapt the game viewport without forcing page scroll or toolbar hacks.
+   * Landscape phones: hide the browser toolbar and stretch the game to the screen.
    * `gesture` is set when this runs inside a tap, which is when browsers allow fullscreen.
    */
   enterImmersive({ gesture = false, lock = false } = {}) {
@@ -1616,15 +1101,18 @@ class Game {
       requestGameFullscreen(lock && gesture).then((ok) => {
         this.fsPending = false;
         if (ok) this.clearTuck();
-        // If fullscreen is unavailable, keep the browser chrome as-is. Scrolling
-        // the Klever WebView during rotation can trigger another renderer reset.
-        this.scheduleResize();
+        else if (!tablet && !this.tucked) {
+          this.tucked = true;
+          this.tuckChrome();
+        }
+        this.resize();
       });
     }
-    // Do not change document height or scroll position on orientation changes.
-    // Klever's Android WebView emits several viewport events while rotating; page
-    // scrolling here causes repeated canvas reallocations during the transition.
-    this.scheduleResize();
+    if (!tablet && (gesture || !this.tucked)) {
+      this.tucked = true;
+      this.tuckChrome();
+    }
+    this.resize();
   }
 
   /** Scroll the mobile URL bar off, then pin the game to the visible screen. */
@@ -1692,14 +1180,6 @@ class Game {
     cam.updateProjectionMatrix();
     this.resScale = 1;
     this.resize();
-  }
-
-  scheduleResize() {
-    if (this.resizeFrame) cancelAnimationFrame(this.resizeFrame);
-    this.resizeFrame = requestAnimationFrame(() => {
-      this.resizeFrame = 0;
-      this.resize();
-    });
   }
 
   resize() {
@@ -2150,7 +1630,6 @@ class Game {
       if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember' || p.kind === 'frost') m.rotation.x += dt * 8;
       if (p.kind === 'crescent') m.rotation.y += dt * 16;
       if (p.kind === 'gloom') m.rotation.y += dt * 5;
-      if (p.kind === 'lavabolt') m.rotation.x += dt * 6;
       if (p.homing && p.age > 0.25) this.steerProjectile(p, dt);
       tickProjectile(this, p, dt);
       if (p.age > p.life) {
@@ -2214,8 +1693,9 @@ class Game {
     this.projectiles = this.projectiles.filter((p) => !p.dead);
   }
 
-  onMonsterKilled(m) {
+  onMonsterKilled(m, { serverAuthoritative = false } = {}) {
     this.kills++;
+    if (!serverAuthoritative) {
     if (m.type === 'orcscout') {
       if (Math.random() < 0.72) {
         const n = m.def.gold[0] + Math.floor(Math.random() * (m.def.gold[1] - m.def.gold[0] + 1));
@@ -2251,6 +1731,7 @@ class Game {
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
     if (m.debugTank) grantDebugTankLoot(this, m);
+    }
     this.applyJournal(this.journal.onKill(m.type));
     if (this.bounties?.onKill(m.type) && this.hud.panelId === 'quest' && this.hud.journalRefresh) this.hud.journalRefresh();
     if (m.type === 'chicken') return;
@@ -2699,8 +2180,30 @@ class Game {
 
   strikeMonster(m, dmg, dx, dz, knock, crit = false) {
     if (!m || m.dead) return;
-    if (this.net?.role === 'guest') this.net.relayHit(m, dmg, dx, dz, knock, crit);
-    else m.takeHit(dmg, dx, dz, knock, crit);
+    if (this.net?.role === 'guest') {
+      this.net.relayHit(m, dmg, dx, dz, knock, crit);
+      return;
+    }
+    const serverCombat = this.mmo?.ws?.readyState === 1 && this.mmo.you?.guest === false;
+    if (m.serverAuthoritative) {
+      if (serverCombat && m.serverId) this.mmo.attackMonster(m.serverId);
+      return;
+    }
+    if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
+    if (serverCombat) {
+      const serverMob = (this.mmo.entities?.monsters || [])
+        .filter((candidate) => candidate.type === m.type)
+        .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (serverMob && serverMob.distance <= 18) {
+        m.serverId = serverMob.candidate.id;
+        m.serverAuthoritative = true;
+        this.mmo.attackMonster(serverMob.candidate.id);
+        return;
+      }
+      if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
+    }
+    m.takeHit(dmg, dx, dz, knock, crit);
   }
 
   ensureRemote(id, name) {
@@ -2997,15 +2500,7 @@ class Game {
     }
     const near = this.ambient.npcs.find((n) => n.near);
     if (!near) return;
-    let script = this.journal.scriptFor(near.def.id);
-    if (!script) {
-      const offer = this.journal.offerFor(near.def.id);
-      if (offer) {
-        const started = this.journal.start(offer.id, true);
-        if (started) this.applyJournal(started);
-        script = this.journal.scriptFor(near.def.id);
-      }
-    }
+    const script = this.journal.scriptFor(near.def.id);
     if (near.def.service === 'alchemy' && !script) {
       this.openAlchemy();
       return;
@@ -3084,6 +2579,72 @@ class Game {
     this.talkQuest = false;
     if (result.ok) this.applyJournal(result);
     this.audio.select();
+  }
+
+  enterRiftFromServer(info) {
+    if (this.world?.realm === 'rift') return;
+    enterRift(this, { party: info?.party_size || 1, follow: false, serverOwned: true });
+  }
+
+  leaveRiftFromServer() {
+    if (this.world?.realm !== 'rift') return;
+    leaveRift(this);
+  }
+
+  syncServerRewardState(snapshot) {
+    if (!snapshot || !this.progress) return;
+    const mergeCounts = (local, server) => {
+      const next = { ...(local || {}) };
+      for (const [id, raw] of Object.entries(server || {})) {
+        const value = Math.max(0, Math.floor(Number(raw) || 0));
+        if (value > (Number(next[id]) || 0)) next[id] = value;
+      }
+      return next;
+    };
+    this.progress.data.gold = Math.max(this.progress.gold, Math.floor(Number(snapshot.gold) || 0));
+    this.progress.data.xp = mergeCounts(this.progress.data.xp, snapshot.xp);
+    this.progress.data.goods = mergeCounts(this.progress.data.goods, snapshot.goods);
+    this.progress.data.materials = mergeCounts(this.progress.data.materials, snapshot.materials);
+    this.progress.data.riftClearAt = Math.max(Number(this.progress.data.riftClearAt) || 0, Number(snapshot.riftClearAt) || 0);
+    this.progress.data.crafted = { ...(this.progress.data.crafted || {}) };
+    for (const [id, owned] of Object.entries(snapshot.crafted || {})) {
+      if (owned) this.progress.data.crafted[id] = true;
+    }
+    this.progress.save(false);
+    this.gold = this.progress.gold;
+    if (this.player) {
+      this.applyGear();
+      this.hud?.setGold?.(this.gold);
+      this.itemsChanged?.();
+      this.refreshHud?.();
+    }
+  }
+
+  applyServerReward(reward) {
+    if (!reward || !this.progress || !(Number(reward.amount) > 0)) return;
+    const amount = Math.floor(Number(reward.amount));
+    if (reward.kind === 'gold') {
+      this.addGold(amount);
+      return;
+    }
+    if (reward.kind === 'xp') {
+      const levelled = this.progress.addXp(String(reward.id), amount);
+      if (levelled) this.hud.banner('Level up', `${reward.id} ${levelled}`, 2600);
+      return;
+    }
+    if (reward.kind === 'gear') {
+      if (this.progress.grantFound(String(reward.id))) {
+        this.applyGear();
+        this.itemsChanged();
+        this.hud.toast(`Found ${String(reward.id)}!`, 2200);
+      } else if (!this.progress.crafted(String(reward.id))) this.hud.toast(INVENTORY_FULL, 1800);
+      return;
+    }
+    let added = 0;
+    if (reward.kind === 'good') added = this.progress.addGood(String(reward.id), amount);
+    else if (reward.kind === 'material') added = this.progress.addPart(String(reward.id), amount);
+    if (added > 0) this.itemsChanged();
+    if (added < amount) this.hud.toast(INVENTORY_FULL, 1800);
   }
 
   addGold(n) {
@@ -3251,7 +2812,7 @@ class Game {
     return true;
   }
 
-  storeInCrate(k, id, n, page = 0) {
+  storeInCrate(k, id, n) {
     n = n | 0;
     if (n < 1) return false;
     const pr = this.progress;
@@ -3259,7 +2820,7 @@ class Game {
       this.hud.toast('That is already in the crate', 1400);
       return false;
     }
-    if (!pr.canFitStorage(k, id, n, page)) {
+    if (!pr.canFitStorage(k, id, n)) {
       this.hud.toast('The crate is full', 1400);
       return false;
     }
@@ -3294,7 +2855,7 @@ class Game {
       pr.setStock(id, it.count);
       this.itemsChanged();
     } else return false;
-    if (!pr.putStorage(k, id, n, page)) {
+    if (!pr.putStorage(k, id, n)) {
       refund();
       this.hud.toast('The crate is full', 1400);
       return false;
@@ -3678,11 +3239,9 @@ class Game {
       }
       this.step(dt, rawMs / 1000);
       this.renderer.render(this.scene, this.camera);
-      // Keep the crash-recovery marker until gameplay has actually started and stayed alive.
-      // The old counter ran during login/character select, so it expired before the first hunt.
-      if (this.started && this.bootFrames >= 0) {
+      if (this.bootFrames >= 0) {
         this.bootFrames += 1;
-        if (this.bootFrames === 600) {
+        if (this.bootFrames === 90) {
           clearBoot();
           this.bootFrames = -1;
         }
@@ -3710,7 +3269,10 @@ class Game {
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
     if (!this.campParked) {
-      for (const m of this.monsters) m.update(dt);
+      for (const m of this.monsters) {
+        m.update(dt);
+        if (m.serverAuthoritative) this.mmo?.updateMonster?.(m);
+      }
       if (this.monsters.some((m) => m.remove)) {
         for (const m of this.monsters) if (m.remove) m.dispose();
         this.monsters = this.monsters.filter((m) => !m.remove);
@@ -3810,56 +3372,15 @@ class Game {
   }
 }
 
-function resumeAfterGlFail() {
-  if (typeof window !== 'undefined' && window.__game && !window.__game.glFailed) {
-    location.reload();
-    return;
-  }
-  startGame();
-}
-
-function showBootGlFail() {
-  showGlFailPanel({
-    probe: defaultGlProbe,
-    onSuccess: resumeAfterGlFail,
-  });
-}
-
-async function startGame() {
-  if (isAdminAccount(readAccount())) {
-    location.replace(adminHref());
-    return;
-  }
-  // Start WebGL and world generation immediately alongside the branded intro.
-  // The intro is only awaited when the game is ready to dismiss the loading UI.
-  const bootSearch = typeof location !== 'undefined' ? location.search : '';
-  if (shouldDropOnlineWithoutSession({ search: bootSearch })) {
-    dropOnlineWithoutSession({ search: bootSearch });
-  }
-  if (shouldForceNoGL() || !defaultGlProbe().ok) {
-    showBootGlFail();
-    return;
-  }
-  let game;
-  try {
-    game = new Game();
-  } catch (err) {
-    showBootGlFail();
-    console.error(err);
-    return;
-  }
-  if (game.glFailed) return;
+function startGame() {
+  const game = new Game();
   window.__game = game;
   try {
     installMockWallet();
     attachDebug(game);
     attachSocial(game);
     const q = new URLSearchParams(location.search);
-    const liveSearch = location.search;
-    const mockOn = q.get('mock') === '1';
-    const wakeRaw = q.get('mockwake');
-    const mockWake = !!(wakeRaw && wakeRaw !== '0' && wakeRaw !== 'false');
-    if (q.get('mmo') === '1' && (shouldMountOnline({ search: liveSearch }) || mockOn || mockWake)) {
+    if (q.get('mmo') === '1') {
       import('./net/worldView.js').then(async (m) => {
         const flags = m.parseMmoFlags(location.search);
         const view = await m.init(game.scene, {
@@ -3868,7 +3389,7 @@ async function startGame() {
           search: location.search,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
-        if (!flags.mock && !flags.mockwake && shouldMountOnline({ search: location.search })) {
+        if (!flags.mock && !flags.mockwake) {
           const { attachMmo } = await import('./net/mmo.js');
           attachMmo(game, view);
         }
@@ -3879,22 +3400,16 @@ async function startGame() {
   }
   game.load().catch((e) => {
     console.error(e);
-    if (isWebGLFailure(e)) {
-      showBootGlFail();
-      return;
-    }
     document.getElementById('load-text').textContent = 'Failed to load: ' + e.message;
   });
 }
 
-if (!sendingToLedger && !glDeadAtBoot) {
-  runLegacySaveBridge().then((result) => {
-    if (result === 'away') return;
-    startGame();
-  }).catch((e) => {
-    console.warn('save bridge', e);
-    startGame();
-  });
-}
+runLegacySaveBridge().then((result) => {
+  if (result === 'away') return;
+  startGame();
+}).catch((e) => {
+  console.warn('save bridge', e);
+  startGame();
+});
 
 export { lerp, GUILD };

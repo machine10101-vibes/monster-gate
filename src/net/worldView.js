@@ -21,71 +21,8 @@
  */
 
 import { lookOptions, cleanName as rosterCleanName, nameProblem } from '../systems/roster.js';
-import { leaveOnlineWorld } from './worldPlay.js';
 import { decorateFrame } from '../ui/theme.js';
 import { applyWeaponCursor } from '../ui/weaponCursor.js';
-
-export const AUTH_SIGNIN_TITLE = 'Sign in to hunt online';
-export const AUTH_SIGNIN_MSG = 'Guests stay solo.';
-export const AUTH_SIGNIN_BTN = 'Sign in';
-export const AUTH_SOLO_BTN = 'Play solo';
-
-/** Default World 1 spawn. Matches server/world.js spawnPose. */
-export const WORLD_SPAWN = { x: 72, y: 3.2, z: 72.5 };
-
-/** Move/chat/hello rejects from the world socket — not sign-in failures. */
-export const WORLD_WIRE_CODES = ['rate', 'teleport', 'protocol', 'chat'];
-
-function bagText(bag) {
-  if (bag == null || bag === '') return '';
-  if (typeof bag === 'string') return bag.trim();
-  if (typeof bag !== 'object') return '';
-  return String(bag.code || bag.message || (typeof bag.detail === 'string' ? bag.detail : '') || '').trim();
-}
-
-/** True when the world server rejected a move, chat, or hello — not an account error. */
-export function isWorldWireError(status, detail) {
-  const bags = [status, detail];
-  for (const bag of bags) {
-    if (bag == null || bag === '') continue;
-    if (typeof bag === 'object') {
-      const code = String(bag.code || '').trim().toLowerCase();
-      if (WORLD_WIRE_CODES.includes(code)) return code;
-      const nested = typeof bag.detail === 'object' && bag.detail ? isWorldWireError(null, bag.detail) : '';
-      if (nested) return nested;
-    }
-    const s = bagText(bag);
-    if (!s) continue;
-    const lower = s.toLowerCase();
-    if (WORLD_WIRE_CODES.includes(lower)) return lower;
-    if (/too far/i.test(s)) return 'teleport';
-    if (/slow down/i.test(s)) return 'rate';
-    if (/say hello/i.test(s) || /expected hello/i.test(s) || /need protocol/i.test(s)) return 'protocol';
-  }
-  return '';
-}
-
-/** True when the world server rejected the hunter for missing / bad auth. */
-export function isAuthReject(status, detail) {
-  const bags = [status, detail];
-  for (const bag of bags) {
-    if (bag == null || bag === '') continue;
-    if (typeof bag === 'string') {
-      const s = bag.trim();
-      if (/^auth$/i.test(s)) return true;
-      if (/sign in to hunt online/i.test(s) || /guests stay solo/i.test(s) || /sign-in is not valid/i.test(s)) return true;
-      continue;
-    }
-    if (typeof bag === 'object') {
-      const code = String(bag.code || '');
-      const msg = String(bag.message || (typeof bag.detail === 'string' ? bag.detail : '') || '');
-      if (code === 'auth' || /^auth$/i.test(msg)) return true;
-      if (/sign in to hunt online/i.test(msg) || /guests stay solo/i.test(msg) || /sign-in is not valid/i.test(msg)) return true;
-      if (bag.detail && typeof bag.detail === 'object' && isAuthReject(null, bag.detail)) return true;
-    }
-  }
-  return false;
-}
 
 export const WORLD_VIEW = 1;
 export const REMOTE_PREFIX = 'wv:';
@@ -105,16 +42,6 @@ export const STATUS = {
   reconnecting: 'reconnecting',
   error: 'error',
 };
-
-/** Pill copy. Only a live socket is "Online"; a World 1 handshake is not "Offline". */
-export function worldModeLabel(status, auth = false) {
-  if (status === STATUS.online) return 'Online';
-  if (status === STATUS.connecting) return 'Connecting';
-  if (status === STATUS.waking) return 'Waking';
-  if (status === STATUS.reconnecting) return 'Reconnecting';
-  if (status === STATUS.error && auth) return 'Sign in';
-  return 'Offline';
-}
 
 export const WAKE_SECONDS = 30;
 export const WAKE_STUCK_MS = 60000;
@@ -467,9 +394,6 @@ export class WorldView {
     this.wakeTick = 0;
     this.nameUi = null;
     this.nameTakenOpen = false;
-    this.authUi = null;
-    this.authReject = false;
-    this.authOpen = false;
     this.online = 0;
     this.intents = [];
     this.onIntent = null;
@@ -483,7 +407,6 @@ export class WorldView {
     this.unsubs = [];
     this.wrapped = null;
     this.live = false;
-    this.spawnSnapped = false;
     this.collapsed = false;
     this.localHeld = null;
     this.localSay = '';
@@ -668,7 +591,7 @@ export class WorldView {
   pushChat(raw) {
     const msg = normalizeChat(raw);
     if (!msg) return;
-    if (this.mutedPlayers.has(String(msg.from.id)) || this.mutedPlayers.has(`name:${String(msg.from.name || '').toLowerCase()}`)) return;
+    if (msg.channel !== 'whisper' && (this.mutedPlayers.has(String(msg.from.id)) || this.mutedPlayers.has(`name:${String(msg.from.name || '').toLowerCase()}`))) return;
     this.chat.push(msg);
     if (this.chat.length > 80) this.chat.shift();
     const row = this.actors.get(msg.from.id);
@@ -686,17 +609,15 @@ export class WorldView {
   }
 
   toggleMutePlayer(id, name = '') {
-    const key = String(id || '') || `name:${String(name).toLowerCase()}`;
-    if (!key) return false;
-    const muted = this.mutedPlayers.has(key);
-    if (muted) this.mutedPlayers.delete(key);
-    else this.mutedPlayers.add(key);
+    const key=String(id || '') || `name:${String(name || '').toLowerCase()}`;
+    if(!key)return false;
+    const muted=this.mutedPlayers.has(key);
+    if(muted)this.mutedPlayers.delete(key);else this.mutedPlayers.add(key);
     return !muted;
   }
 
-  isPlayerMuted(id, name = '') {
-    return this.mutedPlayers.has(String(id || ''))
-      || this.mutedPlayers.has(`name:${String(name || '').toLowerCase()}`);
+  isPlayerMuted(id,name='') {
+    return this.mutedPlayers.has(String(id||'')) || this.mutedPlayers.has(`name:${String(name||'').toLowerCase()}`);
   }
 
   setStatus(status, detail = '') {
@@ -721,29 +642,7 @@ export class WorldView {
           : { code: status.code, message: status.message || extra };
       }
     }
-    const incoming = STATUS[next] || next || STATUS.offline;
-    if (isAuthReject(status, extra) || isAuthReject(status, detail)) {
-      this.latchAuthReject(extra);
-      return;
-    }
-    const wire = isWorldWireError(status, extra) || isWorldWireError(status, detail);
-    if (wire) {
-      if (wire === 'teleport') this.snapToWorldSpawn();
-      if (
-        this.status === STATUS.online
-        || this.status === STATUS.connecting
-        || this.status === STATUS.reconnecting
-      ) {
-        return;
-      }
-    }
-    if (this.authReject && incoming !== STATUS.online) {
-      this.syncAuthPanel();
-      return;
-    }
-    if (this.authReject && incoming === STATUS.online) this.clearAuthLatch();
-    if (incoming === STATUS.connecting || incoming === STATUS.online) this.spawnSnapped = false;
-    this.status = incoming;
+    this.status = STATUS[next] || next || STATUS.offline;
     if (this.status === STATUS.waking) {
       this.wakeDetail = extra && typeof extra === 'object' ? extra : {};
       this.wakeMarkedAt = this.now();
@@ -760,53 +659,6 @@ export class WorldView {
     this.paintHud();
     this.syncWakeOverlay();
     this.syncNamePrompt();
-    this.syncAuthPanel();
-  }
-
-  latchAuthReject(extra) {
-    const msg = extra && typeof extra === 'object'
-      ? String(extra.message || extra.detail || AUTH_SIGNIN_TITLE)
-      : (String(extra || '').trim() || AUTH_SIGNIN_TITLE);
-    this.authReject = true;
-    this.authOpen = true;
-    this.status = STATUS.error;
-    this.detail = {
-      code: 'auth',
-      message: /sign in|guest/i.test(msg) ? msg : AUTH_SIGNIN_TITLE,
-    };
-    this.nameTakenOpen = false;
-    this.stopMmoTransport();
-    this.paintHud();
-    this.syncWakeOverlay();
-    this.syncNamePrompt();
-    this.syncAuthPanel();
-  }
-
-  clearAuthLatch() {
-    this.authReject = false;
-    this.authOpen = false;
-    this.hideAuthPanel();
-  }
-
-  /** Pause the socket on auth. A client that can wait for a new token stays open. */
-  stopMmoTransport() {
-    const mmo = this.game?.mmo || (typeof window !== 'undefined' ? window.__mmo : null);
-    if (!mmo) return;
-    if (typeof mmo.holdForAuth === 'function') {
-      try {
-        mmo.holdForAuth();
-        return;
-      } catch {
-        /* fall through and close the socket */
-      }
-    }
-    const stop = mmo.dispose || mmo.close || mmo.disconnect || mmo.stop;
-    if (typeof stop !== 'function') return;
-    try {
-      stop.call(mmo);
-    } catch {
-      /* transport already down */
-    }
   }
 
   errorCode() {
@@ -969,8 +821,6 @@ export class WorldView {
     this.wakeDismissed = true;
     this.hideWakeOverlay();
     this.stopWakeTick();
-    this.clearAuthLatch();
-    leaveOnlineWorld({ search: this.search });
   }
 
   syncNamePrompt() {
@@ -1028,89 +878,6 @@ export class WorldView {
   hideNamePrompt() {
     this.nameUi?.root?.remove();
     this.nameUi = null;
-  }
-
-  syncAuthPanel() {
-    if (!this.authReject || !this.authOpen) {
-      this.hideAuthPanel();
-      return;
-    }
-    this.ensureAuthPanel();
-    this.paintAuthPanel();
-  }
-
-  ensureAuthPanel() {
-    if (typeof document === 'undefined') return;
-    if (this.authUi) return;
-    let root = document.getElementById('world-auth');
-    let created = false;
-    if (!root) {
-      root = document.createElement('div');
-      root.id = 'world-auth';
-      root.innerHTML = `
-        <div class="wa-card mg-frame">
-          <small>World 1</small>
-          <p class="wa-title">${AUTH_SIGNIN_TITLE}</p>
-          <p class="wa-msg">${AUTH_SIGNIN_MSG}</p>
-          <button type="button" class="start" id="world-auth-signin">${AUTH_SIGNIN_BTN}</button>
-          <button type="button" class="start quiet" id="world-auth-solo">${AUTH_SOLO_BTN}</button>
-        </div>`;
-      (document.getElementById('app') || document.body).appendChild(root);
-      created = true;
-    }
-    root.classList.remove('hidden');
-    root.hidden = false;
-    const sign = root.querySelector('#world-auth-signin');
-    const solo = root.querySelector('#world-auth-solo');
-    if (sign && !sign.dataset.wvBound) {
-      sign.dataset.wvBound = '1';
-      sign.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.onAuthSignIn();
-      });
-    }
-    if (solo && !solo.dataset.wvBound) {
-      solo.dataset.wvBound = '1';
-      solo.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.onAuthSolo();
-      });
-    }
-    if (created) decorateFrame(root.querySelector('.wa-card'));
-    this.authUi = { root, sign, solo, created };
-    this.unsubs.push(() => this.hideAuthPanel());
-  }
-
-  paintAuthPanel() {
-    const root = this.authUi?.root || (typeof document !== 'undefined' ? document.getElementById('world-auth') : null);
-    if (!root) return;
-    root.classList.remove('hidden');
-    root.hidden = false;
-    const title = root.querySelector('.wa-title');
-    const msg = root.querySelector('.wa-msg');
-    if (title) title.textContent = AUTH_SIGNIN_TITLE;
-    if (msg) msg.textContent = this.errorMessage() || AUTH_SIGNIN_MSG;
-  }
-
-  hideAuthPanel() {
-    const root = this.authUi?.root;
-    if (root) {
-      root.classList.add('hidden');
-      root.hidden = true;
-      if (this.authUi?.created) root.remove();
-    }
-    this.authUi = null;
-  }
-
-  onAuthSignIn() {
-    const title = typeof document !== 'undefined' ? document.getElementById('title') : null;
-    title?.classList.remove('hidden');
-    this.game?.openAccount?.('signin');
-  }
-
-  onAuthSolo() {
-    this.clearAuthLatch();
-    this.playOffline();
   }
 
   applyHunterName(raw) {
@@ -1243,32 +1010,7 @@ export class WorldView {
     g.hud.layoutInteractPlates?.();
   }
 
-  /**
-   * World 1 persist is a different record than the solo hunt. A hunter who
-   * joins from the cave (or anywhere past 40u) gets `teleport` on every move
-   * until they stand at the world spawn. Drop them at Oakhollow once.
-   */
-  snapToWorldSpawn() {
-    if (this.spawnSnapped || !this.live) return;
-    const p = this.game?.player;
-    if (!p?.pos) return;
-    const dist = Math.hypot(p.pos.x - WORLD_SPAWN.x, p.pos.z - WORLD_SPAWN.z);
-    if (dist <= 40) return;
-    this.spawnSnapped = true;
-    const y = this.game?.world?.heightAt?.(WORLD_SPAWN.x, WORLD_SPAWN.z);
-    const nextY = Number.isFinite(y) ? y : WORLD_SPAWN.y;
-    if (typeof p.pos.set === 'function') p.pos.set(WORLD_SPAWN.x, nextY, WORLD_SPAWN.z);
-    else {
-      p.pos.x = WORLD_SPAWN.x;
-      p.pos.y = nextY;
-      p.pos.z = WORLD_SPAWN.z;
-    }
-    p.syncObj?.();
-    this.game?.snapCamera?.();
-  }
-
   emitMove() {
-    if (this.status !== STATUS.online) return;
     const p = this.game?.player;
     if (!p?.pos) return;
     const pose = {
@@ -1283,7 +1025,7 @@ export class WorldView {
       look: localLook(this.game),
       armor: localArmor(this.game),
       hp: Number.isFinite(p.hp) ? p.hp : 20,
-      max_hp: Number.isFinite(p.maxHp) ? p.maxHp : 20,
+      max_hp: Number.isFinite(p.maxHp) ? p.maxHp : Number.isFinite(p.max_hp) ? p.max_hp : 20,
       zone: zoneOf(this.game),
     };
     this._onLocalMove?.(pose);
@@ -1295,15 +1037,20 @@ export class WorldView {
     if (!msg) return false;
     const whisper = msg.match(/^\/w(?:hisper)?\s+(\S+)\s+(.+)$/i);
     if (whisper || channel === 'whisper') {
-      if (whisper && this.game?.social?.caps?.whisper) {
-        Promise.resolve(this.game.social.whisper(whisper[1], whisper[2])).then((result) => {
-          if (result && !result.ok) this.game?.hud?.toast?.(result.message || 'Whisper could not be delivered.', 2200);
-        }).catch(() => this.game?.hud?.toast?.('Whisper could not be delivered.', 2200));
+      if (!whisper) {
+        this.game?.hud?.toast?.('Use /w Hunter message to send a private message.', 2200);
+        return true;
       }
-      else this.game?.hud?.toast?.(this.game?.social?.caps?.whisper ? 'Use /w Hunter message to send a private message.' : 'Private whispers are unavailable on this connection.', 2200);
+      if (!this.game?.social?.caps?.whisper) {
+        this.game?.hud?.toast?.('Private whispers are unavailable on this connection.', 2200);
+        return true;
+      }
+      Promise.resolve(this.game.social.whisper(whisper[1],whisper[2])).then(res=>{
+        if(res && !res.ok)this.game?.hud?.toast?.(res.message || 'Whisper could not be delivered.',2200);
+      }).catch(()=>this.game?.hud?.toast?.('Whisper could not be delivered.',2200));
       return true;
     }
-    const allowed = ['world','zone','party'];
+    const allowed=['world','zone','party'];
     const payload = { channel: allowed.includes(channel) ? channel : 'world', text: msg };
     this._onChatSend?.(payload);
     this.emit({ type: 'chat', ...payload });
@@ -1413,29 +1160,8 @@ export class WorldView {
   }
 
   paintHud() {
-    const st = this.status;
-    const modePill = typeof document !== 'undefined'
-      ? document.getElementById('world-mode-pill')
-      : null;
-    if (modePill) {
-      const label = worldModeLabel(st, this.authReject || this.errorCode() === 'auth');
-      const connected = st === STATUS.online;
-      const pending = st === STATUS.connecting || st === STATUS.waking || st === STATUS.reconnecting;
-      modePill.hidden = false;
-      modePill.dataset.mode = connected ? 'online' : (pending ? st : 'offline');
-      modePill.dataset.connectionState = st;
-      modePill.textContent = label;
-      modePill.setAttribute(
-        'aria-label',
-        connected ? 'Connected to online play' : pending ? 'Connecting to online play' : 'Not connected to online play',
-      );
-      modePill.title = connected
-        ? 'Connected to World 1 online play'
-        : pending
-          ? 'Connecting to World 1 online play'
-          : 'Not connected to World 1 online play';
-    }
     if (!this.ui) return;
+    const st = this.status;
     const count = Math.max(this.online, this.actors.size + (this.live ? 1 : 0));
     const label = st === STATUS.online
       ? `Online · ${count}`
@@ -1447,15 +1173,12 @@ export class WorldView {
             ? 'Reconnecting…'
             : st === STATUS.error && this.errorCode() === 'name_taken'
               ? 'Name taken'
-              : st === STATUS.error && (this.authReject || this.errorCode() === 'auth')
-                ? 'Sign in'
-                : st === STATUS.error
-                  ? 'Error'
-                  : 'Offline';
+              : st === STATUS.error
+                ? 'Error'
+                : 'Offline';
     const canRetry = (st === STATUS.offline || st === STATUS.reconnecting)
       && this.errorCode() !== 'name_taken';
     this.ui.status.dataset.state = st;
-    this.ui.status.hidden = st === STATUS.online;
     const note = typeof this.detail === 'string' ? this.detail : '';
     this.ui.status.innerHTML = `<b>${label}</b>${note ? `<small>${escapeHtml(note)}</small>` : ''}${
       canRetry ? '<button type="button" class="wc-retry">Reconnect</button>' : ''
@@ -1478,10 +1201,10 @@ export class WorldView {
     if (!this.ui?.log) return;
     const zone = this.zone;
     const rows = this.chat.filter((m) => {
-      if (m.channel === 'whisper') return this.channel === 'whisper';
+      if (this.channel === 'whisper') return m.channel === 'whisper';
+      if (m.channel === 'whisper') return false;
       if (this.channel === 'world') return m.channel === 'world';
       if (this.channel === 'party') return m.channel === 'party';
-      if (this.channel === 'whisper') return m.channel === 'whisper';
       return m.channel === 'zone' && (!m.zone || !zone || m.zone === zone);
     });
     this.ui.log.innerHTML = rows.slice(-40).map((m) => {
@@ -1490,9 +1213,9 @@ export class WorldView {
       const pid = escapeHtml(m.from.id);
       const mine = m.from.id === 'you' || this.isLocalId(m.from.id);
       const tag = m.channel === 'whisper' ? '<i class="wc-wh">whisper</i> ' : '';
-      const stamp = Number.isFinite(Number(m.at)) ? new Date(Number(m.at)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const stamp = Number.isFinite(Number(m.at)) ? new Date(Number(m.at)).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
       const cls = mine ? ' class="wc-you"' : '';
-      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text} <small class="wc-time" title="Message time">${escapeHtml(stamp)}</small></p>`;
+      return `<p${cls}>${tag}<b class="wc-name" data-pid="${pid}" data-pname="${who}">${who}</b> ${text} <small class="wc-time">${escapeHtml(stamp)}</small></p>`;
     }).join('');
     this.ui.log.scrollTop = this.ui.log.scrollHeight;
     this.paintPin();

@@ -1,4 +1,4 @@
-import { ERRORS, SOCIAL_INBOUND, SOCIAL_PROTOCOL, SOCIAL_GUEST_NOTE, SOCIAL_SOLO_NOTE, cleanHunterName, errorMessage } from './constants.js';
+import { ERRORS, SOCIAL_INBOUND, SOCIAL_PROTOCOL, cleanHunterName, errorMessage } from './constants.js';
 import { emptySnapshot } from './offline.js';
 
 const METHOD = {
@@ -65,9 +65,7 @@ export class MmoSocial {
       this.unhooks.push(() => { if (this.hooked === client) client.onFrame = orig; });
     }
 
-    // MmoClient owns the WebSocket message listener and calls onFrame once.
-    // Wrapping onFrame above is the single social event tap; attaching a second
-    // ws listener here duplicated whispers, party updates and friend events.
+    // MmoClient owns its socket message listener; wrapping onFrame above taps each frame once.
 
     if (client.you) this.applyYou(client.you);
     this.emit('bind');
@@ -123,11 +121,7 @@ export class MmoSocial {
       return;
     }
     if (type === 'error' && msg.code) {
-      const code = String(msg.code);
-      if (code === 'rate' || code === 'teleport' || code === 'protocol' || code === 'chat' || code === 'auth') {
-        return;
-      }
-      this.emit('error', { code, message: msg.message || errorMessage(code) });
+      this.emit('error', { code: msg.code, message: msg.message || errorMessage(msg.code) });
       return;
     }
     if (!SOCIAL_INBOUND.has(type) && type !== 'chat') return;
@@ -150,7 +144,7 @@ export class MmoSocial {
   }
 
   applyFriendList(msg) {
-    this.state.friends = asList(msg.friends).sort((a,b) => (b.presence === 'online') - (a.presence === 'online') || a.name.localeCompare(b.name));
+    this.state.friends = asList(msg.friends);
     this.state.pendingIn = asList(msg.pending_in || msg.pendingIn);
     this.state.pendingOut = asList(msg.pending_out || msg.pendingOut);
     this.state.blocked = asList(msg.blocked);
@@ -247,10 +241,7 @@ export class MmoSocial {
       return { ok: false, code: ERRORS.offline, message: 'The world server does not have this yet.' };
     }
     const client = this.client || this.game?.mmo;
-    if (!client) {
-      const guest = this.game?.wallet?.kind === 'guest' || !this.game?.wallet?.address;
-      return { ok: false, code: ERRORS.offline, message: guest ? SOCIAL_GUEST_NOTE : SOCIAL_SOLO_NOTE };
-    }
+    if (!client) return { ok: false, code: ERRORS.offline, message: 'Not connected.' };
     const method = METHOD[name];
     try {
       if (method && typeof client[method] === 'function') {
@@ -259,8 +250,7 @@ export class MmoSocial {
       }
       if (typeof client.send === 'function') {
         const payload = payloadOf(name, a, b);
-        client.send(name, payload);
-        return { ok: true };
+        return await Promise.resolve(client.send(name, payload));
       }
       if (client.ws && client.ws.readyState === 1) {
         const extra = payloadOf(name, a, b);
@@ -292,7 +282,7 @@ export class MmoSocial {
 
 function applyFeatures(caps, feats) {
   const list = Array.isArray(feats) ? feats : feats && typeof feats === 'object' ? Object.keys(feats).filter((k) => feats[k]) : [];
-  if (!Array.isArray(feats) && !(feats && typeof feats === 'object')) return;
+  if (!list.length) return;
   caps.friends = false;
   caps.party = false;
   caps.whisper = false;
@@ -307,7 +297,7 @@ function applyFeatures(caps, feats) {
 }
 
 function guestNeedsAuth(type) {
-  return type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type);
+  return type.startsWith('friend') || ['block','unblock','ignore','unignore'].includes(type) || type === 'whisper';
 }
 
 function asList(rows) {
@@ -327,6 +317,7 @@ function payloadOf(type, a, b) {
   if (type === 'party_invite') return typeof a === 'string' && a.length <= 16 && !a.includes('_') ? { name: a } : { id: a };
   if (type === 'party_accept' || type === 'party_decline') return { invite_id: a };
   if (type === 'party_loot') return { loot: a };
+  if (type === 'whisper') return { to: a, text: b };
   if (type === 'party_leave' || type === 'friend_list') return {};
   return { id: a, user_id: a };
 }

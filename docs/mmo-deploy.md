@@ -1,6 +1,6 @@
 # World server deploy
 
-Authoritative WebSocket server for `?mmo=1`. Protocol: `PROTOCOL.md`. Friends and block/ignore data use the account-keyed `public.friendships` table; party membership and chat delivery are handled by the live server.
+Authoritative WebSocket server for `?mmo=1`. Protocol: `PROTOCOL.md`.
 
 ## Start
 
@@ -18,10 +18,9 @@ Listens on `PORT` (default **8080**). `GET /health` returns `{ ok, protocol, pla
 | `PORT` | no (8080) | Listen port |
 | `SUPABASE_URL` | no | JWT verification (`/auth/v1/user` or JWKS) |
 | `SUPABASE_ANON_KEY` | no | With URL, verify access tokens |
-| `SUPABASE_SECRET_KEY` | no | Server-only Supabase Data API access for friends, blocks, ignores and character persistence. **Never commit.** |
-| `SUPABASE_SERVICE_ROLE_KEY` | legacy fallback | Same server-only permissions while migrating existing deployments. **Never commit.** |
+| `SUPABASE_SERVICE_ROLE_KEY` | no | Persistence only, when PR #60's `server/persistence` is present. **Never commit.** |
 
-Without `SUPABASE_URL` + `SUPABASE_ANON_KEY`, the server accepts **guest names**. Without a server-only `SUPABASE_SECRET_KEY` (or legacy service-role key), signed-in players can still use parties and chat, but persistent friends, blocks and ignores are not advertised.
+Without the Supabase vars the server accepts **guest names**.
 
 ## Docker
 
@@ -45,7 +44,7 @@ Start command: `node server/index.js` (the image `CMD`).
 
 ## Railway
 
-New service from this repo. Start command: `npm run start:server`. Port: use Railway's `PORT`. Add the env vars above as secrets, including `SUPABASE_SECRET_KEY` for persistent social features.
+New service from this repo. Start command: `npm run start:server`. Port: use Railway's `PORT`. Add the env vars above as secrets.
 
 ## Render
 
@@ -53,7 +52,7 @@ Web service, Docker or native Node. Start: `npm run start:server`. Health check:
 
 ## Client URL
 
-After sign-in, **Choose a world** → **World 1 — Online** reloads with `?mmo=1`. Pages stays offline until a world URL is configured (`MG_WORLD_URL` / `VITE_MMO_URL` at build time, or `?server=`). With no URL World 1 reads **World 1 coming soon** and stays disabled. Guests never open the socket.
+The title screen **Play Online — World 1** button reloads with `?mmo=1`. Pages stays offline until a world URL is configured (`MG_WORLD_URL` / `VITE_MMO_URL` at build time, or `?server=`). With no URL the button reads **World 1 coming soon** and stays disabled.
 
 Manual flags still work:
 
