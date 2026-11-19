@@ -9,13 +9,22 @@ function fixture(mode = 'round_robin') {
   const b = { id: 'b', userId: 'ub', zone: 'Oakhollow', x: 1, z: 0, serverDamage: 20 };
   const players = new Map([['a', a], ['b', b]]);
   const party = { id: 'p', loot: mode, members: [{ id: 'a', joinedAt: 1 }, { id: 'b', joinedAt: 2 }] };
-  const parties = { partyOf: (id) => ['a','b'].includes(id) ? party : null };
+  const parties = {
+    partyOf: (id) => ['a','b'].includes(id) ? party : null,
+    get: (id) => id === 'p' ? party : null,
+  };
   const monster = { id: 'm1', type: 'testbeast', zone: 'Oakhollow', x: 2, z: 0, hp: 20, maxHp: 20, level: 2, respawn: 10, drops: [{ kind: 'good', id: 'hide', amount: 1 }] };
   const grants = [];
+  const grantIds = new Set();
   const engine = createCombatLoot({
     monsters: [monster], players, parties, now: () => time,
     random: () => 50,
-    persist: { grantOnce: async (g) => { grants.push(g); return { granted: true }; } },
+    persist: { grantOnce: async (g) => {
+      if (grantIds.has(g.rewardId)) return { granted: false };
+      grantIds.add(g.rewardId);
+      grants.push(g);
+      return { granted: true };
+    } },
     broadcast: (m) => messages.push(m),
   });
   return { engine, a, b, monster, grants, messages, advance: (ms) => { time += ms; } };
@@ -93,4 +102,30 @@ test('forged session objects cannot attack or submit loot choices', async () => 
   await f.engine.attack(f.a, 'm1');
   const roll = f.messages.find((m) => m.type === 'loot_roll');
   await assert.rejects(() => f.engine.choose({ ...f.b }, roll.roll_id, 'need'), /Authenticated hunter/);
+});
+
+test('Rift chest items use the same per-item round robin and durable replay protection', async () => {
+  const f = fixture();
+  const chest = [
+    { kind: 'gold', id: 'gold', amount: 38 },
+    { kind: 'good', id: 'copper_ore', amount: 2 },
+    { kind: 'good', id: 'birch_logs', amount: 1 },
+  ];
+  await f.engine.distribute(chest, [f.a, f.b], 'p', 'rift:run-1:chest');
+  assert.equal(f.grants.filter((g) => g.kind === 'gold').length, 2);
+  assert.equal(f.grants.find((g) => g.id === 'copper_ore').userId, 'ua');
+  assert.equal(f.grants.find((g) => g.id === 'birch_logs').userId, 'ub');
+  const before = f.grants.length;
+  await f.engine.distribute(chest, [f.a, f.b], 'p', 'rift:run-1:chest');
+  assert.equal(f.grants.length, before);
+});
+
+test('Rift chest items honour Need/Greed when party loot mode is enabled', async () => {
+  const f = fixture('need_greed');
+  await f.engine.distribute([{ kind: 'good', id: 'copper_ore', amount: 2 }], [f.a, f.b], 'p', 'rift:run-2:chest');
+  const roll = f.messages.find((m) => m.type === 'loot_roll');
+  assert.ok(roll);
+  await f.engine.choose(f.b, roll.roll_id, 'greed');
+  await f.engine.choose(f.a, roll.roll_id, 'need');
+  assert.equal(f.grants.find((g) => g.kind === 'good').userId, 'ua');
 });
