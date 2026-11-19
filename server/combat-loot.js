@@ -69,9 +69,10 @@ export function createCombatLoot({
 
   async function roundRobin(item, members, partyId, rewardId) {
     const key = partyId || members[0].id;
-    const cursor = cursors.get(key) || 0;
+    const cursor = partyId ? (parties?.parties?.get?.(partyId)?.loot_turn || 0) : (cursors.get(key) || 0);
     const index = cursor % members.length;
-    cursors.set(key, cursor + 1);
+    if (partyId && parties?.parties?.get?.(partyId)) parties.parties.get(partyId).loot_turn = cursor + 1;
+    else cursors.set(key, cursor + 1);
     await deliver(item, members[index], rewardId);
     return members[index];
   }
@@ -97,7 +98,7 @@ export function createCombatLoot({
     for (const member of members) {
       if (!member.userId) continue;
       const rewardId = `kill:${monster.id}:${monster.deathId}:xp:${member.userId}`;
-      await grant({ rewardId, kind: 'xp', id: monster.type, amount: xpFor(monster) }, member.userId);
+      await grant({ rewardId, kind: 'xp', id: 'strength', amount: xpFor(monster) }, member.userId);
       const goldId = `kill:${monster.id}:${monster.deathId}:gold:${member.userId}`;
       await grant({ rewardId: goldId, kind: 'gold', id: 'gold', amount: goldFor(monster) }, member.userId);
     }
