@@ -25,11 +25,11 @@ function isAccountId(value) {
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
 const PING_MS = 15_000;
 const TOKEN_WATCH_MS = 400;
-export const WAKE_ETA_SEC = 30;
-export const WAKE_GIVE_UP_SEC = 60;
+export const WAKE_ETA_SEC = 60;
+export const WAKE_GIVE_UP_SEC = 75;
 export const WAKE_POLL_MS = 2500;
 export const WAKE_TICK_MS = 1000;
-export const WAKE_PROBE_MS = 3000;
+export const WAKE_PROBE_MS = 65_000;
 
 /** https:// (or http://) /healthz for a wss:// or ws:// world URL. */
 export function healthzUrl(worldUrl) {
