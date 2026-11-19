@@ -10,6 +10,7 @@
  */
 
 import * as worldView from './worldView.js';
+import { showServerRiftChest } from '../world/rift.js';
 import { PROTOCOL, TYPES, encode, parseFrame, parseWorldFlags, resolveWorldUrl } from './worldProtocol.js';
 
 export { PROTOCOL, TYPES, encode, parseFrame, parseWorldFlags, resolveWorldUrl };
@@ -416,9 +417,13 @@ export class MmoClient {
       return;
     }
     if (msg.type === 'rift_wave') {
+      if (this.game?.riftRun) this.game.riftRun.wave = Number(msg.wave) || this.game.riftRun.wave;
+      this.game?.hud?.banner?.(`Wave ${msg.wave}`, `${msg.count || 0} in the tear`, 2400);
+      this.syncAuthoritativeMonsters();
       return;
     }
     if (msg.type === 'rift_chest_ready') {
+      showServerRiftChest(this.game);
       toast(this.game, 'The Rift chest is ready. Claim it at the centre.');
       return;
     }
