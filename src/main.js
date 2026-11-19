@@ -2584,7 +2584,12 @@ class Game {
     this.progress.data.xp = mergeCounts(this.progress.data.xp, snapshot.xp);
     this.progress.data.goods = mergeCounts(this.progress.data.goods, snapshot.goods);
     this.progress.data.materials = mergeCounts(this.progress.data.materials, snapshot.materials);
+    this.progress.data.crafted = { ...(this.progress.data.crafted || {}) };
+    for (const [id, owned] of Object.entries(snapshot.crafted || {})) {
+      if (owned) this.progress.data.crafted[id] = true;
+    }
     this.progress.save(false);
+    this.applyGear();
     this.gold = this.progress.gold;
     this.hud?.setGold?.(this.gold);
     this.itemsChanged?.();
