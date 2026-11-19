@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEAR, WEAPON_ORDER } from '../src/data/catalog.js';
-import { bindPanelClose, minimapArrowAngle, stackNameplates } from '../src/ui/hud.js';
+import { HUD, PARTY_DOT, bindPanelClose, minimapArrowAngle, partyDotPulse, stackNameplates } from '../src/ui/hud.js';
 import { HUD_HOTBAR_FADE, HUD_SAFE_PAD, PLATE_STACK_GAP, VIEWPORT_PLATE_INSET, hudSafeMargin, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, overlap, padHudSafeRects, plateAnchorRect, platesCollide } from '../src/ui/hudLayout.js';
 import {
   CURSOR_KINDS,
@@ -44,6 +44,67 @@ test('minimap remotes use snapshot yaw/heading as the arrow angle', () => {
   assert.match(hud, /paintMinimapArrow\(ctx, toX\(r\.x\), toZ\(r\.z\), r\.yaw/);
   const p = normalizePlayer({ id: 'b', name: 'Bea', heading: Math.PI / 2, x: 1, z: 1 });
   assert.equal(p.yaw, Math.PI / 2);
+});
+
+test('party members are blue pulsing dots on the minimap', () => {
+  const quiet = partyDotPulse((3 * Math.PI) / 10);
+  const loud = partyDotPulse(Math.PI / 10);
+  assert.ok(loud.halo > quiet.halo);
+  assert.ok(loud.core > quiet.core);
+  assert.ok(loud.alpha > quiet.alpha);
+  assert.equal(quiet.wave, 0);
+  assert.equal(loud.wave, 1);
+
+  const arcs = [];
+  const fills = [];
+  const ctx = {
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    imageSmoothingEnabled: false,
+    fillRect() {},
+    drawImage() {},
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    scale() {},
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    closePath() {},
+    fill() { fills.push(this.fillStyle); },
+    stroke() {},
+    arc(_x, _y, r) { arcs.push({ fill: this.fillStyle, r }); },
+    createRadialGradient() { return { addColorStop() {} }; },
+  };
+  const hud = { mctx: ctx, el: { minimap: { width: 150, height: 150 } } };
+  const world = { realm: 'over', minimapOrigin: { x: 0, z: 0 }, minimapCanvas: {}, teleports: [] };
+  const remotes = [
+    { id: 'wv:bram', name: 'Bram', x: 44, z: 42, yaw: 0.4, ready: true },
+    { id: 'wv:nessa', name: 'Nessa', x: 48, z: 46, yaw: 1, ready: true },
+    { id: 'wv:lira', name: 'Lira', x: 400, z: 400, yaw: 0, ready: true },
+    { id: 'wv:pik', name: 'Pik', x: 42, z: 44, yaw: 0, ready: false },
+  ];
+  const partyOf = {
+    isPartyMember(id, name) {
+      return id === 'wv:bram' || id === 'wv:lira' || id === 'wv:pik' || name === 'Bram';
+    },
+  };
+  const draw = (time) => {
+    arcs.length = 0;
+    fills.length = 0;
+    HUD.prototype.drawMinimap.call(hud, world, 40, 40, 0, [], [], time, remotes, partyOf);
+  };
+  draw(Math.PI / 10);
+  const halos = arcs.filter((a) => String(a.fill).startsWith('rgba(47, 125, 255'));
+  assert.equal(halos.length, 1, 'one in-view party member gets a halo');
+  assert.equal(halos[0].r, loud.halo);
+  assert.ok(fills.includes(PARTY_DOT));
+  assert.ok(fills.includes('#9ad7ff'), 'other hunters stay arrows');
+  assert.equal(fills.includes('#ffe27a'), false);
+  draw((3 * Math.PI) / 10);
+  assert.equal(arcs.filter((a) => String(a.fill).startsWith('rgba(47, 125, 255'))[0].r, quiet.halo);
 });
 
 test('MG-UI-10 dialogue stays absolutely positioned and clamped on screen', () => {
