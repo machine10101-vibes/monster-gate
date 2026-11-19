@@ -9,7 +9,7 @@ const LOOT_MODES = new Set(['round_robin', 'need_greed']);
 function distance(a, b) { return Math.hypot((a.x || 0) - (b.x || 0), (a.z || 0) - (b.z || 0)); }
 function orderedMembers(party, players, zone) {
   return (party?.members || [])
-    .slice().sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id))
+    .slice().sort((a, b) => a.joinedAt - b.joinedAt)
     .map((m) => players.get(m.id)).filter((p) => p && p.zone === zone);
 }
 
