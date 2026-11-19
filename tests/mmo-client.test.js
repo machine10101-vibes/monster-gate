@@ -392,3 +392,19 @@ test('Colosseum ranged attacks can select an opponent at bow range', () => {
   assert.equal(sent[0].target_id, 'enemy');
   client.dispose();
 });
+
+
+test('Colosseum match offers require an explicit confirmation frame', () => {
+  const client = new MmoClient({ player: { pos: { x: 0, z: 0 } } }, stubView(), { url: 'ws://world.test', WebSocket: FakeSocket, guest: false });
+  const sent = [];
+  client.ws = { readyState: 1, send: (raw) => sent.push(parseFrame(raw)) };
+  client.onFrame(JSON.stringify({ v: 1, type: 'pvp_match_found', proposal_id: 'proposal-1', mode: '1v1' }));
+  assert.equal(client.pvpProposalId, 'proposal-1');
+  assert.equal(client.confirmPvp(true), true);
+  assert.equal(sent[0].type, 'pvp_confirm');
+  assert.equal(sent[0].proposal_id, 'proposal-1');
+  assert.equal(sent[0].accept, true);
+  client.onFrame(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '1v1', status: 'cancelled' }));
+  assert.equal(client.pvpProposalId, null);
+  client.dispose();
+});
