@@ -321,6 +321,9 @@ export class World {
       move: pose.move ?? 0, anim: pose.anim ?? 0,
       held: gear.held || 'blade',
       weapon: gear.weapon ?? null,
+      pvpRating: Number(row?.state?.pvp?.rating) || 1000,
+      pvpWins: Number(row?.state?.pvp?.wins) || 0,
+      pvpLosses: Number(row?.state?.pvp?.losses) || 0,
       sheath: pose.sheath ?? null,
       look: gear.look,
       armor: gear.armor || {},
@@ -343,7 +346,7 @@ export class World {
       zoneCap: this.zoneCap,
       resumeToken: token,
       resumed: !!slot,
-      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
+      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId, pvp_rating: session.pvpRating, pvp_wins: session.pvpWins, pvp_losses: session.pvpLosses },
       pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
       features: ident.guest ? ['party'] : this.social.features,
     });
