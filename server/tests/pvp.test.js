@@ -23,6 +23,14 @@ test('Colosseum queues pair solo hunters and server resolves PvP damage', async 
   assert.ok(hit.damage > 0);
   assert.equal(pb.hp, before - hit.damage);
   assert.ok(aFrames.some(m => m.type === 'pvp_hit'));
+  const returnPose = { ...pa.pvpReturnPose };
+  srv.world.pvp.leave(pa);
+  assert.equal(pa.pvpMatchId, null);
+  assert.equal(pb.pvpMatchId, null);
+  assert.equal(pa.zone, returnPose.zone);
+  assert.equal(pa.x, returnPose.x);
+  assert.equal(pa.z, returnPose.z);
+  assert.ok(aFrames.some(m => m.type === 'pvp_match_end'));
   a.close(); b.close();
   await srv.close();
 });
