@@ -83,7 +83,8 @@ function cityModels() {
   const wall = new VoxelModel(28, 46, 8);
   wall.box(0, 0, 0, 28, 36, 8, (x, y, z) => brickAt(x, y, z, 3));
   for (let x = 0; x < 28; x += 4) wall.box(x, 36, 0, x + 2, 44, 8, (a, y, z) => brickAt(a, y, z, 3));
-  wall.box(0, 34, 0, 28, 36, 1, 0x6a5a48);
+  wall.box(0, 34, 0, 28, 36, 2, (x, y, z) => stoneAt(x, y, z, 4));
+  wall.box(0, 34, 6, 28, 36, 8, (x, y, z) => stoneAt(x, y, z, 4));
 
   const tower = new VoxelModel(18, 68, 18);
   tower.box(0, 0, 0, 18, 54, 18, (x, y, z) => brickAt(x, y, z, 5));
@@ -121,6 +122,43 @@ function cityModels() {
   seat.box(0, 0, 0, 16, 4, 12, (x, y, z) => stoneAt(x, y, z, 15));
   seat.box(0, 4, 4, 16, 8, 12, (x, y, z) => stoneAt(x, y, z, 16));
   seat.box(0, 8, 8, 16, 12, 12, (x, y, z) => stoneAt(x, y, z, 17));
+  seat.box(1, 4, 5, 5, 5, 7, 0x8a1e1e);
+  seat.box(7, 8, 9, 12, 9, 11, 0xc9a14a);
+
+  const bay = new VoxelModel(36, 58, 10);
+  bay.box(0, 0, 0, 36, 52, 10, (x, y, z) => stoneAt(x, y, z, 60));
+  for (let x = 7; x < 29; x++) {
+    const rise = Math.sin(((x - 7) / 22) * Math.PI) * 12;
+    const top = 8 + Math.floor(rise);
+    bay.carve(x, 0, 0, x + 1, top, 10);
+    const voussoir = x % 2 ? 0xe8e0d2 : 0xb7aa96;
+    bay.box(x, top, 0, x + 1, top + 2, 10, voussoir);
+  }
+  bay.box(16, 20, 0, 20, 24, 2, 0xc9a14a);
+  bay.box(16, 20, 8, 20, 24, 10, 0xc9a14a);
+  bay.box(0, 22, 0, 36, 26, 10, (x, y, z) => stoneAt(x, y, z, 61));
+  for (let x = 11; x < 25; x++) {
+    const rise = Math.sin(((x - 11) / 14) * Math.PI) * 7;
+    const top = 32 + Math.floor(rise);
+    bay.carve(x, 28, 0, x + 1, top, 10);
+    bay.box(x, top, 0, x + 1, top + 1, 10, x % 2 ? 0xe8e0d2 : 0x8a1e1e);
+  }
+  bay.box(12, 33, 8, 24, 38, 10, 0x8a1e1e);
+  bay.box(14, 34, 8, 22, 37, 10, 0xc9a14a);
+  bay.box(0, 48, 0, 36, 52, 10, (x, y, z) => stoneAt(x, y, z, 62));
+  bay.box(16, 49, 0, 20, 52, 2, 0xc9a14a);
+  for (let x = 0; x < 36; x += 6) bay.box(x, 52, 0, x + 2, 58, 10, (a, y, z) => stoneAt(a, y, z, 63));
+
+  const imperial = new VoxelModel(22, 28, 12);
+  imperial.box(0, 0, 0, 22, 8, 12, (x, y, z) => stoneAt(x, y, z, 64));
+  imperial.box(2, 8, 2, 20, 16, 10, (x, y, z) => stoneAt(x, y, z, 65));
+  imperial.box(4, 10, 1, 18, 15, 4, 0x8a1e1e);
+  imperial.box(6, 11, 1, 16, 14, 3, 0xc9a14a);
+  imperial.box(1, 16, 1, 21, 18, 11, 0xf2ead0);
+  imperial.box(0, 18, 0, 22, 20, 12, 0x8a1e1e);
+  imperial.box(3, 20, 4, 5, 26, 6, (x, y, z) => J(0x6a4328, x, y, z, 66, 0.04));
+  imperial.box(17, 20, 4, 19, 26, 6, (x, y, z) => J(0x6a4328, x, y, z, 67, 0.04));
+  imperial.box(3, 24, 4, 19, 26, 6, 0xc9a14a);
 
   const banner = new VoxelModel(14, 36, 4);
   banner.box(1, 0, 1, 3, 30, 3, (x, y, z) => J(0x6a4328, x, y, z, 19, 0.05));
@@ -296,6 +334,8 @@ function cityModels() {
     post: bundle([[post, 0.08, 2, 0, 2]]),
     arch: bundle([[arch, 0.09, 11, 0, 4]]),
     seat: bundle([[seat, 0.1, 8, 0, 6]]),
+    bay: bundle([[bay, 0.1, 18, 0, 5]]),
+    imperial: bundle([[imperial, 0.1, 11, 0, 6]]),
     banner: bundle([[banner, 0.08, 2, 0, 2]]),
     chain: bundle([[chain, 0.12, 0, 0, 1]]),
     cloth: bundle([[cloth, 0.08, 1, 0, 1]]),
@@ -599,7 +639,7 @@ function tagAt(dx, dz, r, original) {
   if (r < CITY_R) {
     const ax = dx - (ARENA.x - CX);
     const az = dz - (ARENA.z - CZ);
-    if ((ax * ax) / (8 * 8) + (az * az) / (6.2 * 6.2) < 1) return { h: FLOOR, tag: 'sand' };
+    if ((ax * ax) / (5.4 * 5.4) + (az * az) / (4.3 * 4.3) < 1) return { h: FLOOR, tag: 'sand' };
     return { h: FLOOR, tag: 'cobble' };
   }
   if (r < MOAT_IN) return { h: FLOOR, tag: 'cobble' };
@@ -708,10 +748,10 @@ function paintCountry(land) {
   }
 }
 
-function gateGap(x, z) {
-  const dx = x - CX;
-  const dz = z - CZ;
-  return Math.abs(dz) < 6.4 && Math.abs(dx) > 22 && Math.abs(dx) < 38;
+/** True when this curtain angle is the east or west drawbridge mouth. */
+function gateMouth(a) {
+  const rel = Math.atan2(Math.sin(a), Math.cos(a));
+  return Math.abs(rel) < 0.2 || Math.abs(Math.abs(rel) - Math.PI) < 0.2;
 }
 
 function inArena(x, z, pad) {
@@ -729,7 +769,7 @@ function onRoad(x, z) {
 function onSand(x, z) {
   const ax = x - ARENA.x;
   const az = z - ARENA.z;
-  return (ax * ax) / (7.2 * 7.2) + (az * az) / (5.6 * 5.6) < 1;
+  return (ax * ax) / (5.8 * 5.8) + (az * az) / (4.6 * 4.6) < 1;
 }
 
 function canDress(world, x, z, r, limit = 28) {
@@ -747,33 +787,37 @@ function drop(world, parts, x, z, rot, scale, r, limit = 28) {
 }
 
 function dressWall(world, parts) {
-  const count = 84;
+  const radius = 29.2;
+  const seg = 28 * 0.075;
+  const count = Math.round((Math.PI * 2 * radius) / (seg * 0.82));
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2;
-    const x = CX + Math.cos(a) * 29.2;
-    const z = CZ + Math.sin(a) * 29.2;
-    if (gateGap(x, z)) continue;
+    const x = CX + Math.cos(a) * radius;
+    const z = CZ + Math.sin(a) * radius;
+    if (gateMouth(a)) continue;
     world.putAt(parts.wall, x, z, a + Math.PI / 2, 1);
-    world.circle(x, z, 0.85);
-    world.occupy(x, z, 1.1);
-    if (i % 6 === 0) {
-      const bx = CX + Math.cos(a) * 27.4;
-      const bz = CZ + Math.sin(a) * 27.4;
-      world.putAt(parts.cloth, bx, bz, a + Math.PI / 2, 1, { y: world.heightAt(bx, bz) + 2.4 });
+    world.circle(x, z, 0.92);
+    world.occupy(x, z, 1.05);
+    if (i % 7 === 0) {
+      const bx = CX + Math.cos(a) * 27.6;
+      const bz = CZ + Math.sin(a) * 27.6;
+      world.putAt(parts.cloth, bx, bz, a + Math.PI / 2, 1, { y: world.heightAt(bx, bz) + 2.35 });
     }
-    if (i % 4 === 2) world.torch(CX + Math.cos(a) * 27.6, CZ + Math.sin(a) * 27.6, 0xffa040);
+    if (i % 5 === 2) world.torch(CX + Math.cos(a) * 27.8, CZ + Math.sin(a) * 27.8, 0xffa040);
   }
   for (const sign of [-1, 1]) {
     for (const side of [-1, 1]) {
-      const x = CX + sign * 28.4;
-      const z = CZ + side * 7.1;
-      world.putAt(parts.tower, x, z, 0, 1);
+      const x = CX + sign * Math.cos(0.3) * radius;
+      const z = CZ + side * Math.sin(0.3) * radius;
+      world.putAt(parts.tower, x, z, sign > 0 ? -Math.PI / 2 : Math.PI / 2, 1);
       world.circle(x, z, 1.05);
-      world.occupy(x, z, 1.3);
+      world.occupy(x, z, 1.25);
       world.lightSpots.push({ x, y: world.heightAt(x, z) + 4.6, z, color: 0xffc870 });
+      world.putAt(parts.wall, CX + sign * 27.6, CZ + side * 5.05, 0, 1);
+      world.circle(CX + sign * 27.6, CZ + side * 5.05, 0.45);
     }
-    const lx = CX + sign * 28.2;
-    world.putAt(parts.lintel, lx, CZ, Math.PI / 2, 1, { y: world.heightAt(lx, CZ) + 3.15 });
+    const lx = CX + sign * 28.4;
+    world.putAt(parts.lintel, lx, CZ, Math.PI / 2, 1.38, { y: world.heightAt(lx, CZ) + 2.55 });
     world.putAt(parts.chain, CX + sign * 26.2, CZ - 2.4, sign > 0 ? 0.15 : Math.PI - 0.15, 1, { y: world.heightAt(CX + sign * 26, CZ) + 1.2 });
     world.putAt(parts.chain, CX + sign * 26.2, CZ + 2.4, sign > 0 ? -0.15 : Math.PI + 0.15, 1, { y: world.heightAt(CX + sign * 26, CZ) + 1.2 });
     for (let i = 0; i < 8; i++) {
@@ -790,51 +834,95 @@ function dressWall(world, parts) {
   }
 }
 
+function arenaMouth(a) {
+  const rel = Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2));
+  return Math.abs(rel) < 0.38;
+}
+
+/** Points spaced by arc length around an ellipse, so the arches meet. */
+function ellipseRing(rx, rz, count) {
+  const steps = 720;
+  let len = 0;
+  let px = rx;
+  let pz = 0;
+  const samples = [[0, rx, 0, 0]];
+  for (let i = 1; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const x = Math.cos(a) * rx;
+    const z = Math.sin(a) * rz;
+    len += Math.hypot(x - px, z - pz);
+    samples.push([a, x, z, len]);
+    px = x;
+    pz = z;
+  }
+  const gap = len / count;
+  const pts = [];
+  let cursor = 0;
+  for (let n = 0; n < count; n++) {
+    let pick = samples[0];
+    for (const s of samples) if (s[3] >= cursor) { pick = s; break; }
+    pts.push({ a: pick[0], x: pick[1], z: pick[2] });
+    cursor += gap;
+  }
+  return pts;
+}
+
 function dressArena(world, parts) {
-  const arches = 20;
-  for (let i = 0; i < arches; i++) {
-    const a = (i / arches) * Math.PI * 2;
-    const gap = Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2));
-    if (Math.abs(gap) < 0.42) continue;
-    const x = ARENA.x + Math.cos(a) * 11.4;
-    const z = ARENA.z + Math.sin(a) * 9.2;
-    world.putAt(parts.arch, x, z, a, 1);
-    world.circle(x, z, 0.72);
+  const rx = 9.05;
+  const rz = 7.35;
+  let bayN = 0;
+  for (const p of ellipseRing(rx, rz, 15)) {
+    if (arenaMouth(p.a)) continue;
+    const x = ARENA.x + p.x;
+    const z = ARENA.z + p.z;
+    if (Math.hypot(x - CX, z - CZ) > 28.4) continue;
+    world.putAt(parts.bay, x, z, p.a + Math.PI / 2, 1);
+    world.circle(x, z, 0.7);
     world.occupy(x, z, 0.9);
+    if (bayN % 2 === 0) {
+      world.putAt(parts.banner, x, z, p.a, 0.9, { y: world.heightAt(x, z) + 3.1 });
+    }
+    bayN++;
   }
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2 + 0.1;
-    const gap = Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2));
-    if (Math.abs(gap) < 0.48) continue;
-    const x = ARENA.x + Math.cos(a) * 8.1;
-    const z = ARENA.z + Math.sin(a) * 6.4;
-    world.putAt(parts.seat, x, z, a + Math.PI, 1);
-    world.circle(x, z, 0.85);
+  const rows = [[6.15, 4.95, 22], [7.45, 6.0, 26]];
+  for (const [sx, sz, count] of rows) {
+    for (const p of ellipseRing(sx, sz, count)) {
+      if (arenaMouth(p.a)) continue;
+      const rel = Math.atan2(Math.sin(p.a + Math.PI / 2), Math.cos(p.a + Math.PI / 2));
+      if (Math.abs(rel) < 0.4) continue;
+      const x = ARENA.x + p.x;
+      const z = ARENA.z + p.z;
+      world.putAt(parts.seat, x, z, p.a + Math.PI, 1);
+      world.circle(x, z, 0.42);
+    }
   }
-  world.putAt(parts.banner, ARENA.x - 3.4, ARENA.z + 10.6, 0, 1);
-  world.putAt(parts.banner, ARENA.x + 3.4, ARENA.z + 10.6, 0, 1);
-  world.circle(ARENA.x - 3.4, ARENA.z + 10.6, 0.22);
-  world.circle(ARENA.x + 3.4, ARENA.z + 10.6, 0.22);
-  for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2 + 0.2;
-    const gap = Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2));
-    if (Math.abs(gap) < 0.55) continue;
-    const x = ARENA.x + Math.cos(a) * 13.2;
-    const z = ARENA.z + Math.sin(a) * 10.6;
-    if (Math.hypot(x - CX, z - CZ) > 26) continue;
-    world.putAt(parts.column, x, z, a, 1);
-    world.circle(x, z, 0.4);
-    world.occupy(x, z, 0.55);
-    if (i % 2 === 0) world.putAt(parts.cloth, x, z + 0.2, a, 0.85, { y: world.heightAt(x, z) + 1.6 });
+  for (const p of ellipseRing(8.15, 6.55, 10)) {
+    if (arenaMouth(p.a)) continue;
+    const x = ARENA.x + p.x;
+    const z = ARENA.z + p.z;
+    if (Math.hypot(x - CX, z - CZ) > 28) continue;
+    world.putAt(parts.column, x, z, p.a, 0.85);
+    world.circle(x, z, 0.22);
   }
-  drop(world, parts.rack, ARENA.x - 5.4, ARENA.z + 11.2, 0.2, 1, 0.55);
-  drop(world, parts.rack, ARENA.x + 5.4, ARENA.z + 11.2, -0.2, 1, 0.55);
-  for (let i = 0; i < 6; i++) {
-    const a = -0.8 + i * 0.32;
-    const x = ARENA.x + Math.cos(a) * 4.2;
-    const z = ARENA.z + 6.2 + Math.sin(a) * 1.2;
-    world.torch(x, z, 0xffa040);
+  for (const p of ellipseRing(5.55, 4.45, 18)) {
+    if (arenaMouth(p.a)) continue;
+    const x = ARENA.x + p.x;
+    const z = ARENA.z + p.z;
+    world.putAt(parts.quay, x, z, p.a, 0.7);
+    world.circle(x, z, 0.16);
   }
+  const boxZ = ARENA.z - 6.4;
+  world.putAt(parts.imperial, ARENA.x, boxZ, Math.PI, 1);
+  world.circle(ARENA.x, boxZ, 0.7);
+  world.occupy(ARENA.x, boxZ, 1.05);
+  world.putAt(parts.banner, ARENA.x - 2.2, boxZ - 0.4, 0.4, 0.9, { y: world.heightAt(ARENA.x, boxZ) + 1.8 });
+  world.putAt(parts.banner, ARENA.x + 2.2, boxZ - 0.4, -0.4, 0.9, { y: world.heightAt(ARENA.x, boxZ) + 1.8 });
+  world.putAt(parts.rack, ARENA.x - 3.6, ARENA.z + 6.5, 0.15, 1);
+  world.putAt(parts.rack, ARENA.x + 3.6, ARENA.z + 6.5, -0.15, 1);
+  world.circle(ARENA.x - 3.6, ARENA.z + 6.5, 0.35);
+  world.circle(ARENA.x + 3.6, ARENA.z + 6.5, 0.35);
+  world.torch(ARENA.x - 2.4, ARENA.z + 7.1, 0xffa040);
+  world.torch(ARENA.x + 2.4, ARENA.z + 7.1, 0xffc870);
 }
 
 function house(world, spec) {
@@ -958,7 +1046,8 @@ function dressTown(world, parts) {
     world.lamp(CX - 5.4, CZ + i * 8);
     world.lamp(CX + 5.4, CZ + i * 8);
   }
-  world.lamp(ARENA.x, ARENA.z + 12.2);
+  world.lamp(ARENA.x - 3.4, ARENA.z + 12.2);
+  world.lamp(ARENA.x + 3.4, ARENA.z + 12.2);
 
   for (let n = 0; n < 14; n++) {
     const x = 414 + hash2(n, 2, 57) * 36;

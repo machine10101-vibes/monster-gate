@@ -7,7 +7,7 @@ import { openSouthfordDesert } from '../src/world/desert.js';
 import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.js';
 import { World } from '../src/world/world.js';
 import { TILES } from '../src/world/tiles.js';
-import { GILANTRE_SPOTS } from '../src/world/gilantre.js';
+import { GILANTRE_SPOTS, dressGilantre } from '../src/world/gilantre.js';
 import { questById, questGiverNpc } from '../src/data/quests.js';
 
 function world() {
@@ -119,6 +119,50 @@ test('a hunter can walk the west road into Gilantre and cross to the east bridge
   route(w, [[468, 144], [500, 144], [GILANTRE_SPOTS.oak.x, GILANTRE_SPOTS.oak.z]]);
   route(w, [[468, 144], [486, 144], [GILANTRE_SPOTS.reed.x, GILANTRE_SPOTS.reed.z]]);
   route(w, [[396, 144], [GILANTRE_SPOTS.grove.x, GILANTRE_SPOTS.grove.z]]);
+});
+
+function blocked(w, x, z) {
+  const body = { x, z };
+  w.resolve(body, 0.28);
+  return Math.hypot(body.x - x, body.z - z) > 0.05;
+}
+
+/** Walk with collider push, the way the player actually moves. */
+function press(w, sx, sz, gx, gz) {
+  const p = { x: sx, z: sz };
+  for (let i = 0; i < 500; i++) {
+    const dx = gx - p.x;
+    const dz = gz - p.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 1.1) return true;
+    const step = Math.min(0.28, dist);
+    p.x += (dx / dist) * step;
+    p.z += (dz / dist) * step;
+    for (let n = 0; n < 4; n++) w.resolve(p, 0.32);
+  }
+  return Math.hypot(gx - p.x, gz - p.z) < 1.4;
+}
+
+test('the curtain wall is solid and the coliseum sand can be reached', () => {
+  const w = world();
+  w.makeModels();
+  w.mats = { solid: {}, glow: {}, window: {}, cover: {} };
+  dressGilantre(w);
+
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const rel = Math.atan2(Math.sin(a), Math.cos(a));
+    const mouth = Math.abs(rel) < 0.16 || Math.abs(Math.abs(rel) - Math.PI) < 0.16;
+    const x = 432 + Math.cos(a) * 29.2;
+    const z = 144 + Math.sin(a) * 29.2;
+    assert.equal(blocked(w, x, z), !mouth, `wall ${a.toFixed(2)} at ${x.toFixed(1)},${z.toFixed(1)}`);
+  }
+
+  assert.equal(blocked(w, GILANTRE_SPOTS.arena.x, GILANTRE_SPOTS.arena.z), false);
+  assert.equal(blocked(w, GILANTRE_SPOTS.arena.x + 9.05, GILANTRE_SPOTS.arena.z), true, 'east arcade');
+  assert.equal(press(w, 396, 144, 468, 144), true, 'east-west road through both gates');
+  assert.equal(press(w, 468, 144, 446, 142), true, 'east gate to the coliseum door');
+  assert.equal(press(w, 446, 142, GILANTRE_SPOTS.arena.x, GILANTRE_SPOTS.arena.z), true, 'south aisle onto the sand');
 });
 
 test('Gilantre quests point at the people who stand in the city', () => {
