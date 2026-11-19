@@ -29,7 +29,7 @@ export function createPersistence(options = {}) {
     let lastError;
     for (let attempt = 0; attempt < 4; attempt++) {
       const current = await adapter.load(id);
-      if (!current) throw new PersistenceError('Character not found.', 'not_found');
+      if (!current) throw new PersistenceError('not_found', 'Character not found.');
       const next = sanitizeState(mergeState(current.state || {}, withSeen(patch)));
       try {
         const saved = await adapter.save(id, next, { expectedVersion: current.version, importedAt });
