@@ -291,6 +291,37 @@ export class Monster {
     if (this.hp <= 0) this.die();
   }
 
+  applyServerState(state) {
+    if (!state || !Number.isFinite(Number(state.hp))) return;
+    this.serverAuthoritative = true;
+    const previousHp = this.hp;
+    const maxHp = Number(state.maxHp ?? state.max_hp);
+    if (Number.isFinite(maxHp) && maxHp > 0) this.maxHp = maxHp;
+    if (Number.isFinite(Number(state.x))) this.x = Number(state.x);
+    if (Number.isFinite(Number(state.y))) this.y = Number(state.y);
+    if (Number.isFinite(Number(state.z))) this.z = Number(state.z);
+    if (Number.isFinite(Number(state.yaw))) this.yaw = Number(state.yaw);
+    this.hp = Math.max(0, Math.min(this.maxHp, Number(state.hp)));
+    if (this.hp < previousHp && this.hp > 0) {
+      const dealt = previousHp - this.hp;
+      this.flash = 0.14;
+      this.game.hud.floatText(...this.game.screenOf(this.x, this.y + 1.6, this.z), String(dealt));
+      this.game.audio.hit();
+    }
+    if (this.hp <= 0 && !this.dead) this.die();
+    else if (this.hp > 0 && this.dead) {
+      this.dead = false;
+      this.deadT = 0;
+      this.remove = false;
+      this.state = 'idle';
+      this.vx = this.vz = this.vy = 0;
+      this.obj.visible = true;
+      this.obj.position.set(this.x, this.game.world.heightAt(this.x, this.z), this.z);
+      this.clearWarn();
+      this.clearStrikes();
+    }
+  }
+
   enrage() {
     const g = this.game;
     this.enraged = true;
@@ -317,7 +348,7 @@ export class Monster {
     const g = this.game;
     this.dead = true;
     this.deadT = 0;
-    g.onMonsterKilled(this);
+    g.onMonsterKilled(this, { serverAuthoritative: !!this.serverAuthoritative });
     g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, familyFx(this.type) ? familyFx(this.type).death : this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : this.type === 'volcanum' ? [0xff5a12, 0xffe08a, 0x1a1210] : this.type === 'darksycledragon' ? [0xb25cff, 0xd8d3ee, 0x2b2450] : this.type === 'snowyeti' ? [0xb4d0e6, 0xe6f9ff, 0x7fd0ff, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0xff3a1a, 0xff8a2a, 0xffffff] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0x6fb8ff, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
     g.audio.pop();
     g.hud.removePlate(this.id);
@@ -532,6 +563,18 @@ export class Monster {
       this.deadAnim(dt);
       return;
     }
+    if (this.serverAuthoritative) {
+      const state = g.mmo?.entities?.monsters?.find((entry) => entry.id === this.serverId);
+      if (state) {
+        this.x = state.x;
+        this.y = state.y;
+        this.z = state.z;
+        this.yaw = state.yaw ?? this.yaw;
+        this.hp = state.hp;
+        this.obj.position.set(this.x, this.y, this.z);
+        this.obj.rotation.y = this.yaw;
+      }
+    }
     if (this.puppet) {
       this.t += dt;
       this.flash = Math.max(0, this.flash - dt);
@@ -554,7 +597,7 @@ export class Monster {
     this.hitT = Math.max(0, this.hitT - dt);
     this.landT = Math.max(0, this.landT - dt);
     this.kick = Math.max(0, this.kick - dt * 4.5);
-    if (this.tickStatus(dt)) return;
+    if (!this.serverAuthoritative && this.tickStatus(dt)) return;
     statusFx(g, this, dt);
     if (this.pend && this.stun <= 0) {
       this.pendT -= dt;
