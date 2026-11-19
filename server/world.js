@@ -445,8 +445,18 @@ export class World {
       };
       this.riftRuns.set(key, run);
     }
-    if (!run.participants.includes(session.id)) run.participants.push(session.id);
+    const joiners = party && run.wave === 0
+      ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
+        member && Math.hypot(member.x - 80, member.z - 98) <= 10)
+      : [session];
+    for (const member of joiners.length ? joiners : [session]) this.joinRift(member, run);
+    if (run.wave === 0) this.spawnRiftWave(run, 1);
+  }
+
+  joinRift(session, run) {
+    if (session.riftRunId === run.id) return;
     const previousZone = session.zone;
+    if (!run.participants.includes(session.id)) run.participants.push(session.id);
     session.riftReturnPose = { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone };
     session.riftRunId = run.id;
     session.zone = 'rift';
@@ -459,7 +469,6 @@ export class World {
     this.social.onZone(session, previousZone);
     this.social.onPose?.(session);
     send(session.ws, 'rift_entered', { run_id: run.id, party_size: run.partySize, wave: run.wave });
-    if (run.wave === 0) this.spawnRiftWave(run, 1);
   }
 
   spawnRiftWave(run, wave) {
