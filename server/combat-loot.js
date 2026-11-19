@@ -163,8 +163,15 @@ export function createCombatLoot({
           monster.dead = false;
           monster.controllerId = null;
           monster.lastMoveAt = 0;
+          monster.x = monster.homeX ?? monster.x;
+          monster.y = monster.homeY ?? monster.y;
+          monster.z = monster.homeZ ?? monster.z;
+          monster.yaw = 0;
           monster.respawnAt = 0;
-          broadcast({ type: 'monster_state', id: monster.id, hp: monster.hp, alive: true });
+          broadcast({
+            type: 'monster_state', id: monster.id, hp: monster.hp, alive: true,
+            x: monster.x, y: monster.y, z: monster.z, yaw: monster.yaw,
+          });
         }
       }
     },
