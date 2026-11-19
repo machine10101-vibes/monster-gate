@@ -521,16 +521,6 @@ export class World {
     for (const p of [...this.players.values()]) {
       if (t - p.last > IDLE_MS) this.drop(p, true);
     }
-    for (const m of this.monsters) {
-      if (m.hp <= 0 && m.respawnAt && t >= m.respawnAt) {
-        m.hp = m.maxHp;
-        m.x = m.homeX;
-        m.y = m.homeY;
-        m.z = m.homeZ;
-        m.respawnAt = 0;
-        this.dirtyMonsters.add(m.id);
-      }
-    }
     for (const n of this.nodes) {
       if (!n.ready && n.respawnAt && t >= n.respawnAt) {
         n.ready = true;
@@ -543,7 +533,7 @@ export class World {
     }
 
     this.social.parties.expire();
-    void this.combatLoot.tick();
+    this.combatLoot.tick().catch((err) => console.warn('combatLoot.tick', err?.message || err));
 
     this.tickCount += 1;
     const farTick = this.tickCount % this.farEvery === 0;
