@@ -31,18 +31,29 @@ function paintBoard() {
   return texture;
 }
 
-function buildBoard(group, ox = OX, oz = OZ, floor = FLOOR) {
+/** Beside the south door of the Gilantre sand, off the aisle. */
+export const COLOSSEUM_BOARD = { x: 441.4, z: 140.4 };
+
+function buildBoard(group, x, z, floor, yaw = 0) {
+  const root = new THREE.Group();
+  root.position.set(x, floor, z);
+  root.rotation.y = yaw;
   const wood = new THREE.MeshStandardMaterial({ color: 0x53331d, roughness: 0.85 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xb88a3d, metalness: 0.45, roughness: 0.42 });
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.9, 0.22), wood);
-  const left = post.clone(), right = post.clone();
-  left.position.set(ox + 15.4, floor + 1.45, oz + 34);
-  right.position.set(ox + 20.6, FLOOR + 1.45, oz + 34);
+  const left = post.clone();
+  const right = post.clone();
+  left.position.set(-2.6, 1.45, 0);
+  right.position.set(2.6, 1.45, 0);
   const board = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.1, 0.22), new THREE.MeshStandardMaterial({ map: paintBoard(), roughness: 0.72 }));
-  board.position.set(ox + 18, floor + 2.45, oz + 34);
+  board.position.set(0, 2.45, 0);
   const cap = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.2, 0.5), gold);
-  cap.position.set(ox + 18, floor + 3.6, oz + 34);
-  group.add(left, right, board, cap);
+  cap.position.set(0, 3.6, 0);
+  const lamp = new THREE.PointLight(0xffc870, 1.4, 10, 2);
+  lamp.position.set(0, 3.8, 0.4);
+  root.add(left, right, board, cap, lamp);
+  group.add(root);
+  return root;
 }
 
 export function buildColosseum(world) {
@@ -93,7 +104,7 @@ export function buildColosseum(world) {
     flame.position.set(x, FLOOR + 2.3, z);
     group.add(brazier, flame);
   }
-  buildBoard(group);
+  buildBoard(group, OX + 18, OZ + 34, FLOOR, 0);
   const heightAt = (x, z) => {
     const lx = Math.floor(x - OX), lz = Math.floor(z - OZ);
     if (lx < 0 || lz < 0 || lx >= SIZE || lz >= SIZE) return 30;
@@ -115,7 +126,10 @@ export function buildColosseum(world) {
 export function buildColosseumSignUpBoard(world) {
   const group = new THREE.Group();
   group.name = 'gilantre-colosseum-signup-board';
-  buildBoard(group, 55, 48, world.heightAt(73, 82));
+  const { x, z } = COLOSSEUM_BOARD;
+  const y = world.heightAt(x, z);
+  const mesh = buildBoard(group, x, z, y, 0);
   world.group.add(group);
-  return group;
+  world.circle(x, z, 0.7);
+  return { group, mesh, x, y, z };
 }

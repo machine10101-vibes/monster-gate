@@ -8,6 +8,7 @@ import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.j
 import { World } from '../src/world/world.js';
 import { TILES } from '../src/world/tiles.js';
 import { GILANTRE_SPOTS, dressGilantre, yawAlong } from '../src/world/gilantre.js';
+import { COLOSSEUM_BOARD } from '../src/world/colosseum.js';
 import { questById, questGiverNpc } from '../src/data/quests.js';
 
 function world() {
@@ -82,6 +83,16 @@ test('wall and arcade pieces lie along the tangent, not the radius', () => {
   const [sx, sz] = head(skew);
   const dot = sx * -Math.sin(Math.PI / 4) + sz * Math.cos(Math.PI / 4);
   assert.ok(Math.abs(dot) < 0.05, 'the old yaw is sideways at the diagonal');
+});
+
+test('the Colosseum sign-up board stands beside the Gilantre sand', () => {
+  const arena = GILANTRE_SPOTS.arena;
+  const dx = COLOSSEUM_BOARD.x - arena.x;
+  const dz = COLOSSEUM_BOARD.z - arena.z;
+  assert.ok(dz > 6 && dz < 14, `south of the sand, dz ${dz}`);
+  assert.ok(Math.abs(dx) > 3.2 && Math.abs(dx) < 8, `off the aisle, dx ${dx}`);
+  assert.ok(Math.abs(COLOSSEUM_BOARD.z - 144) > 2.5, 'clear of the east-west road');
+  assert.ok(Math.hypot(COLOSSEUM_BOARD.x - 432, COLOSSEUM_BOARD.z - 144) < 26, 'inside the city wall');
 });
 
 test('tiles 57, 58, 67 and 68 are the four quarters of Gilantre', () => {

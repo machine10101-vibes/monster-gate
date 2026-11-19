@@ -3107,6 +3107,10 @@ class Game {
       this.openMarket();
       return;
     }
+    if (!this.talkNpc && this.colosseumNear && !npcNear) {
+      this.openColosseumBoard();
+      return;
+    }
     if (!this.talkNpc && this.alchemyNear && !npcNear) {
       this.openAlchemy();
       return;
@@ -3366,6 +3370,46 @@ class Game {
       this.hud.plate('market', "Dalla's Market<small>F · sell ore &amp; fish</small>");
       this.hud.placePlate('market', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('market');
+  }
+
+  openColosseumBoard() {
+    const ui = this.mmo?.pvpBoard;
+    const signedIn = this.mmo?.you?.guest === false && this.mmo?.ws?.readyState === 1;
+    if (!ui || !signedIn) {
+      this.hud.toast('Sign in to World 1 to sign up for the Colosseum', 2400);
+      this.audio.select();
+      return;
+    }
+    ui.q('[data-panel]').style.display = 'block';
+    ui.root.style.display = 'block';
+    this.audio.select();
+  }
+
+  updateColosseumBoard() {
+    const b = this.world.colosseumBoard;
+    if (!b) return;
+    const P = this.player.pos;
+    const d = Math.hypot(P.x - b.x, P.z - b.z);
+    this.colosseumNear = d < 3.4 && this.started && this.world.realm === 'over';
+    if (this.colosseumNear && !this.colosseumHinted) {
+      this.colosseumHinted = true;
+      this.hud.toast('Colosseum board — press F to sign up for PvP', 2600);
+    }
+    if (this.colosseumNear) {
+      const [sx, sy, vis] = this.screenOf(b.x, b.y + 2.6, b.z, true);
+      this.hud.plate('colosseum', 'Colosseum board<small>F · sign up</small>');
+      this.hud.placePlate('colosseum', sx, sy, vis, { dist: d });
+    } else this.hud.removePlate('colosseum');
+  }
+
+  clickColosseumBoard() {
+    const b = this.world.colosseumBoard;
+    const aim = this.input.aim;
+    if (!b?.group || !this.started || !aim.has || this.input.touch) return false;
+    if (Math.hypot(this.player.pos.x - b.x, this.player.pos.z - b.z) > 4.2) return false;
+    if (!this.ray.intersectObject(b.group, true).length) return false;
+    this.openColosseumBoard();
+    return true;
   }
 
   openStorage() {
@@ -3647,7 +3691,7 @@ class Game {
     if (inp.take('attack') && !blocked) {
       if (autoLocked) {
         /* Hostile lock holds: crates, portals, and the smithy cannot steal the swing. */
-      } else if (!this.clickStorage() && !this.clickPortal() && !this.clickSmithy()) this.doAttack();
+      } else if (!this.clickStorage() && !this.clickPortal() && !this.clickSmithy() && !this.clickColosseumBoard()) this.doAttack();
     } else if (!autoLocked && inp.attackHeld && !blocked && this.player.state === 'idle') {
       this.doAttack();
     }
@@ -3982,11 +4026,12 @@ class Game {
     this.updateSmithy(dt);
     this.updateAlchemy(dt);
     this.updateMarket();
+    this.updateColosseumBoard();
     this.updateStorage();
     this.updatePortals();
     updateGatherSites(this.world, dt, t, this);
     this.gather.update(dt);
-    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || !!this.gather.near || this.gather.active;
+    const near = this.ambient.npcs.some((n) => n.near) || this.waygateNear || this.portalNear || this.forgeNear || this.smithyNear || this.alchemyNear || this.marketNear || this.storageNear || this.colosseumNear || !!this.gather.near || this.gather.active;
     this.hud.setTalkVisible(near && this.input.touch);
     this.hud.layoutInteractPlates();
     this.hud.drawMinimap(this.world, P.pos.x, P.pos.z, P.yaw, this.monsters.filter((m) => !m.dead), this.ambient.npcs, t, this.remotes.values(), this.social);
