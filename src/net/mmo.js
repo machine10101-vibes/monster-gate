@@ -335,6 +335,10 @@ export class MmoClient {
   onFrame(raw) {
     const msg = parseFrame(raw);
     if (!msg) return;
+    if (msg.type === 'reward_snapshot') {
+      this.game?.syncServerRewardState?.(msg);
+      return;
+    }
     if (msg.type === 'monster_state') {
       this.entities.monsters = (this.entities.monsters || []).map((entry) => entry.id === msg.id
         ? { ...entry, hp: msg.hp, alive: msg.alive, x: msg.x ?? entry.x, y: msg.y ?? entry.y, z: msg.z ?? entry.z }
