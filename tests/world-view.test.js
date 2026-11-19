@@ -18,7 +18,7 @@ test('MMO flags: presentation on mmo=1, mock feed only with both', () => {
   assert.deepEqual(parseMmoFlags('?mmo=1'), { ...off, mmo: true, enabled: true });
   assert.deepEqual(parseMmoFlags('mock=1'), { ...off, mock: true });
   assert.deepEqual(parseMmoFlags('?mmo=1&mock=1'), { ...off, mmo: true, mock: true, enabled: true, mockFeed: true });
-  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { ...off, mmo: true, mockwake: true, enabled: true, wakeSeconds: 30 });
+  assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=1'), { ...off, mmo: true, mockwake: true, enabled: true, wakeSeconds: 60 });
   assert.deepEqual(parseMmoFlags('?mmo=1&mockwake=90'), { ...off, mmo: true, mockwake: true, enabled: true, wakeSeconds: 90 });
   assert.deepEqual(parseMmoFlags('?mmo=1&mock=1&mockerr=name_taken'), {
     mmo: true, mock: true, mockwake: false, mockerr: 'name_taken', enabled: true, mockFeed: true, wakeSeconds: 0,
