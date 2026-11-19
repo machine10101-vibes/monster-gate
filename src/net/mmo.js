@@ -334,6 +334,22 @@ export class MmoClient {
   onFrame(raw) {
     const msg = parseFrame(raw);
     if (!msg) return;
+    if (msg.type === 'monster_state') {
+      this.view?.applyMonsterState?.(msg);
+      return;
+    }
+    if (msg.type === 'loot_roll') {
+      this.view?.showLootRoll?.(msg);
+      return;
+    }
+    if (msg.type === 'loot_roll_progress' || msg.type === 'loot_roll_result' || msg.type === 'loot_awarded') {
+      this.view?.applyLootEvent?.(msg);
+      return;
+    }
+    if (msg.type === 'combat_result') {
+      this.view?.applyCombatResult?.(msg);
+      return;
+    }
     if (msg.type === 'social_result') {
       const pending=this.pendingSocial.get(String(msg.request_id||''));
       if(pending){clearTimeout(pending.timer);this.pendingSocial.delete(String(msg.request_id));pending.resolve({ok:!!msg.ok,pending:!!msg.pending,code:msg.code||'',message:msg.message||''});}
