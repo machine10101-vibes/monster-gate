@@ -430,7 +430,7 @@ export class MmoClient {
     }
     if (msg.type === 'pvp_hit') {
       if (msg.target === this.you?.id) {
-        if (this.game?.player) { this.game.player.hp = msg.hp; this.game.refreshHud?.(); }
+        if (this.game?.player) { this.game.player.hp = msg.hp; if (msg.defeated) { this.game.player.dead = true; this.game.player.setState?.('dead', 1); } this.game.refreshHud?.(); }
         this.updatePvpBoard(`You took ${msg.damage} damage. ${msg.hp} HP remaining.`);
       }
       const row=this.nearby.get(msg.target);
