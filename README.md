@@ -20,16 +20,16 @@ npm run preview       # serve the production build
 
 Guests play solo from the title (**Play as guest**). After sign-in, account creation, or a returning signed-in Play, **Choose a world** offers **World 1 — Online** (live `/healthz` status: Online + player count, or **Waking…**) and **Solo — Offline**. World 1 reloads with `?mmo=1` and a one-shot continue marker so the hunter lands in the hunt with connecting/waking UI, not back on the title. The last pick is remembered (`localStorage` key `mg-world-mode`) and preselected next time. The in-game Menu has a **Switch world** row (World 1 / Solo). A small **Online** / **Offline** pill sits in the HUD.
 
-World 1 is **World 1 coming soon** (disabled) when no world URL is configured. Guests and anyone without a session token never open the world socket; `?mmo=1` without a session drops to solo and shows **Sign in to hunt online**. The public GitHub Pages build leaves the world URL empty on purpose.
+World 1 is live at `wss://monster-gate-world-1.onrender.com`. The production Pages workflow injects `MG_WORLD_URL` and `VITE_WORLD_URL` at build time. Guests and anyone without a session token never open the world socket; `?mmo=1` without a session drops to solo and shows **Sign in to hunt online**. Authenticated hunters can queue in the Gilantre Colosseum for 1v1, 2v2, or 3v3 matches. Every fighter confirms before a private arena starts; combat, results, and persistent Elo ratings are server-authoritative.
 
-`VITE_MMO_URL` is a build-time input. Rebuild `gh-pages` from `main` with Vite base `/`, `public/CNAME` = `monstergate.online`, and `VITE_BUILD_ID` set to the `main` HEAD. Read the world URL from `MG_WORLD_URL` (leave it empty until World 1 is live):
+`MG_WORLD_URL` and `VITE_WORLD_URL` are production build inputs configured in `.github/workflows/publish-pages.yml`. That workflow runs the test suite, builds from `main` with Vite base `/`, and publishes `dist` to `gh-pages`; it also sets `VITE_BUILD_ID` to the merged `main` SHA. Do not blank the world URL for production. For a local build, use:
 
 ```bash
 git checkout main
 git pull origin main
 MAIN_SHA=$(git rev-parse --short HEAD)
 git checkout gh-pages
-MG_WORLD_URL= VITE_BUILD_ID=$MAIN_SHA npx vite build --base /
+MG_WORLD_URL=wss://monster-gate-world-1.onrender.com VITE_WORLD_URL=wss://monster-gate-world-1.onrender.com VITE_BUILD_ID=$MAIN_SHA npx vite build --base /
 # copy dist onto the gh-pages tree (never git add -A)
 # keep public/CNAME = monstergate.online
 ```
