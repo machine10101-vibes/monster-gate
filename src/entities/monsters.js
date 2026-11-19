@@ -286,6 +286,23 @@ export class Monster {
     if (this.hp <= 0) this.die();
   }
 
+  applyServerState(state) {
+    if (!state || !Number.isFinite(Number(state.hp))) return;
+    this.serverAuthoritative = true;
+    this.hp = Math.max(0, Math.min(this.maxHp, Number(state.hp)));
+    if (this.hp <= 0 && !this.dead) this.die();
+    else if (this.hp > 0 && this.dead) {
+      this.dead = false;
+      this.deadT = 0;
+      this.state = 'idle';
+      this.vx = this.vz = this.vy = 0;
+      this.obj.visible = true;
+      this.obj.position.set(this.x, this.game.world.heightAt(this.x, this.z), this.z);
+      this.clearWarn();
+      this.clearStrikes();
+    }
+  }
+
   enrage() {
     const g = this.game;
     this.enraged = true;
@@ -311,7 +328,7 @@ export class Monster {
     const g = this.game;
     this.dead = true;
     this.deadT = 0;
-    g.onMonsterKilled(this);
+    if (!this.serverAuthoritative) g.onMonsterKilled(this);
     g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, familyFx(this.type) ? familyFx(this.type).death : this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : this.type === 'darksycledragon' ? [0xb25cff, 0xd8d3ee, 0x2b2450] : this.type === 'snowyeti' ? [0xb4d0e6, 0xe6f9ff, 0x7fd0ff, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0xff3a1a, 0xff8a2a, 0xffffff] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0x6fb8ff, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
     g.audio.pop();
     g.hud.removePlate(this.id);
