@@ -405,8 +405,8 @@ export class World {
     }
     if (session.pvpMatchId) {
       session.zone = `colosseum:${session.pvpMatchId}`;
-      session.x = Math.max(1599, Math.min(1636, session.x));
-      session.z = Math.max(799, Math.min(836, session.z));
+      session.x = Math.max(1702, Math.min(1738, session.x));
+      session.z = Math.max(802, Math.min(838, session.z));
     }
     if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
       this.rejectZoneFull(session, session.zone);
