@@ -116,6 +116,7 @@ export class MmoClient {
     this.socialRequestSeq = 0;
     this.pendingSocial = new Map();
     this.lootOverlay = null;
+    this.lootQueue = [];
     this.rewardSnapshot = null;
   }
 
@@ -389,12 +390,13 @@ export class MmoClient {
       return;
     }
     if (msg.type === 'loot_roll_progress') {
-      const status = this.lootOverlay?.querySelector('[data-role="status"]');
+      const status = this.lootOverlay?.dataset.rollId === msg.roll_id
+        ? this.lootOverlay.querySelector('[data-role="status"]') : null;
       if (status) status.textContent = `Choices submitted: ${msg.submitted}/${msg.total}`;
       return;
     }
     if (msg.type === 'loot_roll_result') {
-      this.closeLootRoll();
+      this.closeLootRoll(msg.roll_id);
       if (msg.winner === this.you?.id) toast(this.game, 'You won the loot roll!');
       else if (msg.winner) toast(this.game, 'The party loot roll is complete.');
       return;
@@ -533,13 +535,17 @@ export class MmoClient {
   }
 
   showLootRoll(msg) {
-    this.closeLootRoll();
     if (typeof document === 'undefined' || !msg?.roll_id) return;
+    if (this.lootOverlay) {
+      this.lootQueue.push(msg);
+      return;
+    }
     const overlay = document.createElement('section');
     overlay.className = 'mmo-loot-roll';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Party loot roll');
+    overlay.dataset.rollId = msg.roll_id;
     Object.assign(overlay.style, {
       position: 'fixed', zIndex: '10020', left: '50%', top: '18%', transform: 'translateX(-50%)',
       width: 'min(360px, calc(100vw - 32px))', padding: '16px', borderRadius: '12px',
@@ -576,11 +582,16 @@ export class MmoClient {
     this.lootTimer = setTimeout(() => this.closeLootRoll(), ttl);
   }
 
-  closeLootRoll() {
+  closeLootRoll(rollId = null, advance = true) {
+    if (rollId && this.lootOverlay?.dataset.rollId !== rollId) {
+      this.lootQueue = this.lootQueue.filter((roll) => roll.roll_id !== rollId);
+      return;
+    }
     if (this.lootTimer) clearTimeout(this.lootTimer);
     this.lootTimer = 0;
     this.lootOverlay?.remove();
     this.lootOverlay = null;
+    if (advance && this.lootQueue.length) this.showLootRoll(this.lootQueue.shift());
   }
 
   enterRift() {
@@ -704,7 +715,8 @@ export class MmoClient {
 
   dispose(status = 'offline', detail) {
     this.closed = true;
-    this.closeLootRoll();
+    this.lootQueue = [];
+    this.closeLootRoll(null, false);
     this.wakeGen += 1;
     this.clearWake();
     this.stopPing();
