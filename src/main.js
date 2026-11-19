@@ -4058,10 +4058,14 @@ async function startGame() {
       });
       game.ensureWorldConnection = async () => {
         if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search: liveSearch })) return;
-        const ready = await game.worldViewReady;
-        if (!ready || ready.flags.mock || ready.flags.mockwake) return;
-        const { attachMmo } = await import('./net/mmo.js');
-        attachMmo(game, ready.view, { search: liveSearch });
+        try {
+          const ready = await game.worldViewReady;
+          if (!ready || ready.flags.mock || ready.flags.mockwake) return;
+          const { attachMmo } = await import('./net/mmo.js');
+          attachMmo(game, ready.view, { search: liveSearch });
+        } catch (err) {
+          console.warn('world connection', err);
+        }
       };
     }
   } catch {
