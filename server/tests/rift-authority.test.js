@@ -23,6 +23,12 @@ function makeWorld({ x = 80, z = 98 } = {}) {
     now: () => now,
     social,
     persist: {
+      loadCharacter: async () => ({
+        state: {
+          gold: grants.filter((g) => g.kind === 'gold').reduce((sum, g) => sum + g.amount, 0),
+          xp: {}, goods: {}, materials: {}, crafted: {}, riftClearAt: session.riftClearAt || 0,
+        },
+      }),
       grantOnce: async (reward) => {
         if (grantIds.has(reward.rewardId)) return { granted: false };
         grantIds.add(reward.rewardId);
@@ -81,6 +87,7 @@ test('Rift chest claims distribute gold and each item once through reward persis
   assert.equal(f.grants.filter((g) => g.kind === 'good').length, 2);
   assert.equal(run.claimed, true);
   await assert.rejects(() => f.world.claimRiftChest(f.session), /not ready/);
+  assert.ok(f.frames.some((frame) => frame.type === 'reward_snapshot' && frame.riftClearAt === f.session.riftClearAt));
   assert.ok(f.frames.some((frame) => frame.type === 'rift_chest_result' && frame.ok));
   f.session.riftRunId = null;
   f.session.zone = 'Oakhollow';
