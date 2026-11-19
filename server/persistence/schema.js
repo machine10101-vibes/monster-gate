@@ -154,7 +154,7 @@ export function sanitizeState(raw, { importMode = false } = {}) {
     storage: normalizeStorage(hunt.bank || hunt.storage),
     armor: equipment.armor,
     weapon: equipment.weapon,
-    pvp: {
+    pvp: importMode ? { rating: 1000, wins: 0, losses: 0 } : {
       rating: clampInt(hunt.pvp?.rating, 100, 3000, 1000),
       wins: clampInt(hunt.pvp?.wins, 0, 100000, 0),
       losses: clampInt(hunt.pvp?.losses, 0, 100000, 0),
