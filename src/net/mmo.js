@@ -752,8 +752,8 @@ export class MmoClient {
     });
   }
 
-  friendRequest(target) {
-    const value = String(target || '').trim();
+  friendRequest(name) {
+    const value = String(name || '').trim();
     const extra = isAccountId(value) ? { user_id: value } : { name: value };
     return this.send('friend_request', extra);
   }
