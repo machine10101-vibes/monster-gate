@@ -331,6 +331,14 @@ export class World {
       features: ident.guest ? ['party'] : this.social.features,
     });
     this.sendSnapshot(session);
+    if (row?.state) {
+      send(session.ws, 'reward_snapshot', {
+        gold: Number(row.state.gold ?? row.gold) || 0,
+        xp: row.state.xp || {},
+        goods: row.state.goods || {},
+        materials: row.state.materials || {},
+      });
+    }
     this.dirty.add(session.id);
     await this.social.onJoin(session);
   }
