@@ -69,9 +69,9 @@ export function createCombatLoot({
 
   async function roundRobin(item, members, partyId, rewardId) {
     const key = partyId || members[0].id;
-    const cursor = partyId ? (parties?.parties?.get?.(partyId)?.loot_turn || 0) : (cursors.get(key) || 0);
+    const cursor = partyId ? (parties?.get?.(partyId)?.loot_turn || 0) : (cursors.get(key) || 0);
     const index = cursor % members.length;
-    if (partyId && parties?.parties?.get?.(partyId)) parties.parties.get(partyId).loot_turn = cursor + 1;
+    if (partyId && parties?.get?.(partyId)) parties.parties.get(partyId).loot_turn = cursor + 1;
     else cursors.set(key, cursor + 1);
     await deliver(item, members[index], rewardId);
     return members[index];
