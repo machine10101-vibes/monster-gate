@@ -425,6 +425,9 @@ export class World {
     const party = this.social.parties.partyOf(session.id);
     const key = party?.id || session.id;
     let run = this.riftRuns.get(key);
+    if (run && run.wave > 0 && !run.participants.includes(session.id)) {
+      throw new ProtocolError('rift', 'That Rift is already underway.');
+    }
     if (!run || run.expiresAt <= this.now() || run.claimed) {
       if (party && party.leader !== session.id) throw new ProtocolError('rift', 'Only the party leader can open a new Rift.');
       const ready = party
