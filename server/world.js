@@ -16,6 +16,7 @@ import { PersistErrorCodes } from './persistence/index.js';
 import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
 import { createCombatLoot } from './combat-loot.js';
+import { createPvpRuntime } from './pvp.js';
 import { DROPS, GEAR_DROPS, MATERIALS } from '../src/data/catalog.js';
 import { GOODS } from '../src/data/gathering.js';
 import { riftChestGold, riftChestGoods, riftScale, riftWaveSpawns, RIFT_COOLDOWN_MS, RIFT_WAVES } from '../src/data/rift.js';
@@ -105,6 +106,7 @@ export class World {
       partyMax: opts.partyMax,
       inviteTtl: opts.inviteTtl,
     });
+    this.pvp = opts.pvp || createPvpRuntime(this);
   }
 
   async idle() {
@@ -215,6 +217,11 @@ export class World {
       else if (msg.type === 'monster_move') this.moveMonster(session, msg);
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'pvp_queue') this.pvp.enqueue(session, String(msg.mode || '1v1'));
+      else if (msg.type === 'pvp_cancel') this.pvp.cancel(session);
+      else if (msg.type === 'pvp_attack') this.pvp.attack(session, msg.target_id);
+      else if (msg.type === 'pvp_roll') this.pvp.roll(session);
+      else if (msg.type === 'pvp_leave') this.pvp.leave(session);
       else if (msg.type === 'rift_chest_claim') this.claimRiftChest(session).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_leave') this.leaveRift(session);
       else if (msg.type === TYPES.leave) this.drop(session, true);
@@ -379,6 +386,7 @@ export class World {
   }
 
   move(session, msg) {
+    if (session.pvpMatchId && session.pvpDead) { session.move = 0; return; }
     if (!session.limiter.allowMove()) {
       send(session.ws, errorFrame('rate', 'Slow down.'));
       return;
@@ -393,9 +401,17 @@ export class World {
     const prevHp = session.hp;
     const prevX = session.x, prevY = session.y, prevZ = session.z, prevYaw = session.yaw;
     Object.assign(session, result.pose);
-    if (next.hp != null) session.hp = next.hp;
+    if (next.hp != null && !session.pvpMatchId) session.hp = next.hp;
     if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
+    }
+    if (session.pvpMatchId) {
+      session.zone = `colosseum:${session.pvpMatchId}`;
+      session.x = Math.max(1702, Math.min(1738, session.x));
+      session.z = Math.max(802, Math.min(838, session.z));
+      const dx = session.x - 1719.5, dz = session.z - 819.5;
+      const radius = Math.hypot(dx, dz);
+      if (radius > 14.5) { session.x = 1719.5 + dx / radius * 14.5; session.z = 819.5 + dz / radius * 14.5; }
     }
     if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
       this.rejectZoneFull(session, session.zone);
@@ -463,6 +479,7 @@ export class World {
       throw new ProtocolError('auth', 'Sign in to enter the Rift.');
     }
     if (session.riftRunId) return;
+    if (session.pvpQueued || session.pvpMatchId) throw new ProtocolError('pvp_state', 'Cancel your Colosseum queue or finish your match before entering the Rift.');
     if (this.now() - (session.riftClearAt || 0) < RIFT_COOLDOWN_MS) {
       throw new ProtocolError('rift_cooldown', 'The Waygate is still recovering. Try again in a few minutes.');
     }
@@ -706,7 +723,8 @@ export class World {
 
   persistPose(session, immediate = false) {
     if (!this.persist || !session.userId || session.riftRunId) return;
-    const state = persistStateFromSession(session);
+    const saved = session.pvpReturnPose ? { ...session, ...session.pvpReturnPose, hp: session.pvpReturnHp ?? session.hp } : session;
+    const state = persistStateFromSession(saved);
     const opts = immediate ? { immediate: true } : {};
     const result = this.persist.saveCharacter(session.userId, state, opts);
     if (result && typeof result.then === 'function') {
@@ -725,6 +743,7 @@ export class World {
 
   drop(session, closeSocket = false) {
     if (session.gone) return;
+    this.pvp.disconnect(session);
     session.gone = true;
     if (session.helloTimer) clearTimeout(session.helloTimer);
     if (session.authed && session.id) {
@@ -787,6 +806,7 @@ export class World {
     }
 
     this.social.parties.expire();
+    this.pvp.tick();
     this.combatLoot.tick().catch((err) => console.warn('combatLoot.tick', err?.message || err));
     this.tickRiftRuns(t);
 

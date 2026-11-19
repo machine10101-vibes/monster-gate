@@ -11,6 +11,7 @@ const USERS = {
   ann: { userId: ANN, name: 'Ann' },
   bea: { userId: BEA, name: 'Bea' },
   cal: { userId: CAL, name: 'Cal' },
+  dan: { userId: '44444444-4444-4444-8444-444444444444', name: 'Dan' },
 };
 
 export async function verifyToken(token) {
