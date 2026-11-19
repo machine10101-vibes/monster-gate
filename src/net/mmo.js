@@ -517,8 +517,14 @@ export class MmoClient {
 
   syncAuthoritativeMonsters() {
     if (this.you?.guest !== false) return;
-    const available = (this.entities.monsters || []).filter((entry) => entry.alive !== false && entry.hp > 0);
-    if (!available.length || !this.game?.monsters) return;
+    const allEntries = this.entities.monsters || [];
+    if (!allEntries.length || !this.game?.monsters) return;
+    for (const entry of allEntries) {
+      const existing = this.game.monsters.find((monster) => monster.serverId === entry.id);
+      if (existing) existing.applyServerState?.(entry);
+    }
+    const available = allEntries.filter((entry) => entry.alive !== false && entry.hp > 0);
+    if (!available.length) return;
     const used = new Set((this.game.monsters || []).map((monster) => monster.serverId).filter(Boolean));
     for (const entry of available) {
       if (used.has(entry.id)) continue;
