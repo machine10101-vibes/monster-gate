@@ -117,7 +117,7 @@ export function worldModeLabel(status, auth = false) {
 }
 
 export const WAKE_SECONDS = 30;
-export const WAKE_STUCK_MS = 60000;
+export const WAKE_STUCK_MS = 35000;
 
 const ANIM_NAME = Object.fromEntries(Object.entries(ANIM).map(([k, v]) => [v, k]));
 
