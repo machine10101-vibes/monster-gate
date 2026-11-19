@@ -541,6 +541,18 @@ export class Monster {
       this.deadAnim(dt);
       return;
     }
+    if (this.serverAuthoritative) {
+      const state = g.mmo?.entities?.monsters?.find((entry) => entry.id === this.serverId);
+      if (state) {
+        this.x = state.x;
+        this.y = state.y;
+        this.z = state.z;
+        this.hp = state.hp;
+        this.obj.position.set(this.x, this.y, this.z);
+        this.animate(dt, 99);
+      }
+      return;
+    }
     if (this.puppet) {
       this.t += dt;
       this.flash = Math.max(0, this.flash - dt);
