@@ -116,8 +116,8 @@ export function worldModeLabel(status, auth = false) {
   return 'Offline';
 }
 
-export const WAKE_SECONDS = 30;
-export const WAKE_STUCK_MS = 35000;
+export const WAKE_SECONDS = 60;
+export const WAKE_STUCK_MS = 75000;
 
 const ANIM_NAME = Object.fromEntries(Object.entries(ANIM).map(([k, v]) => [v, k]));
 
@@ -127,7 +127,7 @@ function paramsOf(search) {
   return new URLSearchParams(q);
 }
 
-/** `?mockwake=1` is 30s. `?mockwake=90` is 90 seconds. */
+/** `?mockwake=1` is 60s. `?mockwake=90` is 90 seconds. */
 export function parseWakeSeconds(search = '') {
   const q = typeof search === 'string' ? paramsOf(search) : search;
   const raw = q.get?.('mockwake') ?? q.get('mockwake');
@@ -150,7 +150,7 @@ export function parseMmoFlags(search = '') {
 }
 
 /**
- * Local countdown for the waking overlay. `secondsLeft` defaults to 30.
+ * Local countdown for the waking overlay. `secondsLeft` defaults to 60.
  * If no further setStatus updates arrive, remaining time counts down from
  * the last detail using `markedAt` → `now`.
  */
