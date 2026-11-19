@@ -30,6 +30,11 @@ export const TILE_NAMES = [
 ];
 
 export const STATS = {
+  slime: { name: 'Gate Slime', level: 1, hp: 18, dmg: 2, respawn: 12 },
+  voidslime: { name: 'Void Slime', level: 2, hp: 26, dmg: 3, respawn: 14 },
+  boar: { name: 'Thorn Boar', level: 3, hp: 38, dmg: 3, respawn: 18 },
+  wraith: { name: 'Gate Wraith', level: 3, hp: 24, dmg: 2, respawn: 18 },
+  budgedragon: { name: 'Green Budge Dragon', level: 4, hp: 64, dmg: 4, respawn: 25 },
   darksycledragon: { name: 'Darksycle Dragon', level: 7, hp: 155, dmg: 5, respawn: 45 },
   demonknight: { name: 'Demon Knight', level: 11, hp: 320, dmg: 5, respawn: 30 },
   holyknight: { name: 'Holy Knight', level: 11, hp: 300, dmg: 5, respawn: 30 },
@@ -65,6 +70,7 @@ function keepPosts(tx, tz, localCx, localCz, theta) {
 }
 
 export function zoneAt(x, z, realm) {
+  if (realm === 'rift' || (x >= 1600 && x < 1636 && z >= 800 && z < 836)) return 'rift';
   if (realm === 'cave' || (x >= 800 && x < 840 && z >= 800 && z < 832)) return 'cave';
   const tx = STARTER_TX + Math.floor(Number(x) / TILE_SIZE);
   const tz = STARTER_TZ + Math.floor(Number(z) / TILE_SIZE);
@@ -72,7 +78,7 @@ export function zoneAt(x, z, realm) {
 }
 
 export function realmOf(zone) {
-  return zone === 'cave' ? 'cave' : 'over';
+  return zone === 'cave' ? 'cave' : zone === 'rift' ? 'rift' : 'over';
 }
 
 /** Armor, weapon, and look come from the saved character, never the client. */
@@ -155,6 +161,15 @@ function monster(id, type, x, z, y, zone, extras = {}) {
     homeZ: z,
     homeY: y ?? 3.2,
   };
+}
+
+export function createRiftMonster(id, type, x, z, hpMultiplier = 1) {
+  const entry = monster(id, type, x, z, 2, 'rift');
+  entry.hp = Math.max(1, Math.round(entry.maxHp * hpMultiplier));
+  entry.maxHp = entry.hp;
+  entry.respawn = 0;
+  entry.rift = true;
+  return entry;
 }
 
 export function createMonsters() {
