@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { ProtocolError } from './protocol.js';
 
 const MODES = new Set(['1v1', '2v2', '3v3']);
+const RANGED_WEAPONS = new Set(['budgebow', 'darkbow', 'darkstaff']);
 const ARENA = { x: 1719.5, y: 2.2, z: 819.5 };
 
 function live(world, id) {
@@ -43,6 +44,8 @@ export function createPvpRuntime(world, opts = {}) {
       p.pvpReturnPose = null;
       p.pvpReturnHp = null;
       p.pvpDead = false;
+      p.pvpRollAt = 0;
+      p.pvpInvulnUntil = 0;
       p.move = 0;
       world.dirty.add(p.id);
       world.sendSnapshot(p);
@@ -65,6 +68,8 @@ export function createPvpRuntime(world, opts = {}) {
         p.pvpQueued = null;
         p.pvpTeam = team;
         p.pvpDead = false;
+        p.pvpRollAt = 0;
+        p.pvpInvulnUntil = 0;
         p.zone = `colosseum:${id}`;
         const angle = (index / Math.max(1, match.teams[team].length)) * Math.PI * 0.55 + (team ? Math.PI : 0);
         p.x = ARENA.x + Math.cos(angle) * 8;
@@ -157,16 +162,22 @@ export function createPvpRuntime(world, opts = {}) {
       throw new ProtocolError('pvp_target', 'That opponent is not in your match.');
     }
     if (session.pvpDead || target.pvpDead) throw new ProtocolError('pvp_dead', 'You cannot attack while defeated.');
-    if (session.zone !== target.zone || Math.hypot(session.x - target.x, session.z - target.z) > 4.5 || Math.abs(session.y - target.y) > 3) {
+    const ranged = RANGED_WEAPONS.has(session.weapon);
+    const range = ranged ? 13 : 4.5;
+    if (target.pvpInvulnUntil > now()) throw new ProtocolError('pvp_evade', 'Your opponent evaded the strike.');
+    if (session.zone !== target.zone || Math.hypot(session.x - target.x, session.z - target.z) > range || Math.abs(session.y - target.y) > 3) {
       throw new ProtocolError('pvp_range', 'Move closer to your opponent.');
     }
     const t = now(), last = match.lastHit.get(session.id) || 0;
-    if (t - last < 650) throw new ProtocolError('pvp_cooldown', 'Your weapon is not ready yet.');
+    if (t - last < (ranged ? 950 : 650)) throw new ProtocolError('pvp_cooldown', 'Your weapon is not ready yet.');
     match.lastHit.set(session.id, t);
     session.anim = 1;
     session.move = 0;
     world.dirty.add(session.id);
-    const damage = Math.max(3, Math.min(12, 5 + (session.weapon ? 2 : 0) + Math.floor((session.level || 1) / 10)));
+    const base = ranged ? 4 : 5;
+    const armor = Object.values(target.armor || {}).filter(Boolean).length;
+    const reduction = Math.min(0.3, armor * 0.04);
+    const damage = Math.max(2, Math.min(12, Math.round((base + (session.weapon ? 2 : 0) + Math.floor((session.level || 1) / 10)) * (1 - reduction))));
     target.hp = Math.max(0, target.hp - damage);
     target.anim = target.hp ? 4 : 3;
     if (!target.hp) target.pvpDead = true;
@@ -181,6 +192,17 @@ export function createPvpRuntime(world, opts = {}) {
     }
     return frame;
   }
+  function roll(session) {
+    const match = matches.get(session.pvpMatchId);
+    if (!match || match.finished || session.pvpDead) throw new ProtocolError('pvp_state', 'You are not able to evade right now.');
+    const t = now();
+    if (t - (session.pvpRollAt || 0) < 1200) throw new ProtocolError('pvp_roll_cooldown', 'Your evade is not ready yet.');
+    session.pvpRollAt = t;
+    session.pvpInvulnUntil = t + 300;
+    send(session, 'pvp_roll', { match_id: match.id, invulnerable_ms: 300 });
+    return true;
+  }
+
   function leave(session) {
     const match = matches.get(session.pvpMatchId);
     if (!match) return cancel(session);
@@ -197,5 +219,5 @@ export function createPvpRuntime(world, opts = {}) {
       restore(match, winner);
     }
   }
-  return { enqueue, cancel, attack, leave, disconnect, tick: matchQueues, queues, matches };
+  return { enqueue, cancel, attack, roll, leave, disconnect, tick: matchQueues, queues, matches };
 }
