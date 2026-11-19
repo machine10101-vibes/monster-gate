@@ -65,6 +65,10 @@ const RING = {
   '4,8': ['greenbowl', 'South of Glassroad. The Oasis is the living heart of this desert bowl: palms, reeds and still water, drying to dune and then to the southern sea.'],
   '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Mara\'s Acre and Wend Farm sit on the long fields, with a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
+  '6,5': ['gilantreNw', 'Northwest quarter of Gilantre. Forest and prairie outside the brick wall, and the west drawbridge where the Eastleas road comes in.'],
+  '7,5': ['gilantreNe', 'Northeast quarter of Gilantre. The Roman arena stands inside the wall, with prairie beyond the moat.'],
+  '6,6': ['gilantreSw', 'Southwest quarter of Gilantre. Ironhaven Forge and the smiths sit inside the wall, with forest outside.'],
+  '7,6': ['gilantreSe', 'Southeast quarter of Gilantre. The east drawbridge, the potion stall, and prairie outside the moat.'],
 };
 
 const NAMES = [
@@ -73,8 +77,8 @@ const NAMES = [
   ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Gatewood', 'Wyrmwood', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
   ['Riverwatch', 'Silverbend', 'Fernwood', 'Ashen Road', 'Goldglade', 'Meadowrise', 'Rimefang Mesa', 'Glimmerfrost', 'Dusthill', 'Redcrag'],
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
-  ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Old Acre', 'Harrowfen', 'Reedbank', 'Frogmarsh'],
-  ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Greenrows', 'Blackfen', 'Broken Arch', 'Old Stones'],
+  ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Gilantre', 'Gilantre', 'Reedbank', 'Frogmarsh'],
+  ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Gilantre', 'Gilantre', 'Broken Arch', 'Old Stones'],
   ['Seagate', 'Shellbeach', 'Dunes', 'Sunspill', 'Glassroad', 'Reedford', 'Saltfen', 'Drowned Hall', 'Sunken Yard', 'Grey Sea'],
   ['Open Water', 'West Deep', 'Pale Shore', 'Deepwell', 'Oasis', 'Sedge', 'Ruinwater', 'Black Reef', 'South Deep', 'East Deep'],
   ['Far West', 'Whale Road', 'Glass Sea', 'South Strand', 'Midsea', 'East Strand', 'Kelp', 'Quiet Deep', 'Last Water', 'Far East'],
@@ -91,6 +95,7 @@ function buildTiles() {
       if (!biome) throw new Error('Unknown biome ' + code);
       const southford = tz === 6 && tx === 4;
       const ring = RING[tx + ',' + tz];
+      const gilantre = ring && String(ring[0]).startsWith('gilantre');
       const built = code === 'O' || southford || !!ring;
       tiles.push({
         id: `t${tx}-${tz}`,
@@ -98,9 +103,9 @@ function buildTiles() {
         tz,
         n: tz * GRID + tx + 1,
         code,
-        biome: biome.id,
-        biomeName: biome.name,
-        color: biome.color,
+        biome: gilantre ? 'town' : biome.id,
+        biomeName: gilantre ? 'Town' : biome.name,
+        color: gilantre ? '#e6c36a' : biome.color,
         name: NAMES[tz][tx],
         blurb: code === 'O'
           ? 'The starter tile. Oakhollow, the fairy forest, Greyrock Pit, Mirrormere and the farm all sit on this one tile. Passes leave north, west, east and south into the neighboring tiles.'

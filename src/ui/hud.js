@@ -50,7 +50,7 @@ export const POTION_SHOP = {
   manapotion: { price: 8, max: 20 },
 };
 
-const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire']);
+const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire', 'Gilantre']);
 
 function isPartyRemote(r, partyOf) {
   if (!r || !partyOf) return false;
@@ -63,10 +63,18 @@ function isPartyRemote(r, partyOf) {
 /** Area and city names for the map the player opens. */
 function landMapLabels(world) {
   const labels = [];
+  let gilantre = null;
   for (const land of world.lands || []) {
     if (land.role === 'oak') continue;
     const name = land.banner?.[1];
     if (!name) continue;
+    if (name === 'Gilantre') {
+      gilantre = gilantre || { name, x: 0, z: 0, n: 0, city: true };
+      gilantre.x += land.x0 + TILE_SIZE / 2;
+      gilantre.z += land.z0 + TILE_SIZE / 2;
+      gilantre.n += 1;
+      continue;
+    }
     labels.push({
       name,
       x: land.x0 + TILE_SIZE / 2,
@@ -74,6 +82,7 @@ function landMapLabels(world) {
       city: CITY_NAMES.has(name),
     });
   }
+  if (gilantre) labels.push({ name: 'Gilantre', x: gilantre.x / gilantre.n, z: gilantre.z / gilantre.n, city: true });
   labels.push(
     { name: 'Monster Gate', x: GATE.x, z: GATE.z - 14 },
     { name: 'Greyrock Pit', x: MINE.x + 4, z: MINE.z - 14 },

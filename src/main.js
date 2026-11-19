@@ -3206,30 +3206,42 @@ class Game {
     return true;
   }
 
+  nearestSpot(list) {
+    const P = this.player.pos;
+    let spot = null;
+    let d = Infinity;
+    for (const s of list) {
+      if (!s) continue;
+      const sd = Math.hypot(P.x - s.x, P.z - s.z);
+      if (sd < d) { spot = s; d = sd; }
+    }
+    return { spot, d };
+  }
+
   openAlchemy() {
     this.hud.openPanel('alchemy', this);
     this.hud.panelId = 'alchemy';
     this.audio.select();
-    const a = this.world.alchemy;
+    const a = this._alchemySpot || this.world.alchemy;
     if (a) this.fx.burst(a.x, a.y + 0.8, a.z, [0x5dffb0, 0xb8ffe0, 0xffffff], 12, 1.6, 0.07, 0.8, -1.2, 1.4);
   }
 
   updateAlchemy(dt) {
-    const a = this.world.alchemy;
+    const { spot: a, d } = this.nearestSpot([this.world.alchemy, this.world.gilantreAlchemy]);
+    this._alchemySpot = a;
     if (!a) return;
-    const P = this.player.pos;
-    const d = Math.hypot(P.x - a.x, P.z - a.z);
     this.alchemyNear = d < 3.4 && this.started;
     if (d < 20 && Math.random() < dt * 8) {
       this.fx.burst(a.x + (Math.random() - 0.5) * 0.3, a.y + 0.55, a.z + (Math.random() - 0.5) * 0.3, [0x5dffb0, 0xc8ffe4, 0x4ec8ff], 1, 0.35, 0.07, 1.1, -1.6, 1.3);
     }
+    const label = a.name || "Lira's Alchemy";
     if (this.alchemyNear && !this.alchemyHinted) {
       this.alchemyHinted = true;
-      this.hud.toast("Lira's Alchemy - press F to buy potions", 2600);
+      this.hud.toast(`${label} - press F to buy potions`, 2600);
     }
     if (this.alchemyNear) {
       const [sx, sy, vis] = this.screenOf(a.x, a.y + 1.5, a.z, true);
-      this.hud.plate('alchemy', "Lira's Alchemy<small>F · buy potions</small>");
+      this.hud.plate('alchemy', `${label}<small>F · buy potions</small>`);
       this.hud.placePlate('alchemy', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('alchemy');
   }
@@ -3444,15 +3456,14 @@ class Game {
     this.hud.openPanel('smithy', this);
     this.hud.panelId = 'smithy';
     this.audio.select();
-    const s = this.world.smithy;
+    const s = this._smithySpot || this.world.smithy;
     if (s) this.fx.burst(s.x, s.y + 1.2, s.z, [0xff8a1e, 0xffd27a, 0xffffff], 10, 2.2, 0.08, 0.7, -1, 1.2);
   }
 
   updateSmithy(dt) {
-    const s = this.world.smithy;
+    const { spot: s, d } = this.nearestSpot([this.world.smithy, this.world.gilantreSmithy]);
+    this._smithySpot = s;
     if (!s) return;
-    const P = this.player.pos;
-    const d = Math.hypot(P.x - s.x, P.z - s.z);
     this.smithyNear = d < 4.2 && this.started;
     if (d < 22 && Math.random() < dt * 8) {
       this.fx.burst(s.x + 0.4, s.y + 1.1, s.z, [0xff8a1e, 0xffd27a, 0xff5a1a], 1, 0.6, 0.06, 1.1, -1.4, 1.6);
@@ -3460,28 +3471,33 @@ class Game {
     if (d < 22 && Math.random() < dt * 2) {
       this.fx.burst(s.x - 0.6, s.y + 3.2, s.z, [0x6a6a70, 0x8a8a90], 1, 0.35, 0.16, 1.6, -0.4, 0.7);
     }
+    const label = s.name || 'The Smithy';
     if (this.smithyNear && !this.smithyHinted) {
       this.smithyHinted = true;
-      this.hud.toast('The Smithy - press F to smelt ore into bars', 2800);
+      this.hud.toast(`${label} - press F to smelt ore into bars`, 2800);
     }
     if (this.smithyNear) {
       const [sx, sy, vis] = this.screenOf(s.x, s.y + 3.2, s.z, true);
-      this.hud.plate('smithy', 'The Smithy<small>F · smelt bars</small>');
+      this.hud.plate('smithy', `${label}<small>F · smelt bars</small>`);
       this.hud.placePlate('smithy', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('smithy');
     if (this.hud.panelId === 'smithy' && d > 5.2) this.hud.closePanel();
   }
 
   clickSmithy() {
-    const s = this.world.smithy;
     const aim = this.input.aim;
-    if (!s || !this.started || !aim.has || this.input.touch) return false;
+    if (!this.started || !aim.has || this.input.touch) return false;
     const P = this.player.pos;
-    if (Math.hypot(P.x - s.x, P.z - s.z) > 4.8) return false;
-    const hits = this.ray.intersectObject(s.group, true);
-    if (!hits.length) return false;
-    this.openSmithy();
-    return true;
+    for (const s of [this.world.smithy, this.world.gilantreSmithy]) {
+      if (!s?.group) continue;
+      if (Math.hypot(P.x - s.x, P.z - s.z) > 4.8) continue;
+      const hits = this.ray.intersectObject(s.group, true);
+      if (!hits.length) continue;
+      this._smithySpot = s;
+      this.openSmithy();
+      return true;
+    }
+    return false;
   }
 
   openCarve() {
@@ -3494,15 +3510,14 @@ class Game {
     this.hud.openPanel('forge', this);
     this.hud.panelId = 'forge';
     this.audio.select();
-    const f = this.world.forge;
+    const f = this._forgeSpot || this.world.forge;
     if (f) this.fx.burst(f.x + 0.4, f.y + 1.3, f.z, [0xff8a1e, 0xffd27a, 0xffffff], 10, 2.2, 0.08, 0.7, -1, 1.2);
   }
 
   updateForge(dt) {
-    const f = this.world.forge;
+    const { spot: f, d } = this.nearestSpot([this.world.forge, this.world.gilantreForge]);
+    this._forgeSpot = f;
     if (!f) return;
-    const P = this.player.pos;
-    const d = Math.hypot(P.x - f.x, P.z - f.z);
     this.forgeNear = d < 3.6 && this.started;
     if (d < 22 && Math.random() < dt * 9) {
       this.fx.burst(f.x + 0.5, f.y + 0.7, f.z + (Math.random() - 0.5) * 0.4, [0xff8a1e, 0xffd27a, 0xff5a1a], 1, 0.6, 0.06, 1.1, -1.4, 1.6);
@@ -3510,13 +3525,14 @@ class Game {
     if (d < 22 && Math.random() < dt * 3) {
       this.fx.burst(f.x, f.y + 2.5, f.z, [0x6a6a70, 0x8a8a90], 1, 0.35, 0.16, 1.6, -0.5, 0.8);
     }
+    const label = f.name || 'The Forge';
     if (this.forgeNear && !this.forgeHinted) {
       this.forgeHinted = true;
-      this.hud.toast('The Forge - press F to forge weapons and armor', 2600);
+      this.hud.toast(`${label} - press F to forge weapons and armor`, 2600);
     }
     if (this.forgeNear) {
       const [sx, sy, vis] = this.screenOf(f.x, f.y + 2.9, f.z, true);
-      this.hud.plate('forge', 'The Forge<small>F · forge gear</small>');
+      this.hud.plate('forge', `${label}<small>F · forge gear</small>`);
       this.hud.placePlate('forge', sx, sy, vis, { dist: d });
     } else this.hud.removePlate('forge');
   }
@@ -3815,6 +3831,7 @@ class Game {
       this.journalT -= dt;
       if (this.journalT <= 0) {
         this.journalT = 0.45;
+        const gilan = this.world.gilantre;
         this.applyJournal(this.journal.pulse(this.player.pos, {
           gate: GATE,
           pit: MINE,
@@ -3824,6 +3841,10 @@ class Game {
           hellspire: this.world.demonKeep,
           dawnspire: this.world.holyKeep,
           warfield: this.world.warfield,
+          coliseum: gilan?.arena,
+          westwood: gilan?.grove,
+          markoak: gilan?.oak,
+          reed: gilan?.reed,
         }));
       }
     }

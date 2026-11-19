@@ -589,6 +589,11 @@ const FONT = {
   I: ['XXXXX', '..X..', '..X..', '..X..', '..X..', '..X..', 'XXXXX'],
   L: ['X....', 'X....', 'X....', 'X....', 'X....', 'X....', 'XXXXX'],
   D: ['XXXX.', 'X...X', 'X...X', 'X...X', 'X...X', 'X...X', 'XXXX.'],
+  A: ['.XXX.', 'X...X', 'X...X', 'XXXXX', 'X...X', 'X...X', 'X...X'],
+  N: ['X...X', 'XX..X', 'X.X.X', 'X..XX', 'X...X', 'X...X', 'X...X'],
+  T: ['XXXXX', '..X..', '..X..', '..X..', '..X..', '..X..', '..X..'],
+  R: ['XXXX.', 'X...X', 'X...X', 'XXXX.', 'X.X..', 'X..X.', 'X...X'],
+  E: ['XXXXX', 'X....', 'X....', 'XXXX.', 'X....', 'X....', 'XXXXX'],
 };
 
 export function buildHouse(opts) {
@@ -866,8 +871,20 @@ export function buildStall(seed, awning = [0xc8402f, 0xf2ead3], goods = 'apple')
         }
       } else if (goods === 'apple') M.set(x, 12, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 12, z, seed, 0.1));
       else if (goods === 'pumpkin') M.set(x, 12, z, J(k % 2 ? 0xe8821e : 0x6aa84a, x, 12, z, seed, 0.1));
-      else M.set(x, 12, z, J(k % 2 ? 0x8aa8c0 : 0xd0d8e0, x, 12, z, seed, 0.1));
-      if (goods !== 'potion' && (x + z) % 3 === 0) M.set(x, 13, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 13, z, seed, 0.1));
+      else if (goods === 'timber') {
+        M.set(x, 12, z, J(k % 2 ? 0x8a5a34 : 0xc4a46a, x, 12, z, seed, 0.08));
+        if (x % 6 === 0) {
+          M.set(x, 13, z, J(0x6a4328, x, 13, z, seed, 0.06));
+          M.set(x + 1 < 34 ? x + 1 : x, 14, z, J(0xb7bdc4, x, 14, z, seed, 0.05));
+        }
+      } else if (goods === 'pick') {
+        M.set(x, 12, z, J(k % 2 ? 0x9aa3ab : 0x6e7680, x, 12, z, seed, 0.06));
+        if (x % 6 === 0) {
+          M.set(x, 13, z, J(0xc4a46a, x, 13, z, seed, 0.05));
+          M.set(x, 14, z, J(0xd7dee6, x, 14, z, seed, 0.04));
+        }
+      } else M.set(x, 12, z, J(k % 2 ? 0x8aa8c0 : 0xd0d8e0, x, 12, z, seed, 0.1));
+      if ((goods === 'apple' || goods === 'pumpkin') && (x + z) % 3 === 0) M.set(x, 13, z, J(k % 2 ? 0xdc3a3a : 0xf0a030, x, 13, z, seed, 0.1));
     }
   }
   for (let z = 0; z < 28; z++) {

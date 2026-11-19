@@ -543,6 +543,254 @@ export const QUESTS = [
       },
     ],
   },
+  {
+    id: 'gilan-pick',
+    name: 'The Missing Pick',
+    series: 'Gilantre',
+    kind: 'quest',
+    points: 1,
+    giver: 'Grimbold Ironfist',
+    giverNpc: 'grimbold',
+    requires: [],
+    reward: { gold: 25 },
+    blurb: 'A pick walked out of Ironhaven and into Ragnar\'s stall.',
+    opening:
+      'Grimbold keeps the anvil in front of Ironhaven, on the south side of the well. He says his best pick is not on the bench. He says Ragnar has it, and that Ragnar will call it a loan.',
+    steps: [
+      {
+        id: 'ask-grimbold',
+        kind: 'talk',
+        npc: 'grimbold',
+        objective: 'Speak with Grimbold at Ironhaven',
+        lines: [
+          'You have the look of someone who swings a pick. Good. Mine is missing.',
+          'Ragnar Stonebeard keeps the mining stall on the north side of the well. He will tell you it was a loan. Ask him whose name was on the handle, then come back.',
+        ],
+        journal:
+          'Grimbold\'s best pick is not on the Ironhaven bench. He sent me to Ragnar Stonebeard, who will call it a loan. I am to ask whose name was on the handle.',
+      },
+      {
+        id: 'ask-ragnar',
+        kind: 'talk',
+        npc: 'ragnar',
+        objective: 'Ask Ragnar about the pick',
+        lines: [
+          'The iron one with the split handle? It was on my bench so a hunter could see what a Gilantre pick looks like. Grimbold lent it. He has forgotten the lending.',
+          'Tell him the handle still says Ironhaven. I do not keep what I do not sell. The picks I do sell are the plain ones, and you already carry one of those if you have been in a pit.',
+        ],
+        journal:
+          'Ragnar says the split-handled pick was a loan for the stall, and that the handle still reads Ironhaven. He does not sell that one. He sells the plain picks, and I already carry one.',
+      },
+      {
+        id: 'pick-back',
+        kind: 'talk',
+        npc: 'grimbold',
+        objective: 'Tell Grimbold what Ragnar said',
+        lines: [
+          'A loan. I did say that, last month, and then I said it again to the coal and not to him.',
+          'Leave it on his bench. A stall with no iron on it looks closed. Take the coin. The anvil is here when you have bars.',
+        ],
+        journal:
+          'Grimbold remembered the loan once I repeated it. The split-handled pick stays on Ragnar\'s bench so the stall does not look closed. The anvil is there when I have bars.',
+      },
+    ],
+  },
+  {
+    id: 'gilan-bowl',
+    name: 'Onto the Sand',
+    series: 'Gilantre',
+    kind: 'quest',
+    points: 1,
+    giver: 'Marcellus Valerius',
+    giverNpc: 'marcellus',
+    requires: [],
+    reward: { gold: 30 },
+    blurb: 'The arena master wants a hunter standing on the sand, not talking about it.',
+    opening:
+      'The bowl north of the well is older than the brick wall. Marcellus Valerius keeps the doors. He does not explain the place to people who have not stood in it.',
+    steps: [
+      {
+        id: 'ask-marcellus',
+        kind: 'talk',
+        npc: 'marcellus',
+        objective: 'Speak with Marcellus at the arena',
+        lines: [
+          'You can see the arches from the well. That is not the same as standing on the sand.',
+          'Walk in through the south gate. If the gate turns you around, we will both have learned something. Then come and tell me the color of the lowest course of stone.',
+        ],
+        journal:
+          'Marcellus will not talk about the arena until I have been in it. The south gate faces the well. He wants the color of the lowest course of stone.',
+      },
+      {
+        id: 'stand-sand',
+        kind: 'visit',
+        spot: 'coliseum',
+        radius: 8,
+        objective: 'Stand on the sand of the arena',
+        journal:
+          'The sand is pale and beaten flat. The lowest course of the wall is a yellower stone than the seats, and the joints are wider. Elwynn was right about the age. She was wrong about there being a stair.',
+      },
+      {
+        id: 'bowl-back',
+        kind: 'talk',
+        npc: 'marcellus',
+        objective: 'Tell Marcellus you stood on the sand',
+        lines: [
+          'You came back through the same gate. Most people do. A few try the seats and learn why the seats have no stairs on the inside.',
+          'The old stone stays. I keep the doors and the banners. If you want a fight, the prairie outside the wall has more of them than I do.',
+        ],
+        journal:
+          'Marcellus took the report and paid the door fee the other way around. The old stone stays. The fights, he says, are still out on the prairie.',
+      },
+    ],
+  },
+  {
+    id: 'gilan-roots',
+    name: 'Thin Fields',
+    series: 'Gilantre',
+    kind: 'quest',
+    points: 1,
+    giver: 'Gwyneth Earthsong',
+    giverNpc: 'gwyneth',
+    requires: [],
+    reward: { gold: 20 },
+    blurb: 'Gwyneth will not cross the moat. She wants eyes on the west wood.',
+    opening:
+      'Gwyneth Earthsong walks the cobbles with a basket she does not fill. The fields outside the west bridge are thin this season, and she will not go and look.',
+    steps: [
+      {
+        id: 'ask-gwyneth',
+        kind: 'talk',
+        npc: 'gwyneth',
+        objective: 'Speak with Gwyneth in the square',
+        lines: [
+          'The wheat outside the west bridge came up and then stopped. I can see the color from the gate. I cannot see the roots.',
+          'Cross the drawbridge and walk to the trees on the north side of the road. Tell me if the soil is bare. I am not carrying a basket across that moat.',
+        ],
+        journal:
+          'Gwyneth can see the color of the west fields from the gate and nothing else. She wants me across the drawbridge, at the trees on the north side of the road, to look at the soil.',
+      },
+      {
+        id: 'see-grove',
+        kind: 'visit',
+        spot: 'westwood',
+        radius: 16,
+        objective: 'Look at the trees west of the bridge',
+        journal:
+          'The trees are standing. The grass under them is short and pale, and the soil at the roots is open in patches, as if something pulled instead of grazed. It is not a blight I have a name for. It is enough to tell Gwyneth the field is thin and the wood is not dead.',
+      },
+      {
+        id: 'roots-back',
+        kind: 'talk',
+        npc: 'gwyneth',
+        objective: 'Tell Gwyneth what the west wood looks like',
+        lines: [
+          'Standing trees and open soil. That is better than a fire and worse than a harvest.',
+          'I will keep the basket for the prairie on the east road. Take the coin. You walked farther than I would, which is the whole of the work.',
+        ],
+        journal:
+          'Gwyneth kept the basket for the east prairie. The west wood is thin and still standing. She paid for the walk she would not take.',
+      },
+    ],
+  },
+  {
+    id: 'gilan-timber',
+    name: 'The Marked Oak',
+    series: 'Gilantre',
+    kind: 'quest',
+    points: 1,
+    giver: 'Elara Moonwhisper',
+    giverNpc: 'elara',
+    requires: [],
+    reward: { gold: 20 },
+    blurb: 'Elara marked an oak on the east road and wants it seen before someone else claims it.',
+    opening:
+      'Elara Moonwhisper sells the axes and keeps the marks. There is an oak past the east drawbridge with her cut in the bark, and she does not trust the road to leave it alone.',
+    steps: [
+      {
+        id: 'ask-elara',
+        kind: 'talk',
+        npc: 'elara',
+        objective: 'Speak with Elara at the wood stall',
+        lines: [
+          'The axe you carry will fell birch and oak. Maple waits until your arm is less hopeful.',
+          'Past the east bridge, on the south side of the road, there is an oak with a fresh cut in the bark and a sign under it. Go and see that the sign is still mine. Do not swing at it.',
+        ],
+        journal:
+          'Elara marked an oak past the east drawbridge, south of the road. I am to see that her sign is still there. I am not to swing at the tree.',
+      },
+      {
+        id: 'see-oak',
+        kind: 'visit',
+        spot: 'markoak',
+        radius: 12,
+        objective: 'Find Elara\'s marked oak',
+        journal:
+          'The cut in the bark is fresh and the sign is still standing. The oak is large enough for a hall beam. The prairie around it is open, and nothing else on the road has a mark.',
+      },
+      {
+        id: 'timber-back',
+        kind: 'talk',
+        npc: 'elara',
+        objective: 'Tell Elara the oak is still marked',
+        lines: [
+          'Still standing, then. Good. The hall can wait a season. A tree cut in a hurry is a beam that twists.',
+          'If you need the axe sharpened, the bench is here. I do not charge a hunter for looking at a tree I asked them to look at.',
+        ],
+        journal:
+          'Elara left the oak for another season. The sign stays. She does not charge for a look she asked for, and the axe bench is there when the edge goes dull.',
+      },
+    ],
+  },
+  {
+    id: 'gilan-reed',
+    name: 'The East Reed',
+    series: 'Gilantre',
+    kind: 'quest',
+    points: 1,
+    giver: 'Lyra Swiftfoot',
+    giverNpc: 'lyra',
+    requires: [],
+    reward: { gold: 15 },
+    blurb: 'Lyra dries one reed on the east bank. She wants it looked at, not pulled.',
+    opening:
+      'Lyra Swiftfoot sells the same draughts Lira does, from a stall on the south road inside the wall. The reed she dries grows on the east bank of the moat, and she will not say it is still good until someone has looked at the water.',
+    steps: [
+      {
+        id: 'ask-lyra',
+        kind: 'talk',
+        npc: 'lyra',
+        objective: 'Speak with Lyra at her stall',
+        lines: [
+          'Draughts for the cuts, philters for the bolt. The prices are the same as the south road in Oakhollow. The herbs are not.',
+          'On the east bank of the moat, past the bridge and a little south, there is a stand of reed I cut for drying. Look at the water around it. If it is brown, tell me. If it is clear, also tell me. Do not pull the reed.',
+        ],
+        journal:
+          'Lyra cuts one stand of reed on the east bank, south of the bridge. I am to look at the water and leave the reed in the mud.',
+      },
+      {
+        id: 'see-reed',
+        kind: 'visit',
+        spot: 'reed',
+        radius: 12,
+        objective: 'Look at the reed on the east bank',
+        journal:
+          'The reed is green at the tips and pale at the waterline. The moat around it is dark and clear enough to show the brick of the inner bank. Nothing brown is moving in it. Lyra can dry this cutting.',
+      },
+      {
+        id: 'reed-back',
+        kind: 'talk',
+        npc: 'lyra',
+        objective: 'Tell Lyra the water is clear',
+        lines: [
+          'Clear, then. I will cut it in the morning, when the guards are bored and not watching the bank.',
+          'Buy a draught if you are bleeding. Looking at a reed does not close a cut, whatever the old stories say.',
+        ],
+        journal:
+          'The east reed is fit to dry. Lyra will cut it when the guards are bored. A draught is still the thing that closes a cut.',
+      },
+    ],
+  },
 ];
 
 export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
@@ -556,6 +804,12 @@ export const QUEST_GIVER_NPC = {
   Lira: 'alchemist',
   'Old Tobin': 'farmer',
   Pip: 'child',
+  'Grimbold Ironfist': 'grimbold',
+  'Ragnar Stonebeard': 'ragnar',
+  'Elara Moonwhisper': 'elara',
+  'Lyra Swiftfoot': 'lyra',
+  'Marcellus Valerius': 'marcellus',
+  'Gwyneth Earthsong': 'gwyneth',
 };
 
 export const QUEST_MARK_OFFER = 'offer';

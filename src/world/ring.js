@@ -7,6 +7,7 @@ import { JUNGLE_SPECS, jungleFeature, paintJungleCell, dressJungle, finishJungle
 import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount, gradeCinderCone } from './volcanic.js';
 import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert, openLongacreSouth, openDunesEast } from './desert.js';
 import { buildHouse } from './models.js';
+import { GILANTRE_SPECS, openGilantreWest, carveGilantre, dressGilantre } from './gilantre.js';
 
 /**
  * The seven tiles around Oakhollow (44, 45, 46, 54, 56, 64, 66).
@@ -657,12 +658,16 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'glassroad') return { n: rowOf(south, W - 1), w: colOf(made.sunspill, W - 1) };
   if (kind === 'deepwell') return { n: rowOf(made.sunspill, W - 1) };
   if (kind === 'greenbowl') return { n: rowOf(made.glassroad, W - 1), w: colOf(made.deepwell, W - 1) };
+  if (kind === 'gilantreNw') return { n: rowOf(made.snowfall, W - 1), w: colOf(made.eastleas, W - 1) };
+  if (kind === 'gilantreNe') return { n: rowOf(made.icewind, W - 1), w: colOf(made.gilantreNw, W - 1) };
+  if (kind === 'gilantreSw') return { n: rowOf(made.gilantreNw, W - 1), w: colOf(made.hayfield, W - 1) };
+  if (kind === 'gilantreSe') return { n: rowOf(made.gilantreNe, W - 1), w: colOf(made.gilantreSw, W - 1) };
   return {};
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -670,7 +675,8 @@ export function generateRing(oak, south) {
       openLongacreSouth(made.longacre);
       openDunesEast(made.pirateshore);
     }
-    const spec = { ...SPECS[kind], kind };
+    if (kind === 'gilantreNw') openGilantreWest(made.eastleas, made.hayfield);
+    const spec = { ...(SPECS[kind] || GILANTRE_SPECS[kind]), kind };
     const tile = TILES.find((t) => t.kind === kind);
     const edges = specEdges(kind, oak, south, made);
     for (const key of Object.keys(edges)) if (!edges[key]) edges[key] = null;
@@ -707,6 +713,7 @@ export function generateRing(oak, south) {
   }
   frostGoldmead(made.goldmead);
   carveDesert(lands.filter((l) => DESERT_SPECS[l.kind]));
+  carveGilantre(lands);
   return lands;
 }
 
@@ -819,6 +826,7 @@ function dressOrcCamp(world, land) {
 }
 
 function dressLand(world, land) {
+  if (typeof land.kind === 'string' && land.kind.startsWith('gilantre')) return;
   const m = world.models;
   const spec = SPECS[land.kind];
   const seed = spec.seed;
@@ -1071,4 +1079,5 @@ export function dressRing(world) {
     if (land.role === 'ring') dressLand(world, land);
   }
   finishJungle(world);
+  dressGilantre(world);
 }

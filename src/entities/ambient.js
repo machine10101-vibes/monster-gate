@@ -382,6 +382,7 @@ export function createAmbient(game) {
   for (const pen of game.world.cowPens || []) {
     for (const spot of pen.spots) cows.push(new Cow(game, spot.x, spot.z, pen.bounds));
   }
+  const townsfolk = (game.world.townsfolk || []).map((p) => new NPC(game, p));
   const farmers = (game.world.farms || []).map((farm) => new NPC(game, {
     id: farm.id,
     name: farm.farmer,
@@ -404,7 +405,12 @@ export function createAmbient(game) {
     const z = rng.range(40, 58);
     butterflies.push(new Butterfly(game, x, z, [0x6af4ff, 0x9affef, 0xc27bff][i % 3]));
   }
-  return { npcs: npcs.concat(farmers), fowl, butterflies, cows };
+  if (game.world.gilantre) {
+    for (let i = 0; i < 10; i++) {
+      butterflies.push(new Butterfly(game, 416 + rng.range(0, 32), 132 + rng.range(0, 24), colors[i % colors.length]));
+    }
+  }
+  return { npcs: npcs.concat(farmers, townsfolk), fowl, butterflies, cows };
 }
 
 export { ZONE, shade };
