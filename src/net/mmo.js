@@ -174,7 +174,7 @@ export class MmoClient {
     q('[data-cancel]').disabled=!(this.pvpQueueMode||this.pvpProposalId);
     q('[data-attack]').disabled=!this.pvpMatchId;
     q('[data-leave]').disabled=!this.pvpMatchId;
-    q('[data-leave]').textContent=this.pvpResult?'Return to world':'Leave match';
+    q('[data-leave]').textContent=this.pvpResult?'Exit Coliseum':'Leave match';
   }
 
   sendPvp(type, extra={}) {
