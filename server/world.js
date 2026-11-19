@@ -18,7 +18,7 @@ import { openPersistence } from './store.js';
 import { createCombatLoot } from './combat-loot.js';
 import { DROPS, GEAR_DROPS, MATERIALS } from '../src/data/catalog.js';
 import { GOODS } from '../src/data/gathering.js';
-import { riftChestGold, riftChestGoods, riftScale, riftWaveSpawns, RIFT_WAVES } from '../src/data/rift.js';
+import { riftChestGold, riftChestGoods, riftScale, riftWaveSpawns, RIFT_COOLDOWN_MS, RIFT_WAVES } from '../src/data/rift.js';
 
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -316,6 +316,7 @@ export class World {
       armor: gear.armor || {},
       zone: spawnZone,
       hp: pose.hp ?? 20,
+      riftClearAt: Number(row?.state?.riftClearAt) || 0,
       movedAt: 0,
     });
     this.players.set(session.id, session);
@@ -344,6 +345,7 @@ export class World {
         goods: row.state.goods || {},
         materials: row.state.materials || {},
         crafted: row.state.crafted || {},
+        riftClearAt: Number(row.state.riftClearAt) || 0,
       });
     }
     this.dirty.add(session.id);
@@ -419,6 +421,9 @@ export class World {
   async enterRift(session) {
     if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to enter the Rift.');
     if (session.riftRunId) return;
+    if (this.now() - (session.riftClearAt || 0) < RIFT_COOLDOWN_MS) {
+      throw new ProtocolError('rift_cooldown', 'The Waygate is still recovering. Try again in a few minutes.');
+    }
     if (session.zone === 'rift' || Math.hypot(session.x - 80, session.z - 98) > 10) {
       throw new ProtocolError('rift', 'Stand beside the Waygate to enter the Rift.');
     }
@@ -432,7 +437,8 @@ export class World {
       if (party && party.leader !== session.id) throw new ProtocolError('rift', 'Only the party leader can open a new Rift.');
       const ready = party
         ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
-          member && !member.riftRunId && Math.hypot(member.x - 80, member.z - 98) <= 10)
+          member && !member.riftRunId && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
+          && Math.hypot(member.x - 80, member.z - 98) <= 10)
         : [session];
       run = {
         id: randomBytes(16).toString('hex'),
@@ -547,7 +553,14 @@ export class World {
         { kind: 'gold', id: 'gold', amount: riftChestGold(run.partySize) },
         ...goods,
       ], members, run.partyId, `rift:${run.id}:chest`);
-      for (const member of members) this._send(member.ws, 'rift_chest_result', { run_id: run.id, ok: true });
+      for (const member of members) {
+        await this.persist.grantOnce({
+          rewardId: `rift:${run.id}:clear:${member.userId}`,
+          userId: member.userId, kind: 'rift_clear', id: 'rift', amount: 1,
+        });
+        member.riftClearAt = this.now();
+        this._send(member.ws, 'rift_chest_result', { run_id: run.id, ok: true });
+      }
     } catch (err) {
       run.claimed = false;
       throw err;
