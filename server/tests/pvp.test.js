@@ -60,10 +60,12 @@ test('2v2 matchmaking pairs two full leader-created parties', async () => {
     hello(sockets[3], 'dan', { name: 'Dan' }),
   ]);
   sockets[0].send(JSON.stringify({ v: 1, type: 'party_invite', name: 'Bea', request_id: 'invite-bea' }));
-  const inviteA = await waitUntil(() => frames[1].find(m => m.type === 'party_invite')) && frames[1].find(m => m.type === 'party_invite');
+  await waitUntil(() => frames[1].find(m => m.type === 'party_invite'));
+  const inviteA = frames[1].find(m => m.type === 'party_invite');
   sockets[1].send(JSON.stringify({ v: 1, type: 'party_accept', invite_id: inviteA.invite_id, request_id: 'accept-bea' }));
   sockets[2].send(JSON.stringify({ v: 1, type: 'party_invite', name: 'Dan', request_id: 'invite-dan' }));
-  const inviteB = await waitUntil(() => frames[3].find(m => m.type === 'party_invite')) && frames[3].find(m => m.type === 'party_invite');
+  await waitUntil(() => frames[3].find(m => m.type === 'party_invite'));
+  const inviteB = frames[3].find(m => m.type === 'party_invite');
   sockets[3].send(JSON.stringify({ v: 1, type: 'party_accept', invite_id: inviteB.invite_id, request_id: 'accept-dan' }));
   await waitUntil(() => frames[0].some(m => m.type === 'party_state' && m.party?.members?.length === 2)
     && frames[2].some(m => m.type === 'party_state' && m.party?.members?.length === 2));
