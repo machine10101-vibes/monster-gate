@@ -72,15 +72,20 @@ export function createCombatLoot({
   async function resolveRoll(roll) {
     if (roll.resolving) return;
     roll.resolving = true;
-    const entries = [...roll.choices.entries()];
-    const need = entries.filter(([, c]) => c.choice === 'need').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
-    const greed = entries.filter(([, c]) => c.choice === 'greed').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
-    const winnerId = (need[0] || greed[0])?.[0];
-    let winner = players.get(winnerId);
-    if (winner) await deliver(roll.item, winner, roll.rewardId);
-    else winner = await roundRobin(roll.item, roll.members, roll.partyId, roll.rewardId);
-    rolls.delete(roll.id);
-    broadcast({ type: 'loot_roll_result', roll_id: roll.id, reward_id: roll.rewardId, winner: winner?.id || null, item: roll.item }, roll.members);
+    try {
+      const entries = [...roll.choices.entries()];
+      const need = entries.filter(([, c]) => c.choice === 'need').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
+      const greed = entries.filter(([, c]) => c.choice === 'greed').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
+      const winnerId = (need[0] || greed[0])?.[0];
+      let winner = players.get(winnerId);
+      if (winner) await deliver(roll.item, winner, roll.rewardId);
+      else winner = await roundRobin(roll.item, roll.members, roll.partyId, roll.rewardId);
+      rolls.delete(roll.id);
+      broadcast({ type: 'loot_roll_result', roll_id: roll.id, reward_id: roll.rewardId, winner: winner?.id || null, item: roll.item }, roll.members);
+    } catch (err) {
+      roll.resolving = false;
+      throw err;
+    }
   }
 
   async function kill(monster, killer) {
@@ -154,8 +159,8 @@ export function createCombatLoot({
       for (const roll of [...rolls.values()]) {
         if (now() >= roll.expiresAt) {
           for (const member of roll.members) if (!roll.choices.has(member.id)) roll.choices.set(member.id, { choice: 'pass', value: 0, order: roll.members.indexOf(member) });
-          await resolveRoll(roll);
         }
+        if (roll.choices.size === roll.members.length) await resolveRoll(roll);
       }
       for (const monster of monsters) {
         if (monster.dead && monster.respawnAt && now() >= monster.respawnAt) {
