@@ -425,6 +425,7 @@ export class MmoClient {
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
       this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
+      this.syncAuthoritativeMonsters();
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
       this.setStatus('online', { online: msg.online });
     } else if (msg.type === TYPES.snapshot) {
@@ -502,6 +503,7 @@ export class MmoClient {
   }
 
   syncAuthoritativeMonsters() {
+    if (this.you?.guest !== false) return;
     const available = (this.entities.monsters || []).filter((entry) => entry.alive !== false && entry.hp > 0);
     if (!available.length || !this.game?.monsters) return;
     const used = new Set((this.game.monsters || []).map((monster) => monster.serverId).filter(Boolean));
