@@ -3452,25 +3452,30 @@ function startGame() {
     if (!mmoSearch.has('mmo')) mmoSearch.set('mmo', '1');
     const worldSearch = `?${mmoSearch.toString()}`;
     if (q.get('mmo') !== '0') {
-      import('./net/worldView.js').then(async (m) => {
+      game.worldViewReady = import('./net/worldView.js').then(async (m) => {
         const flags = m.parseMmoFlags(worldSearch);
-        game.worldViewReady = m.init(game.scene, {
+        const view = await m.init(game.scene, {
           game,
           mock: flags.mockFeed || flags.mockwake,
           search: worldSearch,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
-        game.ensureWorldConnection = async () => {
-          if (game.mmo || game.wallet?.kind === 'guest' || flags.mock || flags.mockwake || q.get('mmo') === '0') return;
-          try {
-            const view = await game.worldViewReady;
-            const { attachMmo } = await import('./net/mmo.js');
-            attachMmo(game, view, { search: worldSearch });
-          } catch (err) {
-            console.warn('world connection', err);
-          }
-        };
-      }).catch((err) => console.warn('world view', err));
+        return { view, flags };
+      }).catch((err) => {
+        console.warn('world view', err);
+        return null;
+      });
+      game.ensureWorldConnection = async () => {
+        if (game.mmo || game.wallet?.kind === 'guest' || q.get('mmo') === '0') return;
+        try {
+          const ready = await game.worldViewReady;
+          if (!ready || ready.flags.mock || ready.flags.mockwake) return;
+          const { attachMmo } = await import('./net/mmo.js');
+          attachMmo(game, ready.view, { search: worldSearch });
+        } catch (err) {
+          console.warn('world connection', err);
+        }
+      };
     }
   } catch {
     /* query parsing failed; stay offline */
