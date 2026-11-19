@@ -191,12 +191,12 @@ export class MmoClient {
 
   queuePvp(mode) { if(this.sendPvp('pvp_queue',{mode})){this.pvpQueueMode=mode;this.updatePvpBoard(`Joining ${mode} queue…`);} }
 
-  pvpAttackNearest() {
+  pvpAttackNearest(maxRange = 4.5) {
     if(!this.pvpMatchId||!this.game?.player)return false;
     const p=this.game.player.pos;
     const target=[...this.nearby.values()].filter(row=>row.zone===`colosseum:${this.pvpMatchId}`&&row.pvp_team!==this.pvpTeam&&!row.pvp_dead)
       .map(row=>({...row,distance:Math.hypot(row.x-p.x,row.z-p.z)})).sort((a,b)=>a.distance-b.distance)[0];
-    if(!target||target.distance>4.5){this.updatePvpBoard('Move within striking distance of an opponent.');return false;}
+    if(!target||target.distance>maxRange){this.updatePvpBoard('Move within striking distance of an opponent.');return false;}
     return this.sendPvp('pvp_attack',{target_id:target.id});
   }
 
