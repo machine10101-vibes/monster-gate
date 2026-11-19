@@ -431,6 +431,7 @@ export class MmoClient {
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
       this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
+      if (this.game?.riftRun?.serverOwned && msg.pose?.zone !== 'rift') this.game.leaveRiftFromServer?.();
       this.syncAuthoritativeMonsters();
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
       this.setStatus('online', { online: msg.online });
