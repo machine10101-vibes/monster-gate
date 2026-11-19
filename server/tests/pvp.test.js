@@ -38,6 +38,9 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     const pa = srv.world.players.get(wa.you.id), pb = srv.world.players.get(wb.you.id);
     assert.equal(pa.zone, pb.zone);
     assert.match(pa.zone, /^colosseum:/);
+    const startFrame = aFrames.find(m => m.type === 'pvp_match_start');
+    assert.ok(startFrame?.pose);
+    assert.equal(startFrame.pose.x, pa.x);
     assert.notEqual(pa.pvpTeam, pb.pvpTeam);
     pa.x = pb.x - 2; pa.z = pb.z;
     const before = pb.hp;
