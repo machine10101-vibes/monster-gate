@@ -3226,6 +3226,17 @@ class Game {
       this.ember += (0 - this.ember) * Math.min(1, dt * 2);
       return;
     }
+    if (this.world.realm === 'colosseum') {
+      if (this.zone !== 'colosseum') {
+        this.zone = 'colosseum';
+        this.hud.setArea('Gilantre Colosseum');
+      }
+      this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
+      this.chill += (0 - this.chill) * Math.min(1, dt * 2);
+      this.ember += (0 - this.ember) * Math.min(1, dt * 2);
+      return;
+    }
+
     const land = this.world.landAt(P.x, P.z);
     const oasisName = oasisAreaName(P.x, P.z);
     if (oasisName) {
