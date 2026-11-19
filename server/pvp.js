@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { ProtocolError } from './protocol.js';
 
 const MODES = new Set(['1v1', '2v2', '3v3']);
-const ARENA = { x: 1617.5, y: 2, z: 817.5 };
+const ARENA = { x: 1719.5, y: 2.2, z: 819.5 };
 
 function live(world, id) {
   const player = world.players.get(id);
@@ -76,7 +76,7 @@ export function createPvpRuntime(world, opts = {}) {
         world.dirty.add(p.id);
         world.sendSnapshot(p);
         world.social.onZone(p, match.teams[team][index] === p.id ? p.pvpReturnPose.zone : p.zone);
-        send(p, 'pvp_match_start', { match_id: id, mode, team, arena: 'Gilantre Colosseum', hp: p.hp, max_hp: p.maxHp || 20 });
+        send(p, 'pvp_match_start', { match_id: id, mode, team, arena: 'Gilantre Colosseum', pose: { x: p.x, y: p.y, z: p.z, yaw: p.yaw }, hp: p.hp, max_hp: p.maxHp || 20 });
       }
     }
     return match;
