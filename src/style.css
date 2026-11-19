@@ -1484,11 +1484,20 @@ h1 em {
   border-color: #ffd23f;
   box-shadow: 0 0 0 1px rgba(255, 210, 63, 0.35);
 }
-.world-switch {
+.world-switch,
+.gfx-switch {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+.gfx-switch .gfx-opt {
+  min-width: 64px;
+}
+.gfx-switch .gfx-opt.on {
+  background: #3a2a14;
+  border-color: #ffd23f;
+  color: #ffe7a3;
 }
 #world-auth {
   position: absolute;

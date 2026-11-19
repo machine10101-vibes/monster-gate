@@ -25,6 +25,7 @@ import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
 import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
+import { QUALITIES } from '../engine/quality.js';
 import { canCreateWorld } from '../admin/gate.js';
 
 export const ITEMS = [
@@ -833,7 +834,7 @@ export class HUD {
               ['Hunter Stats', '<button id="set-stats">Open</button>'],
             ]
           : []),
-        ['Graphics quality', `<button id="set-q">${q.label}</button>`],
+        ['Graphics quality', `<span class="gfx-switch">${QUALITIES.map((item) => `<button type="button" class="gfx-opt${item.id === q.id ? ' on' : ''}" data-q="${item.id}">${item.label}</button>`).join('')}</span>`],
         ['Build', `<b id="set-build">${BUILD_ID}</b>`],
         ...(game.debug && !game.mmo && !game.worldView
           ? [
@@ -880,10 +881,14 @@ export class HUD {
       if (bagBtn) bagBtn.onclick = () => this.openPanel('bag', game);
       const bookBtn = document.getElementById('set-book');
       if (bookBtn) bookBtn.onclick = () => this.openPanel('spellbook', game);
-      document.getElementById('set-q').onclick = () => {
-        game.cycleQuality();
-        document.getElementById('set-q').textContent = game.quality.label;
-      };
+      body.querySelectorAll('.gfx-opt').forEach((btn) => {
+        btn.onclick = () => {
+          game.setQuality(btn.dataset.q);
+          body.querySelectorAll('.gfx-opt').forEach((el) => {
+            el.classList.toggle('on', el.dataset.q === game.quality.id);
+          });
+        };
+      });
       document.getElementById('set-snd').onclick = () => {
         game.audio.toggle();
         document.getElementById('set-snd').textContent = game.audio.enabled ? 'On' : 'Off';

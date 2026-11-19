@@ -9,6 +9,7 @@ import { Sky } from './world/sky.js';
 import { Snowfall } from './world/snowfall.js';
 import { Ashfall } from './world/ashfall.js';
 import { FX } from './engine/fx.js';
+import { QUALITIES, chooseBootQuality, qualityById, readSavedQuality } from './engine/quality.js';
 import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
@@ -154,12 +155,6 @@ function clearBoot() {
   }
 }
 
-const QUALITIES = [
-  { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
-  { id: 'medium', label: 'Medium', density: 0.8, motes: 220, gateMotes: 160, shadowSize: 2048, shadowExtent: 30, dpr: 1.25, shadows: true },
-  { id: 'high', label: 'High', density: 1, motes: 380, gateMotes: 260, shadowSize: 3072, shadowExtent: 34, dpr: 2, shadows: true },
-];
-
 const ZONE_NAMES = {
   [ZONE.TOWN]: ['Village', 'Oakhollow'],
   [ZONE.FIELD]: ['Open Fields', 'Goldenmeadow'],
@@ -185,34 +180,24 @@ function isDesktopGraphics() {
 }
 
 function pickQuality() {
-  const saved = localStorage.getItem('mg-quality');
-  const found = QUALITIES.find((q) => q.id === saved);
-  if (found) return found;
+  const saved = readSavedQuality(typeof localStorage !== 'undefined' ? localStorage : null);
+  if (saved) return { ...saved };
   if (isDesktopGraphics()) return QUALITIES[1];
   const cores = navigator.hardwareConcurrency || 4;
   return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
 }
 
-/**
- * A boot that already died reloads once on the small setting.
- * The first boot keeps the chosen foliage. Shrinking every iPad boot, then
- * drawing that scene three times, is what turned one restart into a loop.
- */
-function survivalBudget(q, heavy) {
-  const w = Math.max(window.screen?.width || 0, window.innerWidth || 1);
-  const h = Math.max(window.screen?.height || 0, window.innerHeight || 1);
-  const dprCap = heavy ? Math.max(0.6, Math.min(1, Math.sqrt(800000 / (w * h)))) : 1;
-  return {
-    ...q,
-    id: heavy ? 'low' : q.id,
-    label: heavy ? 'Low' : q.label,
-    density: heavy ? Math.min(q.density, 0.45) : q.density,
-    motes: heavy ? Math.min(q.motes, 80) : q.motes,
-    gateMotes: heavy ? Math.min(q.gateMotes, 60) : q.gateMotes,
-    dpr: Math.min(q.dpr, Math.round(dprCap * 100) / 100),
-    shadowSize: heavy ? 512 : Math.min(q.shadowSize, 1024),
-    shadows: heavy ? false : q.shadows,
-  };
+function graphicsSize() {
+  try {
+    return {
+      screenW: window.screen?.width || 0,
+      screenH: window.screen?.height || 0,
+      innerW: window.innerWidth || 1,
+      innerH: window.innerHeight || 1,
+    };
+  } catch {
+    return {};
+  }
 }
 
 class Game {
@@ -225,10 +210,18 @@ class Game {
     // Touch phones can lose the WebGL context when the game first expands to landscape.
     // Start them on the same conservative scene budget as iOS/tablets, then let them upgrade later.
     this.safeBoot = isIOS() || isTablet() || !isDesktopGraphics() || killed;
-    this.heavyBoot = this.safeBoot;
-    this.lightBoot = this.safeBoot;
-    const base = this.safeBoot ? QUALITIES[0] : pickQuality();
-    this.quality = this.safeBoot ? survivalBudget(base, true) : base;
+    const savedQuality = readSavedQuality(typeof localStorage !== 'undefined' ? localStorage : null);
+    const bootQuality = this.safeBoot
+      ? chooseBootQuality({
+        saved: savedQuality,
+        safeBoot: true,
+        killed,
+        size: graphicsSize(),
+      })
+      : { quality: pickQuality(), recovered: false, light: false };
+    this.heavyBoot = bootQuality.light;
+    this.lightBoot = bootQuality.light;
+    this.quality = bootQuality.quality;
     this.bootFrames = 0;
     this.hud = new HUD();
     this.audio = new Audio8();
@@ -1662,14 +1655,27 @@ class Game {
   }
 
   /* ------------------------------ quality ------------------------------ */
+  setQuality(id) {
+    const next = qualityById(id);
+    if (!next) return false;
+    const changed = this.quality.id !== next.id
+      || this.quality.dpr !== next.dpr
+      || this.quality.shadowSize !== next.shadowSize
+      || this.quality.density !== next.density
+      || this.quality.shadows !== next.shadows;
+    Object.assign(this.quality, next);
+    try { localStorage.setItem('mg-quality', next.id); } catch { /* private mode */ }
+    if (!changed) return false;
+    this.applyQuality();
+    if (this.fx) this.fx.quality = this.quality;
+    this.hud?.toast?.(`Graphics: ${this.quality.label}. Foliage density applies on reload.`, 2600);
+    return true;
+  }
+
   cycleQuality() {
     const i = Math.max(0, QUALITIES.findIndex((q) => q.id === this.quality.id));
     const next = QUALITIES[(i + 1) % QUALITIES.length];
-    localStorage.setItem('mg-quality', next.id);
-    const base = this.heavyBoot ? QUALITIES[0] : next;
-    this.quality = this.lightBoot ? survivalBudget(base, this.heavyBoot) : next;
-    this.applyQuality();
-    this.hud.toast(`Graphics: ${this.quality.label} (foliage density applies on reload)`, 2600);
+    this.setQuality(next.id);
   }
 
   applyQuality() {
