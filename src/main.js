@@ -2603,6 +2603,14 @@ class Game {
       if (levelled) this.hud.banner('Level up', `${reward.id} ${levelled}`, 2600);
       return;
     }
+    if (reward.kind === 'gear') {
+      if (this.progress.grantFound(String(reward.id))) {
+        this.applyGear();
+        this.itemsChanged();
+        this.hud.toast(`Found ${String(reward.id)}!`, 2200);
+      } else if (!this.progress.crafted(String(reward.id))) this.hud.toast(INVENTORY_FULL, 1800);
+      return;
+    }
     let added = 0;
     if (reward.kind === 'good') added = this.progress.addGood(String(reward.id), amount);
     else if (reward.kind === 'material') added = this.progress.addPart(String(reward.id), amount);
