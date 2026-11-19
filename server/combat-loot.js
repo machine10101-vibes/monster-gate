@@ -99,9 +99,13 @@ export function createCombatLoot({
     for (const member of members) {
       if (!member.userId) continue;
       const rewardId = `kill:${monster.id}:${monster.deathId}:xp:${member.userId}`;
-      await grant({ rewardId, kind: 'xp', id: 'strength', amount: xpFor(monster) }, member.userId);
+      const xpAmount = xpFor(monster);
+      const xpResult = await grant({ rewardId, kind: 'xp', id: 'strength', amount: xpAmount }, member.userId);
+      if (xpResult?.granted) broadcast({ type: 'reward_update', kind: 'xp', id: 'strength', amount: xpAmount }, [member]);
       const goldId = `kill:${monster.id}:${monster.deathId}:gold:${member.userId}`;
-      await grant({ rewardId: goldId, kind: 'gold', id: 'gold', amount: goldFor(monster) }, member.userId);
+      const goldAmount = goldFor(monster);
+      const goldResult = await grant({ rewardId: goldId, kind: 'gold', id: 'gold', amount: goldAmount }, member.userId);
+      if (goldResult?.granted) broadcast({ type: 'reward_update', kind: 'gold', id: 'gold', amount: goldAmount }, [member]);
     }
     const party = partyFor(killer);
     const mode = LOOT_MODES.has(party?.loot) ? party.loot : 'round_robin';
