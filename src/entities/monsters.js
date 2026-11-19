@@ -290,6 +290,8 @@ export class Monster {
     if (!state || !Number.isFinite(Number(state.hp))) return;
     this.serverAuthoritative = true;
     const previousHp = this.hp;
+    const maxHp = Number(state.maxHp ?? state.max_hp);
+    if (Number.isFinite(maxHp) && maxHp > 0) this.maxHp = maxHp;
     if (Number.isFinite(Number(state.x))) this.x = Number(state.x);
     if (Number.isFinite(Number(state.y))) this.y = Number(state.y);
     if (Number.isFinite(Number(state.z))) this.z = Number(state.z);
