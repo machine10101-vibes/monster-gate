@@ -377,3 +377,18 @@ test('name_taken is a fatal distinct error on the view', async () => {
   assert.match(err.message, /already taken/i);
   assert.ok(toasts.some((t) => /already taken/i.test(t)));
 });
+
+
+test('Colosseum ranged attacks can select an opponent at bow range', () => {
+  const game = { player: { pos: { x: 0, z: 0 } } };
+  const client = new MmoClient(game, stubView(), { url: 'ws://world.test', WebSocket: FakeSocket, guest: false });
+  client.pvpMatchId = 'match-1';
+  client.pvpTeam = 0;
+  client.nearby.set('enemy', { id: 'enemy', zone: 'colosseum:match-1', pvp_team: 1, pvp_dead: false, x: 10, z: 0 });
+  const sent = [];
+  client.ws = { readyState: 1, send: (raw) => sent.push(parseFrame(raw)) };
+  assert.equal(client.pvpAttackNearest(13), true);
+  assert.equal(sent[0].type, 'pvp_attack');
+  assert.equal(sent[0].target_id, 'enemy');
+  client.dispose();
+});
