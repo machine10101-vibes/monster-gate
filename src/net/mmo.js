@@ -362,6 +362,11 @@ export class MmoClient {
       } else toast(this.game, msg.message || 'The Rift chest could not be claimed.');
       return;
     }
+    if (msg.type === 'rift_expired') {
+      this.game?.leaveRiftFromServer?.();
+      toast(this.game, 'The Rift has collapsed.');
+      return;
+    }
     if (msg.type === 'rift_left') return;
     if (msg.type === 'reward_snapshot') {
       this.rewardSnapshot = msg;
