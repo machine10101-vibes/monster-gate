@@ -15,7 +15,7 @@ grant select, insert on public.world_reward_claims to service_role;
 
 create or replace function public.grant_world_reward(
   p_reward_id text, p_user_id uuid, p_kind text, p_item_id text, p_amount integer
-) returns table(granted boolean)
+ ) returns table(granted boolean, version bigint)
 language plpgsql
 security definer
 set search_path = public
@@ -24,6 +24,7 @@ declare
   inserted_id text;
   state_doc jsonb;
   current_count integer;
+  current_version bigint;
 begin
   if p_reward_id is null or length(p_reward_id) < 8 or length(p_reward_id) > 180
      or p_kind not in ('good','material','gold','xp','gear','rift_clear')
@@ -37,11 +38,13 @@ begin
   on conflict (reward_id) do nothing
   returning reward_id into inserted_id;
   if inserted_id is null then
-    return query select false;
+    select c.version into current_version from public.characters c where c.user_id=p_user_id;
+    return query select false, current_version;
     return;
   end if;
 
-  select state into state_doc from public.characters where user_id=p_user_id for update;
+  select c.state, c.version into state_doc, current_version
+  from public.characters c where c.user_id=p_user_id for update;
   if state_doc is null then raise exception 'character_not_found'; end if;
 
   if p_kind='gold' then
@@ -81,8 +84,8 @@ begin
   update public.characters set state=state_doc,
     gold=coalesce((state_doc->>'gold')::integer,gold),
     version=version+1, updated_at=now()
-  where user_id=p_user_id;
-  return query select true;
+  where user_id=p_user_id returning public.characters.version into current_version;
+  return query select true, current_version;
 end;
 $$;
 revoke all on function public.grant_world_reward(text,uuid,text,text,integer) from public, anon, authenticated;
