@@ -733,7 +733,6 @@ export class World {
       this.dirty.delete(session.id);
       this.social.onLeave(session);
       for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
-      this.rememberResume(session);
       if (session.riftRunId && session.riftReturnPose) {
         Object.assign(session, session.riftReturnPose);
         session.riftRunId = null;
