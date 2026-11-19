@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { World } from '../world.js';
 
 function makeWorld({ x = 80, z = 98 } = {}) {
-  let now = 10_000;
+  let now = 1_000_000;
   const frames = [];
   const grants = [];
   const grantIds = new Set();
   const ws = { readyState: 1, send: (raw) => frames.push(JSON.parse(raw)) };
   const session = {
     id: 'hunter-1', userId: 'user-1', name: 'Hunter', guest: false,
-    x, y: 3, z, yaw: 0, zone: 'Oakhollow', hp: 20, weapon: 'blade',
+    x, y: 3, z, yaw: 0, zone: 'Oakhollow', hp: 20, weapon: 'blade', riftClearAt: 0,
     ws, gone: false,
   };
   const social = {
