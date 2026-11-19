@@ -405,6 +405,7 @@ class Game {
       this.enterImmersive({ gesture: true, lock: this.isLandscape() && !isTablet() });
     }
     this.started = true;
+    this.ensureWorldConnection?.();
     if (this.wakeWorld) {
       this.wakeWorld = false;
       this.ambient = createAmbient(this);
@@ -3453,16 +3454,18 @@ function startGame() {
     if (q.get('mmo') !== '0') {
       import('./net/worldView.js').then(async (m) => {
         const flags = m.parseMmoFlags(worldSearch);
-        const view = await m.init(game.scene, {
+        game.worldViewReady = m.init(game.scene, {
           game,
           mock: flags.mockFeed || flags.mockwake,
           search: worldSearch,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
-        if (!flags.mock && !flags.mockwake) {
+        game.ensureWorldConnection = async () => {
+          if (game.mmo || flags.mock || flags.mockwake || q.get('mmo') === '0') return;
+          const view = await game.worldViewReady;
           const { attachMmo } = await import('./net/mmo.js');
           attachMmo(game, view, { search: worldSearch });
-        }
+        };
       }).catch((err) => console.warn('world view', err));
     }
   } catch {
