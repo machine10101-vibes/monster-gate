@@ -2,7 +2,7 @@
 create table if not exists public.world_reward_claims (
   reward_id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
-  kind text not null check (kind in ('good','material','gold','xp')),
+  kind text not null check (kind in ('good','material','gold','xp','gear')),
   item_id text not null,
   amount integer not null check (amount > 0 and amount <= 100000),
   created_at timestamptz not null default now()
@@ -26,7 +26,7 @@ declare
   current_count integer;
 begin
   if p_reward_id is null or length(p_reward_id) < 8 or length(p_reward_id) > 180
-     or p_kind not in ('good','material','gold','xp')
+     or p_kind not in ('good','material','gold','xp','gear')
      or p_item_id is null or length(p_item_id) > 48
      or p_amount is null or p_amount < 1 or p_amount > 100000 then
     raise exception 'invalid_reward';
@@ -62,6 +62,16 @@ begin
     current_count := coalesce((state_doc->'materials'->>p_item_id)::integer,0);
     state_doc := jsonb_set(state_doc, array['materials',p_item_id],
       to_jsonb(least(99999,current_count+p_amount)), true);
+  elsif p_kind='gear' then
+    if p_amount <> 1 or p_item_id not in (
+      'demonhelm','demonchest','demonarms','demonlegs','demonboots','demonsword','demonshield',
+      'holyhelm','holychest','holyarms','holylegs','holyboots','holyhammer','ashenbrand'
+    ) then
+      raise exception 'invalid_gear';
+    end if;
+    state_doc := jsonb_set(state_doc, '{crafted}',
+      coalesce(state_doc->'crafted', '{}'::jsonb), true);
+    state_doc := jsonb_set(state_doc, array['crafted',p_item_id], 'true'::jsonb, true);
   end if;
 
   update public.characters set state=state_doc,
