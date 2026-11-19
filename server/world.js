@@ -385,6 +385,7 @@ export class World {
   }
 
   move(session, msg) {
+    if (session.pvpMatchId && session.pvpDead) { session.move = 0; return; }
     if (!session.limiter.allowMove()) {
       send(session.ws, errorFrame('rate', 'Slow down.'));
       return;
