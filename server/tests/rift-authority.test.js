@@ -86,3 +86,20 @@ test('Rift chest claims distribute gold and each item once through reward persis
   f.session.z = 98;
   await assert.rejects(() => f.world.enterRift(f.session), /still recovering/);
 });
+
+test('server validates monster movement bounds and assigns one movement controller', async () => {
+  const f = makeWorld();
+  await f.world.enterRift(f.session);
+  const monster = f.world.monsters.find((entry) => entry.riftRunId);
+  const before = { x: monster.x, y: monster.y, z: monster.z };
+  f.world.moveMonster(f.session, {
+    id: monster.id, x: before.x + 0.5, y: before.y, z: before.z, yaw: 0.2,
+  });
+  assert.equal(monster.controllerId, f.session.id);
+  assert.equal(monster.x, before.x + 0.5);
+  const acceptedX = monster.x;
+  f.world.moveMonster(f.session, {
+    id: monster.id, x: before.x + 100, y: before.y, z: before.z, yaw: 0.2,
+  });
+  assert.equal(monster.x, acceptedX);
+});
