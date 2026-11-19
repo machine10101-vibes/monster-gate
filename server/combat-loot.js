@@ -51,7 +51,8 @@ export function createCombatLoot({
   function partyFor(player) { return parties?.partyOf?.(player.id) || null; }
   function recipients(player) {
     const party = partyFor(player);
-    const all = orderedMembers(party, players, player.zone);
+    const all = orderedMembers(party, players, player.zone)
+      .filter((member) => distance(member, player) <= 40);
     return all.length ? all : [player];
   }
 
@@ -110,7 +111,7 @@ export function createCombatLoot({
       if (mode === 'need_greed' && party && members.length > 1) {
         const roll = { id: randomUUID(), rewardId, item, partyId: party.id, members, choices: new Map(), expiresAt: now() + ROLL_TTL_MS };
         rolls.set(roll.id, roll);
-        broadcast({ type: 'loot_roll', roll_id: roll.id, reward_id: rewardId, item, expires_at: roll.expiresAt, members: members.map((m) => m.id) });
+        broadcast({ type: 'loot_roll', roll_id: roll.id, reward_id: rewardId, item, expires_at: roll.expiresAt, members: members.map((m) => m.id) }, members);
       } else await roundRobin(item, members, party?.id, rewardId);
     }
     broadcast({ type: 'monster_state', id: monster.id, hp: 0, alive: false, respawn_at: monster.respawnAt });
@@ -140,7 +141,7 @@ export function createCombatLoot({
       if (!roll.members.some((m) => m.id === player.id)) throw new Error('Not eligible for this roll.');
       if (roll.choices.has(player.id)) throw new Error('Choice already submitted.');
       roll.choices.set(player.id, { choice, value: choice === 'pass' ? 0 : random(), order: roll.members.findIndex((m) => m.id === player.id) });
-      broadcast({ type: 'loot_roll_progress', roll_id: roll.id, submitted: roll.choices.size, total: roll.members.length });
+      broadcast({ type: 'loot_roll_progress', roll_id: roll.id, submitted: roll.choices.size, total: roll.members.length }, roll.members);
       if (roll.choices.size === roll.members.length) await resolveRoll(roll);
       return { ok: true };
     },
