@@ -2582,7 +2582,7 @@ class Game {
 
   enterRiftFromServer(info) {
     if (this.world?.realm === 'rift') return;
-    enterRift(this, { party: info?.party_size || 1, follow: false });
+    enterRift(this, { party: info?.party_size || 1, follow: false, serverOwned: true });
   }
 
   leaveRiftFromServer() {
