@@ -12,7 +12,7 @@ import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
 import { buildRift } from './rift.js';
-import { buildColosseum } from './colosseum.js';
+import { buildColosseum, buildColosseumSignUpBoard } from './colosseum.js';
 import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
@@ -390,6 +390,7 @@ export class World {
     this.cave = buildCave(this);
     this.rift = buildRift(this);
     this.colosseum = buildColosseum(this);
+    this.colosseumBoard = buildColosseumSignUpBoard(this);
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
