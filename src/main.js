@@ -511,6 +511,7 @@ class Game {
       this.enterImmersive({ gesture: false, lock: false });
     }
     this.started = true;
+    this.ensureWorldConnection?.();
     // Keep the one-shot splash marker for this tab so auth/session reloads do not replay it.
     if (this.wakeWorld) {
       this.wakeWorld = false;
@@ -4042,19 +4043,26 @@ async function startGame() {
     const wakeRaw = q.get('mockwake');
     const mockWake = !!(wakeRaw && wakeRaw !== '0' && wakeRaw !== 'false');
     if (q.get('mmo') === '1' && (shouldMountOnline({ search: liveSearch }) || mockOn || mockWake)) {
-      import('./net/worldView.js').then(async (m) => {
-        const flags = m.parseMmoFlags(location.search);
+      game.worldViewReady = import('./net/worldView.js').then(async (m) => {
+        const flags = m.parseMmoFlags(liveSearch);
         const view = await m.init(game.scene, {
           game,
           mock: flags.mockFeed || flags.mockwake,
-          search: location.search,
+          search: liveSearch,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
-        if (!flags.mock && !flags.mockwake && shouldMountOnline({ search: location.search })) {
-          const { attachMmo } = await import('./net/mmo.js');
-          attachMmo(game, view);
-        }
-      }).catch((err) => console.warn('world view', err));
+        return { view, flags };
+      }).catch((err) => {
+        console.warn('world view', err);
+        return null;
+      });
+      game.ensureWorldConnection = async () => {
+        if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search: liveSearch })) return;
+        const ready = await game.worldViewReady;
+        if (!ready || ready.flags.mock || ready.flags.mockwake) return;
+        const { attachMmo } = await import('./net/mmo.js');
+        attachMmo(game, ready.view, { search: liveSearch });
+      };
     }
   } catch {
     /* query parsing failed; stay offline */
