@@ -430,7 +430,7 @@ test('setStatus waking counts down locally and exposes retry / stuck states', ()
   assert.equal(view.wakeActive(), false);
 });
 
-test('mockwake drives waking for 30s then online', () => {
+test('mockwake drives waking for 60s then online', () => {
   const game = stubGame();
   const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1&mockwake=1' });
   const feed = new MockWorld(view, { game, mockwake: true, wakeMs: 1000 });
