@@ -337,6 +337,7 @@ export class MmoClient {
     const msg = parseFrame(raw);
     if (!msg) return;
     if (msg.type === 'rift_entered') {
+      if (this.game?.world?.realm !== 'rift') this.game?.enterRiftFromServer?.(msg);
       this.view?.setStatus?.('online', { message: 'Inside the Waygate Rift' });
       return;
     }
