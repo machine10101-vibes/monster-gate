@@ -58,5 +58,5 @@ export function resolveWorldUrl(search = '', opts = {}) {
   } catch {
     /* Node tests have no Vite env */
   }
-  return '';
+  return 'wss://monster-gate-world-1.onrender.com';
 }
