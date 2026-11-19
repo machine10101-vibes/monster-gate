@@ -289,7 +289,14 @@ export class Monster {
   applyServerState(state) {
     if (!state || !Number.isFinite(Number(state.hp))) return;
     this.serverAuthoritative = true;
+    const previousHp = this.hp;
     this.hp = Math.max(0, Math.min(this.maxHp, Number(state.hp)));
+    if (this.hp < previousHp && this.hp > 0) {
+      const dealt = previousHp - this.hp;
+      this.flash = 0.14;
+      this.game.hud.floatText(...this.game.screenOf(this.x, this.y + 1.6, this.z), String(dealt));
+      this.game.audio.hit();
+    }
     if (this.hp <= 0 && !this.dead) this.die();
     else if (this.hp > 0 && this.dead) {
       this.dead = false;
