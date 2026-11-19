@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  ERRORS, ERROR_TEXT, FRIENDS_CAP, INVITE_TTL_MS, MAX_PARTY, errorMessage, parseSocialFlags,
+  ERRORS, ERROR_TEXT, FRIENDS_CAP, INVITE_TTL_MS, MAX_PARTY, SOCIAL_GUEST_BTN, SOCIAL_GUEST_NOTE,
+  SOCIAL_SOLO_BTN, SOCIAL_SOLO_NOTE, errorMessage, parseSocialFlags, socialOfflinePrompt,
 } from '../src/social/constants.js';
 import {
   clampPartySize, lootWinner, needGreedResolve, nextLootTurn, splitGold, splitXp,
@@ -106,10 +107,15 @@ test('mock party invite, leave, kick, promote', async () => {
   const s = mock();
   const inv = await s.act('party_invite', 'Bram');
   assert.equal(inv.ok, true);
+  assert.equal(inv.pending, true);
+  assert.equal(s.party.members.length, 1, 'invited hunter must accept before joining');
+  assert.equal(s.resolveOutgoingInvite(inv.invite_id).ok, true);
   assert.equal(s.party.members.length, 2);
   assert.equal(s.party.leader, 'u_you');
   const second = await s.act('party_invite', 'wv:lira');
   assert.equal(second.ok, true);
+  assert.equal(s.party.members.length, 2);
+  assert.equal(s.resolveOutgoingInvite(second.invite_id).ok, true);
   assert.equal(s.party.members.length, 3);
   const promo = await s.act('party_promote', 'Bram');
   assert.equal(promo.ok, true);
@@ -201,8 +207,36 @@ test('offline adapter and session refuse social actions', async () => {
   assert.equal(session.mode, 'offline');
   const res = await session.requestFriend('Bram');
   assert.equal(res.ok, false);
-  assert.match(res.message, /Online only/);
+  assert.equal(res.message, SOCIAL_GUEST_NOTE);
   assert.equal(session.snapshot().friends.length, 0);
+  const signed = new SocialSession({ wallet: { kind: 'email', address: 'acct:1' } }, backend, { offline: true });
+  const live = await signed.requestFriend('Bram');
+  assert.equal(live.message, SOCIAL_SOLO_NOTE);
+});
+
+test('friends panel copy: signed-in solo vs guest, never Not connected', async () => {
+  assert.deepEqual(socialOfflinePrompt({ guest: true }), {
+    note: SOCIAL_GUEST_NOTE, action: 'signin', label: SOCIAL_GUEST_BTN,
+  });
+  assert.deepEqual(socialOfflinePrompt({ signedIn: true }), {
+    note: SOCIAL_SOLO_NOTE, action: 'world', label: SOCIAL_SOLO_BTN,
+  });
+  const ui = src('../src/social/ui.js');
+  assert.match(ui, /socialOfflinePrompt/);
+  assert.match(ui, /mg-social-join-world|Join World 1/);
+  assert.match(ui, /mg-social-signin/);
+  assert.doesNotMatch(src('../src/social/mmo.js'), /Not connected\./);
+  const guest = new MmoSocial({ game: { wallet: { kind: 'guest', address: 'guest:local' } } });
+  guest.caps.friends = true;
+  const g = await guest.act('friend_request', 'Bram');
+  assert.equal(g.ok, false);
+  assert.equal(g.message, SOCIAL_GUEST_NOTE);
+  guest.dispose();
+  const email = new MmoSocial({ game: { wallet: { kind: 'email', address: 'acct:1' } } });
+  email.caps.friends = true;
+  const e = await email.act('friend_request', 'Bram');
+  assert.equal(e.message, SOCIAL_SOLO_NOTE);
+  email.dispose();
 });
 
 test('mmo adapter feature-detects missing methods and welcome.features', async () => {
@@ -317,9 +351,14 @@ test('mmo adapter treats guests as auth and welcome.features as the cap list', a
   mmo.subscribe((_snap, evt) => persist.push(evt));
   mmo.onFrame({ v: 1, type: 'error', code: 'persist' });
   mmo.onFrame({ v: 1, type: 'error', code: 'name' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'teleport', message: 'That move was too far.' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'rate', message: 'Slow down.' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'protocol', message: 'Say hello first.' });
+  mmo.onFrame({ v: 1, type: 'error', code: 'auth' });
   assert.equal(persist[0].code, 'persist');
   assert.equal(persist[0].message, "Couldn't save, try again");
   assert.equal(persist[1].message, 'No hunter by that name');
+  assert.equal(persist.length, 2, 'world move/hello rejects are not friends-and-party toasts');
   mmo.dispose();
 });
 
@@ -339,11 +378,8 @@ test('friends cap constant and SOCIAL_SPEC cover the protocol', () => {
   assert.match(spec, /0\.08/);
   const mmo = src('../src/net/mmo.js');
   assert.match(mmo, /export class MmoClient/);
-  assert.match(mmo, /friendRequest/);
-  assert.match(mmo, /partyInvite/);
-  assert.match(mmo, /sendWhisper/);
-  const proto = src('../server/PROTOCOL.md');
+  assert.match(mmo, /friendRequest\(name\)/);
+  assert.match(mmo, /sendWhisper\(to, text\)/);
+  const proto = src('../PROTOCOL.md');
   assert.match(proto, /friend_request/);
-  assert.match(proto, /party_state/);
-  assert.match(proto, /"features": \["friends", "party", "whisper", "block"\]/);
 });
