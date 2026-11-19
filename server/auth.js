@@ -15,6 +15,10 @@ import { cleanName, ProtocolError } from './protocol.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const jwksCache = new Map();
+const PRODUCTION_ORIGINS = new Set([
+  'https://monstergate.online',
+  'https://www.monstergate.online',
+]);
 
 function envOf(env, key) {
   const v = env?.[key];
@@ -34,6 +38,7 @@ export function parseOrigins(env = process.env) {
 }
 
 export function originAllowed(origin, allowed) {
+  if (PRODUCTION_ORIGINS.has(origin)) return true;
   if (!allowed || !allowed.length) return true;
   if (allowed.includes('*')) return true;
   if (!origin) return true;
