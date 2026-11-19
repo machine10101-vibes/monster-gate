@@ -244,13 +244,14 @@ export class MmoClient {
     const alive = () => gen === this.wakeGen && !this.closed && !this.fatal;
     const elapsedMs = () => Math.max(0, now() - started);
     const secondsLeft = () => Math.max(0, etaSec - Math.floor(elapsedMs() / 1000));
-    let announced = false;
-
     const announce = () => {
       if (!alive()) return;
-      announced = true;
       this.setStatus('waking', { secondsLeft: secondsLeft(), elapsedMs: elapsedMs() });
     };
+
+    // Show the queue immediately, while the first long-lived probe wakes Render.
+    announce();
+    this.wakeTick = setInterval(announce, tickMs);
 
     while (alive()) {
       const ok = await this.probeHealthz(probeMs);
@@ -260,10 +261,6 @@ export class MmoClient {
         this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
         this.openSocket();
         return;
-      }
-      if (!announced) {
-        announce();
-        this.wakeTick = setInterval(announce, tickMs);
       }
       // Past 75s the view shows Retry from elapsedMs; keep probing so a late
       // wake still moves to connecting/online. onRetry starts a fresh countdown.
