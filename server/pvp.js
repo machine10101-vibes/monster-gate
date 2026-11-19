@@ -7,6 +7,7 @@ const GEAR_BY_ID = new Map(GEAR.map((entry) => [entry.id, entry]));
 const DEFAULT_RATING = 1000;
 const RATING_K = 32;
 const PROPOSAL_MS = 20_000;
+const RESULT_EXIT_MS = 30_000;
 
 function isRangedWeapon(id) {
   return GEAR_BY_ID.get(id)?.item?.kind === 'ranged';
@@ -78,7 +79,7 @@ export function createPvpRuntime(world, opts = {}) {
       const p = live(world, id);
       if (p) send(p, 'pvp_result', { match_id: match.id, winner, winning_team: match.teams[winner], reason });
     }
-    setTimeout(() => restore(match, winner), 8000).unref?.();
+    setTimeout(() => restore(match, winner), RESULT_EXIT_MS).unref?.();
   };
   const restore = (match, winner) => {
     if (match.finished) return;
@@ -157,6 +158,10 @@ export function createPvpRuntime(world, opts = {}) {
     const proposal = proposals.get(String(proposalId || ''));
     if (!proposal || !proposal.players.includes(session.id) || session.pvpProposalId !== proposal.id) {
       throw new ProtocolError('pvp_confirm', 'That match offer is no longer available.');
+    }
+    if (proposal.expiresAt <= now()) {
+      releaseProposal(proposal);
+      throw new ProtocolError('pvp_confirm', 'That match offer expired. Queue again.');
     }
     if (!accept) {
       releaseProposal(proposal, 'A fighter declined the match. Queue again when ready.');
