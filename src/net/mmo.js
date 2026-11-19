@@ -118,6 +118,7 @@ export class MmoClient {
     this.lootOverlay = null;
     this.lootQueue = [];
     this.rewardSnapshot = null;
+    this.monsterMoveAt = new Map();
   }
 
   bind() {
@@ -376,7 +377,7 @@ export class MmoClient {
     }
     if (msg.type === 'monster_state') {
       this.entities.monsters = (this.entities.monsters || []).map((entry) => entry.id === msg.id
-        ? { ...entry, hp: msg.hp, alive: msg.alive, x: msg.x ?? entry.x, y: msg.y ?? entry.y, z: msg.z ?? entry.z }
+        ? { ...entry, hp: msg.hp, alive: msg.alive, x: msg.x ?? entry.x, y: msg.y ?? entry.y, z: msg.z ?? entry.z, yaw: msg.yaw ?? entry.yaw }
         : entry);
       for (const monster of this.game?.monsters || []) {
         if (monster.serverId !== msg.id) continue;
@@ -592,6 +593,18 @@ export class MmoClient {
     this.lootOverlay?.remove();
     this.lootOverlay = null;
     if (advance && this.lootQueue.length) this.showLootRoll(this.lootQueue.shift());
+  }
+
+  updateMonster(monster) {
+    if (!this.ws || this.ws.readyState !== 1 || !monster?.serverId || monster.dead) return false;
+    const now = Date.now();
+    const last = this.monsterMoveAt.get(monster.serverId) || 0;
+    if (now - last < 220) return false;
+    this.monsterMoveAt.set(monster.serverId, now);
+    this.ws.send(encode('monster_move', {
+      id: monster.serverId, x: monster.x, y: monster.y, z: monster.z, yaw: monster.yaw || 0,
+    }));
+    return true;
   }
 
   enterRift() {
