@@ -81,7 +81,7 @@ test('?mmo=1 keeps a long-lived health probe open through a 10s Render cold star
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('timed out waiting for waking queue')), 7000);
       const tick = () => {
-        if (view.statuses.some((s) => s.status === 'waking')) {
+        if (view.statuses.some((s) => s.status === 'waking') && healthRequests >= 2) {
           clearTimeout(timer);
           return resolve();
         }
