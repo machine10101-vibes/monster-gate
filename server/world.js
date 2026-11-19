@@ -399,7 +399,7 @@ export class World {
     const prevHp = session.hp;
     const prevX = session.x, prevY = session.y, prevZ = session.z, prevYaw = session.yaw;
     Object.assign(session, result.pose);
-    if (next.hp != null) session.hp = next.hp;
+    if (next.hp != null && !session.pvpMatchId) session.hp = next.hp;
     if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
     }
