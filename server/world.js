@@ -479,7 +479,8 @@ export class World {
       if (party && party.leader !== session.id) throw new ProtocolError('rift', 'Only the party leader can open a new Rift.');
       const ready = party
         ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
-          member && !member.riftRunId && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
+          member && member.userId && !member.guest && !member.riftRunId
+          && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
           && Math.hypot(member.x - 80, member.z - 98) <= 10)
         : [session];
       run = {
