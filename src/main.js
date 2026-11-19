@@ -3432,7 +3432,7 @@ function startGame() {
     attachDebug(game);
     attachSocial(game);
     const q = new URLSearchParams(location.search);
-    if (q.get('mmo') === '1') {
+    if (q.get('mmo') !== '0') {
       import('./net/worldView.js').then(async (m) => {
         const flags = m.parseMmoFlags(location.search);
         const view = await m.init(game.scene, {
