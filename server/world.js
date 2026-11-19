@@ -501,7 +501,9 @@ export class World {
     for (const [key, run] of this.riftRuns) {
       if (now >= run.expiresAt) {
         this.riftRuns.delete(key);
-        this.monsters = this.monsters.filter((monster) => monster.riftRunId !== run.id);
+        for (let i = this.monsters.length - 1; i >= 0; i--) {
+          if (this.monsters[i].riftRunId === run.id) this.monsters.splice(i, 1);
+        }
         continue;
       }
       if (!run.wave || run.completed || run.claimed) continue;
