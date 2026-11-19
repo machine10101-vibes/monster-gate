@@ -432,7 +432,7 @@ export class World {
       if (party && party.leader !== session.id) throw new ProtocolError('rift', 'Only the party leader can open a new Rift.');
       const ready = party
         ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
-          member && Math.hypot(member.x - 80, member.z - 98) <= 10)
+          member && !member.riftRunId && Math.hypot(member.x - 80, member.z - 98) <= 10)
         : [session];
       run = {
         id: randomBytes(16).toString('hex'),
@@ -450,7 +450,7 @@ export class World {
     }
     const joiners = party && run.wave === 0
       ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
-        member && Math.hypot(member.x - 80, member.z - 98) <= 10)
+        member && !member.riftRunId && Math.hypot(member.x - 80, member.z - 98) <= 10)
       : [session];
     for (const member of joiners.length ? joiners : [session]) this.joinRift(member, run);
     if (run.wave === 0) this.spawnRiftWave(run, 1);
@@ -458,6 +458,7 @@ export class World {
 
   joinRift(session, run) {
     if (session.riftRunId === run.id) return;
+    if (session.riftRunId) return;
     const previousZone = session.zone;
     if (!run.participants.includes(session.id)) run.participants.push(session.id);
     session.riftReturnPose = { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone };
@@ -500,6 +501,7 @@ export class World {
     for (const [key, run] of this.riftRuns) {
       if (now >= run.expiresAt) {
         this.riftRuns.delete(key);
+        this.monsters = this.monsters.filter((monster) => monster.riftRunId !== run.id);
         continue;
       }
       if (!run.wave || run.completed || run.claimed) continue;
