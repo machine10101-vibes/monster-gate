@@ -16,6 +16,8 @@ import { PersistErrorCodes } from './persistence/index.js';
 import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
 import { createCombatLoot } from './combat-loot.js';
+import { DROPS, MATERIALS } from '../src/data/catalog.js';
+import { GOODS } from '../src/data/gathering.js';
 
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -77,7 +79,13 @@ export class World {
       damageFor: (player) => Math.max(4, Math.min(18, 6 + (player.weapon ? 4 : 0))),
       xpFor: (monster) => Math.max(5, monster.level * 18),
       goldFor: (monster) => Math.max(2, monster.level * 5),
-      dropsFor: (monster) => [{ kind: 'good', id: 'copper_ore', amount: monster.level >= 10 ? 3 : 1 }],
+      dropsFor: (monster) => (DROPS[monster.type] || []).flatMap((drop) => {
+        if (Math.random() >= drop.chance) return [];
+        const [min, max] = drop.qty || [1, 1];
+        const amount = min + Math.floor(Math.random() * (max - min + 1));
+        const kind = MATERIALS[drop.id] ? 'material' : GOODS[drop.id] ? 'good' : null;
+        return kind ? [{ kind, id: drop.id, amount }] : [];
+      }),
       broadcast: (frame, audience) => {
         const targets = Array.isArray(audience) ? audience : [...this.players.values()];
         for (const player of targets) {
