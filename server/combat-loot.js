@@ -88,7 +88,7 @@ export function createCombatLoot({
   async function kill(monster, killer) {
     monster.hp = 0;
     monster.dead = true;
-    monster.respawnAt = now() + Math.max(5, monster.respawn || 30) * 1000;
+    monster.respawnAt = monster.rift ? 0 : now() + Math.max(5, monster.respawn || 30) * 1000;
     monster.deathId = randomUUID();
     const members = recipients(killer);
     for (const member of members) {
