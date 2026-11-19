@@ -24,9 +24,10 @@ The live GitHub Pages client only opens a socket when the page is loaded with `?
 
 Because the Render free plan sleeps when nobody is connected (up to about 60 seconds to wake), the client checks `/healthz` on the **https** (or http) form of the world URL before opening the WebSocket:
 
-1. Immediately show the waking queue and update its clock once a second.
-2. Probe `GET {https-world}/healthz` with a **65-second timeout** so the request can remain open while Render starts the sleeping service. If it fails or times out, wait **2.5 seconds** before retrying.
-3. While the probe is pending, call:
+1. Try `GET {https-world}/healthz` once with a **3-second timeout**. If the server is already awake, connect immediately without showing the queue.
+2. If that quick probe fails, show the waking queue immediately and update its clock once a second.
+3. Start a follow-up `GET {https-world}/healthz` with a **65-second timeout** so the request can remain open while Render starts the sleeping service. If it fails or times out, wait **2.5 seconds** before retrying.
+4. While the probe is pending, call:
 
 ```js
 worldView.setStatus('waking', { secondsLeft, elapsedMs })
@@ -35,9 +36,9 @@ worldView.setStatus('waking', { secondsLeft, elapsedMs })
 - `secondsLeft` is an integer, counting down from **60**, updated about once a second. If it reaches 0 and the server is still asleep, keep probing and keep `secondsLeft` at **0**.
 - `elapsedMs` is milliseconds since this wake attempt started (0 at the first failed probe, then increasing). The view counts down locally if updates pause, switches to “Almost there” after 60s elapsed, and shows **Retry** after 75s.
 
-4. Do not switch to an error status at 75s — stay on `waking` with `secondsLeft: 0` and a growing `elapsedMs`, and keep probing so a late wake still connects.
-5. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` back to 60, `elapsedMs` back to 0).
-6. As soon as `/healthz` returns ok, call `setStatus('connecting')` (or `reconnecting` on a later attempt) and then open the socket. After `welcome`, call `setStatus('online', { online })`. `'online'` is what closes the wake screen.
+5. Do not switch to an error status at 75s — stay on `waking` with `secondsLeft: 0` and a growing `elapsedMs`, and keep probing so a late wake still connects.
+6. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` back to 60, `elapsedMs` back to 0).
+7. As soon as `/healthz` returns ok, call `setStatus('connecting')` (or `reconnecting` on a later attempt) and then open the socket. After `welcome`, call `setStatus('online', { online })`. `'online'` is what closes the wake screen.
 
 A `name_taken` error (duplicate hunter name) is fatal. The client calls `setStatus('error', { code: 'name_taken', message })` and does not reconnect.
 
