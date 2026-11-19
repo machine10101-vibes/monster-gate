@@ -119,6 +119,7 @@ export class MmoClient {
     this.lootQueue = [];
     this.rewardSnapshot = null;
     this.monsterMoveAt = new Map();
+    this.riftEnterPending = false;
   }
 
   bind() {
@@ -339,8 +340,12 @@ export class MmoClient {
     const msg = parseFrame(raw);
     if (!msg) return;
     if (msg.type === 'rift_entered') {
+      this.riftEnterPending = false;
       if (this.game?.world?.realm !== 'rift') this.game?.enterRiftFromServer?.(msg);
-      if (this.game?.riftRun) this.game.riftRun.party = msg.party_size || this.game.riftRun.party;
+      if (this.game?.riftRun) {
+        this.game.riftRun.serverOwned = true;
+        this.game.riftRun.party = msg.party_size || this.game.riftRun.party;
+      }
       this.syncAuthoritativeMonsters();
       this.view?.setStatus?.('online', { message: 'Inside the Waygate Rift' });
       return;
@@ -458,6 +463,12 @@ export class MmoClient {
       this.nearby.delete(msg.id);
       this.view?.removePlayer?.(msg.id);
     } else if (msg.type === TYPES.error) {
+      if (this.riftEnterPending && String(msg.code || '').startsWith('rift')) {
+        this.riftEnterPending = false;
+        if (this.game?.riftRun) this.game.riftRun.serverOwned = false;
+        toast(this.game, msg.message || 'The Rift could not be opened online.');
+        return;
+      }
       if (msg.code === 'name_taken') {
         this.fatal = true;
         this.fatalReason = 'name_taken';
@@ -612,6 +623,7 @@ export class MmoClient {
 
   enterRift() {
     if (this.ws?.readyState !== 1 || this.you?.guest !== false) return false;
+    this.riftEnterPending = true;
     this.ws.send(encode('rift_enter'));
     return true;
   }
