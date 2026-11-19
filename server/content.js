@@ -30,11 +30,11 @@ export const TILE_NAMES = [
 ];
 
 export const STATS = {
-  slime: { name: 'Gate Slime', level: 1, hp: 18, dmg: 2, respawn: 12 },
-  voidslime: { name: 'Void Slime', level: 2, hp: 26, dmg: 3, respawn: 14 },
-  boar: { name: 'Thorn Boar', level: 3, hp: 38, dmg: 3, respawn: 18 },
-  wraith: { name: 'Gate Wraith', level: 3, hp: 24, dmg: 2, respawn: 18 },
-  budgedragon: { name: 'Green Budge Dragon', level: 4, hp: 64, dmg: 4, respawn: 25 },
+  slime: { name: 'Gate Slime', level: 1, hp: 18, dmg: 2, speed: 2.6, aggro: 9, respawn: 12 },
+  voidslime: { name: 'Void Slime', level: 2, hp: 26, dmg: 3, speed: 3, aggro: 11, respawn: 14 },
+  boar: { name: 'Thorn Boar', level: 3, hp: 38, dmg: 3, speed: 2.5, aggro: 10, respawn: 18 },
+  wraith: { name: 'Gate Wraith', level: 3, hp: 24, dmg: 2, speed: 2.2, aggro: 13, respawn: 18 },
+  budgedragon: { name: 'Green Budge Dragon', level: 4, hp: 64, dmg: 4, speed: 3.1, aggro: 12, respawn: 25 },
   darksycledragon: { name: 'Darksycle Dragon', level: 7, hp: 155, dmg: 5, respawn: 45 },
   demonknight: { name: 'Demon Knight', level: 11, hp: 320, dmg: 5, respawn: 30 },
   holyknight: { name: 'Holy Knight', level: 11, hp: 300, dmg: 5, respawn: 30 },
@@ -154,6 +154,8 @@ function monster(id, type, x, z, y, zone, extras = {}) {
     maxHp: stats.hp,
     level: stats.level,
     dmg: stats.dmg,
+    speed: stats.speed || 2.8,
+    aggro: stats.aggro || 12,
     zone,
     respawn: stats.respawn,
     respawnAt: 0,
