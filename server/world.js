@@ -500,6 +500,10 @@ export class World {
   tickRiftRuns(now) {
     for (const [key, run] of this.riftRuns) {
       if (now >= run.expiresAt) {
+        for (const id of run.participants) {
+          const player = this.players.get(id);
+          if (player) this._send(player.ws, 'rift_expired', { run_id: run.id });
+        }
         this.riftRuns.delete(key);
         for (let i = this.monsters.length - 1; i >= 0; i--) {
           if (this.monsters[i].riftRunId === run.id) this.monsters.splice(i, 1);
