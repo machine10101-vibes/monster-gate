@@ -265,7 +265,7 @@ export class MmoClient {
         announce();
         this.wakeTick = setInterval(announce, tickMs);
       }
-      // Past 60s the view shows Retry from elapsedMs; keep probing so a late
+      // Past 75s the view shows Retry from elapsedMs; keep probing so a late
       // wake still moves to connecting/online. onRetry starts a fresh countdown.
       await new Promise((resolve) => {
         this.wakePoll = setTimeout(resolve, pollMs);
