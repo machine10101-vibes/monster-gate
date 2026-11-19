@@ -115,6 +115,7 @@ export class MmoClient {
     this.authHold = false;
     this.rejectedToken = '';
     this.lastHelloToken = '';
+    this.tokenWatch = 0;
     this.entities = { monsters: [], nodes: [] };
     this.nearby = new Map();
     this.wakeGen = 0;
@@ -204,6 +205,38 @@ export class MmoClient {
     if (token && token !== this.authRejectedToken) this.resetAuth();
   }
 
+  holdForAuth() {
+    if (this.closed) return;
+    this.authHold = true;
+    this.rejectedToken = this.lastHelloToken || this.currentToken();
+    this.authRejectedToken = this.rejectedToken;
+    this.stopPing();
+    clearTimeout(this.timer);
+    this.timer = 0;
+    if (this.ws) {
+      const ws = this.ws;
+      this.ws = null;
+      try { ws.close(); } catch { /* already closing */ }
+    }
+    if (this.view) this.view.authReject = true;
+    this.watchToken();
+  }
+
+  watchToken() {
+    this.stopTokenWatch();
+    if (this.pollToken()) return;
+    const timer = setInterval(() => {
+      if (this.pollToken()) this.stopTokenWatch();
+    }, TOKEN_WATCH_MS);
+    timer.unref?.();
+    this.tokenWatch = timer;
+  }
+
+  stopTokenWatch() {
+    if (this.tokenWatch) clearInterval(this.tokenWatch);
+    this.tokenWatch = 0;
+  }
+
   pollToken() {
     if (this.closed || !this.authHold) return false;
     const token = this.currentToken();
@@ -213,7 +246,7 @@ export class MmoClient {
     this.authRejectedToken = null;
     this.fatal = false;
     this.fatalReason = null;
-    if (this.view) this.view.authReject = false;
+    this.stopTokenWatch();
     this.view?.clearAuthLatch?.();
     this.attempt = 0;
     this.connect();
@@ -511,11 +544,7 @@ export class MmoClient {
         return;
       }
       if (msg.code === 'auth') {
-        this.authHold = true;
-        this.rejectedToken = this.lastHelloToken || this.currentToken();
-        this.authRejectedToken = this.rejectedToken;
-        this.stopPing();
-        if (this.view) this.view.authReject = true;
+        this.holdForAuth();
         toast(this.game, msg.message || 'Sign in to hunt online. Guests stay solo.');
         this.setStatus('error', { code: 'auth', message: msg.message || 'Sign in to hunt online.' });
         return;
