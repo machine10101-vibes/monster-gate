@@ -499,7 +499,8 @@ export class World {
     }
     const joiners = party && run.wave === 0
       ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
-        member && !member.riftRunId && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
+        member && member.userId && !member.guest && !member.riftRunId
+          && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
           && Math.hypot(member.x - 80, member.z - 98) <= 10)
       : [session];
     for (const member of joiners.length ? joiners : [session]) this.joinRift(member, run);
