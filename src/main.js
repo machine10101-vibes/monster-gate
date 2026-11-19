@@ -43,7 +43,7 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
-import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
+import { updateRift, enterRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
@@ -2574,6 +2574,11 @@ class Game {
     this.talkQuest = false;
     if (result.ok) this.applyJournal(result);
     this.audio.select();
+  }
+
+  enterRiftFromServer(info) {
+    if (this.world?.realm === 'rift') return;
+    enterRift(this, { party: info?.party_size || 1, follow: false });
   }
 
   syncServerRewardState(snapshot) {
