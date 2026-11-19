@@ -135,6 +135,159 @@ function cityModels() {
     chain.set(x, y + 1, 1, 0x8a9098);
   }
 
+  const cloth = new VoxelModel(12, 18, 3);
+  cloth.box(0, 0, 1, 2, 16, 3, (x, y, z) => J(0x6a4328, x, y, z, 21, 0.05));
+  cloth.box(0, 14, 0, 12, 16, 3, 0x5c4038);
+  for (let y = 6; y < 14; y++) {
+    const sag = y > 10 ? 1 : 0;
+    cloth.box(2, y - sag, 0, 11, y - sag + 1, 2, y % 2 ? 0x8a1e1e : 0xc9a14a);
+  }
+
+  const bench = new VoxelModel(16, 8, 6);
+  for (const [x, z] of [[0, 0], [14, 0], [0, 4], [14, 4]]) bench.box(x, 0, z, x + 2, 4, z + 2, 0x5c3a22);
+  bench.box(0, 4, 0, 16, 6, 6, (x, y, z) => J(x % 2 ? 0xa87244 : 0x8a5a34, x, y, z, 22, 0.05));
+  bench.box(0, 6, 4, 16, 8, 6, 0x6a4328);
+
+  const fountain = new VoxelModel(14, 16, 14);
+  fountain.box(1, 0, 1, 13, 4, 13, (x, y, z) => stoneAt(x, y, z, 23));
+  fountain.carve(3, 2, 3, 11, 4, 11);
+  fountain.box(3, 2, 3, 11, 3, 11, 0x3a8ec4);
+  fountain.box(6, 3, 6, 8, 11, 8, (x, y, z) => stoneAt(x, y, z, 24));
+  fountain.box(5, 11, 5, 9, 13, 9, 0x7ec8ff, true);
+  fountain.box(4, 4, 1, 10, 6, 3, 0x8bc34a);
+  fountain.box(4, 4, 11, 10, 6, 13, 0x34c759);
+
+  const cart = new VoxelModel(18, 12, 10);
+  cart.box(2, 4, 1, 16, 6, 9, (x, y, z) => J(z % 2 ? 0x8a5a34 : 0xa87244, x, y, z, 25, 0.05));
+  cart.box(2, 6, 1, 4, 10, 9, 0x6a4328);
+  cart.box(14, 6, 1, 16, 10, 9, 0x6a4328);
+  cart.box(4, 6, 1, 14, 9, 3, 0x6a4328);
+  cart.box(5, 6, 3, 13, 8, 8, 0xc9a14a);
+  for (const x of [2, 15]) {
+    for (const z of [0, 7]) {
+      cart.box(x, 0, z, x + 2, 5, z + 3, 0x3e4552);
+      cart.box(x, 1, z + 1, x + 2, 4, z + 2, 0xf2ead0);
+    }
+  }
+
+  const canopy = new VoxelModel(20, 12, 14);
+  for (const [x, z] of [[0, 0], [18, 0], [0, 12], [18, 12]]) {
+    canopy.box(x, 0, z, x + 2, 8, z + 2, (a, y, c) => J(0x6a4328, a, y, c, 26, 0.05));
+  }
+  canopy.box(0, 8, 0, 20, 10, 14, (x, y, z) => (Math.floor(x / 3) % 2 ? 0xffc107 : 0x8bc34a));
+  canopy.box(0, 10, 0, 20, 11, 2, 0x455a64);
+  canopy.box(0, 10, 12, 20, 11, 14, 0x455a64);
+
+  const board = new VoxelModel(10, 16, 3);
+  board.box(4, 0, 1, 6, 10, 3, (x, y, z) => J(0x6a4328, x, y, z, 27, 0.05));
+  board.box(0, 9, 0, 10, 15, 2, 0xf2ead0);
+  board.box(1, 10, 0, 9, 14, 2, 0x8a1e1e);
+  board.box(3, 11, 0, 7, 13, 2, 0xc9a14a);
+
+  const rack = new VoxelModel(14, 16, 4);
+  rack.box(0, 0, 1, 2, 14, 3, 0x6a4328);
+  rack.box(12, 0, 1, 14, 14, 3, 0x6a4328);
+  rack.box(0, 10, 1, 14, 12, 3, 0x5c4038);
+  rack.box(3, 4, 1, 5, 13, 2, 0xd7dbe2);
+  rack.box(6, 5, 1, 8, 14, 2, 0xc9a14a);
+  rack.box(9, 4, 1, 11, 12, 2, 0x8a9098);
+
+  const column = new VoxelModel(6, 30, 6);
+  column.box(1, 0, 1, 5, 26, 5, (x, y, z) => stoneAt(x, y, z, 28));
+  column.box(0, 24, 0, 6, 28, 6, (x, y, z) => stoneAt(x, y, z, 29));
+  column.box(0, 0, 0, 6, 2, 6, (x, y, z) => stoneAt(x, y, z, 30));
+
+  const quay = new VoxelModel(8, 6, 8);
+  quay.box(0, 0, 0, 8, 4, 8, (x, y, z) => stoneAt(x, y, z, 31));
+  quay.box(1, 4, 1, 7, 6, 7, (x, y, z) => stoneAt(x, y, z, 32));
+
+  const ore = new VoxelModel(10, 6, 8);
+  ore.box(1, 0, 1, 8, 3, 6, (x, y, z) => J(0x6e7680, x, y, z, 33, 0.08));
+  ore.box(2, 2, 2, 7, 5, 5, (x, y, z) => J(0xa84828, x, y, z, 34, 0.08));
+  ore.box(4, 4, 3, 6, 6, 5, 0xd7c4a4);
+
+  const timber = new VoxelModel(16, 8, 8);
+  for (let y = 0; y < 6; y += 2) {
+    timber.box(1, y, 1 + (y % 4), 15, y + 2, 3 + (y % 4), (x, yy, z) => J(z % 2 ? 0x8a5a34 : 0xc4a06a, x, yy, z, 35, 0.06));
+  }
+
+  const mill = new VoxelModel(16, 28, 16);
+  mill.box(5, 0, 5, 11, 16, 11, (x, y, z) => stoneAt(x, y, z, 36));
+  mill.box(6, 8, 4, 10, 12, 6, 0x87b4d4);
+  mill.box(4, 16, 4, 12, 20, 12, (x, y, z) => J(0x8a4030, x, y, z, 37, 0.05));
+  mill.box(6, 20, 6, 10, 23, 10, 0x6a3028);
+  mill.box(0, 14, 7, 16, 16, 9, 0xf2ead0);
+  mill.box(7, 7, 7, 9, 23, 9, 0xf2ead0);
+  mill.box(7, 14, 7, 9, 16, 9, 0x5c4038);
+
+  const gardenArch = new VoxelModel(16, 18, 4);
+  gardenArch.box(0, 0, 1, 3, 14, 4, (x, y, z) => stoneAt(x, y, z, 38));
+  gardenArch.box(13, 0, 1, 16, 14, 4, (x, y, z) => stoneAt(x, y, z, 39));
+  gardenArch.box(0, 13, 1, 16, 16, 4, (x, y, z) => stoneAt(x, y, z, 40));
+  for (let x = 2; x < 14; x++) {
+    const rise = Math.sin(((x - 2) / 12) * Math.PI) * 3;
+    gardenArch.box(x, 10 + Math.floor(rise), 1, x + 1, 13 + Math.floor(rise), 3, 0x3c643c);
+  }
+  gardenArch.box(1, 4, 0, 3, 12, 2, 0x34c759);
+  gardenArch.box(13, 4, 0, 15, 12, 2, 0x8bc34a);
+
+  const laundry = new VoxelModel(22, 10, 4);
+  laundry.box(0, 0, 1, 2, 8, 3, (x, y, z) => J(0x6a4328, x, y, z, 42, 0.05));
+  laundry.box(20, 0, 1, 22, 8, 3, (x, y, z) => J(0x6a4328, x, y, z, 43, 0.05));
+  for (let x = 2; x < 20; x++) laundry.set(x, 7, 2, 0xc8b8a0);
+  for (const [x, c] of [[3, 0xf2ead0], [7, 0x8a1e1e], [11, 0x3a6a8a], [15, 0xc9a14a]]) {
+    laundry.box(x, 3, 1, x + 3, 7, 3, c);
+  }
+
+  const birdbath = new VoxelModel(8, 8, 8);
+  birdbath.box(3, 0, 3, 5, 5, 5, (x, y, z) => stoneAt(x, y, z, 45));
+  birdbath.box(1, 5, 1, 7, 7, 7, (x, y, z) => stoneAt(x, y, z, 46));
+  birdbath.carve(2, 6, 2, 6, 7, 6);
+  birdbath.box(2, 6, 2, 6, 7, 6, 0x7ec8ff);
+
+  const statue = new VoxelModel(8, 18, 8);
+  statue.box(1, 0, 1, 7, 3, 7, (x, y, z) => stoneAt(x, y, z, 47));
+  statue.box(3, 3, 3, 5, 10, 5, (x, y, z) => stoneAt(x, y, z, 48));
+  statue.box(2, 10, 2, 6, 14, 6, (x, y, z) => stoneAt(x, y, z, 49));
+  statue.box(1, 8, 3, 7, 10, 5, (x, y, z) => stoneAt(x, y, z, 50));
+  statue.box(3, 14, 3, 5, 17, 5, 0xe8dcc8);
+
+  const ruinGate = new VoxelModel(14, 12, 4);
+  ruinGate.box(0, 0, 1, 2, 10, 3, 0x5c4038);
+  ruinGate.box(12, 0, 1, 14, 8, 3, 0x6a4328);
+  ruinGate.box(2, 6, 1, 10, 8, 3, 0x964b00);
+  ruinGate.box(4, 3, 1, 9, 6, 3, 0x7a4a28);
+  ruinGate.box(8, 8, 1, 12, 10, 3, 0x964b00);
+
+  const bell = new VoxelModel(6, 16, 6);
+  bell.box(2, 0, 2, 4, 10, 4, (x, y, z) => J(0x6a4328, x, y, z, 53, 0.05));
+  bell.box(1, 10, 1, 5, 12, 5, 0x5c4038);
+  bell.box(2, 6, 2, 4, 10, 4, 0xc9a14a);
+  bell.box(1, 7, 1, 5, 9, 5, 0xb8893a);
+
+  const comb = new VoxelModel(6, 8, 6);
+  comb.box(2, 0, 2, 4, 4, 4, (x, y, z) => J(0x6a4328, x, y, z, 52, 0.05));
+  comb.box(1, 4, 1, 5, 7, 5, 0xffd700);
+  comb.box(2, 5, 0, 4, 7, 2, 0xc9a14a);
+
+  const lantern = new VoxelModel(4, 12, 4);
+  lantern.box(1, 0, 1, 3, 8, 3, (x, y, z) => J(0x3e4552, x, y, z, 51, 0.04));
+  lantern.box(0, 8, 0, 4, 11, 4, 0xffc870, true);
+  lantern.box(1, 11, 1, 3, 12, 3, 0x2a241c);
+
+  const planter = new VoxelModel(8, 6, 6);
+  planter.box(0, 0, 0, 8, 3, 6, (x, y, z) => J(0x8a5a34, x, y, z, 44, 0.05));
+  planter.box(1, 3, 1, 7, 5, 5, 0x2f8a3f);
+  planter.box(2, 5, 2, 4, 6, 4, 0xffd23f);
+  planter.box(5, 5, 3, 7, 6, 5, 0xff6f91);
+
+  const larder = new VoxelModel(14, 10, 8);
+  larder.box(0, 0, 0, 14, 5, 8, (x, y, z) => J(0x8a5a34, x, y, z, 41, 0.05));
+  larder.box(1, 5, 1, 6, 8, 6, 0xc45a3a);
+  larder.box(7, 5, 1, 12, 7, 4, 0xf2ead0);
+  larder.box(8, 7, 2, 11, 9, 4, 0x34c759);
+  larder.box(0, 8, 0, 14, 10, 8, (x, y, z) => (x % 3 === 0 ? 0xffc107 : 0x8a1e1e));
+
   models = {
     wall: bundle([[wall, 0.075, 14, 0, 4]]),
     tower: bundle([[tower, 0.09, 9, 0, 9]]),
@@ -145,6 +298,28 @@ function cityModels() {
     seat: bundle([[seat, 0.1, 8, 0, 6]]),
     banner: bundle([[banner, 0.08, 2, 0, 2]]),
     chain: bundle([[chain, 0.12, 0, 0, 1]]),
+    cloth: bundle([[cloth, 0.08, 1, 0, 1]]),
+    bench: bundle([[bench, 0.08, 8, 0, 3]]),
+    fountain: bundle([[fountain, 0.1, 7, 0, 7]]),
+    cart: bundle([[cart, 0.09, 9, 0, 5]]),
+    canopy: bundle([[canopy, 0.1, 10, 0, 7]]),
+    board: bundle([[board, 0.08, 5, 0, 1]]),
+    rack: bundle([[rack, 0.08, 7, 0, 2]]),
+    column: bundle([[column, 0.08, 3, 0, 3]]),
+    quay: bundle([[quay, 0.12, 4, 0, 4]]),
+    ore: bundle([[ore, 0.1, 5, 0, 4]]),
+    timber: bundle([[timber, 0.09, 8, 0, 4]]),
+    mill: bundle([[mill, 0.11, 8, 0, 8]]),
+    gardenArch: bundle([[gardenArch, 0.09, 8, 0, 2]]),
+    larder: bundle([[larder, 0.09, 7, 0, 4]]),
+    laundry: bundle([[laundry, 0.08, 11, 0, 2]]),
+    planter: bundle([[planter, 0.08, 4, 0, 3]]),
+    birdbath: bundle([[birdbath, 0.08, 4, 0, 4]]),
+    statue: bundle([[statue, 0.08, 4, 0, 4]]),
+    lantern: bundle([[lantern, 0.08, 2, 0, 2]]),
+    ruinGate: bundle([[ruinGate, 0.09, 7, 0, 2]]),
+    comb: bundle([[comb, 0.08, 3, 0, 3]]),
+    bell: bundle([[bell, 0.08, 3, 0, 3]]),
   };
   return models;
 }
@@ -179,6 +354,37 @@ function paintCell(data, i, tag) {
     tint[i * 3] = 0.86;
     tint[i * 3 + 1] = 0.78;
     tint[i * 3 + 2] = 0.7;
+    return;
+  }
+  if (tag === 'cobble') {
+    zone[i] = ZONE.FIELD;
+    top[i] = TILE.COBBLE;
+    pathMask[i] = 1;
+    forest[i] = 0;
+    const warm = (i % 7) === 0;
+    tint[i * 3] = warm ? 0.98 : 0.86;
+    tint[i * 3 + 1] = warm ? 0.9 : 0.84;
+    tint[i * 3 + 2] = warm ? 0.78 : 0.76;
+    return;
+  }
+  if (tag === 'farm') {
+    zone[i] = ZONE.FIELD;
+    top[i] = TILE.FARMLAND;
+    pathMask[i] = 0;
+    forest[i] = 0;
+    tint[i * 3] = 0.72;
+    tint[i * 3 + 1] = 0.9;
+    tint[i * 3 + 2] = 0.42;
+    return;
+  }
+  if (tag === 'meadow') {
+    zone[i] = ZONE.FIELD;
+    top[i] = TILE.FLOWER_GRASS;
+    pathMask[i] = 0;
+    forest[i] = 0;
+    tint[i * 3] = 0.78;
+    tint[i * 3 + 1] = 0.98;
+    tint[i * 3 + 2] = 0.52;
     return;
   }
   if (tag === 'sand') {
@@ -394,9 +600,9 @@ function tagAt(dx, dz, r, original) {
     const ax = dx - (ARENA.x - CX);
     const az = dz - (ARENA.z - CZ);
     if ((ax * ax) / (8 * 8) + (az * az) / (6.2 * 6.2) < 1) return { h: FLOOR, tag: 'sand' };
-    return { h: FLOOR, tag: 'path' };
+    return { h: FLOOR, tag: 'cobble' };
   }
-  if (r < MOAT_IN) return { h: FLOOR, tag: 'path' };
+  if (r < MOAT_IN) return { h: FLOOR, tag: 'cobble' };
   if (bridge) return { h: FLOOR, tag: 'path' };
   if (r < MOAT_OUT) return { h: 0, tag: 'water' };
   if (westRoad) {
@@ -468,7 +674,38 @@ export function carveGilantre(lands) {
   copySeam(nw.data, sw.data, 'gilantreSw', (n) => (W - 1) * W + n, (n) => n);
   copySeam(ne.data, se.data, 'gilantreSe', (n) => (W - 1) * W + n, (n) => n);
   copySeam(sw.data, se.data, 'gilantreSe', (n) => n * W + (W - 1), (n) => n * W);
-  for (const land of four) reslope(land.data.H, land.data.slope);
+  for (const land of four) {
+    paintCountry(land);
+    reslope(land.data.H, land.data.slope);
+  }
+}
+
+/** Farm strips on the east prairie and flowers in the west clearings. Heights stay put. */
+function paintCountry(land) {
+  const data = land.data;
+  const seed = GILANTRE_SPECS[land.kind]?.seed || 57;
+  for (let z = 2; z < W - 2; z++) {
+    for (let x = 2; x < W - 2; x++) {
+      const i = z * W + x;
+      if (data.pathMask[i] || data.zone[i] !== ZONE.FIELD) continue;
+      const h = data.H[i];
+      if (h < 1.15 || h > 6.8) continue;
+      const dx = land.x0 + x + 0.5 - CX;
+      const dz = land.z0 + z + 0.5 - CZ;
+      const r = Math.hypot(dx, dz);
+      if (r < MOAT_OUT + 1.5 || r > 102) continue;
+      if (Math.abs(dz) < 9 && Math.abs(dx) > 16) continue;
+      const roll = hash2(x, z, seed);
+      if (dx > 12 && roll > 0.38 && ((Math.floor(dx / 7) + Math.floor(dz / 5)) % 2) === 0) paintCell(data, i, 'farm');
+      else if (dx < -10 && roll > 0.7) paintCell(data, i, 'meadow');
+    }
+  }
+  for (let i = 0; i < data.zone.length; i++) {
+    if (data.zone[i] !== ZONE.FOREST) continue;
+    data.tint[i * 3] = Math.min(1, data.tint[i * 3] * 0.82 + 0.06);
+    data.tint[i * 3 + 1] = Math.min(1, data.tint[i * 3 + 1] * 0.88);
+    data.tint[i * 3 + 2] = Math.min(1, data.tint[i * 3 + 2] * 0.75 + 0.05);
+  }
 }
 
 function gateGap(x, z) {
@@ -483,6 +720,32 @@ function inArena(x, z, pad) {
   return (ax * ax) / ((12 + pad) * (12 + pad)) + (az * az) / ((10 + pad) * (10 + pad)) < 1;
 }
 
+function onRoad(x, z) {
+  if (Math.abs(z - CZ) < 5.4 && Math.abs(x - CX) < 48) return true;
+  if (Math.abs(x - CX) < 4.4 && Math.abs(z - CZ) < 26) return true;
+  return false;
+}
+
+function onSand(x, z) {
+  const ax = x - ARENA.x;
+  const az = z - ARENA.z;
+  return (ax * ax) / (7.2 * 7.2) + (az * az) / (5.6 * 5.6) < 1;
+}
+
+function canDress(world, x, z, r, limit = 28) {
+  if (onRoad(x, z) || onSand(x, z)) return false;
+  if (Math.hypot(x - CX, z - CZ) > limit) return false;
+  return world.free(x, z, r);
+}
+
+function drop(world, parts, x, z, rot, scale, r, limit = 28) {
+  if (!canDress(world, x, z, r, limit)) return false;
+  world.putAt(parts, x, z, rot, scale);
+  world.circle(x, z, Math.max(0.2, r * 0.7));
+  if (r > 0.35) world.occupy(x, z, r);
+  return true;
+}
+
 function dressWall(world, parts) {
   const count = 84;
   for (let i = 0; i < count; i++) {
@@ -493,6 +756,12 @@ function dressWall(world, parts) {
     world.putAt(parts.wall, x, z, a + Math.PI / 2, 1);
     world.circle(x, z, 0.85);
     world.occupy(x, z, 1.1);
+    if (i % 6 === 0) {
+      const bx = CX + Math.cos(a) * 27.4;
+      const bz = CZ + Math.sin(a) * 27.4;
+      world.putAt(parts.cloth, bx, bz, a + Math.PI / 2, 1, { y: world.heightAt(bx, bz) + 2.4 });
+    }
+    if (i % 4 === 2) world.torch(CX + Math.cos(a) * 27.6, CZ + Math.sin(a) * 27.6, 0xffa040);
   }
   for (const sign of [-1, 1]) {
     for (const side of [-1, 1]) {
@@ -546,6 +815,20 @@ function dressArena(world, parts) {
   world.putAt(parts.banner, ARENA.x + 3.4, ARENA.z + 10.6, 0, 1);
   world.circle(ARENA.x - 3.4, ARENA.z + 10.6, 0.22);
   world.circle(ARENA.x + 3.4, ARENA.z + 10.6, 0.22);
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + 0.2;
+    const gap = Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2));
+    if (Math.abs(gap) < 0.55) continue;
+    const x = ARENA.x + Math.cos(a) * 13.2;
+    const z = ARENA.z + Math.sin(a) * 10.6;
+    if (Math.hypot(x - CX, z - CZ) > 26) continue;
+    world.putAt(parts.column, x, z, a, 1);
+    world.circle(x, z, 0.4);
+    world.occupy(x, z, 0.55);
+    if (i % 2 === 0) world.putAt(parts.cloth, x, z + 0.2, a, 0.85, { y: world.heightAt(x, z) + 1.6 });
+  }
+  drop(world, parts.rack, ARENA.x - 5.4, ARENA.z + 11.2, 0.2, 1, 0.55);
+  drop(world, parts.rack, ARENA.x + 5.4, ARENA.z + 11.2, -0.2, 1, 0.55);
   for (let i = 0; i < 6; i++) {
     const a = -0.8 + i * 0.32;
     const x = ARENA.x + Math.cos(a) * 4.2;
@@ -637,6 +920,31 @@ function dressTown(world, parts) {
   world.lightSpots.push({ x: px, y: py + 0.7, z: pz, color: 0x5dffb0 });
   world.gilantreAlchemy = { x: px, y: py, z: pz, name: "Lyra's Stall" };
 
+  drop(world, parts.fountain, 418, 132, 0.3, 1, 1.15);
+  drop(world, parts.gardenArch, 424, 128, 0.2, 1, 0.7);
+  drop(world, parts.larder, 436, 128, 0.4, 1, 0.85);
+  drop(world, parts.laundry, 428, 158, 0.15, 1, 0.45);
+  drop(world, parts.birdbath, 412, 132, 0.4, 1, 0.4);
+  drop(world, parts.bell, 416, 124, 0.2, 1, 0.35);
+  const statueA = 2.3;
+  drop(world, parts.statue, CX + Math.cos(statueA) * 31, CZ + Math.sin(statueA) * 31, statueA, 1, 0.45, 33);
+  for (const x of [420, 432, 444]) drop(world, parts.lantern, x, 137.6, 0, 1, 0.25);
+  for (const [x, z] of [[416, 140], [432, 140], [446, 148], [420, 154], [438, 154]]) {
+    drop(world, parts.planter, x, z, 0.2, 1, 0.35);
+  }
+  drop(world, parts.canopy, 430, 130, 0.15, 1, 1.3);
+  drop(world, parts.cart, 456, 156, -0.6, 1, 1.15);
+  drop(world, parts.board, 412, 138, -0.5, 1, 0.35);
+  drop(world, parts.board, 452, 150, 0.8, 1, 0.35);
+  drop(world, parts.ore, GILANTRE_SPOTS.mine.x + 2.2, GILANTRE_SPOTS.mine.z + 1.4, 0.4, 1, 0.55, 34);
+  drop(world, parts.timber, GILANTRE_SPOTS.wood.x + 2.4, GILANTRE_SPOTS.wood.z - 1.2, 0.2, 1, 0.6, 32);
+  for (const x of [414, 424, 438, 448]) {
+    drop(world, parts.bench, x, 137, 0, 1, 0.55);
+    drop(world, parts.bench, x, 151, Math.PI, 1, 0.55);
+  }
+  house(world, { x: 422, z: 168, w: 4, d: 3, seed: 71, wall: 0xc4b49a, roof: roofs.gold, shutters: 0x8a1e1e });
+  house(world, { x: 440, z: 168, w: 4, d: 3, seed: 72, wall: 0x6e4634, roof: roofs.slate, shutters: 0x34c759, rot: Math.PI });
+
   world.putAt(m.well, CX, CZ + 2.2, 0.2, 1);
   world.circle(CX, CZ + 2.2, 0.85);
   world.occupy(CX, CZ + 2.2, 1.1);
@@ -681,7 +989,7 @@ function dressWild(world, land) {
   const spec = GILANTRE_SPECS[land.kind];
   const data = land.data;
   let trees = 0;
-  for (let n = 0; n < 180 && trees < 52; n++) {
+  for (let n = 0; n < 280 && trees < 70; n++) {
     const lx = 8 + Math.floor(hash2(n, 2, spec.seed) * (W - 16));
     const lz = 8 + Math.floor(hash2(n, 5, spec.seed) * (W - 16));
     const i = lz * W + lx;
@@ -694,11 +1002,23 @@ function dressWild(world, land) {
     const roll = hash2(n, 4, spec.seed);
     const wooded = (data.forest[i] || 0) > 0.28;
     if (!wooded) {
-      if (roll > 0.45) {
-        const parts = roll > 0.75 ? m.flowers[n % m.flowers.length] : m.tuftsGold[n % m.tuftsGold.length];
+      if (data.top[i] === TILE.FARMLAND && roll > 0.4) {
+        world.putAt(m.wheat[n % m.wheat.length], x, z, roll * 4, 1, { cover: true });
+      } else if (data.top[i] === TILE.FLOWER_GRASS || roll > 0.55) {
+        const parts = roll > 0.8 ? m.flowers[n % m.flowers.length] : m.tuftsGold[n % m.tuftsGold.length];
         world.putAt(parts, x, z, roll * 6, 1, { cover: true });
+      } else if (roll < 0.12) {
+        world.putAt(m.rocks[n % m.rocks.length], x, z, roll * 5, 0.8 + roll, { cover: true });
       }
       continue;
+    }
+    if (roll < 0.22) {
+      const floor = roll < 0.08 ? m.ferns[n % m.ferns.length] : roll < 0.14 ? m.bushes[n % m.bushes.length] : m.mushRed[n % m.mushRed.length];
+      world.putAt(floor, x + 0.8, z - 0.4, roll * 4, 1, { cover: true });
+    }
+    if (roll > 0.9 && world.free(x + 1.4, z + 0.6, 0.4)) {
+      world.putAt(roll > 0.95 ? m.logs[n % m.logs.length] : m.stumps[n % m.stumps.length], x + 1.4, z + 0.6, roll * 3, 1);
+      world.circle(x + 1.4, z + 0.6, 0.3);
     }
     let parts = m.oaks[n % m.oaks.length];
     if (roll > 0.78) parts = m.pines[n % m.pines.length];
@@ -718,6 +1038,33 @@ function dressWild(world, land) {
     if (Math.abs(z - CZ) < BRIDGE + 1.4 && Math.abs(x - CX) > 20) continue;
     if (world.heightAt(x, z) > 0.45) continue;
     world.putAt(m.reeds[n % m.reeds.length], x, z, a, 1, { y: 0.36, cover: true });
+    if (n % 3 === 0) world.putAt(m.lily[n % m.lily.length], x + 0.8, z - 0.5, a, 1, { y: 0.22, cover: true });
+  }
+  for (let n = 0; n < 48; n++) {
+    const a = (n / 48) * Math.PI * 2;
+    const rad = n % 2 === 0 ? MOAT_IN - 0.4 : MOAT_OUT + 0.6;
+    const x = CX + Math.cos(a) * rad;
+    const z = CZ + Math.sin(a) * rad;
+    if (Math.abs(z - CZ) < BRIDGE + 2 && Math.abs(x - CX) > 18) continue;
+    if (x < land.x0 + 2 || z < land.z0 + 2 || x >= land.x0 + W - 2 || z >= land.z0 + W - 2) continue;
+    world.putAt(partsQuay(world), x, z, a, 1, { y: 0.15 });
+    world.circle(x, z, 0.45);
+  }
+}
+
+function partsQuay(world) {
+  return cityModels().quay;
+}
+
+function mushrooms(world, x, z) {
+  const m = world.models;
+  const kinds = [...m.mushRed, ...m.mushBrown, ...m.mushPurple, ...m.bigMush];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    const px = x + Math.cos(a) * (1.2 + (i % 3) * 0.45);
+    const pz = z + Math.sin(a) * (1.2 + (i % 3) * 0.45);
+    if (Math.abs(pz - CZ) < 8) continue;
+    world.putAt(kinds[i % kinds.length], px, pz, a, i % 3 === 0 ? 1.15 : 0.9, { cover: true });
   }
 }
 
@@ -890,7 +1237,55 @@ export function dressGilantre(world) {
   dressArena(world, parts);
   dressTown(world, parts);
   for (const land of world.lands) if (String(land.kind || '').startsWith('gilantre')) dressWild(world, land);
-  cluster(world, GILANTRE_SPOTS.grove.x, GILANTRE_SPOTS.grove.z, 7, 0.95);
+  cluster(world, GILANTRE_SPOTS.grove.x, GILANTRE_SPOTS.grove.z, 9, 0.95);
+  const m = world.models;
+  if (world.free(502, 112, 1.4) && Math.abs(112 - CZ) > 10) {
+    world.putAt(cityModels().mill, 502, 112, 0.6, 1);
+    world.circle(502, 112, 0.7);
+    world.occupy(502, 112, 1.3);
+  }
+  mushrooms(world, 360, 108);
+  mushrooms(world, 348, 156);
+  const kit = cityModels();
+  for (const [x, z, rot] of [[376, 150, 0.4], [358, 96, -0.6]]) {
+    if (!world.free(x, z, 0.8) || Math.abs(z - CZ) < 8) continue;
+    world.putAt(kit.ruinGate, x, z, rot, 1);
+    world.circle(x, z, 0.4);
+    world.occupy(x, z, 0.7);
+  }
+  for (const [x, z] of [[354, 120], [342, 140], [370, 86], [336, 168], [382, 170]]) {
+    if (Math.abs(z - CZ) < 8) continue;
+    world.putAt(kit.comb, x, z, 0.5, 1, { cover: true });
+  }
+  for (const [x, z] of [[350, 132], [366, 158], [338, 112]]) {
+    if (!world.free(x, z, 0.4)) continue;
+    world.putAt(m.crystals[0], x, z, 0.3, 0.7);
+    world.circle(x, z, 0.2);
+  }
+  if (world.free(374, 122, 0.6)) {
+    world.putAt(cityModels().timber, 374, 122, 0.7, 0.65);
+    world.circle(374, 122, 0.35);
+  }
+  if (world.free(368, 118, 1.6)) {
+    world.putAt(m.giants[0], 368, 118, 0.8, 1.15);
+    world.circle(368, 118, 0.7);
+    world.occupy(368, 118, 1.5);
+    world.treeDots.push({ x: 368, z: 118 });
+  }
+  if (world.free(492, 128, 0.8)) {
+    world.putAt(m.scarecrow, 492, 128, 0.4, 1);
+    world.circle(492, 128, 0.35);
+    world.occupy(492, 128, 0.5);
+  }
+  world.fenceLine(478, 108, 512, 108);
+  world.fenceLine(512, 108, 512, 124);
+  world.fenceLine(512, 124, 478, 124);
+  world.fenceLine(478, 124, 478, 108);
+  for (const [x, z] of [[486, 122], [498, 136], [504, 118]]) {
+    if (!world.free(x, z, 0.6) || Math.abs(z - CZ) < 8) continue;
+    world.putAt(m.hay, x, z, 0.5, 1.2);
+    world.circle(x, z, 0.4);
+  }
   const oak = GILANTRE_SPOTS.oak;
   world.putAt(world.models.oaks[0], oak.x, oak.z, 0.4, 1.2);
   world.circle(oak.x, oak.z, 0.45);

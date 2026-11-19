@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { TILE } from '../src/engine/materials.js';
 import { W, ZONE, generateTile } from '../src/world/terrain.js';
 import { SOUTH_Z, generateSouthford, openSouthPass } from '../src/world/southford.js';
 import { openSouthfordDesert } from '../src/world/desert.js';
@@ -87,6 +88,14 @@ test('Gilantre has a walkable square, a moat, and both drawbridges', () => {
   for (const spot of [GILANTRE_SPOTS.westgate, GILANTRE_SPOTS.eastgate, GILANTRE_SPOTS.arena, GILANTRE_SPOTS.forge]) {
     assert.equal(w.playable(spot.x, spot.z), true, `${spot.x},${spot.z} h=${w.heightAt(spot.x, spot.z)}`);
   }
+
+  const square = w.lands.find((l) => 420 >= l.x0 && 150 >= l.z0 && 420 < l.x0 + W && 150 < l.z0 + W);
+  const si = (150 - square.z0) * W + (420 - square.x0);
+  assert.equal(square.data.top[si], TILE.COBBLE);
+  const field = w.lands.find((l) => l.kind === 'gilantreSe');
+  let farms = 0;
+  for (let i = 0; i < field.data.top.length; i++) if (field.data.top[i] === TILE.FARMLAND) farms++;
+  assert.ok(farms > 40, `east farm cells ${farms}`);
 
   const nw = w.lands.find((l) => l.kind === 'gilantreNw');
   const ne = w.lands.find((l) => l.kind === 'gilantreNe');
