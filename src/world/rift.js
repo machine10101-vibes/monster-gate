@@ -210,6 +210,7 @@ export function startWave(game, wave) {
     const m = game.spawner.spawn(type, cx + Math.cos(a) * rad, cz + Math.sin(a) * rad, true);
     scaleSpawn(m, run.scale);
   });
+  game.mmo?.syncAuthoritativeMonsters?.();
   game.hud.banner(spec?.title || `Wave ${wave}`, `${types.length} in the tear`, 2400);
   game.hud.toast(`Wave ${wave} of ${RIFT_WAVES.length}. Party ${run.party}.`, 2800);
 }
