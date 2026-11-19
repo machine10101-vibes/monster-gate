@@ -478,6 +478,7 @@ export class World {
       throw new ProtocolError('auth', 'Sign in to enter the Rift.');
     }
     if (session.riftRunId) return;
+    if (session.pvpQueued || session.pvpMatchId) throw new ProtocolError('pvp_state', 'Cancel your Colosseum queue or finish your match before entering the Rift.');
     if (this.now() - (session.riftClearAt || 0) < RIFT_COOLDOWN_MS) {
       throw new ProtocolError('rift_cooldown', 'The Waygate is still recovering. Try again in a few minutes.');
     }
