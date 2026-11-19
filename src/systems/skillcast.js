@@ -186,6 +186,10 @@ function poorToast(game, skill) {
 }
 
 export function castSkill(game, id) {
+  if (game?.mmo?.pvpMatchId) {
+    game.hud?.toast?.('Skills are disabled in the Colosseum', 1400);
+    return false;
+  }
   const skill = SKILLS[id];
   const p = game.player;
   if (!skill || skill.kind === 'passive') return false;
