@@ -422,6 +422,7 @@ class Game {
     this.scene.add(this.world.group);
     if (this.world.cave) this.scene.add(this.world.cave.group);
     if (this.world.rift) this.scene.add(this.world.rift.group);
+    if (this.world.colosseum) this.scene.add(this.world.colosseum.group);
     this.sky = new Sky(this.scene, this.quality);
     this.snowfall = new Snowfall(this.scene);
     this.ashfall = new Ashfall(this.scene);
@@ -510,6 +511,7 @@ class Game {
       this.enterImmersive({ gesture: false, lock: false });
     }
     this.started = true;
+    this.ensureWorldConnection?.();
     // Keep the one-shot splash marker for this tab so auth/session reloads do not replay it.
     if (this.wakeWorld) {
       this.wakeWorld = false;
@@ -2733,6 +2735,61 @@ class Game {
     m.takeHit(dmg, dx, dz, knock, crit);
   }
 
+  enterPvpArenaFromServer(info) {
+    const w = this.world, arena = w?.colosseum, pose = info?.pose;
+    if (!w || !arena || !pose || !this.player || w.realm === 'rift') return false;
+    if (w.cave) w.cave.group.visible = false;
+    if (w.rift) w.rift.group.visible = false;
+    w.group.visible = false;
+    arena.group.visible = true;
+    w.realm = 'colosseum';
+    this.player.pos.set(Number(pose.x) || arena.arena.x, Number(pose.y) || 2.2, Number(pose.z) || arena.arena.z);
+    this.player.yaw = Number(pose.yaw) || 0;
+    this.player.vel?.set(0, 0, 0);
+    this.player.knock?.set(0, 0, 0);
+    this.player.syncObj?.();
+    this.player.hp = Number(info.hp) || this.player.hp;
+    this.player.dead = false;
+    this.player.setState?.('idle');
+    this.cam.targetYaw = this.player.yaw;
+    this.sky.indoors = true;
+    this.snapCamera();
+    this.zone = 'colosseum';
+    this.hud.setArea('Gilantre Colosseum');
+    this.hud.banner('Colosseum', info.mode || 'Match begins', 2600);
+    this.refreshHud?.();
+    return true;
+  }
+
+  leavePvpArenaFromServer(info) {
+    const w = this.world, arena = w?.colosseum, pose = info?.return_pose;
+    if (!w || !arena || !this.player) return false;
+    arena.group.visible = false;
+    const zone = String(pose?.zone || 'Oakhollow');
+    const realm = zone === 'cave' ? 'cave' : zone === 'rift' ? 'rift' : 'over';
+    w.realm = realm;
+    w.group.visible = realm === 'over';
+    if (w.cave) w.cave.group.visible = realm === 'cave';
+    if (w.rift) w.rift.group.visible = realm === 'rift';
+    if (pose) {
+      this.player.pos.set(Number(pose.x) || 72, Number(pose.y) || 3, Number(pose.z) || 72.5);
+      this.player.yaw = Number(pose.yaw) || 0;
+    }
+    this.player.vel?.set(0, 0, 0);
+    this.player.knock?.set(0, 0, 0);
+    this.player.syncObj?.();
+    this.player.hp = Number(info.hp) || this.player.hp;
+    this.player.dead = false;
+    this.player.setState?.('idle');
+    this.cam.targetYaw = this.player.yaw;
+    this.sky.indoors = realm !== 'over';
+    this.snapCamera();
+    this.zone = zone;
+    this.hud.setArea(zone === 'cave' ? 'Darksycle Den' : zone === 'rift' ? 'Waygate Rift' : zone);
+    this.refreshHud?.();
+    return true;
+  }
+
   enterRiftFromServer(info) {
     if (this.world?.realm === 'rift') return;
     enterRift(this, { party: info?.party_size || 1, follow: false, serverOwned: true });
@@ -3716,6 +3773,17 @@ class Game {
       this.ember += (0 - this.ember) * Math.min(1, dt * 2);
       return;
     }
+    if (this.world.realm === 'colosseum') {
+      if (this.zone !== 'colosseum') {
+        this.zone = 'colosseum';
+        this.hud.setArea('Gilantre Colosseum');
+      }
+      this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
+      this.chill += (0 - this.chill) * Math.min(1, dt * 2);
+      this.ember += (0 - this.ember) * Math.min(1, dt * 2);
+      return;
+    }
+
     const land = this.world.landAt(P.x, P.z);
     const oasisName = oasisAreaName(P.x, P.z);
     if (oasisName) {
@@ -3975,19 +4043,30 @@ async function startGame() {
     const wakeRaw = q.get('mockwake');
     const mockWake = !!(wakeRaw && wakeRaw !== '0' && wakeRaw !== 'false');
     if (q.get('mmo') === '1' && (shouldMountOnline({ search: liveSearch }) || mockOn || mockWake)) {
-      import('./net/worldView.js').then(async (m) => {
-        const flags = m.parseMmoFlags(location.search);
+      game.worldViewReady = import('./net/worldView.js').then(async (m) => {
+        const flags = m.parseMmoFlags(liveSearch);
         const view = await m.init(game.scene, {
           game,
           mock: flags.mockFeed || flags.mockwake,
-          search: location.search,
+          search: liveSearch,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
-        if (!flags.mock && !flags.mockwake && shouldMountOnline({ search: location.search })) {
+        return { view, flags };
+      }).catch((err) => {
+        console.warn('world view', err);
+        return null;
+      });
+      game.ensureWorldConnection = async () => {
+        if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search: liveSearch })) return;
+        try {
+          const ready = await game.worldViewReady;
+          if (!ready || ready.flags.mock || ready.flags.mockwake) return;
           const { attachMmo } = await import('./net/mmo.js');
-          attachMmo(game, view);
+          attachMmo(game, ready.view, { search: liveSearch });
+        } catch (err) {
+          console.warn('world connection', err);
         }
-      }).catch((err) => console.warn('world view', err));
+      };
     }
   } catch {
     /* query parsing failed; stay offline */
