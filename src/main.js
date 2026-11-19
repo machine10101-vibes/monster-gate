@@ -3432,18 +3432,21 @@ function startGame() {
     attachDebug(game);
     attachSocial(game);
     const q = new URLSearchParams(location.search);
+    const mmoSearch = new URLSearchParams(location.search);
+    if (!mmoSearch.has('mmo')) mmoSearch.set('mmo', '1');
+    const worldSearch = `?${mmoSearch.toString()}`;
     if (q.get('mmo') !== '0') {
       import('./net/worldView.js').then(async (m) => {
-        const flags = m.parseMmoFlags(location.search);
+        const flags = m.parseMmoFlags(worldSearch);
         const view = await m.init(game.scene, {
           game,
           mock: flags.mockFeed || flags.mockwake,
-          search: location.search,
+          search: worldSearch,
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
         if (!flags.mock && !flags.mockwake) {
           const { attachMmo } = await import('./net/mmo.js');
-          attachMmo(game, view);
+          attachMmo(game, view, { search: worldSearch });
         }
       }).catch((err) => console.warn('world view', err));
     }
