@@ -338,6 +338,8 @@ export class MmoClient {
     if (!msg) return;
     if (msg.type === 'rift_entered') {
       if (this.game?.world?.realm !== 'rift') this.game?.enterRiftFromServer?.(msg);
+      if (this.game?.riftRun) this.game.riftRun.party = msg.party_size || this.game.riftRun.party;
+      this.syncAuthoritativeMonsters();
       this.view?.setStatus?.('online', { message: 'Inside the Waygate Rift' });
       return;
     }
@@ -493,18 +495,36 @@ export class MmoClient {
 
   syncAuthoritativeMonsters() {
     const available = (this.entities.monsters || []).filter((entry) => entry.alive !== false && entry.hp > 0);
-    const used = new Set((this.game?.monsters || []).map((monster) => monster.serverId).filter(Boolean));
-    for (const monster of this.game?.monsters || []) {
-      if (monster.serverAuthoritative || monster.dead) continue;
-      const candidate = available
-        .filter((entry) => entry.type === monster.type && !used.has(entry.id))
-        .map((entry) => ({ entry, distance: Math.hypot(entry.x - monster.x, entry.z - monster.z) }))
-        .sort((a, b) => a.distance - b.distance)[0];
-      if (!candidate || candidate.distance > 18) continue;
-      monster.serverId = candidate.entry.id;
-      monster.serverAuthoritative = true;
-      used.add(candidate.entry.id);
-      monster.applyServerState?.(candidate.entry);
+    if (!available.length || !this.game?.monsters) return;
+    const used = new Set((this.game.monsters || []).map((monster) => monster.serverId).filter(Boolean));
+    for (const entry of available) {
+      if (used.has(entry.id)) continue;
+      const realm = entry.zone === 'rift' ? 'rift' : entry.zone === 'cave' ? 'cave' : 'over';
+      let local = this.game.monsters
+        .filter((monster) => !monster.serverAuthoritative && !monster.dead
+          && monster.type === entry.type && (monster.realm || 'over') === realm)
+        .map((monster) => ({ monster, distance: Math.hypot(entry.x - monster.x, entry.z - monster.z) }))
+        .sort((a, b) => a.distance - b.distance)[0]?.monster;
+      if (!local || Math.hypot(entry.x - local.x, entry.z - local.z) > 18) {
+        if (realm === 'rift' && this.game.world?.realm !== 'rift') continue;
+        if (realm === 'cave' && this.game.world?.realm !== 'cave') continue;
+        local = this.game.spawner?.spawn?.(entry.type, entry.x, entry.z, false);
+        if (!local) continue;
+        local.realm = realm;
+      }
+      local.serverId = entry.id;
+      local.serverAuthoritative = true;
+      used.add(entry.id);
+      local.applyServerState?.(entry);
+    }
+    if (this.game.world?.realm === 'rift') {
+      const serverIds = new Set(available.filter((entry) => entry.zone === 'rift').map((entry) => entry.id));
+      for (const monster of [...this.game.monsters]) {
+        if (monster.realm === 'rift' && !monster.serverAuthoritative) {
+          monster.dispose?.();
+          this.game.monsters.splice(this.game.monsters.indexOf(monster), 1);
+        }
+      }
     }
   }
 
