@@ -415,6 +415,7 @@ export class World {
   }
 
   moveMonster(session, msg) {
+    if (!session.userId || session.guest) return;
     const monster = this.monsters.find((entry) => entry.id === String(msg.id || ''));
     if (!monster || monster.dead || monster.hp <= 0 || monster.zone !== session.zone) return;
     if (monster.controllerId && monster.controllerId !== session.id) return;
