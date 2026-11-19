@@ -382,6 +382,7 @@ class Game {
     }
     this.refreshWalletUi();
     this.applyQuality();
+    this.mmo?.applyRewardSnapshot?.();
     if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
