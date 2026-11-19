@@ -150,7 +150,7 @@ export function createPvpRuntime(world, opts = {}) {
     if (!remaining[0] || !remaining[1]) {
       const winner = remaining[0] ? 0 : 1;
       for (const id of match.players) { const p = live(world, id); if (p) send(p, 'pvp_result', { match_id: match.id, winner, winning_team: match.teams[winner] }); }
-      setTimeout(() => restore(match, winner), 2500).unref?.();
+      setTimeout(() => restore(match, winner), 8000).unref?.();
     }
     return frame;
   }
