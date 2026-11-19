@@ -81,10 +81,10 @@ begin
     state_doc := jsonb_set(state_doc, array['crafted',p_item_id], 'true'::jsonb, true);
   end if;
 
-  update public.characters as character set state=state_doc,
-    gold=coalesce((state_doc->>'gold')::integer,character.gold),
-    version=character.version+1, updated_at=now()
-  where character.user_id=p_user_id returning character.version into current_version;
+  update public.characters as c set state=state_doc,
+    gold=coalesce((state_doc->>'gold')::integer,c.gold),
+    version=c.version+1, updated_at=now()
+  where c.user_id=p_user_id returning c.version into current_version;
   return query select true, current_version;
 end;
 $$;
