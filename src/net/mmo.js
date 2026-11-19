@@ -115,6 +115,7 @@ export class MmoClient {
     this.retryBound = false;
     this.socialRequestSeq = 0;
     this.pendingSocial = new Map();
+    this.lootOverlay = null;
   }
 
   bind() {
@@ -343,11 +344,24 @@ export class MmoClient {
       return;
     }
     if (msg.type === 'loot_roll') {
-      this.view?.showLootRoll?.(msg);
+      this.showLootRoll(msg);
       return;
     }
-    if (msg.type === 'loot_roll_progress' || msg.type === 'loot_roll_result' || msg.type === 'loot_awarded') {
-      this.view?.applyLootEvent?.(msg);
+    if (msg.type === 'loot_roll_progress') {
+      const status = this.lootOverlay?.querySelector('[data-role="status"]');
+      if (status) status.textContent = `Choices submitted: ${msg.submitted}/${msg.total}`;
+      return;
+    }
+    if (msg.type === 'loot_roll_result') {
+      this.closeLootRoll();
+      if (msg.winner === this.you?.id) toast(this.game, 'You won the loot roll!');
+      else if (msg.winner) toast(this.game, 'The party loot roll is complete.');
+      return;
+    }
+    if (msg.type === 'loot_awarded') {
+      toast(this.game, msg.winner === this.you?.id
+        ? `Loot received: ${msg.amount} ${msg.id}.`
+        : 'Party loot was awarded.');
       return;
     }
     if (msg.type === 'combat_result') {
@@ -428,6 +442,57 @@ export class MmoClient {
       monsters: patch(this.entities.monsters, entities.monsters),
       nodes: patch(this.entities.nodes, entities.nodes),
     };
+  }
+
+  showLootRoll(msg) {
+    this.closeLootRoll();
+    if (typeof document === 'undefined' || !msg?.roll_id) return;
+    const overlay = document.createElement('section');
+    overlay.className = 'mmo-loot-roll';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Party loot roll');
+    Object.assign(overlay.style, {
+      position: 'fixed', zIndex: '10020', left: '50%', top: '18%', transform: 'translateX(-50%)',
+      width: 'min(360px, calc(100vw - 32px))', padding: '16px', borderRadius: '12px',
+      background: '#171522', color: '#fff', border: '1px solid #b99a52',
+      boxShadow: '0 12px 40px #000a', font: '14px system-ui',
+    });
+    const title = document.createElement('strong');
+    title.textContent = `Need / Greed: ${msg.item?.id || 'party drop'} ×${msg.item?.amount || 1}`;
+    const status = document.createElement('p');
+    status.dataset.role = 'status';
+    status.textContent = 'Choose before the roll expires.';
+    Object.assign(status.style, { margin: '10px 0', color: '#ddd' });
+    const actions = document.createElement('div');
+    Object.assign(actions.style, { display: 'flex', gap: '8px' });
+    for (const choice of ['need', 'greed', 'pass']) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = choice[0].toUpperCase() + choice.slice(1);
+      Object.assign(button.style, {
+        flex: '1', padding: '9px 5px', borderRadius: '7px', border: '1px solid #8f7b52',
+        background: choice === 'need' ? '#80612a' : '#302c3b', color: '#fff', cursor: 'pointer',
+      });
+      button.addEventListener('click', () => {
+        if (!this.chooseLoot(msg.roll_id, choice)) return;
+        for (const item of actions.querySelectorAll('button')) item.disabled = true;
+        status.textContent = 'Choice submitted. Waiting for party…';
+      }, { once: true });
+      actions.append(button);
+    }
+    overlay.append(title, status, actions);
+    document.body.append(overlay);
+    this.lootOverlay = overlay;
+    const ttl = Math.max(0, Number(msg.expires_at) - Date.now());
+    this.lootTimer = setTimeout(() => this.closeLootRoll(), ttl);
+  }
+
+  closeLootRoll() {
+    if (this.lootTimer) clearTimeout(this.lootTimer);
+    this.lootTimer = 0;
+    this.lootOverlay?.remove();
+    this.lootOverlay = null;
   }
 
   attackMonster(monsterId) {
@@ -533,6 +598,7 @@ export class MmoClient {
 
   dispose(status = 'offline', detail) {
     this.closed = true;
+    this.closeLootRoll();
     this.wakeGen += 1;
     this.clearWake();
     this.stopPing();
