@@ -5,7 +5,7 @@ import { blankState } from '../persistence/schema.js';
 import { PersistenceError } from '../persistence/errors.js';
 
 test('queued pose saves rebase on atomic reward updates without overwriting rewards', async () => {
-  const row = { userId: 'user-1', version: 1, state: blankState('Tester') };
+  const row = { userId: '00000000-0000-4000-8000-000000000001', version: 1, state: blankState('Tester') };
   const rewards = new Set();
   const adapter = {
     async load() { return structuredClone(row); },
@@ -25,14 +25,14 @@ test('queued pose saves rebase on atomic reward updates without overwriting rewa
     },
   };
   const persist = createPersistence({ adapter, autoStart: false });
-  await persist.saveCharacter('user-1', {
+  await persist.saveCharacter('00000000-0000-4000-8000-000000000001', {
     hunter: { x: 100, y: 3, z: 101, yaw: 1, realm: 'over' },
   });
   await persist.grantOnce({
-    rewardId: 'rift:run-1:gold:user-1', userId: 'user-1',
+    rewardId: 'rift:run-1:gold:00000000-0000-4000-8000-000000000001', userId: '00000000-0000-4000-8000-000000000001',
     kind: 'gold', id: 'gold', amount: 50,
   });
-  await persist.flush('user-1');
+  await persist.flush('00000000-0000-4000-8000-000000000001');
 
   assert.equal(row.state.gold, 50);
   assert.equal(row.state.hunter.x, 100);
