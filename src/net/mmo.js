@@ -116,6 +116,7 @@ export class MmoClient {
     this.socialRequestSeq = 0;
     this.pendingSocial = new Map();
     this.lootOverlay = null;
+    this.rewardSnapshot = null;
   }
 
   bind() {
@@ -336,7 +337,8 @@ export class MmoClient {
     const msg = parseFrame(raw);
     if (!msg) return;
     if (msg.type === 'reward_snapshot') {
-      this.game?.syncServerRewardState?.(msg);
+      this.rewardSnapshot = msg;
+      this.applyRewardSnapshot();
       return;
     }
     if (msg.type === 'monster_state') {
@@ -454,6 +456,12 @@ export class MmoClient {
       monsters: patch(this.entities.monsters, entities.monsters),
       nodes: patch(this.entities.nodes, entities.nodes),
     };
+  }
+
+  applyRewardSnapshot() {
+    if (!this.rewardSnapshot || !this.game?.player) return;
+    this.game.syncServerRewardState?.(this.rewardSnapshot);
+    this.rewardSnapshot = null;
   }
 
   showLootRoll(msg) {
