@@ -176,7 +176,7 @@ export function enterRift(game, opts = {}) {
   w.group.visible = false;
   r.group.visible = true;
   r.cool = 1.2;
-  game.riftRun = { party, scale, wave: 0, follow, looted: false };
+  game.riftRun = { party, scale, wave: 0, follow, looted: false, serverOwned };
   const y = r.heightAt(r.spawn.x, r.spawn.z);
   game.player.pos.set(r.spawn.x, y, r.spawn.z);
   game.player.yaw = Math.PI;
