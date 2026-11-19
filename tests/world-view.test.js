@@ -406,6 +406,7 @@ test('setStatus waking counts down locally and exposes retry / stuck states', ()
   assert.equal(view.pollWake(t).phase, 'queue');
   assert.equal(view.pollWake(t).secondsLeft, 30);
   assert.equal(view.pollWake(t + 5000).secondsLeft, 25);
+  assert.equal(view.pollWake(t + 36000).phase, 'stuck', 'show retry controls shortly after the countdown expires');
   assert.equal(view.pollWake(t + 31000).phase, 'late');
   assert.equal(view.pollWake(t + 61000).phase, 'stuck');
   const obj = wakeClock({ secondsLeft: WAKE_SECONDS, elapsedMs: 0 }, t, t);
