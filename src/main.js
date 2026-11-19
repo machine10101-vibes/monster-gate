@@ -2570,6 +2570,25 @@ class Game {
     this.audio.select();
   }
 
+  applyServerReward(reward) {
+    if (!reward || !this.progress || !(Number(reward.amount) > 0)) return;
+    const amount = Math.floor(Number(reward.amount));
+    if (reward.kind === 'gold') {
+      this.addGold(amount);
+      return;
+    }
+    if (reward.kind === 'xp') {
+      const levelled = this.progress.addXp(String(reward.id), amount);
+      if (levelled) this.hud.banner('Level up', `${reward.id} ${levelled}`, 2600);
+      return;
+    }
+    let added = 0;
+    if (reward.kind === 'good') added = this.progress.addGood(String(reward.id), amount);
+    else if (reward.kind === 'material') added = this.progress.addPart(String(reward.id), amount);
+    if (added > 0) this.itemsChanged();
+    if (added < amount) this.hud.toast(INVENTORY_FULL, 1800);
+  }
+
   addGold(n) {
     this.gold = Math.max(0, this.gold + n);
     this.hud.setGold(this.gold);
