@@ -335,7 +335,7 @@ export class Monster {
     const g = this.game;
     this.dead = true;
     this.deadT = 0;
-    if (!this.serverAuthoritative) g.onMonsterKilled(this);
+    g.onMonsterKilled(this, { serverAuthoritative: !!this.serverAuthoritative });
     g.fx.burst(this.x, this.y + 0.7 + this.hover, this.z, familyFx(this.type) ? familyFx(this.type).death : this.type === 'boar' ? [0xc9967a, 0x8a5634, 0xffffff] : this.type === 'budgedragon' ? [0x6fd45a, 0xf1e6c6, 0xffffff] : this.type === 'darksycledragon' ? [0xb25cff, 0xd8d3ee, 0x2b2450] : this.type === 'snowyeti' ? [0xb4d0e6, 0xe6f9ff, 0x7fd0ff, 0xffffff] : this.type === 'demonknight' ? [0x3a3a42, 0xff3a1a, 0xff8a2a, 0xffffff] : this.type === 'holyknight' ? [0xdfe1e6, 0xffd27a, 0x6fb8ff, 0xffffff] : [0xc27bff, 0x57d46c, 0xffffff], 22, 4.5, 0.14, 0.8);
     g.audio.pop();
     g.hud.removePlate(this.id);
