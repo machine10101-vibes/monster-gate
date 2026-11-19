@@ -418,7 +418,7 @@ export class World {
   }
 
   moveMonster(session, msg) {
-    if (!session.userId || session.guest) return;
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) return;
     const monster = this.monsters.find((entry) => entry.id === String(msg.id || ''));
     if (!monster || monster.dead || monster.hp <= 0 || monster.zone !== session.zone) return;
     if (monster.controllerId && monster.controllerId !== session.id) return;
@@ -457,7 +457,9 @@ export class World {
   }
 
   async enterRift(session) {
-    if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to enter the Rift.');
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to enter the Rift.');
+    }
     if (session.riftRunId) return;
     if (this.now() - (session.riftClearAt || 0) < RIFT_COOLDOWN_MS) {
       throw new ProtocolError('rift_cooldown', 'The Waygate is still recovering. Try again in a few minutes.');
@@ -573,6 +575,9 @@ export class World {
   }
 
   async claimRiftChest(session) {
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to claim Rift rewards.');
+    }
     const run = [...this.riftRuns.values()].find((candidate) => candidate.id === session.riftRunId);
     if (!run || !run.completed || run.claimed || !run.participants.includes(session.id)) {
       throw new ProtocolError('rift', 'That Rift chest is not ready to claim.');
@@ -607,7 +612,7 @@ export class World {
   }
 
   leaveRift(session) {
-    if (!session.riftRunId || !session.riftReturnPose) return;
+    if (session.gone || this.players.get(session.id) !== session || !session.riftRunId || !session.riftReturnPose) return;
     const previousZone = session.zone;
     Object.assign(session, session.riftReturnPose);
     session.riftRunId = null;
