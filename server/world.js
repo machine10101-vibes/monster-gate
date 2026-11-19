@@ -407,6 +407,9 @@ export class World {
       session.zone = `colosseum:${session.pvpMatchId}`;
       session.x = Math.max(1702, Math.min(1738, session.x));
       session.z = Math.max(802, Math.min(838, session.z));
+      const dx = session.x - 1719.5, dz = session.z - 819.5;
+      const radius = Math.hypot(dx, dz);
+      if (radius > 14.5) { session.x = 1719.5 + dx / radius * 14.5; session.z = 819.5 + dz / radius * 14.5; }
     }
     if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
       this.rejectZoneFull(session, session.zone);
@@ -717,7 +720,8 @@ export class World {
 
   persistPose(session, immediate = false) {
     if (!this.persist || !session.userId || session.riftRunId) return;
-    const state = persistStateFromSession(session);
+    const saved = session.pvpReturnPose ? { ...session, ...session.pvpReturnPose, hp: session.pvpReturnHp ?? session.hp } : session;
+    const state = persistStateFromSession(saved);
     const opts = immediate ? { immediate: true } : {};
     const result = this.persist.saveCharacter(session.userId, state, opts);
     if (result && typeof result.then === 'function') {
