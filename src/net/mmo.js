@@ -413,7 +413,7 @@ export class MmoClient {
     if (!msg) return;
     if (msg.type === 'pvp_queue') {
       if (msg.status === 'queued') this.pvpQueueMode = msg.mode;
-      else if (msg.status === 'cancelled') this.pvpQueueMode = null;
+      else if (msg.status === 'cancelled' || msg.status === 'matched') this.pvpQueueMode = null;
       this.updatePvpBoard(msg.status === 'queued' ? `Queued for ${msg.mode}. Waiting for rivals…` : 'Queue cancelled.');
       return;
     }
