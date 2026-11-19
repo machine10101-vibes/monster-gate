@@ -736,13 +736,13 @@ export class World {
 
   drop(session, closeSocket = false) {
     if (session.gone) return;
+    this.pvp.disconnect(session);
     session.gone = true;
     if (session.helloTimer) clearTimeout(session.helloTimer);
     if (session.authed && session.id) {
       this.players.delete(session.id);
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
       this.dirty.delete(session.id);
-      this.pvp.disconnect(session);
       this.social.onLeave(session);
       for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
       if (session.riftRunId && session.riftReturnPose) {
