@@ -338,6 +338,7 @@ export class World {
         xp: row.state.xp || {},
         goods: row.state.goods || {},
         materials: row.state.materials || {},
+        crafted: row.state.crafted || {},
       });
     }
     this.dirty.add(session.id);
