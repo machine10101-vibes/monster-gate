@@ -8,6 +8,7 @@ import {
   isRetiredHunterOp,
 } from '../supabase/functions/_shared/retiredHunter.js';
 import { cloudHuntAllowed, pushHunt, syncHunt } from '../src/wallet/cloud.js';
+import { originAllowed } from '../server/auth.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -64,4 +65,12 @@ test('MG-AUTH-1 a leftover wallet session cannot push or pull a hunt', async () 
   const synced = await syncHunt(wallet, { data: {} });
   assert.equal(synced.state, 'off');
   assert.equal(synced.replaced, false);
+});
+
+
+test('World 1 always permits the canonical Monster Gate production origins', () => {
+  const staleAllowlist = ['https://machine10101-vibes.github.io'];
+  assert.equal(originAllowed('https://monstergate.online', staleAllowlist), true);
+  assert.equal(originAllowed('https://www.monstergate.online', staleAllowlist), true);
+  assert.equal(originAllowed('https://evil.example', staleAllowlist), false);
 });
