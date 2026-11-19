@@ -518,7 +518,6 @@ export class MmoClient {
       local.applyServerState?.(entry);
     }
     if (this.game.world?.realm === 'rift') {
-      const serverIds = new Set(available.filter((entry) => entry.zone === 'rift').map((entry) => entry.id));
       for (const monster of [...this.game.monsters]) {
         if (monster.realm === 'rift' && !monster.serverAuthoritative) {
           monster.dispose?.();
