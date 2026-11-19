@@ -7,8 +7,9 @@ import { toonMaterial } from '../engine/materials.js';
  * by liquid-lava veins, purple wing membranes, purple-blue dorsal spines,
  * orange eyes and a mouth that pours lava. Built on the same rig as the
  * Darksycle Dragon so the flight, jaw and wing beats stay as detailed.
- * Matches the volcanic dragon reference: black body, lava chest and wing
- * bones, purple membranes, pale claws.
+ * Matches the volcanic dragon reference: charcoal plates, an orange Y of
+ * lava on the chest, violet sails with lava finger bones, purple crystal
+ * spines, orange slit eyes, and a mouth that pours fire cubes.
  */
 const S = 0.05;
 
@@ -19,14 +20,14 @@ const C = {
   s3: 0x3c3c46,
   b0: 0x140e0c,
   b1: 0x241610,
-  m0: 0x241448,
-  m1: 0x3a2068,
-  m2: 0x5a348c,
-  m3: 0x7a4cb0,
-  c0: 0x3a28a0,
-  c1: 0x5a40d0,
-  c2: 0x7a68ee,
-  c3: 0xc4b8ff,
+  m0: 0x3a1870,
+  m1: 0x5c28a4,
+  m2: 0x8a46d0,
+  m3: 0xc080f0,
+  c0: 0x4a2ad0,
+  c1: 0x6a48ee,
+  c2: 0x9470ff,
+  c3: 0xd0c0ff,
   glow: 0xff5a12,
   glowHi: 0xffe08a,
   claw: 0xc8c4bc,
@@ -165,31 +166,31 @@ function paintBody() {
   for (let z = 4; z <= 30; z += 2) {
     const top = topY(B, cx, z);
     if (top < 0) continue;
-    const h = z > 32 ? 3 : 4 + Math.round(1.4 * Math.sin(z * 0.45));
-    shard(B, cx, top, z, h, 0.65, z > 32 ? 1 : 2);
+    const h = z > 28 ? 5 : 7 + Math.round(Math.sin(z * 0.45));
+    shard(B, cx, top, z, h, 0.55, 2);
+    shard(B, cx + 1, top - 1, z, Math.max(3, h - 3), 0.55, 1);
   }
   for (const s of [-1, 1]) {
     stroke(B, cx + s * 7.4, 17, 26, cx + s * 11.5, 23, 20, 3, (t, x, y, z) => (t > 0.75 ? cryst(0.9, x, y, z) : plate(x, y, z, 31)), 0.66);
     stroke(B, cx + s * 6, 12, 34, cx + s * 9.5, 14, 30, 2, (t, x, y, z) => plate(x, y, z, 32), 0.5);
   }
 
-  const cy0 = 10.5;
-  const coreAt = [];
-  for (let dy = -5; dy <= 5; dy++)
-    for (let dx = -4; dx <= 4; dx++) {
-      const r = (dx / 3.6) ** 2 + (dy / 4.6) ** 2;
-      if (r > 1) continue;
-      const x = cx + dx;
-      const y = Math.round(cy0 + dy);
-      const fz = frontZ(B, x, y);
-      if (fz < 0) continue;
-      coreAt.push([x, y, fz, r]);
-    }
-  for (const [x, y, fz, r] of coreAt) {
-    const col = r < 0.18 ? C.glowHi : r < 0.55 ? C.glow : C.c0;
-    B.set(x, y, fz, col, true);
-    if (r < 0.62) B.set(x, y, fz + 1, r < 0.25 ? C.glowHi : C.c1, true);
+  const paintFront = (x, y, col) => {
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    const fz = frontZ(B, ix, iy);
+    if (fz < 0) return;
+    B.set(ix, iy, fz, col, true);
+    if (fz + 1 < B.sz) B.set(ix, iy, fz + 1, col, true);
+  };
+  // Sternum stem and two shoulder arms: the reference's orange Y, not a purple badge.
+  for (let y = 6; y <= 15; y++) paintFront(cx, y, y >= 11 && y <= 13 ? C.glowHi : C.glow);
+  for (let k = 1; k <= 7; k++) {
+    const y = 12 + k * 0.65;
+    paintFront(cx + k * 0.72, y, k < 3 ? C.glowHi : C.glow);
+    paintFront(cx - k * 0.72, y, k < 3 ? C.glowHi : C.glow);
   }
+  const cy0 = 10.5;
   const rng = new RNG(77);
   for (let v = 0; v < 6; v++) {
     let x = cx + rng.int(-2, 2);
@@ -197,7 +198,7 @@ function paintBody() {
     let dir = rng.int(0, 3);
     for (let k = 0; k < 8; k++) {
       const fz = frontZ(B, x, y);
-      if (fz >= 0 && !B.get(x, y, fz + 1)) B.set(x, y, fz, k < 3 ? C.glow : C.c0, true);
+      if (fz >= 0 && !B.get(x, y, fz + 1)) B.set(x, y, fz, k < 3 ? C.glowHi : C.glow, true);
       if (dir === 0) x += 1;
       else if (dir === 1) x -= 1;
       else if (dir === 2) y -= 1;
@@ -241,6 +242,15 @@ function paintNeck() {
       if (i % 2 === 0) stroke(N, cx + side * 4.4, y + 1, z + 1, cx + side * 4.9, y - 0.8, z - 1, 1, () => C.glow, 0.25, true);
     }
   }
+  // Orange rings at each neck segment, the reference's glowing collars.
+  for (const [cy, cz, rx] of neck) {
+    const y = Math.round(cy);
+    const z = Math.round(cz);
+    for (let x = Math.round(cx - rx); x <= Math.round(cx + rx); x++) {
+      if (N.has(x, y, z)) N.set(x, y, z, (x + z) & 1 ? C.glowHi : C.glow, true);
+      if (N.has(x, y, z + 1)) N.set(x, y, z + 1, C.glow, true);
+    }
+  }
   return N;
 }
 
@@ -256,6 +266,7 @@ function paintHead() {
   blob(H, cx, 10.6, 30.5, 4.5, 3.6, 5, skull(42), 42, 0.12, 7);
   blob(H, cx, 10, 35.5, 3.6, 3.1, 4, skull(43), 43, 0.1, 7);
   blob(H, cx, 10.4, 38.6, 2.8, 2.7, 1.9, skull(44), 44, 0.08, 7);
+  blob(H, cx, 10.1, 41.4, 2.0, 2.1, 1.5, skull(44), 144, 0.08, 8);
   for (const s of [-1, 1]) {
     blob(H, cx + s * 4.6, 17.4, 21, 3.1, 1.9, 3.4, (x, y, z) => J(C.s0, x, y, z, 45, 0.03), 45, 0.1);
     blob(H, cx + s * 2.6, 13.4, 36.2, 1.2, 1.1, 1.3, (x, y, z) => J(0x07070b, x, y, z, 46, 0.02), 46, 0);
@@ -263,15 +274,13 @@ function paintHead() {
 
   for (const s of [-1, 1]) {
     const ex = (k) => cx + s * k - (s < 0 ? 1 : 0);
-    for (let row = 0; row < 2; row++)
-      for (let col = 0; col < 3; col++) {
-        const x = ex(3 + col);
-        const y = 14 + row;
-        const fz = frontZ(H, x, y);
-        if (fz < 0) continue;
-        const center = col === 1 && row === 0;
-        H.set(x, y, fz, center ? C.glowHi : col === 2 && row === 1 ? C.c0 : C.glow, true);
-      }
+    for (let col = 0; col < 3; col++) {
+      const x = ex(3 + col);
+      const fz = frontZ(H, x, 15);
+      if (fz < 0) continue;
+      H.set(x, 15, fz, col === 1 ? C.glowHi : C.glow, true);
+      H.set(x, 15, fz + 1, C.glow, true);
+    }
     for (let k = 0; k < 4; k++) {
       const x = ex(2 + k);
       const fz = frontZ(H, x, 16);
@@ -309,7 +318,7 @@ function paintHead() {
   }
   for (let z = 6; z <= 14; z += 3) {
     const top = topY(H, cx, z);
-    if (top >= 0) shard(H, cx, top, z, 3, 0.8, 1);
+    if (top >= 0) shard(H, cx, top, z, z === 9 ? 7 : 5, 0.7, 2);
   }
 
   for (const s of [-1, 1]) {
@@ -334,6 +343,12 @@ function paintJaw() {
   blob(Jw, cx, 2.8, 26, 2.3, 1.8, 2.3, under(54), 54, 0.1);
   for (let z = 5; z <= 24; z++) for (let x = cx - 3; x <= cx + 2; x++) if (Jw.has(x, 5, z) || Jw.has(x, 4, z)) Jw.set(x, 5, z, J(C.mouth, x, 5, z, 55, 0.03));
   for (let z = 7; z <= 20; z++) Jw.set(cx - 1 + (z & 1), 5, z, C.mouthGlow, true);
+  for (let i = 0; i < 3; i++) {
+    const z = 27 + i;
+    Jw.set(cx, 5, z, i === 1 ? C.glowHi : C.glow, true);
+    Jw.set(cx - 1, 4, z, C.glow, true);
+    Jw.set(cx + 1, 4, z, C.mouthGlow, true);
+  }
   for (const s of [-1, 1]) {
     for (const z of [9, 12.5, 16, 19.5, 23]) {
       const x = cx + s * (z < 18 ? 4 : 2.6) - (s < 0 ? 1 : 0);
@@ -443,7 +458,7 @@ function paintWings() {
       const edge = (z - zt) / Math.max(1, zl - zt);
       const patch = hash3(x >> 1, 0, z >> 1, 71);
       const fine = hash3(x, 0, z, 72);
-      let t = 0.18 + clamp(dBone / 7, 0, 1) * 0.5 + (patch - 0.5) * 0.55 + (fine - 0.5) * 0.14 + (1 - edge) * 0.08;
+      let t = 0.48 + clamp(dBone / 7, 0, 1) * 0.38 + (patch - 0.5) * 0.4 + (fine - 0.5) * 0.12 + (1 - edge) * 0.06;
       t = clamp(t, 0, 0.999);
       if (dBone < 0.9) {
         put(x, 2, z, dBone < 0.4 ? C.glowHi : C.glow, true);
@@ -517,7 +532,7 @@ function tailSeg(w, h, len, seed, spikeH) {
         const dx = (x + 0.5 - cx) / rw;
         const dy = (y + 0.5 - cy) / rh;
         if (dx * dx + dy * dy <= 1.02) {
-          if (dy < -0.45 && Math.abs(dx) < 0.28) T.set(x, y, z, (z & 1) ? C.glow : C.glowHi, true);
+          if (dy < -0.38 && Math.abs(dx) < 0.48) T.set(x, y, z, (z & 1) ? C.glow : C.glowHi, true);
           else T.set(x, y, z, dy < -0.38 ? belly(x, y, z) : plate(x, y, z, seed));
         }
       }
@@ -586,6 +601,7 @@ export function buildVolcanumDragon() {
   neck.add(head);
   const jaw = new THREE.Group();
   jaw.position.set(0, -1.4 * S, 4 * S);
+  jaw.rotation.x = 0.38;
   jaw.add(meshFrom(paintJaw(), 9, 4, 3, mat));
   head.add(jaw);
 
@@ -604,8 +620,8 @@ export function buildVolcanumDragon() {
     om.scale.x = side;
     og.add(om);
     g.add(og);
-    og.rotation.z = side * -0.12;
-    g.rotation.z = side * 0.45;
+    og.rotation.z = side * -0.28;
+    g.rotation.z = side * 1.05;
     bodyG.add(g);
     wings.push(g);
     wingsOuter.push(og);
@@ -640,11 +656,12 @@ export function buildVolcanumDragon() {
   });
 
   const tail = [];
-  const segs = [tailSeg(10, 10, 11, 30, 5), tailSeg(8, 8, 11, 31, 4), tailSeg(7, 7, 10, 32, 4), tailSeg(5, 5, 10, 33, 3), tailFan()];
+  const segs = [tailSeg(10, 10, 11, 30, 7), tailSeg(8, 8, 11, 31, 6), tailSeg(7, 7, 10, 32, 5), tailSeg(5, 5, 10, 33, 4), tailFan()];
   let parent = bodyG;
   segs.forEach((s, i) => {
     const g = new THREE.Group();
     g.position.set(0, i === 0 ? (8 - BO.y) * S : 0, i === 0 ? (3 - BO.z) * S : -(segs[i - 1].len - 0.5) * S);
+    g.rotation.x = i === 0 ? -0.32 : i === segs.length - 1 ? 0.48 : -0.06 + i * 0.05;
     g.add(meshFrom(s.model, s.cx, s.cy, s.len, mat));
     parent.add(g);
     parent = g;

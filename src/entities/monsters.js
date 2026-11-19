@@ -1438,7 +1438,8 @@ export class Monster {
         const follow = this.state === 'recover' && this.atk === 'slash' ? Math.max(0, 1 - this.t * 3) * 1.1 : 0;
         sg.rotation.y = sway + (i === 0 ? (slash + follow) * 0.7 : (slash + follow) * 0.45) + clamp(-lat * 0.06, -0.5, 0.5) * (i + 1) * 0.3;
         const trail = flying ? (diving ? -0.18 : 0.1) : 0;
-        sg.rotation.x = (i === 0 ? -0.1 : i === last ? -0.05 : 0.04) + trail;
+        const curl = lava ? (i === 0 ? -0.32 : i === last ? 0.48 : -0.06 + i * 0.05) : (i === 0 ? -0.1 : i === last ? -0.05 : 0.04);
+        sg.rotation.x = curl + trail;
       });
       p.wings.forEach((w, i) => {
         const sgn = i === 0 ? -1 : 1;
@@ -1446,6 +1447,12 @@ export class Monster {
         let amp = this.state === 'breath' ? 0.22 : winding ? 0.2 : 0.55 + moving * 0.12;
         let sweep = this.state === 'breath' ? 0.18 : winding ? 0.25 : 0.05;
         let sweepAmp = winding || this.state === 'breath' ? 0 : 0.12;
+        if (lava && !flying && !winding && this.state !== 'breath') {
+          base = 1.05;
+          amp = 0.14;
+          sweep = -0.22;
+          sweepAmp = 0.04;
+        }
         if (ascending) {
           base = 0.12;
           amp = 0.95;
@@ -1471,7 +1478,7 @@ export class Monster {
         og.rotation.x = Math.sin(wristPhase) * (inAir ? 0.08 : 0.035);
       });
       let headX = 0.08 + Math.sin(t * 1.6) * 0.04;
-      let jawX = 0.05;
+      let jawX = lava ? 0.38 : 0.05;
       let neckX = Math.sin(t * 0.72) * 0.035;
       let lean = 0.06 * moving + Math.sin(t * flapRate) * 0.025 + clamp(spd * 0.01, 0, 0.06);
       if (ascending) {
