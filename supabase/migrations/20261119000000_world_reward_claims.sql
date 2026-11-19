@@ -23,7 +23,7 @@ as $$
 declare
   inserted_id text;
   state_doc jsonb;
-  current_count integer;
+  current_count bigint;
   current_version bigint;
 begin
   if p_reward_id is null or length(p_reward_id) < 8 or length(p_reward_id) > 180
@@ -54,7 +54,7 @@ begin
     if p_item_id not in ('strength','agility','stamina','mining','smithing','fishing','cooking','woodcutting','firemaking') then
       raise exception 'invalid_xp_skill';
     end if;
-    current_count := coalesce((state_doc->'xp'->>p_item_id)::integer,0);
+    current_count := coalesce((state_doc->'xp'->>p_item_id)::bigint,0);
     state_doc := jsonb_set(state_doc, array['xp',p_item_id],
       to_jsonb(least(2000000000,current_count+p_amount)), true);
   elsif p_kind='good' then
