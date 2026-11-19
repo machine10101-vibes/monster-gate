@@ -335,6 +335,10 @@ export class MmoClient {
     const msg = parseFrame(raw);
     if (!msg) return;
     if (msg.type === 'monster_state') {
+      for (const monster of this.game?.monsters || []) {
+        if (monster.serverId !== msg.id) continue;
+        monster.applyServerState?.(msg);
+      }
       this.view?.applyMonsterState?.(msg);
       return;
     }
@@ -424,6 +428,18 @@ export class MmoClient {
       monsters: patch(this.entities.monsters, entities.monsters),
       nodes: patch(this.entities.nodes, entities.nodes),
     };
+  }
+
+  attackMonster(monsterId) {
+    if (!this.ws || this.ws.readyState !== 1 || !monsterId) return false;
+    this.ws.send(encode('attack', { monster_id: String(monsterId) }));
+    return true;
+  }
+
+  chooseLoot(rollId, choice) {
+    if (!this.ws || this.ws.readyState !== 1 || !rollId || !['need', 'greed', 'pass'].includes(choice)) return false;
+    this.ws.send(encode('loot_roll_choice', { roll_id: String(rollId), choice }));
+    return true;
   }
 
   send(type, extra = {}) {
