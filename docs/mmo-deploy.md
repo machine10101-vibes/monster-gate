@@ -48,11 +48,11 @@ New service from this repo. Start command: `npm run start:server`. Port: use Rai
 
 ## Render
 
-Web service, Docker or native Node. Start: `npm run start:server`. Health check: `/health`. Set `PORT` to Render's port. Add env vars as secrets.
+Web service, native Node. Start: `npm run start:server`. Health check: `/healthz`. Set `PORT` to Render's port and add the Supabase auth/persistence variables as secrets. The current production service is `monster-gate-world-1`.
 
 ## Client URL
 
-The title screen **Play Online — World 1** button reloads with `?mmo=1`. Pages stays offline until a world URL is configured (`MG_WORLD_URL` / `VITE_MMO_URL` at build time, or `?server=`). With no URL the button reads **World 1 coming soon** and stays disabled.
+The title screen **Play Online — World 1** button reloads with `?mmo=1`. The production Pages build injects `wss://monster-gate-world-1.onrender.com` through `MG_WORLD_URL` and `VITE_WORLD_URL`; local builds can use `?world=` or `?server=`.
 
 Manual flags still work:
 
@@ -68,11 +68,8 @@ Local:
 http://localhost:5173/?mmo=1&server=ws://localhost:8080
 ```
 
-Rebuild `gh-pages` from `main` with Vite base `/`, `public/CNAME` = `monstergate.online`, `VITE_BUILD_ID` = the `main` HEAD, and `MG_WORLD_URL` as the world URL (empty for now):
+GitHub Pages publishing is automated by `.github/workflows/publish-pages.yml` on pushes to `main`. It builds with the production Render URL, preserves the `CNAME` and `.nojekyll` files, and publishes `dist` to `gh-pages`. Do not publish a build with an empty `MG_WORLD_URL`.
 
-```bash
-MAIN_SHA=$(git rev-parse --short main)
-MG_WORLD_URL= VITE_BUILD_ID=$MAIN_SHA npx vite build --base /
-```
+The Render Free plan sleeps when idle. The client first makes a 3-second health check; if the server is asleep, it shows a 60-second waking queue and keeps a follow-up `/healthz` request open for up to 65 seconds. It continues retrying, with a Retry control after 75 seconds, rather than giving up when the countdown reaches zero. See [the protocol wake sequence](../server/PROTOCOL.md).
 
-When World 1 is live, set `MG_WORLD_URL=wss://YOUR_HOST` on that build. `?mmo=1&mock=1` is the local crowd only (no socket).
+`?mmo=1&mock=1` is the local crowd only (no socket).
