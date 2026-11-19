@@ -48,7 +48,7 @@ export function createPvpRuntime(world, opts = {}) {
       world.sendSnapshot(p);
       world.social.onZone(p, previousZone);
       world.persistPose(p, true);
-      send(p, 'pvp_match_end', { match_id: match.id, winner, won: winner === team, reason: 'complete', return_pose: pose });
+      send(p, 'pvp_match_end', { match_id: match.id, winner, won: winner === team, reason: 'complete', return_pose: pose, hp: p.hp, max_hp: p.maxHp || 20 });
     }
   };
   const begin = (mode, a, b) => {
