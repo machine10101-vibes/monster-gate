@@ -2189,6 +2189,7 @@ class Game {
       if (serverCombat && m.serverId) this.mmo.attackMonster(m.serverId);
       return;
     }
+    if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
     if (serverCombat) {
       const serverMob = (this.mmo.entities?.monsters || [])
         .filter((candidate) => candidate.type === m.type)
