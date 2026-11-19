@@ -66,8 +66,10 @@ export function createCombatLoot({
     const index = cursor % members.length;
     if (partyId && parties?.get?.(partyId)) parties.get(partyId).loot_turn = cursor + 1;
     else cursors.set(key, cursor + 1);
-    await deliver(item, members[index], rewardId);
-    return members[index];
+    const selected = members[index];
+    const winner = players.get(selected.id) || selected;
+    await deliver(item, winner, rewardId);
+    return winner;
   }
 
   async function resolveRoll(roll) {
