@@ -724,6 +724,20 @@ export class Player {
         if (d > reach + m.radius) continue;
         const dot = (dx * f.x + dz * f.z) / (d || 1);
         if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
+        const online = g.mmo?.ws?.readyState === 1;
+        if (online) {
+          const serverMob = (g.mmo.entities?.monsters || [])
+            .filter((candidate) => candidate.type === m.type)
+            .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
+            .sort((a, b) => a.distance - b.distance)[0];
+          if (serverMob && serverMob.distance <= 14) {
+            m.serverId = serverMob.candidate.id;
+            m.serverAuthoritative = true;
+            g.mmo.attackMonster(serverMob.candidate.id);
+            hits++;
+            continue;
+          }
+        }
         const crit = Math.random() < 0.12 + (mods.crit || 0);
         const dmgOut = Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee);
         g.strikeMonster(m, dmgOut, dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
