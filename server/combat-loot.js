@@ -34,18 +34,11 @@ export function createCombatLoot({
   const rolls = new Map();
   const claimed = new Set();
   const cursors = new Map();
-  const memoryGrants = new Set();
-
   async function grant(reward, userId) {
-    if (typeof persist?.grantOnce === 'function') {
-      return persist.grantOnce({ ...reward, userId });
+    if (typeof persist?.grantOnce !== 'function') {
+      throw new Error('Transactional grantOnce persistence is required.');
     }
-    // Local/test fallback only. Production must supply a transactional adapter.
-    if (process.env.NODE_ENV === 'production') throw new Error('Transactional grantOnce persistence is required.');
-    const key = reward.rewardId + ':' + userId;
-    if (memoryGrants.has(key)) return { granted: false };
-    memoryGrants.add(key);
-    return { granted: true };
+    return persist.grantOnce({ ...reward, userId });
   }
 
   function partyFor(player) { return parties?.partyOf?.(player.id) || null; }
@@ -79,6 +72,8 @@ export function createCombatLoot({
   }
 
   async function resolveRoll(roll) {
+    if (roll.resolving) return;
+    roll.resolving = true;
     const entries = [...roll.choices.entries()];
     const need = entries.filter(([, c]) => c.choice === 'need').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
     const greed = entries.filter(([, c]) => c.choice === 'greed').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
@@ -123,7 +118,9 @@ export function createCombatLoot({
 
   return {
     async attack(player, monsterId) {
-      if (!player?.userId || !players.has(player.id)) throw new Error('Authenticated hunter required.');
+      const livePlayer = player?.id ? players.get(player.id) : null;
+      if (!livePlayer?.userId || livePlayer !== player) throw new Error('Authenticated hunter required.');
+      player = livePlayer;
       const monster = monsters.find((m) => m.id === String(monsterId));
       if (!monster || monster.dead || monster.hp <= 0) throw new Error('Monster is not alive.');
       if (monster.zone !== player.zone || distance(player, monster) > ATTACK_RANGE) throw new Error('Monster is out of range.');
@@ -139,6 +136,9 @@ export function createCombatLoot({
     },
 
     async choose(player, rollId, choice) {
+      const livePlayer = player?.id ? players.get(player.id) : null;
+      if (!livePlayer?.userId || livePlayer !== player) throw new Error('Authenticated hunter required.');
+      player = livePlayer;
       const roll = rolls.get(String(rollId));
       if (!roll || now() >= roll.expiresAt) throw new Error('Loot roll expired.');
       if (!['need', 'greed', 'pass'].includes(choice)) throw new Error('Invalid loot choice.');
