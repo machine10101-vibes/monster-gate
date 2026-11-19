@@ -86,6 +86,8 @@ export function createCombatLoot({
   async function kill(monster, killer) {
     monster.hp = 0;
     monster.dead = true;
+    monster.controllerId = null;
+    monster.lastMoveAt = 0;
     monster.respawnAt = monster.rift ? 0 : now() + Math.max(5, monster.respawn || 30) * 1000;
     monster.deathId = randomUUID();
     const members = recipients(killer);
@@ -159,6 +161,8 @@ export function createCombatLoot({
         if (monster.dead && monster.respawnAt && now() >= monster.respawnAt) {
           monster.hp = monster.maxHp;
           monster.dead = false;
+          monster.controllerId = null;
+          monster.lastMoveAt = 0;
           monster.respawnAt = 0;
           broadcast({ type: 'monster_state', id: monster.id, hp: monster.hp, alive: true });
         }
