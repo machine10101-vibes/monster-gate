@@ -176,6 +176,7 @@ export class World {
   }
 
   async onMessage(session, data) {
+    if (session.gone) return;
     session.last = this.now();
     if (frameBytes(data) > MAX_PAYLOAD) {
       send(session.ws, errorFrame('protocol', 'Frame too large.'));
@@ -625,7 +626,9 @@ export class World {
   }
 
   async combatAction(session, msg) {
-    if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to fight online.');
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to fight online.');
+    }
     if (!session.limiter.allowMove()) throw new ProtocolError('rate', 'Slow down.');
     if (typeof msg.monster_id !== 'string' || msg.monster_id.length > 64) throw new ProtocolError('combat', 'Invalid monster.');
     const result = await this.combatLoot.attack(session, msg.monster_id);
@@ -633,7 +636,9 @@ export class World {
   }
 
   async lootChoice(session, msg) {
-    if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to roll for loot.');
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to roll for loot.');
+    }
     if (typeof msg.roll_id !== 'string' || msg.roll_id.length > 64) throw new ProtocolError('loot', 'Invalid loot roll.');
     const result = await this.combatLoot.choose(session, msg.roll_id, msg.choice);
     send(session.ws, 'loot_choice_result', { request_id: String(msg.request_id || ''), ...result });
