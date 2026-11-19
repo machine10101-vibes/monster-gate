@@ -425,6 +425,7 @@ export class MmoClient {
         monsters: msg.entities.monsters || [],
         nodes: msg.entities.nodes || [],
       };
+      this.syncAuthoritativeMonsters();
     } else if (msg.type === TYPES.delta) {
       const upsert = [];
       for (const row of msg.upsert || []) {
@@ -437,6 +438,7 @@ export class MmoClient {
       this.view?.applyDelta?.({ upsert, remove: msg.remove || [] });
       if (msg.online != null) this.view?.setOnlineCount?.(msg.online);
       this.applyEntityDelta(msg.entities);
+      this.syncAuthoritativeMonsters();
     } else if (msg.type === TYPES.chat) {
       this.view?.pushChat?.(msg);
     } else if (msg.type === TYPES.leave && msg.id) {
@@ -486,6 +488,23 @@ export class MmoClient {
     if (!this.rewardSnapshot || !this.game?.player) return;
     this.game.syncServerRewardState?.(this.rewardSnapshot);
     this.rewardSnapshot = null;
+  }
+
+  syncAuthoritativeMonsters() {
+    const available = (this.entities.monsters || []).filter((entry) => entry.alive !== false && entry.hp > 0);
+    const used = new Set((this.game?.monsters || []).map((monster) => monster.serverId).filter(Boolean));
+    for (const monster of this.game?.monsters || []) {
+      if (monster.serverAuthoritative || monster.dead) continue;
+      const candidate = available
+        .filter((entry) => entry.type === monster.type && !used.has(entry.id))
+        .map((entry) => ({ entry, distance: Math.hypot(entry.x - monster.x, entry.z - monster.z) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (!candidate || candidate.distance > 18) continue;
+      monster.serverId = candidate.entry.id;
+      monster.serverAuthoritative = true;
+      used.add(candidate.entry.id);
+      monster.applyServerState?.(candidate.entry);
+    }
   }
 
   showLootRoll(msg) {
