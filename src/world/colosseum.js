@@ -37,11 +37,11 @@ function buildBoard(group, ox = OX, oz = OZ) {
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.9, 0.22), wood);
   const left = post.clone(), right = post.clone();
   left.position.set(ox + 15.4, FLOOR + 1.45, oz + 34);
-  right.position.set(ox + 20.6, FLOOR + 1.45, OZ + 34);
+  right.position.set(ox + 20.6, FLOOR + 1.45, oz + 34);
   const board = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.1, 0.22), new THREE.MeshStandardMaterial({ map: paintBoard(), roughness: 0.72 }));
-  board.position.set(ox + 18, FLOOR + 2.45, OZ + 34);
+  board.position.set(ox + 18, FLOOR + 2.45, oz + 34);
   const cap = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.2, 0.5), gold);
-  cap.position.set(OX + 18, FLOOR + 3.6, OZ + 34);
+  cap.position.set(ox + 18, FLOOR + 3.6, oz + 34);
   group.add(left, right, board, cap);
 }
 
