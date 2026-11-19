@@ -3462,9 +3462,13 @@ function startGame() {
         });
         game.ensureWorldConnection = async () => {
           if (game.mmo || game.wallet?.kind === 'guest' || flags.mock || flags.mockwake || q.get('mmo') === '0') return;
-          const view = await game.worldViewReady;
-          const { attachMmo } = await import('./net/mmo.js');
-          attachMmo(game, view, { search: worldSearch });
+          try {
+            const view = await game.worldViewReady;
+            const { attachMmo } = await import('./net/mmo.js');
+            attachMmo(game, view, { search: worldSearch });
+          } catch (err) {
+            console.warn('world connection', err);
+          }
         };
       }).catch((err) => console.warn('world view', err));
     }
