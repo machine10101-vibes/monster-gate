@@ -2597,6 +2597,8 @@ class Game {
     this.player.vel?.set?.(0, 0, 0);
     this.player.syncObj?.();
     this.player.hp = Number(info.hp) || this.player.hp;
+    this.player.dead = false;
+    this.player.setState?.('idle', 0);
     this.cam.targetYaw = this.player.yaw;
     this.sky.indoors = true;
     this.snapCamera();
