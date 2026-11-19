@@ -220,6 +220,7 @@ export class World {
       else if (msg.type === 'pvp_queue') this.pvp.enqueue(session, String(msg.mode || '1v1'));
       else if (msg.type === 'pvp_cancel') this.pvp.cancel(session);
       else if (msg.type === 'pvp_attack') this.pvp.attack(session, msg.target_id);
+      else if (msg.type === 'pvp_roll') this.pvp.roll(session);
       else if (msg.type === 'pvp_leave') this.pvp.leave(session);
       else if (msg.type === 'rift_chest_claim') this.claimRiftChest(session).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_leave') this.leaveRift(session);
