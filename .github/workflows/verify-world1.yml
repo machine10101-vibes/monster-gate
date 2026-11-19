@@ -29,8 +29,10 @@ jobs:
       - name: Install persistence dependencies
         run: npm ci --prefix server/persistence
       - name: Run client and live server tests
-        run: node --test tests/*.js server/tests/*.test.js
+        timeout-minutes: 10
+        run: node --test --test-force-exit tests/*.js server/tests/*.test.js
       - name: Run persistence tests
-        run: npm run test --prefix server/persistence
+        timeout-minutes: 10
+        run: npm run test --prefix server/persistence -- --test-force-exit
       - name: Build production client
         run: npm run build
