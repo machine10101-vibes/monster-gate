@@ -179,6 +179,7 @@ export class MmoClient {
     this.closed = false;
     this.authRejectedToken = null;
     this.authHold = false;
+    this.stopTokenWatch();
     this.rejectedToken = '';
     clearTimeout(this.timer);
     this.timer = 0;
@@ -815,6 +816,10 @@ export class MmoClient {
   }
 
   retry() {
+    if (this.authHold) {
+      if (this.pollToken()) return;
+      return;
+    }
     this.maybeClearAuthRejection();
     if (this.fatal) return;
     this.closed = false;
@@ -836,6 +841,7 @@ export class MmoClient {
     this.wakeGen += 1;
     this.clearWake();
     this.stopPing();
+    this.stopTokenWatch();
     clearTimeout(this.timer);
     for(const [id,pending] of this.pendingSocial){clearTimeout(pending.timer);pending.resolve({ok:false,code:'offline',message:'World connection closed before the action was confirmed.'});this.pendingSocial.delete(id);}
     if (this.ws) {
