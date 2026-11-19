@@ -31,17 +31,17 @@ function paintBoard() {
   return texture;
 }
 
-function buildBoard(group, ox = OX, oz = OZ) {
+function buildBoard(group, ox = OX, oz = OZ, floor = FLOOR) {
   const wood = new THREE.MeshStandardMaterial({ color: 0x53331d, roughness: 0.85 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xb88a3d, metalness: 0.45, roughness: 0.42 });
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.9, 0.22), wood);
   const left = post.clone(), right = post.clone();
-  left.position.set(ox + 15.4, FLOOR + 1.45, oz + 34);
+  left.position.set(ox + 15.4, floor + 1.45, oz + 34);
   right.position.set(ox + 20.6, FLOOR + 1.45, oz + 34);
   const board = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.1, 0.22), new THREE.MeshStandardMaterial({ map: paintBoard(), roughness: 0.72 }));
-  board.position.set(ox + 18, FLOOR + 2.45, oz + 34);
+  board.position.set(ox + 18, floor + 2.45, oz + 34);
   const cap = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.2, 0.5), gold);
-  cap.position.set(ox + 18, FLOOR + 3.6, oz + 34);
+  cap.position.set(ox + 18, floor + 3.6, oz + 34);
   group.add(left, right, board, cap);
 }
 
@@ -115,7 +115,7 @@ export function buildColosseum(world) {
 export function buildColosseumSignUpBoard(world) {
   const group = new THREE.Group();
   group.name = 'gilantre-colosseum-signup-board';
-  buildBoard(group, 55, 48);
+  buildBoard(group, 55, 48, world.heightAt(73, 82));
   world.group.add(group);
   return group;
 }
