@@ -29,7 +29,7 @@ export const DEFAULT_ZONE_CAP = 150;
 export const SPEED_MAX = 16;
 export const TELEPORT_MAX = 40;
 export const WORLD_MIN = -800;
-export const WORLD_MAX = 1490;
+export const WORLD_MAX = 1700;
 
 export const MOVE_PER_SEC = 12;
 export const CHAT_PER_SEC = 2;

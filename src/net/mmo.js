@@ -115,6 +115,12 @@ export class MmoClient {
     this.retryBound = false;
     this.socialRequestSeq = 0;
     this.pendingSocial = new Map();
+    this.lootOverlay = null;
+    this.lootQueue = [];
+    this.rewardSnapshot = null;
+    this.monsterMoveAt = new Map();
+    this.monsterMovePos = new Map();
+    this.riftEnterPending = false;
   }
 
   bind() {
@@ -334,6 +340,90 @@ export class MmoClient {
   onFrame(raw) {
     const msg = parseFrame(raw);
     if (!msg) return;
+    if (msg.type === 'rift_entered') {
+      this.riftEnterPending = false;
+      if (this.game?.world?.realm !== 'rift') this.game?.enterRiftFromServer?.(msg);
+      if (this.game?.riftRun) {
+        this.game.riftRun.serverOwned = true;
+        this.game.riftRun.party = msg.party_size || this.game.riftRun.party;
+      }
+      this.syncAuthoritativeMonsters();
+      this.view?.setStatus?.('online', { message: 'Inside the Waygate Rift' });
+      return;
+    }
+    if (msg.type === 'rift_wave') {
+      return;
+    }
+    if (msg.type === 'rift_chest_ready') {
+      toast(this.game, 'The Rift chest is ready. Claim it at the centre.');
+      return;
+    }
+    if (msg.type === 'rift_chest_result') {
+      if (msg.ok && this.game?.riftRun) {
+        this.game.riftRun.looted = true;
+        if (this.game.world?.rift?.chest) this.game.world.rift.chest.looted = true;
+        if (this.game.progress?.data) {
+          this.game.progress.data.riftClearAt = Date.now();
+          this.game.progress.save();
+        }
+        toast(this.game, 'Rift rewards distributed to the party.');
+      } else toast(this.game, msg.message || 'The Rift chest could not be claimed.');
+      return;
+    }
+    if (msg.type === 'rift_expired') {
+      this.game?.leaveRiftFromServer?.();
+      toast(this.game, 'The Rift has collapsed.');
+      return;
+    }
+    if (msg.type === 'rift_left') return;
+    if (msg.type === 'reward_snapshot') {
+      this.rewardSnapshot = msg;
+      this.applyRewardSnapshot();
+      return;
+    }
+    if (msg.type === 'monster_state') {
+      this.entities.monsters = (this.entities.monsters || []).map((entry) => entry.id === msg.id
+        ? { ...entry, hp: msg.hp, alive: msg.alive, x: msg.x ?? entry.x, y: msg.y ?? entry.y, z: msg.z ?? entry.z, yaw: msg.yaw ?? entry.yaw }
+        : entry);
+      for (const monster of this.game?.monsters || []) {
+        if (monster.serverId !== msg.id) continue;
+        monster.applyServerState?.(msg);
+      }
+      this.syncAuthoritativeMonsters();
+      this.view?.applyMonsterState?.(msg);
+      return;
+    }
+    if (msg.type === 'loot_roll') {
+      this.showLootRoll(msg);
+      return;
+    }
+    if (msg.type === 'loot_roll_progress') {
+      const status = this.lootOverlay?.dataset.rollId === msg.roll_id
+        ? this.lootOverlay.querySelector('[data-role="status"]') : null;
+      if (status) status.textContent = `Choices submitted: ${msg.submitted}/${msg.total}`;
+      return;
+    }
+    if (msg.type === 'loot_roll_result') {
+      this.closeLootRoll(msg.roll_id);
+      if (msg.winner === this.you?.id) toast(this.game, 'You won the loot roll!');
+      else if (msg.winner) toast(this.game, 'The party loot roll is complete.');
+      return;
+    }
+    if (msg.type === 'loot_awarded') {
+      this.game?.applyServerReward?.(msg);
+      toast(this.game, msg.winner === this.you?.id
+        ? `Loot received: ${msg.amount} ${msg.id}.`
+        : 'Party loot was awarded.');
+      return;
+    }
+    if (msg.type === 'reward_update') {
+      this.game?.applyServerReward?.(msg);
+      return;
+    }
+    if (msg.type === 'combat_result') {
+      this.view?.applyCombatResult?.(msg);
+      return;
+    }
     if (msg.type === 'social_result') {
       const pending=this.pendingSocial.get(String(msg.request_id||''));
       if(pending){clearTimeout(pending.timer);this.pendingSocial.delete(String(msg.request_id));pending.resolve({ok:!!msg.ok,pending:!!msg.pending,code:msg.code||'',message:msg.message||''});}
@@ -342,6 +432,8 @@ export class MmoClient {
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
       this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
+      if (this.game?.riftRun?.serverOwned && msg.pose?.zone !== 'rift') this.game.leaveRiftFromServer?.();
+      this.syncAuthoritativeMonsters();
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
       this.setStatus('online', { online: msg.online });
     } else if (msg.type === TYPES.snapshot) {
@@ -353,6 +445,7 @@ export class MmoClient {
         monsters: msg.entities.monsters || [],
         nodes: msg.entities.nodes || [],
       };
+      this.syncAuthoritativeMonsters();
     } else if (msg.type === TYPES.delta) {
       const upsert = [];
       for (const row of msg.upsert || []) {
@@ -365,12 +458,19 @@ export class MmoClient {
       this.view?.applyDelta?.({ upsert, remove: msg.remove || [] });
       if (msg.online != null) this.view?.setOnlineCount?.(msg.online);
       this.applyEntityDelta(msg.entities);
+      this.syncAuthoritativeMonsters();
     } else if (msg.type === TYPES.chat) {
       this.view?.pushChat?.(msg);
     } else if (msg.type === TYPES.leave && msg.id) {
       this.nearby.delete(msg.id);
       this.view?.removePlayer?.(msg.id);
     } else if (msg.type === TYPES.error) {
+      if (this.riftEnterPending && String(msg.code || '').startsWith('rift')) {
+        this.riftEnterPending = false;
+        if (this.game?.riftRun) this.game.riftRun.serverOwned = false;
+        toast(this.game, msg.message || 'The Rift could not be opened online.');
+        return;
+      }
       if (msg.code === 'name_taken') {
         this.fatal = true;
         this.fatalReason = 'name_taken';
@@ -408,6 +508,161 @@ export class MmoClient {
       monsters: patch(this.entities.monsters, entities.monsters),
       nodes: patch(this.entities.nodes, entities.nodes),
     };
+  }
+
+  applyRewardSnapshot() {
+    if (!this.rewardSnapshot || !this.game?.player) return;
+    this.game.syncServerRewardState?.(this.rewardSnapshot);
+    this.rewardSnapshot = null;
+  }
+
+  syncAuthoritativeMonsters() {
+    if (this.you?.guest !== false) return;
+    const allEntries = this.entities.monsters || [];
+    if (!allEntries.length || !this.game?.monsters) return;
+    for (const entry of allEntries) {
+      const existing = this.game.monsters.find((monster) => monster.serverId === entry.id);
+      if (existing) existing.applyServerState?.(entry);
+    }
+    const available = allEntries.filter((entry) => entry.alive !== false && entry.hp > 0);
+    if (!available.length) return;
+    const used = new Set((this.game.monsters || []).map((monster) => monster.serverId).filter(Boolean));
+    for (const entry of available) {
+      if (used.has(entry.id)) continue;
+      const realm = entry.zone === 'rift' ? 'rift' : entry.zone === 'cave' ? 'cave' : 'over';
+      let local = this.game.monsters
+        .filter((monster) => !monster.serverAuthoritative && !monster.dead
+          && monster.type === entry.type && (monster.realm || 'over') === realm)
+        .map((monster) => ({ monster, distance: Math.hypot(entry.x - monster.x, entry.z - monster.z) }))
+        .sort((a, b) => a.distance - b.distance)[0]?.monster;
+      if (!local || Math.hypot(entry.x - local.x, entry.z - local.z) > 18) {
+        if (realm === 'rift' && this.game.world?.realm !== 'rift') continue;
+        if (realm === 'cave' && this.game.world?.realm !== 'cave') continue;
+        local = this.game.spawner?.spawn?.(entry.type, entry.x, entry.z, false);
+        if (!local) continue;
+        local.realm = realm;
+      }
+      local.serverId = entry.id;
+      local.serverAuthoritative = true;
+      used.add(entry.id);
+      local.applyServerState?.(entry);
+    }
+    if (this.game.world?.realm === 'rift') {
+      for (const monster of [...this.game.monsters]) {
+        if (monster.realm === 'rift' && !monster.serverAuthoritative) {
+          monster.dispose?.();
+          this.game.monsters.splice(this.game.monsters.indexOf(monster), 1);
+        }
+      }
+    }
+  }
+
+  showLootRoll(msg) {
+    if (typeof document === 'undefined' || !msg?.roll_id) return;
+    if (this.lootOverlay) {
+      this.lootQueue.push(msg);
+      return;
+    }
+    const overlay = document.createElement('section');
+    overlay.className = 'mmo-loot-roll';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Party loot roll');
+    overlay.dataset.rollId = msg.roll_id;
+    Object.assign(overlay.style, {
+      position: 'fixed', zIndex: '10020', left: '50%', top: '18%', transform: 'translateX(-50%)',
+      width: 'min(360px, calc(100vw - 32px))', padding: '16px', borderRadius: '12px',
+      background: '#171522', color: '#fff', border: '1px solid #b99a52',
+      boxShadow: '0 12px 40px #000a', font: '14px system-ui',
+    });
+    const title = document.createElement('strong');
+    title.textContent = `Need / Greed: ${msg.item?.id || 'party drop'} ×${msg.item?.amount || 1}`;
+    const status = document.createElement('p');
+    status.dataset.role = 'status';
+    status.textContent = 'Choose before the roll expires.';
+    Object.assign(status.style, { margin: '10px 0', color: '#ddd' });
+    const actions = document.createElement('div');
+    Object.assign(actions.style, { display: 'flex', gap: '8px' });
+    for (const choice of ['need', 'greed', 'pass']) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = choice[0].toUpperCase() + choice.slice(1);
+      Object.assign(button.style, {
+        flex: '1', padding: '9px 5px', borderRadius: '7px', border: '1px solid #8f7b52',
+        background: choice === 'need' ? '#80612a' : '#302c3b', color: '#fff', cursor: 'pointer',
+      });
+      button.addEventListener('click', () => {
+        if (!this.chooseLoot(msg.roll_id, choice)) return;
+        for (const item of actions.querySelectorAll('button')) item.disabled = true;
+        status.textContent = 'Choice submitted. Waiting for party…';
+      }, { once: true });
+      actions.append(button);
+    }
+    overlay.append(title, status, actions);
+    document.body.append(overlay);
+    this.lootOverlay = overlay;
+    const ttl = Math.max(0, Number(msg.expires_at) - Date.now());
+    this.lootTimer = setTimeout(() => this.closeLootRoll(), ttl);
+  }
+
+  closeLootRoll(rollId = null, advance = true) {
+    if (rollId && this.lootOverlay?.dataset.rollId !== rollId) {
+      this.lootQueue = this.lootQueue.filter((roll) => roll.roll_id !== rollId);
+      return;
+    }
+    if (this.lootTimer) clearTimeout(this.lootTimer);
+    this.lootTimer = 0;
+    this.lootOverlay?.remove();
+    this.lootOverlay = null;
+    if (advance && this.lootQueue.length) this.showLootRoll(this.lootQueue.shift());
+  }
+
+  updateMonster(monster) {
+    if (!this.ws || this.ws.readyState !== 1 || this.you?.guest !== false || !monster?.serverId || monster.dead) return false;
+    const now = Date.now();
+    const last = this.monsterMoveAt.get(monster.serverId) || 0;
+    const previous = this.monsterMovePos.get(monster.serverId);
+    const yaw = monster.yaw || 0;
+    if (previous && Math.hypot(monster.x - previous.x, monster.z - previous.z) < 0.25
+      && Math.abs(yaw - previous.yaw) < 0.12) return false;
+    if (now - last < 220) return false;
+    this.monsterMoveAt.set(monster.serverId, now);
+    this.monsterMovePos.set(monster.serverId, { x: monster.x, z: monster.z, yaw });
+    this.ws.send(encode('monster_move', {
+      id: monster.serverId, x: monster.x, y: monster.y, z: monster.z, yaw,
+    }));
+    return true;
+  }
+
+  enterRift() {
+    if (this.ws?.readyState !== 1 || this.you?.guest !== false) return false;
+    this.riftEnterPending = true;
+    this.ws.send(encode('rift_enter'));
+    return true;
+  }
+
+  leaveRift() {
+    if (this.ws?.readyState !== 1) return false;
+    this.ws.send(encode('rift_leave'));
+    return true;
+  }
+
+  claimRiftChest() {
+    if (this.ws?.readyState !== 1 || this.you?.guest !== false) return false;
+    this.ws.send(encode('rift_chest_claim'));
+    return true;
+  }
+
+  attackMonster(monsterId) {
+    if (!this.ws || this.ws.readyState !== 1 || !monsterId) return false;
+    this.ws.send(encode('attack', { monster_id: String(monsterId) }));
+    return true;
+  }
+
+  chooseLoot(rollId, choice) {
+    if (!this.ws || this.ws.readyState !== 1 || !rollId || !['need', 'greed', 'pass'].includes(choice)) return false;
+    this.ws.send(encode('loot_roll_choice', { roll_id: String(rollId), choice }));
+    return true;
   }
 
   send(type, extra = {}) {
@@ -501,6 +756,8 @@ export class MmoClient {
 
   dispose(status = 'offline', detail) {
     this.closed = true;
+    this.lootQueue = [];
+    this.closeLootRoll(null, false);
     this.wakeGen += 1;
     this.clearWake();
     this.stopPing();

@@ -165,6 +165,7 @@ export function sanitizeState(raw, { importMode = false } = {}) {
     last_seen: normalizeTime(hunt.last_seen),
     importedAt: hunt.importedAt ? clampInt(hunt.importedAt, 0, Date.now() + 60_000, 0) || null : null,
     savedAt: clampInt(hunt.savedAt, 0, Date.now() + 60_000, 0),
+    riftClearAt: clampInt(hunt.riftClearAt, 0, Date.now() + 60_000, 0),
   };
   assertSize(state);
   return state;

@@ -2,7 +2,7 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify, originAllowed, parseOrigins } from './auth.js';
-import { appearanceFromState, createMonsters, createNodes, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
+import { appearanceFromState, createMonsters, createNodes, createRiftMonster, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
 import { applyMove, createBucket, createLimiter } from './limits.js';
 import {
   AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, CLOSE_POLICY, CLOSE_TOO_LARGE,
@@ -15,6 +15,10 @@ import {
 import { PersistErrorCodes } from './persistence/index.js';
 import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
+import { createCombatLoot } from './combat-loot.js';
+import { DROPS, GEAR_DROPS, MATERIALS } from '../src/data/catalog.js';
+import { GOODS } from '../src/data/gathering.js';
+import { riftChestGold, riftChestGoods, riftScale, riftWaveSpawns, RIFT_COOLDOWN_MS, RIFT_WAVES } from '../src/data/rift.js';
 
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -66,7 +70,35 @@ export class World {
     this.nodes = opts.nodes || createNodes();
     this.byNode = new Map(this.nodes.map((n) => [n.id, n]));
     this.pendingSaves = [];
+    this.riftRuns = new Map();
     this._send = send;
+    this.combatLoot = opts.combatLoot || createCombatLoot({
+      monsters: this.monsters,
+      players: this.players,
+      parties: { partyOf: (id) => this.social?.parties?.partyOf(id) || null, get: (id) => this.social?.parties?.parties?.get(id) || null },
+      persist: this.persist,
+      now: this.now,
+      damageFor: (player) => Math.max(4, Math.min(18, 6 + (player.weapon ? 4 : 0))),
+      xpFor: (monster) => Math.max(5, monster.level * 18),
+      goldFor: (monster) => Math.max(2, monster.level * 5),
+      dropsFor: (monster) => (DROPS[monster.type] || []).flatMap((drop) => {
+        if (Math.random() >= drop.chance) return [];
+        const [min, max] = drop.qty || [1, 1];
+        const amount = min + Math.floor(Math.random() * (max - min + 1));
+        const kind = MATERIALS[drop.id] ? 'material' : GOODS[drop.id] ? 'good' : null;
+        return kind ? [{ kind, id: drop.id, amount }] : [];
+      }).concat((GEAR_DROPS[monster.type] || []).flatMap((drop) =>
+        Math.random() < drop.chance ? [{ kind: 'gear', id: drop.id, amount: 1 }] : [])),
+      broadcast: (frame, audience) => {
+        const targets = Array.isArray(audience) ? audience : [...this.players.values()];
+        for (const player of targets) {
+          if (!player?.ws || player.gone) continue;
+          if (!Array.isArray(audience) && frame.id && frame.type === 'monster_state'
+              && !inAoi(player, this.monsters.find((m) => m.id === frame.id), this.aoi)) continue;
+          this._send(player.ws, frame.type, frame);
+        }
+      },
+    });
     this.social = opts.social || createSocialRuntime(this, {
       friends: opts.friends,
       friendsCap: opts.friendsCap,
@@ -144,6 +176,7 @@ export class World {
   }
 
   async onMessage(session, data) {
+    if (session.gone) return;
     session.last = this.now();
     if (frameBytes(data) > MAX_PAYLOAD) {
       send(session.ws, errorFrame('protocol', 'Frame too large.'));
@@ -178,6 +211,12 @@ export class World {
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
+      else if (msg.type === 'attack') this.combatAction(session, msg).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'monster_move') this.moveMonster(session, msg);
+      else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'rift_chest_claim') this.claimRiftChest(session).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'rift_leave') this.leaveRift(session);
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
     } catch (err) {
@@ -209,7 +248,7 @@ export class World {
       userId: session.userId,
       id: session.id,
       at: this.now(),
-      pose: playerView(session),
+      pose: session.riftReturnPose ? { ...playerView(session), ...session.riftReturnPose } : playerView(session),
     });
     return token;
   }
@@ -279,6 +318,7 @@ export class World {
       armor: gear.armor || {},
       zone: spawnZone,
       hp: pose.hp ?? 20,
+      riftClearAt: Number(row?.state?.riftClearAt) || 0,
       movedAt: 0,
     });
     this.players.set(session.id, session);
@@ -300,6 +340,16 @@ export class World {
       features: ident.guest ? ['party'] : this.social.features,
     });
     this.sendSnapshot(session);
+    if (row?.state) {
+      send(session.ws, 'reward_snapshot', {
+        gold: Number(row.state.gold ?? row.gold) || 0,
+        xp: row.state.xp || {},
+        goods: row.state.goods || {},
+        materials: row.state.materials || {},
+        crafted: row.state.crafted || {},
+        riftClearAt: Number(row.state.riftClearAt) || 0,
+      });
+    }
     this.dirty.add(session.id);
     await this.social.onJoin(session);
   }
@@ -358,11 +408,254 @@ export class World {
     }
     this.dirty.add(session.id);
     const zoneChanged = session.zone !== prevZone;
-    if (zoneChanged) this.sendSnapshot(session);
+    if (zoneChanged) {
+      for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
+      this.sendSnapshot(session);
+    }
     this.social.onZone(session, prevZone);
     this.social.onHp(session, prevHp);
     this.social.onPose?.(session);
     this.persistPose(session);
+  }
+
+  moveMonster(session, msg) {
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) return;
+    const monster = this.monsters.find((entry) => entry.id === String(msg.id || ''));
+    if (!monster || monster.dead || monster.hp <= 0 || monster.zone !== session.zone) return;
+    if (monster.controllerId && monster.controllerId !== session.id) return;
+    const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), yaw = Number(msg.yaw);
+    if (![x, y, z, yaw].every(Number.isFinite)) return;
+    const t = this.now();
+    if (monster.lastMoveAt && t - monster.lastMoveAt < 120) return;
+    const dt = monster.lastMoveAt ? Math.max(0.12, Math.min(0.6, (t - monster.lastMoveAt) / 1000)) : 0.25;
+    const maxStep = (monster.speed || 2.8) * dt + 0.9;
+    if (Math.hypot(x - monster.x, z - monster.z) > maxStep) return;
+    if (Math.hypot(x - monster.homeX, z - monster.homeZ) > 36) return;
+    if (monster.rift && (x < 1600 || x >= 1636 || z < 800 || z >= 836)) return;
+    if (Math.hypot(x - session.x, z - session.z) > (monster.aggro || 12) + 14) {
+      if (monster.controllerId === session.id) monster.controllerId = null;
+      return;
+    }
+    if (Math.abs(y - monster.y) > 3) return;
+    monster.controllerId = session.id;
+    monster.lastMoveAt = t;
+    monster.x = x;
+    monster.y = y;
+    monster.z = z;
+    monster.yaw = ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    for (const player of this.players.values()) {
+      if (inAoi(player, monster, this.aoi)) {
+        this._send(player.ws, 'monster_state', {
+          id: monster.id, hp: monster.hp, alive: true,
+          x: monster.x, y: monster.y, z: monster.z, yaw: monster.yaw,
+        });
+      }
+    }
+  }
+
+  actionError(session, err) {
+    const code = err instanceof ProtocolError ? err.code : 'combat';
+    send(session.ws, errorFrame(code, err?.message || 'That action could not be completed.'));
+  }
+
+  async enterRift(session) {
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to enter the Rift.');
+    }
+    if (session.riftRunId) return;
+    if (this.now() - (session.riftClearAt || 0) < RIFT_COOLDOWN_MS) {
+      throw new ProtocolError('rift_cooldown', 'The Waygate is still recovering. Try again in a few minutes.');
+    }
+    if (session.zone === 'rift' || Math.hypot(session.x - 80, session.z - 98) > 10) {
+      throw new ProtocolError('rift', 'Stand beside the Waygate to enter the Rift.');
+    }
+    const party = this.social.parties.partyOf(session.id);
+    const key = party?.id || session.id;
+    let run = this.riftRuns.get(key);
+    if (run && run.wave > 0 && session.riftRunId !== run.id) {
+      throw new ProtocolError('rift', 'That Rift is already underway.');
+    }
+    if (!run || run.expiresAt <= this.now() || run.claimed) {
+      if (party && party.leader !== session.id) throw new ProtocolError('rift', 'Only the party leader can open a new Rift.');
+      const ready = party
+        ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
+          member && member.userId && !member.guest && !member.riftRunId
+          && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
+          && Math.hypot(member.x - 80, member.z - 98) <= 10)
+        : [session];
+      run = {
+        id: randomBytes(16).toString('hex'),
+        key,
+        partyId: party?.id || null,
+        partySize: Math.max(1, Math.min(4, ready.length)),
+        participants: [],
+        wave: 0,
+        pendingAt: 0,
+        completed: false,
+        claimed: false,
+        expiresAt: this.now() + 20 * 60_000,
+      };
+      this.riftRuns.set(key, run);
+    }
+    const joiners = party && run.wave === 0
+      ? party.members.map((member) => this.players.get(member.id)).filter((member) =>
+        member && member.userId && !member.guest && !member.riftRunId
+          && this.now() - (member.riftClearAt || 0) >= RIFT_COOLDOWN_MS
+          && Math.hypot(member.x - 80, member.z - 98) <= 10)
+      : [session];
+    for (const member of joiners.length ? joiners : [session]) this.joinRift(member, run);
+    if (run.wave === 0) this.spawnRiftWave(run, 1);
+  }
+
+  joinRift(session, run) {
+    if (session.riftRunId === run.id) return;
+    if (session.riftRunId) return;
+    const previousZone = session.zone;
+    if (!run.participants.includes(session.id)) run.participants.push(session.id);
+    session.riftReturnPose = { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone };
+    session.riftRunId = run.id;
+    session.zone = 'rift';
+    session.x = 1617.5;
+    session.y = 2;
+    session.z = 830;
+    session.yaw = Math.PI;
+    session.move = 0;
+    this.sendSnapshot(session);
+    this.social.onZone(session, previousZone);
+    this.social.onPose?.(session);
+    send(session.ws, 'rift_entered', { run_id: run.id, party_size: run.partySize, wave: run.wave });
+  }
+
+  spawnRiftWave(run, wave) {
+    const scale = riftScale(run.partySize);
+    const types = riftWaveSpawns(wave, run.partySize);
+    for (const [index, type] of types.entries()) {
+      const angle = (index / Math.max(1, types.length)) * Math.PI * 2;
+      const radius = 3.2 + (index % 3) * 1.1;
+      const x = 1617.5 + Math.cos(angle) * radius;
+      const z = 817.5 + Math.sin(angle) * radius;
+      const monster = createRiftMonster(`rift_${run.id}_w${wave}_${index}`, type, x, z, scale.hpMul);
+      monster.riftRunId = run.id;
+      monster.riftWave = wave;
+      this.monsters.push(monster);
+    }
+    run.wave = wave;
+    run.pendingAt = 0;
+    const audience = run.participants.map((id) => this.players.get(id)).filter(Boolean);
+    for (const player of audience) {
+      this._send(player.ws, 'rift_wave', { run_id: run.id, wave, count: types.length });
+      this.sendSnapshot(player);
+    }
+  }
+
+  tickRiftRuns(now) {
+    for (const [key, run] of this.riftRuns) {
+      if (now >= run.expiresAt) {
+        for (const id of run.participants) {
+          const player = this.players.get(id);
+          if (player) this._send(player.ws, 'rift_expired', { run_id: run.id });
+        }
+        this.riftRuns.delete(key);
+        for (let i = this.monsters.length - 1; i >= 0; i--) {
+          if (this.monsters[i].riftRunId === run.id) this.monsters.splice(i, 1);
+        }
+        continue;
+      }
+      if (!run.wave || run.completed || run.claimed) continue;
+      const alive = this.monsters.some((monster) =>
+        monster.riftRunId === run.id && !monster.dead && monster.hp > 0);
+      if (alive) continue;
+      if (!run.pendingAt) run.pendingAt = now + 1400;
+      if (now < run.pendingAt) continue;
+      if (run.wave < RIFT_WAVES.length) {
+        this.spawnRiftWave(run, run.wave + 1);
+      } else {
+        run.completed = true;
+        run.chest = { x: 1617.5, z: 817.5 };
+        const audience = run.participants.map((id) => this.players.get(id)).filter(Boolean);
+        for (const player of audience) this._send(player.ws, 'rift_chest_ready', { run_id: run.id });
+      }
+    }
+  }
+
+  async claimRiftChest(session) {
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to claim Rift rewards.');
+    }
+    const run = [...this.riftRuns.values()].find((candidate) => candidate.id === session.riftRunId);
+    if (!run || !run.completed || run.claimed || !run.participants.includes(session.id)) {
+      throw new ProtocolError('rift', 'That Rift chest is not ready to claim.');
+    }
+    if (session.zone !== 'rift' || Math.hypot(session.x - run.chest.x, session.z - run.chest.z) > 5) {
+      throw new ProtocolError('rift', 'Move closer to the Rift chest.');
+    }
+    const members = run.participants.map((id) => this.players.get(id))
+      .filter((member) => member?.userId && member.riftRunId === run.id && member.zone === 'rift');
+    if (!members.length) throw new ProtocolError('rift', 'No eligible hunters are present.');
+    run.claimed = true;
+    const goods = riftChestGoods(run.partySize).map((item) => ({
+      kind: 'good', id: item.id, amount: item.n,
+    }));
+    try {
+      await this.combatLoot.distribute([
+        { kind: 'gold', id: 'gold', amount: riftChestGold(run.partySize) },
+        ...goods,
+      ], members, run.partyId, `rift:${run.id}:chest`);
+      for (const member of members) {
+        await this.persist.grantOnce({
+          rewardId: `rift:${run.id}:clear:${member.userId}`,
+          userId: member.userId, kind: 'rift_clear', id: 'rift', amount: 1,
+        });
+        member.riftClearAt = this.now();
+        const saved = await this.persist.loadCharacter(member.userId);
+        if (saved?.state) {
+          this._send(member.ws, 'reward_snapshot', {
+            gold: Number(saved.state.gold ?? saved.gold) || 0,
+            xp: saved.state.xp || {},
+            goods: saved.state.goods || {},
+            materials: saved.state.materials || {},
+            crafted: saved.state.crafted || {},
+            riftClearAt: Number(saved.state.riftClearAt) || member.riftClearAt,
+          });
+        }
+        this._send(member.ws, 'rift_chest_result', { run_id: run.id, ok: true });
+      }
+    } catch (err) {
+      run.claimed = false;
+      throw err;
+    }
+  }
+
+  leaveRift(session) {
+    if (session.gone || this.players.get(session.id) !== session || !session.riftRunId || !session.riftReturnPose) return;
+    const previousZone = session.zone;
+    Object.assign(session, session.riftReturnPose);
+    session.riftRunId = null;
+    session.riftReturnPose = null;
+    this.sendSnapshot(session);
+    this.social.onZone(session, previousZone);
+    this.social.onPose?.(session);
+    this.persistPose(session, true);
+    send(session.ws, 'rift_left', { x: session.x, y: session.y, z: session.z, zone: session.zone });
+  }
+
+  async combatAction(session, msg) {
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to fight online.');
+    }
+    if (!session.limiter.allowMove()) throw new ProtocolError('rate', 'Slow down.');
+    if (typeof msg.monster_id !== 'string' || msg.monster_id.length > 64) throw new ProtocolError('combat', 'Invalid monster.');
+    const result = await this.combatLoot.attack(session, msg.monster_id);
+    send(session.ws, 'combat_result', { request_id: String(msg.request_id || ''), ...result });
+  }
+
+  async lootChoice(session, msg) {
+    if (session.gone || this.players.get(session.id) !== session || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to roll for loot.');
+    }
+    if (typeof msg.roll_id !== 'string' || msg.roll_id.length > 64) throw new ProtocolError('loot', 'Invalid loot roll.');
+    const result = await this.combatLoot.choose(session, msg.roll_id, msg.choice);
+    send(session.ws, 'loot_choice_result', { request_id: String(msg.request_id || ''), ...result });
   }
 
   partyChat(session,msg) {
@@ -412,7 +705,7 @@ export class World {
   }
 
   persistPose(session, immediate = false) {
-    if (!this.persist || !session.userId) return;
+    if (!this.persist || !session.userId || session.riftRunId) return;
     const state = persistStateFromSession(session);
     const opts = immediate ? { immediate: true } : {};
     const result = this.persist.saveCharacter(session.userId, state, opts);
@@ -439,7 +732,11 @@ export class World {
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
       this.dirty.delete(session.id);
       this.social.onLeave(session);
-      this.rememberResume(session);
+      for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
+      if (session.riftRunId && session.riftReturnPose) {
+        Object.assign(session, session.riftReturnPose);
+        session.riftRunId = null;
+      }
       const online = this.players.size;
       for (const other of this.players.values()) {
         const watched = other.interest?.has(session.id);
@@ -478,16 +775,6 @@ export class World {
     for (const p of [...this.players.values()]) {
       if (t - p.last > IDLE_MS) this.drop(p, true);
     }
-    for (const m of this.monsters) {
-      if (m.hp <= 0 && m.respawnAt && t >= m.respawnAt) {
-        m.hp = m.maxHp;
-        m.x = m.homeX;
-        m.y = m.homeY;
-        m.z = m.homeZ;
-        m.respawnAt = 0;
-        this.dirtyMonsters.add(m.id);
-      }
-    }
     for (const n of this.nodes) {
       if (!n.ready && n.respawnAt && t >= n.respawnAt) {
         n.ready = true;
@@ -500,6 +787,8 @@ export class World {
     }
 
     this.social.parties.expire();
+    this.combatLoot.tick().catch((err) => console.warn('combatLoot.tick', err?.message || err));
+    this.tickRiftRuns(t);
 
     this.tickCount += 1;
     const farTick = this.tickCount % this.farEvery === 0;

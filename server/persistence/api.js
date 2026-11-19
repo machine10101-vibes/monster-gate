@@ -24,22 +24,45 @@ export function createPersistence(options = {}) {
 
   const signals = [];
 
-  async function write(userId, state, { expectedVersion, importedAt } = {}) {
+  async function write(userId, patch, { importedAt } = {}) {
     const id = requireUserId(userId);
-    const version = expectedVersion ?? versions.get(id);
-    const saved = await adapter.save(id, withSeen(state), { expectedVersion: version, importedAt });
-    versions.set(id, saved.version);
-    return saved;
+    let lastError;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const current = await adapter.load(id);
+      if (!current) throw new PersistenceError('not_found', 'Character not found.');
+      const next = sanitizeState(mergeState(current.state || {}, withSeen(patch)));
+      try {
+        const saved = await adapter.save(id, next, { expectedVersion: current.version, importedAt });
+        versions.set(id, Math.max(versions.get(id) || 0, saved.version));
+        return saved;
+      } catch (err) {
+        lastError = err;
+        if (err?.code !== 'conflict' || attempt === 3) throw err;
+      }
+    }
+    throw lastError;
   }
 
   function remember(row) {
-    if (row?.userId) versions.set(row.userId, row.version);
+    if (row?.userId) versions.set(row.userId, Math.max(versions.get(row.userId) || 0, row.version));
     return row;
   }
 
   return {
     adapter,
     queue,
+
+    async grantOnce(reward) {
+      if (typeof adapter.grantOnce !== 'function') throw new Error('Transactional reward grants require the Supabase persistence adapter.');
+      const result = await adapter.grantOnce(reward);
+      const id = requireUserId(reward.userId);
+      if (Number.isFinite(result?.version)) {
+        versions.set(id, Math.max(versions.get(id) || 0, result.version));
+        const pending = queue.peek(id);
+        if (pending) queue.enqueue(id, pending.state);
+      }
+      return result;
+    },
 
     async loadCharacter(userId) {
       return remember(await adapter.load(userId));
@@ -56,8 +79,8 @@ export function createPersistence(options = {}) {
     async saveCharacter(userId, state, opts = {}) {
       const id = requireUserId(userId);
       const queued = queue.peek(id)?.state;
-      const next = sanitizeState(mergeState(queued || (await peekState(adapter, id)), state));
-      queue.enqueue(id, next, { expectedVersion: opts.expectedVersion ?? versions.get(id) });
+      const next = mergeState(queued || {}, state);
+      queue.enqueue(id, next);
       if (opts.immediate) return queue.flush(id);
       return { ok: true, queued: true, userId: id };
     },

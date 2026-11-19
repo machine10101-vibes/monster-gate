@@ -1,12 +1,9 @@
 /**
- * Server-owned World 1 content: tile names, knight / Darksycle spawns,
- * and shared gathering nodes. Coordinates follow the live client
+ * Server-owned World 1 content: shared field/boss/Rift monster spawns,
+ * stats, tile names, and gathering nodes. Coordinates follow the live client
  * (src/world/tiles.js, volcanic.js, keeps.js, cave.js, gatherSite.js,
  * entities/monsters.js). Tree offsets are a simplified grove layout;
  * mine, fish, and boss posts match the client.
- *
- * Combat resolution and inventory credit are TODO: this module syncs
- * spawn positions, HP, and node ready/respawn state only.
  */
 
 import { cleanZone } from './protocol.js';
@@ -30,6 +27,11 @@ export const TILE_NAMES = [
 ];
 
 export const STATS = {
+  slime: { name: 'Gate Slime', level: 1, hp: 18, dmg: 2, speed: 2.6, aggro: 9, respawn: 12 },
+  voidslime: { name: 'Void Slime', level: 2, hp: 26, dmg: 3, speed: 3, aggro: 11, respawn: 14 },
+  boar: { name: 'Thorn Boar', level: 3, hp: 38, dmg: 3, speed: 2.5, aggro: 10, respawn: 18 },
+  wraith: { name: 'Gate Wraith', level: 3, hp: 24, dmg: 2, speed: 2.2, aggro: 13, respawn: 18 },
+  budgedragon: { name: 'Green Budge Dragon', level: 4, hp: 64, dmg: 4, speed: 3.1, aggro: 12, respawn: 25 },
   darksycledragon: { name: 'Darksycle Dragon', level: 7, hp: 155, dmg: 5, respawn: 45 },
   demonknight: { name: 'Demon Knight', level: 11, hp: 320, dmg: 5, respawn: 30 },
   holyknight: { name: 'Holy Knight', level: 11, hp: 300, dmg: 5, respawn: 30 },
@@ -65,6 +67,7 @@ function keepPosts(tx, tz, localCx, localCz, theta) {
 }
 
 export function zoneAt(x, z, realm) {
+  if (realm === 'rift' || (x >= 1600 && x < 1636 && z >= 800 && z < 836)) return 'rift';
   if (realm === 'cave' || (x >= 800 && x < 840 && z >= 800 && z < 832)) return 'cave';
   const tx = STARTER_TX + Math.floor(Number(x) / TILE_SIZE);
   const tz = STARTER_TZ + Math.floor(Number(z) / TILE_SIZE);
@@ -148,6 +151,8 @@ function monster(id, type, x, z, y, zone, extras = {}) {
     maxHp: stats.hp,
     level: stats.level,
     dmg: stats.dmg,
+    speed: stats.speed || 2.8,
+    aggro: stats.aggro || 12,
     zone,
     respawn: stats.respawn,
     respawnAt: 0,
@@ -157,8 +162,25 @@ function monster(id, type, x, z, y, zone, extras = {}) {
   };
 }
 
+export function createRiftMonster(id, type, x, z, hpMultiplier = 1) {
+  const entry = monster(id, type, x, z, 2, 'rift');
+  entry.hp = Math.max(1, Math.round(entry.maxHp * hpMultiplier));
+  entry.maxHp = entry.hp;
+  entry.respawn = 0;
+  entry.rift = true;
+  return entry;
+}
+
 export function createMonsters() {
   const list = [];
+  const commonSpawns = [
+    ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
+    ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70],
+    ['slime', 76, 102], ['budgedragon', 120, 74],
+  ];
+  commonSpawns.forEach(([type, x, z], i) => {
+    list.push(monster(`field_${type}_${i}`, type, x, z, 3.2, zoneAt(x, z)));
+  });
   const demon = keepPosts(3, 1, 72, 66, 0); // Hellspire
   demon.posts.forEach((p, i) => {
     list.push(monster(`demonknight_${i}`, 'demonknight', p[0], p[1], 3.6, 'Hellspire'));

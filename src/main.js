@@ -43,7 +43,7 @@ import { updateGatherSites } from './world/gatherSite.js';
 import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
-import { updateRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
+import { updateRift, enterRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
 import { accountAddress, clearAccount, createAccount, legacyUserId, readAccount, signInAccount } from './wallet/account.js';
 import { clearSession, inKleverHandoff, isMobile, launchKleverApp, markPrompt, promptIsCooling, shortAddress, showWalletHelp } from './wallet/klever.js';
 import { loginWithKlever } from './wallet/link.js';
@@ -382,6 +382,8 @@ class Game {
     }
     this.refreshWalletUi();
     this.applyQuality();
+    this.mmo?.syncAuthoritativeMonsters?.();
+    this.mmo?.applyRewardSnapshot?.();
     if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
     progress(1, 'Ready');
 
@@ -1691,8 +1693,9 @@ class Game {
     this.projectiles = this.projectiles.filter((p) => !p.dead);
   }
 
-  onMonsterKilled(m) {
+  onMonsterKilled(m, { serverAuthoritative = false } = {}) {
     this.kills++;
+    if (!serverAuthoritative) {
     if (m.type === 'orcscout') {
       if (Math.random() < 0.72) {
         const n = m.def.gold[0] + Math.floor(Math.random() * (m.def.gold[1] - m.def.gold[0] + 1));
@@ -1728,6 +1731,7 @@ class Game {
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
     if (m.debugTank) grantDebugTankLoot(this, m);
+    }
     this.applyJournal(this.journal.onKill(m.type));
     if (this.bounties?.onKill(m.type) && this.hud.panelId === 'quest' && this.hud.journalRefresh) this.hud.journalRefresh();
     if (m.type === 'chicken') return;
@@ -2176,8 +2180,30 @@ class Game {
 
   strikeMonster(m, dmg, dx, dz, knock, crit = false) {
     if (!m || m.dead) return;
-    if (this.net?.role === 'guest') this.net.relayHit(m, dmg, dx, dz, knock, crit);
-    else m.takeHit(dmg, dx, dz, knock, crit);
+    if (this.net?.role === 'guest') {
+      this.net.relayHit(m, dmg, dx, dz, knock, crit);
+      return;
+    }
+    const serverCombat = this.mmo?.ws?.readyState === 1 && this.mmo.you?.guest === false;
+    if (m.serverAuthoritative) {
+      if (serverCombat && m.serverId) this.mmo.attackMonster(m.serverId);
+      return;
+    }
+    if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
+    if (serverCombat) {
+      const serverMob = (this.mmo.entities?.monsters || [])
+        .filter((candidate) => candidate.type === m.type)
+        .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (serverMob && serverMob.distance <= 18) {
+        m.serverId = serverMob.candidate.id;
+        m.serverAuthoritative = true;
+        this.mmo.attackMonster(serverMob.candidate.id);
+        return;
+      }
+      if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
+    }
+    m.takeHit(dmg, dx, dz, knock, crit);
   }
 
   ensureRemote(id, name) {
@@ -2553,6 +2579,72 @@ class Game {
     this.talkQuest = false;
     if (result.ok) this.applyJournal(result);
     this.audio.select();
+  }
+
+  enterRiftFromServer(info) {
+    if (this.world?.realm === 'rift') return;
+    enterRift(this, { party: info?.party_size || 1, follow: false, serverOwned: true });
+  }
+
+  leaveRiftFromServer() {
+    if (this.world?.realm !== 'rift') return;
+    leaveRift(this);
+  }
+
+  syncServerRewardState(snapshot) {
+    if (!snapshot || !this.progress) return;
+    const mergeCounts = (local, server) => {
+      const next = { ...(local || {}) };
+      for (const [id, raw] of Object.entries(server || {})) {
+        const value = Math.max(0, Math.floor(Number(raw) || 0));
+        if (value > (Number(next[id]) || 0)) next[id] = value;
+      }
+      return next;
+    };
+    this.progress.data.gold = Math.max(this.progress.gold, Math.floor(Number(snapshot.gold) || 0));
+    this.progress.data.xp = mergeCounts(this.progress.data.xp, snapshot.xp);
+    this.progress.data.goods = mergeCounts(this.progress.data.goods, snapshot.goods);
+    this.progress.data.materials = mergeCounts(this.progress.data.materials, snapshot.materials);
+    this.progress.data.riftClearAt = Math.max(Number(this.progress.data.riftClearAt) || 0, Number(snapshot.riftClearAt) || 0);
+    this.progress.data.crafted = { ...(this.progress.data.crafted || {}) };
+    for (const [id, owned] of Object.entries(snapshot.crafted || {})) {
+      if (owned) this.progress.data.crafted[id] = true;
+    }
+    this.progress.save(false);
+    this.gold = this.progress.gold;
+    if (this.player) {
+      this.applyGear();
+      this.hud?.setGold?.(this.gold);
+      this.itemsChanged?.();
+      this.refreshHud?.();
+    }
+  }
+
+  applyServerReward(reward) {
+    if (!reward || !this.progress || !(Number(reward.amount) > 0)) return;
+    const amount = Math.floor(Number(reward.amount));
+    if (reward.kind === 'gold') {
+      this.addGold(amount);
+      return;
+    }
+    if (reward.kind === 'xp') {
+      const levelled = this.progress.addXp(String(reward.id), amount);
+      if (levelled) this.hud.banner('Level up', `${reward.id} ${levelled}`, 2600);
+      return;
+    }
+    if (reward.kind === 'gear') {
+      if (this.progress.grantFound(String(reward.id))) {
+        this.applyGear();
+        this.itemsChanged();
+        this.hud.toast(`Found ${String(reward.id)}!`, 2200);
+      } else if (!this.progress.crafted(String(reward.id))) this.hud.toast(INVENTORY_FULL, 1800);
+      return;
+    }
+    let added = 0;
+    if (reward.kind === 'good') added = this.progress.addGood(String(reward.id), amount);
+    else if (reward.kind === 'material') added = this.progress.addPart(String(reward.id), amount);
+    if (added > 0) this.itemsChanged();
+    if (added < amount) this.hud.toast(INVENTORY_FULL, 1800);
   }
 
   addGold(n) {
@@ -3177,7 +3269,10 @@ class Game {
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
     if (!this.campParked) {
-      for (const m of this.monsters) m.update(dt);
+      for (const m of this.monsters) {
+        m.update(dt);
+        if (m.serverAuthoritative) this.mmo?.updateMonster?.(m);
+      }
       if (this.monsters.some((m) => m.remove)) {
         for (const m of this.monsters) if (m.remove) m.dispose();
         this.monsters = this.monsters.filter((m) => !m.remove);
