@@ -136,6 +136,9 @@ export function createPvpRuntime(world, opts = {}) {
     const t = now(), last = match.lastHit.get(session.id) || 0;
     if (t - last < 650) throw new ProtocolError('pvp_cooldown', 'Your weapon is not ready yet.');
     match.lastHit.set(session.id, t);
+    session.anim = 1;
+    session.move = 0;
+    world.dirty.add(session.id);
     const damage = Math.max(3, Math.min(12, 5 + (session.weapon ? 2 : 0) + Math.floor((session.level || 1) / 10)));
     target.hp = Math.max(0, target.hp - damage);
     target.anim = target.hp ? 4 : 3;
