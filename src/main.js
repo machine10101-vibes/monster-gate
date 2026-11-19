@@ -2200,7 +2200,7 @@ class Game {
         this.mmo.attackMonster(serverMob.candidate.id);
         return;
       }
-      if (m.realm === 'rift') return;
+      if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
     }
     m.takeHit(dmg, dx, dz, knock, crit);
   }
