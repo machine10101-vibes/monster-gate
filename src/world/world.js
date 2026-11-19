@@ -12,6 +12,7 @@ import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
 import { buildCave } from './cave.js';
 import { buildRift } from './rift.js';
+import { buildColosseum, buildColosseumSignUpBoard } from './colosseum.js';
 import * as M from './models.js';
 import { buildArcticModels } from './arcticModels.js';
 import { buildVolcanicModels } from './volcanicModels.js';
@@ -84,6 +85,7 @@ export class World {
     return null;
   }
   heightAt(x, z) {
+    if (this.colosseum?.contains(x, z)) return this.colosseum.heightAt(x, z);
     if (this.rift?.contains(x, z)) return this.rift.heightAt(x, z);
     if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
     const d = this.dock;
@@ -107,7 +109,7 @@ export class World {
     return this.heightAt(x, z) < WATER_Y;
   }
   zoneAt(x, z) {
-    if (this.rift?.contains(x, z) || this.cave?.contains(x, z)) return ZONE.FIELD;
+    if (this.colosseum?.contains(x, z) || this.rift?.contains(x, z) || this.cave?.contains(x, z)) return ZONE.FIELD;
     const land = this.landAt(x, z);
     if (!land) return ZONE.MOUNTAIN;
     const lx = Math.floor(x) - land.x0;
@@ -120,6 +122,7 @@ export class World {
     return false;
   }
   playable(x, z) {
+    if (this.colosseum?.contains(x, z)) return this.colosseum.walkable(x, z);
     if (this.rift?.contains(x, z)) return this.rift.walkable(x, z);
     if (this.cave?.contains(x, z)) return this.cave.walkable(x, z);
     const h = this.heightAt(x, z);
@@ -402,6 +405,8 @@ export class World {
     dressRing(this);
     this.cave = buildCave(this);
     this.rift = buildRift(this);
+    this.colosseum = buildColosseum(this);
+    this.colosseumBoard = buildColosseumSignUpBoard(this);
 
     progress(0.85, 'Painting the final touches');
     await nextFrame();
