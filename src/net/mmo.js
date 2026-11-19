@@ -336,6 +336,30 @@ export class MmoClient {
   onFrame(raw) {
     const msg = parseFrame(raw);
     if (!msg) return;
+    if (msg.type === 'rift_entered') {
+      this.view?.setStatus?.('online', { message: 'Inside the Waygate Rift' });
+      return;
+    }
+    if (msg.type === 'rift_wave') {
+      return;
+    }
+    if (msg.type === 'rift_chest_ready') {
+      toast(this.game, 'The Rift chest is ready. Claim it at the centre.');
+      return;
+    }
+    if (msg.type === 'rift_chest_result') {
+      if (msg.ok && this.game?.riftRun) {
+        this.game.riftRun.looted = true;
+        if (this.game.world?.rift?.chest) this.game.world.rift.chest.looted = true;
+        if (this.game.progress?.data) {
+          this.game.progress.data.riftClearAt = Date.now();
+          this.game.progress.save();
+        }
+        toast(this.game, 'Rift rewards distributed to the party.');
+      } else toast(this.game, msg.message || 'The Rift chest could not be claimed.');
+      return;
+    }
+    if (msg.type === 'rift_left') return;
     if (msg.type === 'reward_snapshot') {
       this.rewardSnapshot = msg;
       this.applyRewardSnapshot();
@@ -513,6 +537,24 @@ export class MmoClient {
     this.lootTimer = 0;
     this.lootOverlay?.remove();
     this.lootOverlay = null;
+  }
+
+  enterRift() {
+    if (this.ws?.readyState !== 1) return false;
+    this.ws.send(encode('rift_enter'));
+    return true;
+  }
+
+  leaveRift() {
+    if (this.ws?.readyState !== 1) return false;
+    this.ws.send(encode('rift_leave'));
+    return true;
+  }
+
+  claimRiftChest() {
+    if (this.ws?.readyState !== 1) return false;
+    this.ws.send(encode('rift_chest_claim'));
+    return true;
   }
 
   attackMonster(monsterId) {
