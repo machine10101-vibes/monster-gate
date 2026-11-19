@@ -34,7 +34,7 @@ worldView.setStatus('waking', { secondsLeft, elapsedMs })
 ```
 
 - `secondsLeft` is an integer, counting down from **60**, updated about once a second. If it reaches 0 and the server is still asleep, keep probing and keep `secondsLeft` at **0**.
-- `elapsedMs` is milliseconds since this wake attempt started (0 at the first failed probe, then increasing). The view counts down locally if updates pause, switches to “Almost there” after 60s elapsed, and shows **Retry** after 75s.
+- `elapsedMs` is milliseconds since this wake attempt started, including the initial quick probe. The view counts down locally if updates pause, switches to “Almost there” after 60s elapsed, and shows **Retry** after 75s.
 
 5. Do not switch to an error status at 75s — stay on `waking` with `secondsLeft: 0` and a growing `elapsedMs`, and keep probing so a late wake still connects.
 6. If the view has `onRetry(cb)`, the client registers it (once) and starts a fresh wake check when it fires (`secondsLeft` back to 60, `elapsedMs` back to 0).
