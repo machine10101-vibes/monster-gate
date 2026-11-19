@@ -133,7 +133,6 @@ test('MmoClient maps server frames onto worldView and sends move/chat', async ()
   assert.equal(chat.type, 'chat');
   assert.equal(chat.channel, 'zone');
 
-  client.dispose();
   assert.ok(view.statuses.some((s) => s === 'offline' || s?.status === 'offline'));
 });
 
@@ -189,7 +188,6 @@ test('MG-MMO-4: setToken after auth rejection reconnects without a reload', asyn
   const hello = parseFrame(client.ws.sent[0]);
   assert.equal(hello.type, 'hello');
   assert.equal(hello.token, 'fresh-token');
-  client.dispose();
 });
 
 test('MG-MMO-4: resetAuth and retry work once a new token is present', async () => {
@@ -227,7 +225,6 @@ test('MG-MMO-4: resetAuth and retry work once a new token is present', async () 
   assert.equal(client.fatal, false);
   assert.equal(sockets.length, 3);
   assert.equal(parseFrame(sockets[2].sent[0]).token, 'brand-new');
-  client.dispose();
 });
 
 test('social actions resolve only after a matching server acknowledgement', async () => {
@@ -247,7 +244,6 @@ test('social actions resolve only after a matching server acknowledgement', asyn
   assert.equal(settled,false);
   client.ws.push({v:1,type:'social_result',request_id:sent.request_id,ok:true,pending:true});
   assert.deepEqual(await pending,{ok:true,pending:true,code:'',message:''});
-  client.dispose();
 });
 
 test('healthzUrl uses the https form of a wss world URL', () => {
@@ -270,7 +266,6 @@ test('a live /healthz skips waking and goes connecting then online', async () =>
   assert.ok(view.statuses.some((s) => s.status === 'connecting'));
   client.ws.push({ v: 1, type: 'welcome', protocol: 1, tickHz: 15, you: { id: 'u_ann', name: 'Ann' }, online: 1 });
   assert.ok(view.statuses.some((s) => s.status === 'online'));
-  client.dispose();
 });
 
 test('a sleeping /healthz counts down secondsLeft and then connects', async () => {
@@ -307,7 +302,6 @@ test('a sleeping /healthz counts down secondsLeft and then connects', async () =
   assert.ok(waking[0].secondsLeft >= 0);
   assert.ok(waking[0].elapsedMs >= 0);
   assert.ok(view.statuses.some((s) => s.status === 'connecting'));
-  client.dispose();
 });
 
 test('secondsLeft stays at 0 after the ETA, and onRetry restarts the wake check', async () => {
@@ -352,7 +346,6 @@ test('secondsLeft stays at 0 after the ETA, and onRetry restarts the wake check'
     tick();
   });
   assert.ok(view.statuses.some((s) => s.status === 'connecting'));
-  client.dispose();
 });
 
 test('a view that throws on waking does not crash the client', async () => {
@@ -387,7 +380,6 @@ test('a view that throws on waking does not crash the client', async () => {
     tick();
   });
   assert.ok(client.ws || view.statuses.some((s) => s.status === 'connecting'));
-  client.dispose();
 });
 
 test('name_taken is a fatal distinct error on the view', async () => {
@@ -410,4 +402,18 @@ test('name_taken is a fatal distinct error on the view', async () => {
   assert.ok(err);
   assert.match(err.message, /already taken/i);
   assert.ok(toasts.some((t) => /already taken/i.test(t)));
+});
+
+
+test('Colosseum ranged attacks use the longer server-validated weapon reach', () => {
+  const game = { player: { pos: { x: 0, z: 0 } } };
+  const client = new MmoClient(game, stubView(), { url: 'ws://world.test', WebSocket: FakeSocket, guest: false });
+  client.pvpMatchId = 'match-1';
+  client.pvpTeam = 0;
+  client.nearby.set('enemy', { id: 'enemy', zone: 'colosseum:match-1', pvp_team: 1, pvp_dead: false, x: 10, z: 0 });
+  const sent = [];
+  client.ws = { readyState: 1, send: (raw) => sent.push(parseFrame(raw)) };
+  assert.equal(client.pvpAttackNearest(13), true);
+  assert.equal(sent[0].type, 'pvp_attack');
+  assert.equal(sent[0].target_id, 'enemy');
 });

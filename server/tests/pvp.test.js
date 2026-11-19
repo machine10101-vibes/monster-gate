@@ -34,6 +34,11 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     const wb = await hello(b, 'bea', { name: 'Bea' });
     a.send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '1v1' }));
     b.send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '1v1' }));
+    await waitUntil(() => aFrames.some(m => m.type === 'pvp_match_found') && bFrames.some(m => m.type === 'pvp_match_found'));
+    const proposalA = aFrames.find(m => m.type === 'pvp_match_found').proposal_id;
+    const proposalB = bFrames.find(m => m.type === 'pvp_match_found').proposal_id;
+    a.send(JSON.stringify({ v: 1, type: 'pvp_confirm', proposal_id: proposalA, accept: true }));
+    b.send(JSON.stringify({ v: 1, type: 'pvp_confirm', proposal_id: proposalB, accept: true }));
     await waitUntil(() => aFrames.some(m => m.type === 'pvp_match_start') && bFrames.some(m => m.type === 'pvp_match_start'));
     const pa = srv.world.players.get(wa.you.id), pb = srv.world.players.get(wb.you.id);
     assert.equal(pa.zone, pb.zone);
@@ -61,6 +66,10 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     assert.equal(pb.hp, rangedBefore - rangedHit.damage);
     const returnPose = { ...pa.pvpReturnPose };
     srv.world.pvp.leave(pa);
+    assert.ok(pb.pvpRating > 1000);
+    assert.ok(pa.pvpRating < 1000);
+    assert.equal(pb.pvpWins, 1);
+    assert.equal(pa.pvpLosses, 1);
     assert.equal(pa.pvpMatchId, null);
     assert.equal(pb.pvpMatchId, null);
     assert.equal(pa.zone, returnPose.zone);
@@ -104,11 +113,68 @@ test('2v2 matchmaking pairs two full leader-created parties', async () => {
       && frames[2].some(m => m.type === 'party_state' && m.party?.members?.length === 2));
     sockets[0].send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '2v2' }));
     sockets[2].send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '2v2' }));
+    await waitUntil(() => frames.every(list => list.some(m => m.type === 'pvp_match_found' && m.mode === '2v2')));
+    for (let i = 0; i < sockets.length; i++) {
+      const offer = frames[i].find(m => m.type === 'pvp_match_found');
+      sockets[i].send(JSON.stringify({ v: 1, type: 'pvp_confirm', proposal_id: offer.proposal_id, accept: true }));
+    }
     await waitUntil(() => frames.every(list => list.some(m => m.type === 'pvp_match_start' && m.mode === '2v2')));
     const ids = [ann.you.id, bea.you.id, cal.you.id, dan.you.id];
     const players = ids.map(id => srv.world.players.get(id));
     assert.equal(players.filter(p => p.pvpTeam === 0).length, 2);
     assert.equal(players.filter(p => p.pvpTeam === 1).length, 2);
     assert.equal(new Set(players.map(p => p.pvpMatchId)).size, 1);
+  });
+});
+
+
+test('Colosseum declines a match offer cleanly for every queued fighter', async () => {
+  await withWorld(async (srv, connect) => {
+    const a = await connect(), b = await connect();
+    const aFrames = collect(a), bFrames = collect(b);
+    await hello(a, 'ann', { name: 'Ann' });
+    await hello(b, 'bea', { name: 'Bea' });
+    a.send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '1v1' }));
+    b.send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '1v1' }));
+    await waitUntil(() => aFrames.some(m => m.type === 'pvp_match_found') && bFrames.some(m => m.type === 'pvp_match_found'));
+    const offer = bFrames.find(m => m.type === 'pvp_match_found');
+    b.send(JSON.stringify({ v: 1, type: 'pvp_confirm', proposal_id: offer.proposal_id, accept: false }));
+    await waitUntil(() => aFrames.some(m => m.type === 'pvp_queue' && m.status === 'cancelled') && bFrames.some(m => m.type === 'pvp_queue' && m.status === 'cancelled'));
+    assert.equal(srv.world.pvp.proposals.size, 0);
+    assert.equal(srv.world.pvp.matches.size, 0);
+  });
+});
+
+test('3v3 matchmaking confirms six fighters and isolates their match zone', async () => {
+  await withWorld(async (srv, connect) => {
+    const sockets = await Promise.all(Array.from({ length: 6 }, () => connect()));
+    const frames = sockets.map(collect);
+    const names = ['Ann', 'Bea', 'Cal', 'Dan', 'Eve', 'Fox'];
+    const welcomes = await Promise.all(sockets.map((ws, i) => hello(ws, names[i].toLowerCase(), { name: names[i] })));
+    async function invite(leader, member, inviteId) {
+      sockets[leader].send(JSON.stringify({ v: 1, type: 'party_invite', name: names[member], request_id: inviteId }));
+      await waitUntil(() => frames[member].some(m => m.type === 'party_invite'));
+      const offer = [...frames[member]].reverse().find(m => m.type === 'party_invite');
+      sockets[member].send(JSON.stringify({ v: 1, type: 'party_accept', invite_id: offer.invite_id, request_id: inviteId + '-accept' }));
+      await waitUntil(() => frames[leader].some(m => m.type === 'party_state' && m.party?.members?.length === (member === 1 || member === 4 ? 2 : 3)));
+    }
+    await invite(0, 1, 'a-bea');
+    await invite(0, 2, 'a-cal');
+    await invite(3, 4, 'b-eve');
+    await invite(3, 5, 'b-fox');
+    sockets[0].send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '3v3' }));
+    sockets[3].send(JSON.stringify({ v: 1, type: 'pvp_queue', mode: '3v3' }));
+    await waitUntil(() => frames.every(list => list.some(m => m.type === 'pvp_match_found' && m.mode === '3v3')));
+    for (let i = 0; i < sockets.length; i++) {
+      const offer = frames[i].find(m => m.type === 'pvp_match_found');
+      sockets[i].send(JSON.stringify({ v: 1, type: 'pvp_confirm', proposal_id: offer.proposal_id, accept: true }));
+    }
+    await waitUntil(() => frames.every(list => list.some(m => m.type === 'pvp_match_start' && m.mode === '3v3')));
+    const players = welcomes.map(w => srv.world.players.get(w.you.id));
+    assert.equal(players.filter(p => p.pvpTeam === 0).length, 3);
+    assert.equal(players.filter(p => p.pvpTeam === 1).length, 3);
+    assert.equal(new Set(players.map(p => p.pvpMatchId)).size, 1);
+    assert.equal(new Set(players.map(p => p.zone)).size, 1);
+    assert.match(players[0].zone, /^colosseum:/);
   });
 });

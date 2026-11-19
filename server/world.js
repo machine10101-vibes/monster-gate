@@ -218,6 +218,7 @@ export class World {
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));
       else if (msg.type === 'pvp_queue') this.pvp.enqueue(session, String(msg.mode || '1v1'));
+      else if (msg.type === 'pvp_confirm') this.pvp.confirm(session, msg.proposal_id, msg.accept === true);
       else if (msg.type === 'pvp_cancel') this.pvp.cancel(session);
       else if (msg.type === 'pvp_attack') this.pvp.attack(session, msg.target_id);
       else if (msg.type === 'pvp_roll') this.pvp.roll(session);
@@ -320,6 +321,9 @@ export class World {
       move: pose.move ?? 0, anim: pose.anim ?? 0,
       held: gear.held || 'blade',
       weapon: gear.weapon ?? null,
+      pvpRating: Number(row?.state?.pvp?.rating) || 1000,
+      pvpWins: Number(row?.state?.pvp?.wins) || 0,
+      pvpLosses: Number(row?.state?.pvp?.losses) || 0,
       sheath: pose.sheath ?? null,
       look: gear.look,
       armor: gear.armor || {},
@@ -342,7 +346,7 @@ export class World {
       zoneCap: this.zoneCap,
       resumeToken: token,
       resumed: !!slot,
-      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
+      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId, pvp_rating: session.pvpRating, pvp_wins: session.pvpWins, pvp_losses: session.pvpLosses },
       pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
       features: ident.guest ? ['party'] : this.social.features,
     });

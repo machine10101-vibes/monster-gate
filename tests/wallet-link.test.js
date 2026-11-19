@@ -13,7 +13,7 @@ import {
   mockSignatureFor,
   signedMessage,
 } from '../supabase/functions/_shared/linkAuth.js';
-import { addressFromPublicKey, kleverMessageHash, verifyKleverSignature } from '../src/wallet/verify.js';
+import { addressFromPublicKey, kleverMessageHash, signatureBytes, verifyKleverSignature } from '../src/wallet/verify.js';
 import { parseMockWallet } from '../src/wallet/mock.js';
 
 ed.hashes.sha512 = sha512;
@@ -255,4 +255,14 @@ test('?mockwallet is session-only and never a signup path', () => {
   assert.match(src('../src/wallet/settings.js'), /Connect Klever wallet/);
   assert.match(src('../src/wallet/mock.js'), /MOCK WALLET/);
   assert.match(src('../src/wallet/mock.js'), /sessionStorage/);
+});
+
+
+test('Klever Base64-encoded hex signatures verify identically to server-decoded signatures', () => {
+  const a = keypair(17);
+  const message = 'Monster Gate signature format compatibility test';
+  const hex = sign(a.secret, message);
+  const base64Hex = Buffer.from(hex, 'utf8').toString('base64');
+  assert.equal(signatureBytes(base64Hex).length, 64);
+  assert.equal(verifyKleverSignature(message, base64Hex, a.address), true);
 });

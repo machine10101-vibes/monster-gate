@@ -1,8 +1,17 @@
 import { randomBytes } from 'node:crypto';
 import { ProtocolError } from './protocol.js';
+import { GEAR } from '../src/data/catalog.js';
 
 const MODES = new Set(['1v1', '2v2', '3v3']);
-const RANGED_WEAPONS = new Set(['budgebow', 'darkbow', 'darkstaff']);
+const GEAR_BY_ID = new Map(GEAR.map((entry) => [entry.id, entry]));
+const DEFAULT_RATING = 1000;
+const RATING_K = 32;
+const PROPOSAL_MS = 20_000;
+const RESULT_EXIT_MS = 30_000;
+
+function isRangedWeapon(id) {
+  return GEAR_BY_ID.get(id)?.item?.kind === 'ranged';
+}
 const ARENA = { x: 1719.5, y: 2.2, z: 819.5 };
 
 function live(world, id) {
@@ -13,6 +22,7 @@ function live(world, id) {
 export function createPvpRuntime(world, opts = {}) {
   const queues = new Map([['1v1', []], ['2v2', []], ['3v3', []]]);
   const matches = new Map();
+  const proposals = new Map();
   const now = opts.now || world.now;
   const send = (player, type, data = {}) => world._send(player.ws, type, data);
   const teamFor = (mode, leader) => {
@@ -26,6 +36,50 @@ export function createPvpRuntime(world, opts = {}) {
       throw new ProtocolError('pvp_team', 'Every teammate must be online and free to fight.');
     }
     return members;
+  };
+  const releaseProposal = (proposal, message = 'Match confirmation expired. Queue again when ready.') => {
+    if (!proposal || !proposals.has(proposal.id)) return false;
+    proposals.delete(proposal.id);
+    for (const id of proposal.players) {
+      const p = live(world, id);
+      if (!p || p.pvpProposalId !== proposal.id) continue;
+      p.pvpProposalId = null;
+      p.pvpQueued = null;
+      send(p, 'pvp_queue', { mode: proposal.mode, status: 'cancelled', message });
+    }
+    return true;
+  };
+  const applyRating = (match, winner) => {
+    if (match.rated) return;
+    match.rated = true;
+    const teamRatings = match.teams.map((team) => {
+      const players = team.map((id) => live(world, id)).filter(Boolean);
+      return players.length ? players.reduce((sum, p) => sum + (Number(p.pvpRating) || DEFAULT_RATING), 0) / players.length : DEFAULT_RATING;
+    });
+    const expectedA = 1 / (1 + (10 ** ((teamRatings[1] - teamRatings[0]) / 400)));
+    const deltaA = Math.round(RATING_K * ((winner === 0 ? 1 : 0) - expectedA));
+    for (let team = 0; team < 2; team++) {
+      for (const id of match.teams[team]) {
+        const p = live(world, id);
+        if (!p) continue;
+        p.pvpRating = Math.max(100, Math.min(3000, (Number(p.pvpRating) || DEFAULT_RATING) + (team === 0 ? deltaA : -deltaA)));
+        p.pvpWins = Math.max(0, Number(p.pvpWins) || 0) + (team === winner ? 1 : 0);
+        p.pvpLosses = Math.max(0, Number(p.pvpLosses) || 0) + (team === winner ? 0 : 1);
+        world.dirty.add(p.id);
+        world.persistPose(p, true);
+      }
+    }
+  };
+  const finish = (match, winner, reason = 'complete') => {
+    if (match.finished || match.winner !== undefined) return;
+    match.winner = winner;
+    match.reason = reason;
+    applyRating(match, winner);
+    for (const id of match.players) {
+      const p = live(world, id);
+      if (p) send(p, 'pvp_result', { match_id: match.id, winner, winning_team: match.teams[winner], reason });
+    }
+    setTimeout(() => restore(match, winner), RESULT_EXIT_MS).unref?.();
   };
   const restore = (match, winner) => {
     if (match.finished) return;
@@ -51,7 +105,7 @@ export function createPvpRuntime(world, opts = {}) {
       world.sendSnapshot(p);
       world.social.onZone(p, previousZone);
       world.persistPose(p, true);
-      send(p, 'pvp_match_end', { match_id: match.id, winner, won: winner === team, reason: 'complete', return_pose: pose, hp: p.hp, max_hp: p.maxHp || 20 });
+      send(p, 'pvp_match_end', { match_id: match.id, winner, won: winner === team, reason: match.reason || 'complete', return_pose: pose, hp: p.hp, max_hp: p.maxHp || 20, rating: p.pvpRating || DEFAULT_RATING, wins: p.pvpWins || 0, losses: p.pvpLosses || 0 });
     }
   };
   const begin = (mode, a, b) => {
@@ -66,6 +120,7 @@ export function createPvpRuntime(world, opts = {}) {
         p.pvpReturnHp = p.hp;
         p.pvpMatchId = id;
         p.pvpQueued = null;
+        p.pvpProposalId = null;
         p.pvpTeam = team;
         p.pvpDead = false;
         p.pvpRollAt = 0;
@@ -88,6 +143,58 @@ export function createPvpRuntime(world, opts = {}) {
     }
     return match;
   };
+  const propose = (mode, a, b) => {
+    const id = randomBytes(12).toString('hex');
+    const proposal = { id, mode, teams: [a.slice(), b.slice()], players: [...a, ...b], accepted: new Set(), expiresAt: now() + PROPOSAL_MS };
+    proposals.set(id, proposal);
+    for (const playerId of proposal.players) {
+      const p = live(world, playerId);
+      if (!p) { releaseProposal(proposal, 'A fighter disconnected. Queue again.'); return; }
+      p.pvpProposalId = id;
+      send(p, 'pvp_match_found', { proposal_id: id, mode, team_size: a.length, expires_at: proposal.expiresAt });
+    }
+  };
+  function confirm(session, proposalId, accept) {
+    const proposal = proposals.get(String(proposalId || ''));
+    if (!proposal || !proposal.players.includes(session.id) || session.pvpProposalId !== proposal.id) {
+      throw new ProtocolError('pvp_confirm', 'That match offer is no longer available.');
+    }
+    if (proposal.expiresAt <= now()) {
+      releaseProposal(proposal);
+      throw new ProtocolError('pvp_confirm', 'That match offer expired. Queue again.');
+    }
+    if (!accept) {
+      releaseProposal(proposal, 'A fighter declined the match. Queue again when ready.');
+      return false;
+    }
+    proposal.accepted.add(session.id);
+    const accepted = proposal.accepted.size;
+    for (const id of proposal.players) {
+      const p = live(world, id);
+      if (p) send(p, 'pvp_match_confirmation', { proposal_id: proposal.id, accepted, required: proposal.players.length });
+    }
+    if (accepted !== proposal.players.length) return true;
+    const valid = proposal.teams.every((group) => {
+      const members = group.map((id) => live(world, id));
+      if (members.some((p) => !p || p.pvpQueued !== proposal.mode || p.pvpProposalId !== proposal.id || p.pvpMatchId || p.riftRunId)) return false;
+      try {
+        const current = teamFor(proposal.mode, members[0]);
+        return current.length === group.length && current.every((p) => group.includes(p.id));
+      } catch { return false; }
+    });
+    if (!valid) {
+      releaseProposal(proposal, 'A team changed before confirming. Queue again.');
+      return false;
+    }
+    proposals.delete(proposal.id);
+    for (const id of proposal.players) {
+      const p = live(world, id);
+      if (p) p.pvpProposalId = null;
+    }
+    begin(proposal.mode, proposal.teams[0].map((id) => live(world, id)), proposal.teams[1].map((id) => live(world, id)));
+    return true;
+  }
+
   const matchQueues = () => {
     const release = (mode, group) => {
       for (const id of group) {
@@ -99,7 +206,7 @@ export function createPvpRuntime(world, opts = {}) {
     };
     const eligible = (mode, group) => {
       const members = group.map(id => live(world, id));
-      if (members.some(p => !p || p.pvpQueued !== mode || p.pvpMatchId || p.riftRunId || p.zone.startsWith('colosseum'))) return false;
+      if (members.some(p => !p || p.pvpQueued !== mode || p.pvpProposalId || p.pvpMatchId || p.riftRunId || p.zone.startsWith('colosseum'))) return false;
       try {
         const current = teamFor(mode, members[0]);
         return current.length === group.length && current.every(p => group.includes(p.id));
@@ -120,7 +227,7 @@ export function createPvpRuntime(world, opts = {}) {
           release(mode, b);
           continue;
         }
-        begin(mode, a.map(id => live(world, id)), b.map(id => live(world, id)));
+        propose(mode, a, b);
       }
     }
   };
@@ -135,12 +242,17 @@ export function createPvpRuntime(world, opts = {}) {
     queues.get(mode).push(group);
     for (const p of members) {
       p.pvpQueued = mode;
+      p.pvpProposalId = null;
       send(p, 'pvp_queue', { mode, status: 'queued', party_size: group.length });
     }
     matchQueues();
     return true;
   }
   function cancel(session) {
+    if (session.pvpProposalId) {
+      const proposal = proposals.get(session.pvpProposalId);
+      if (proposal) return releaseProposal(proposal, 'A fighter cancelled the match offer. Queue again when ready.');
+    }
     let removed = false;
     for (const [mode, queue] of queues) {
       const index = queue.findIndex(group => group.includes(session.id));
@@ -158,11 +270,11 @@ export function createPvpRuntime(world, opts = {}) {
   function attack(session, targetId) {
     const match = matches.get(session.pvpMatchId);
     const target = live(world, String(targetId || ''));
-    if (!match || match.finished || !target || target.pvpMatchId !== match.id || target.pvpTeam === session.pvpTeam) {
+    if (!match || match.finished || match.winner !== undefined || !target || target.pvpMatchId !== match.id || target.pvpTeam === session.pvpTeam) {
       throw new ProtocolError('pvp_target', 'That opponent is not in your match.');
     }
     if (session.pvpDead || target.pvpDead) throw new ProtocolError('pvp_dead', 'You cannot attack while defeated.');
-    const ranged = RANGED_WEAPONS.has(session.weapon);
+    const ranged = isRangedWeapon(session.weapon);
     const range = ranged ? 13 : 4.5;
     if (target.pvpInvulnUntil > now()) throw new ProtocolError('pvp_evade', 'Your opponent evaded the strike.');
     if (session.zone !== target.zone || Math.hypot(session.x - target.x, session.z - target.z) > range || Math.abs(session.y - target.y) > 3) {
@@ -187,16 +299,13 @@ export function createPvpRuntime(world, opts = {}) {
     const remaining = match.teams.map(team => team.some(id => { const p = live(world, id); return p && !p.pvpDead; }));
     if (!remaining[0] || !remaining[1]) {
       const winner = remaining[0] ? 0 : 1;
-      match.winner = winner;
-      match.reason = 'complete';
-      for (const id of match.players) { const p = live(world, id); if (p) send(p, 'pvp_result', { match_id: match.id, winner, winning_team: match.teams[winner] }); }
-      setTimeout(() => restore(match, winner), 8000).unref?.();
+      finish(match, winner, 'complete');
     }
     return frame;
   }
   function roll(session) {
     const match = matches.get(session.pvpMatchId);
-    if (!match || match.finished || session.pvpDead) throw new ProtocolError('pvp_state', 'You are not able to evade right now.');
+    if (!match || match.finished || match.winner !== undefined || session.pvpDead) throw new ProtocolError('pvp_state', 'You are not able to evade right now.');
     const t = now();
     if (t - (session.pvpRollAt || 0) < 1200) throw new ProtocolError('pvp_roll_cooldown', 'Your evade is not ready yet.');
     session.pvpRollAt = t;
@@ -210,7 +319,7 @@ export function createPvpRuntime(world, opts = {}) {
     if (!match) return cancel(session);
     if (match.winner !== undefined) { restore(match, match.winner); return true; }
     const winner = match.teams[0].includes(session.id) ? 1 : 0;
-    for (const id of match.players) { const p = live(world, id); if (p) send(p, 'pvp_result', { match_id: match.id, winner, reason: 'forfeit' }); }
+    finish(match, winner, 'forfeit');
     restore(match, winner);
     return true;
   }
@@ -219,8 +328,13 @@ export function createPvpRuntime(world, opts = {}) {
     const match = matches.get(session.pvpMatchId);
     if (match) {
       const winner = match.winner !== undefined ? match.winner : (match.teams[0].includes(session.id) ? 1 : 0);
+      if (match.winner === undefined) finish(match, winner, 'disconnect');
       restore(match, winner);
     }
   }
-  return { enqueue, cancel, attack, roll, leave, disconnect, tick: matchQueues, queues, matches };
+  function tick() {
+    for (const proposal of proposals.values()) if (proposal.expiresAt <= now()) releaseProposal(proposal);
+    matchQueues();
+  }
+  return { enqueue, confirm, cancel, attack, roll, leave, disconnect, tick, queues, matches, proposals };
 }

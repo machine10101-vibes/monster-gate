@@ -126,6 +126,7 @@ export class MmoClient {
     this.pvpTeam = null;
     this.pvpMode = null;
     this.pvpQueueMode = null;
+    this.pvpProposalId = null;
     this.pvpResult = null;
     this.party = null;
     this.pvpBoard = null;
@@ -137,7 +138,7 @@ export class MmoClient {
     const root = document.createElement('section');
     root.id = 'gilantre-pvp-board';
     Object.assign(root.style, { position: 'fixed', zIndex: '10030', right: '14px', top: '84px', width: 'min(340px, calc(100vw - 28px))', color: '#f7e9c8', font: '14px system-ui', display: 'none' });
-    root.innerHTML = '<button type="button" data-open style="position:absolute;right:0;top:-42px;padding:10px 14px;border:1px solid #c59b52;border-radius:8px;background:#28202d;color:#f7e9c8;font-weight:800;cursor:pointer">Colosseum Board</button><div data-panel style="display:none;padding:16px;border:1px solid #b58a4c;border-radius:12px;background:linear-gradient(145deg,#241c2c,#101018);box-shadow:0 12px 36px #000b"><h2 style="margin:0 0 6px;font:700 20px Georgia;color:#f4d58a">GILANTRE COLOSSEUM</h2><p style="margin:0 0 12px;color:#d6c6a7">Form a team, choose a bracket, and enter the arena.</p><div data-team style="font-size:12px;color:#d4c5a7;margin-bottom:8px">No team selected. 1v1 is solo; 2v2 and 3v3 need a full party.</div><div style="display:flex;gap:6px;margin-bottom:12px"><input data-name maxlength="16" placeholder="Hunter name to invite" style="min-width:0;flex:1;padding:9px;border-radius:6px;border:1px solid #66533c;background:#14111b;color:#fff"><button type="button" data-invite style="padding:9px;border-radius:6px;border:1px solid #c59b52;background:#604526;color:#fff">Invite</button></div><button type="button" data-party-leave style="margin-bottom:10px">Leave team</button><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px"><button data-queue="1v1">Solo 1v1</button><button data-queue="2v2">Team 2v2</button><button data-queue="3v3">Team 3v3</button></div><p data-status aria-live="polite" style="min-height:36px;margin:10px 0;color:#f4d58a">Sign in and connect to World 1 to queue.</p><div style="display:flex;gap:7px"><button data-cancel>Cancel queue</button><button data-attack>Attack nearest</button><button data-leave>Leave match</button></div><div data-invite-prompt style="display:none;margin-top:10px;padding:10px;border:1px solid #8f7147;border-radius:8px;background:#15111a"><span data-invite-text></span><div style="display:flex;gap:8px;margin-top:8px"><button data-accept>Accept team invite</button><button data-decline>Decline</button></div></div><style>#gilantre-pvp-board button{cursor:pointer;color:#fff;background:#403348;border:1px solid #88704d;border-radius:7px;padding:9px 7px;font-weight:700}#gilantre-pvp-board button:disabled{opacity:.4;cursor:not-allowed}#gilantre-pvp-board [data-panel] button[data-queue]{font-size:12px}#gilantre-pvp-board [data-panel]>div:last-of-type button{flex:1;font-size:12px}</style></div>';
+    root.innerHTML = '<button type="button" data-open style="position:absolute;right:0;top:-42px;padding:10px 14px;border:1px solid #c59b52;border-radius:8px;background:#28202d;color:#f7e9c8;font-weight:800;cursor:pointer">Colosseum Board</button><div data-panel style="display:none;padding:16px;border:1px solid #b58a4c;border-radius:12px;background:linear-gradient(145deg,#241c2c,#101018);box-shadow:0 12px 36px #000b"><h2 style="margin:0 0 6px;font:700 20px Georgia;color:#f4d58a">GILANTRE COLOSSEUM</h2><p style="margin:0 0 12px;color:#d6c6a7">Form a team, choose a bracket, and enter the arena.</p><div data-team style="font-size:12px;color:#d4c5a7;margin-bottom:8px">No team selected. 1v1 is solo; 2v2 and 3v3 need a full party.</div><div data-rating style="font-size:12px;color:#f4d58a;margin-bottom:10px">Rating 1000 · 0W / 0L</div><div style="display:flex;gap:6px;margin-bottom:12px"><input data-name maxlength="16" placeholder="Hunter name to invite" style="min-width:0;flex:1;padding:9px;border-radius:6px;border:1px solid #66533c;background:#14111b;color:#fff"><button type="button" data-invite style="padding:9px;border-radius:6px;border:1px solid #c59b52;background:#604526;color:#fff">Invite</button></div><button type="button" data-party-leave style="margin-bottom:10px">Leave team</button><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px"><button data-queue="1v1">Solo 1v1</button><button data-queue="2v2">Team 2v2</button><button data-queue="3v3">Team 3v3</button></div><p data-status aria-live="polite" style="min-height:36px;margin:10px 0;color:#f4d58a">Sign in and connect to World 1 to queue.</p><div style="display:flex;gap:7px"><button data-cancel>Cancel queue</button><button data-attack>Attack nearest</button><button data-leave>Leave match</button></div><div data-invite-prompt style="display:none;margin-top:10px;padding:10px;border:1px solid #8f7147;border-radius:8px;background:#15111a"><span data-invite-text></span><div style="display:flex;gap:8px;margin-top:8px"><button data-accept>Accept team invite</button><button data-decline>Decline</button></div></div><div data-match-prompt style="display:none;margin-top:10px;padding:10px;border:1px solid #d7ad5d;border-radius:8px;background:#211a27"><span data-match-text>Match found. Confirm to enter the arena.</span><div style="display:flex;gap:8px;margin-top:8px"><button data-match-accept>Accept match</button><button data-match-decline>Decline</button></div></div><style>#gilantre-pvp-board button{cursor:pointer;color:#fff;background:#403348;border:1px solid #88704d;border-radius:7px;padding:9px 7px;font-weight:700}#gilantre-pvp-board button:disabled{opacity:.4;cursor:not-allowed}#gilantre-pvp-board [data-panel] button[data-queue]{font-size:12px}#gilantre-pvp-board [data-panel]>div:last-of-type button{flex:1;font-size:12px}</style></div>';
     (document.getElementById('app') || document.body).append(root);
     const q = (sel) => root.querySelector(sel);
     q('[data-open]').addEventListener('click', () => { const panel=q('[data-panel]'); panel.style.display=panel.style.display==='none'?'block':'none'; });
@@ -147,6 +148,8 @@ export class MmoClient {
     q('[data-cancel]').addEventListener('click',()=>this.sendPvp('pvp_cancel'));
     q('[data-attack]').addEventListener('click',()=>this.pvpAttackNearest());
     q('[data-leave]').addEventListener('click',()=>this.sendPvp('pvp_leave'));
+    q('[data-match-accept]').addEventListener('click',()=>this.confirmPvp(true));
+    q('[data-match-decline]').addEventListener('click',()=>this.confirmPvp(false));
     q('[data-accept]').addEventListener('click',()=>{if(this.pendingPartyInvite)this.partyAccept(this.pendingPartyInvite.invite_id);q('[data-invite-prompt]').style.display='none';});
     q('[data-decline]').addEventListener('click',()=>{if(this.pendingPartyInvite)this.partyDecline(this.pendingPartyInvite.invite_id);q('[data-invite-prompt]').style.display='none';});
     this.pvpBoard = { root, q };
@@ -160,16 +163,18 @@ export class MmoClient {
     const members=this.party?.members||[];
     const names=members.map(m=>m.name||'Hunter').join(', ');
     q('[data-team]').textContent = this.party ? `Team ${members.length}/3: ${names}${this.party.leader===this.you?.id?' (leader)':''}` : 'No team selected. 1v1 is solo; 2v2 and 3v3 need a full party.';
-    q('[data-status]').textContent = message || (this.pvpMatchId ? `In ${this.pvpMode} match. Fight!` : this.pvpQueueMode ? `Queued for ${this.pvpQueueMode}. Waiting for rivals…` : this.pvpResult || 'Choose a bracket to queue.');
+    q('[data-status]').textContent = message || (this.pvpMatchId ? `In ${this.pvpMode} match. Fight!` : this.pvpProposalId ? 'Match found — confirm to enter.' : this.pvpQueueMode ? `Queued for ${this.pvpQueueMode}. Waiting for rivals…` : this.pvpResult || 'Choose a bracket to queue.');
+    q('[data-rating]').textContent = `Rating ${this.you?.pvp_rating ?? 1000} · ${this.you?.pvp_wins ?? 0}W / ${this.you?.pvp_losses ?? 0}L`;
+    q('[data-match-prompt]').style.display = this.pvpProposalId ? 'block' : 'none';
     for(const btn of root.querySelectorAll('[data-queue]')){
       const mode=btn.dataset.queue, need=Number(mode[0]);
-      btn.disabled=!!this.pvpMatchId||!!this.pvpQueueMode||(need===1?!!this.party:members.length!==need||this.party?.leader!==this.you?.id);
+      btn.disabled=!!this.pvpMatchId||!!this.pvpQueueMode||!!this.pvpProposalId||(need===1?!!this.party:members.length!==need||this.party?.leader!==this.you?.id);
     }
     q('[data-party-leave]').disabled=!this.party||!!this.pvpMatchId||!!this.pvpQueueMode;
-    q('[data-cancel]').disabled=!this.pvpQueueMode;
+    q('[data-cancel]').disabled=!(this.pvpQueueMode||this.pvpProposalId);
     q('[data-attack]').disabled=!this.pvpMatchId;
     q('[data-leave]').disabled=!this.pvpMatchId;
-    q('[data-leave]').textContent=this.pvpResult?'Return to world':'Leave match';
+    q('[data-leave]').textContent=this.pvpResult?'Exit Coliseum':'Leave match';
   }
 
   sendPvp(type, extra={}) {
@@ -179,12 +184,17 @@ export class MmoClient {
 
   queuePvp(mode) { if(this.sendPvp('pvp_queue',{mode})){this.pvpQueueMode=mode;this.updatePvpBoard(`Joining ${mode} queue…`);} }
 
-  pvpAttackNearest() {
+  confirmPvp(accept) {
+    if (!this.pvpProposalId) return false;
+    return this.sendPvp('pvp_confirm', { proposal_id: this.pvpProposalId, accept: !!accept });
+  }
+
+  pvpAttackNearest(maxRange = 4.5) {
     if(!this.pvpMatchId||!this.game?.player)return false;
     const p=this.game.player.pos;
     const target=[...this.nearby.values()].filter(row=>row.zone===`colosseum:${this.pvpMatchId}`&&row.pvp_team!==this.pvpTeam&&!row.pvp_dead)
       .map(row=>({...row,distance:Math.hypot(row.x-p.x,row.z-p.z)})).sort((a,b)=>a.distance-b.distance)[0];
-    if(!target||target.distance>4.5){this.updatePvpBoard('Move within striking distance of an opponent.');return false;}
+    if(!target||target.distance>maxRange){this.updatePvpBoard('Move within striking distance of an opponent.');return false;}
     return this.sendPvp('pvp_attack',{target_id:target.id});
   }
 
@@ -417,12 +427,24 @@ export class MmoClient {
     if (!msg) return;
     if (msg.type === 'pvp_queue') {
       if (msg.status === 'queued') this.pvpQueueMode = msg.mode;
-      else if (msg.status === 'cancelled' || msg.status === 'matched') this.pvpQueueMode = null;
-      this.updatePvpBoard(msg.status === 'queued' ? `Queued for ${msg.mode}. Waiting for rivals…` : 'Queue cancelled.');
+      else if (msg.status === 'cancelled' || msg.status === 'matched') { this.pvpQueueMode = null; this.pvpProposalId = null; }
+      this.updatePvpBoard(msg.status === 'queued' ? `Queued for ${msg.mode}. Waiting for rivals…` : (msg.message || 'Queue cancelled.'));
+      return;
+    }
+    if (msg.type === 'pvp_match_found') {
+      this.pvpProposalId = msg.proposal_id;
+      this.pvpQueueMode = msg.mode;
+      this.pvpBoard?.q('[data-match-text]') && (this.pvpBoard.q('[data-match-text]').textContent = `${msg.mode} match found. Accept before the offer expires.`);
+      this.updatePvpBoard('Match found — confirm to enter the arena.');
+      return;
+    }
+    if (msg.type === 'pvp_match_confirmation') {
+      if (this.pvpProposalId === msg.proposal_id) this.pvpBoard?.q('[data-match-text]') && (this.pvpBoard.q('[data-match-text]').textContent = `Confirmed ${msg.accepted}/${msg.required}. Waiting for the other fighters…`);
       return;
     }
     if (msg.type === 'pvp_match_start') {
       this.pvpQueueMode = null;
+      this.pvpProposalId = null;
       this.pvpMatchId = msg.match_id;
       this.pvpTeam = msg.team;
       this.pvpMode = msg.mode;
@@ -454,6 +476,7 @@ export class MmoClient {
       this.pvpTeam = null;
       this.pvpMode = null;
       this.pvpQueueMode = null;
+      if (this.you) { this.you.pvp_rating = msg.rating ?? this.you.pvp_rating; this.you.pvp_wins = msg.wins ?? this.you.pvp_wins; this.you.pvp_losses = msg.losses ?? this.you.pvp_losses; }
       this.updatePvpBoard(msg.won?'Victory — returned to your previous location.':'Match complete — returned to your previous location.');
       return;
     }

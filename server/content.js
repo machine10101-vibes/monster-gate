@@ -126,6 +126,7 @@ export function persistStateFromSession(session) {
     look: session.look,
     armor: session.armor && typeof session.armor === 'object' ? session.armor : {},
     weapon: session.weapon ?? null,
+    pvp: { rating: session.pvpRating ?? 1000, wins: session.pvpWins ?? 0, losses: session.pvpLosses ?? 0 },
     hunter: {
       x: session.x,
       y: session.y,
