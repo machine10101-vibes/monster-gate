@@ -43,7 +43,7 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
       });
       if (error) throw wrap(error, { table: 'world_reward_claims', userId: reward.userId });
       const row = Array.isArray(data) ? data[0] : data;
-      return { granted: !!row?.granted };
+      return { granted: !!row?.granted, version: Number(row?.version) || undefined };
     },
 
     async load(userId) {
