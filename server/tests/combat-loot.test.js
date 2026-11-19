@@ -23,7 +23,9 @@ function fixture(mode = 'round_robin') {
 
 test('server attack owns damage, kill, XP, gold, respawn and rejects forged range', async () => {
   const f = fixture();
-  await assert.rejects(() => f.engine.attack({ ...f.a, x: 100 }, 'm1'), /out of range/);
+  f.a.x = 100;
+  await assert.rejects(() => f.engine.attack(f.a, 'm1'), /out of range/);
+  f.a.x = 0;
   const hit = await f.engine.attack(f.a, 'm1');
   assert.deepEqual(hit, { monster_id: 'm1', damage: 20, hp: 0, killed: true });
   assert.equal(f.monster.dead, true);
@@ -74,4 +76,21 @@ test('expired rolls auto-pass missing members and resolve', async () => {
   await f.engine.tick();
   assert.equal(f.grants.filter((g) => g.kind === 'good').length, 1);
   assert.equal(f.engine.pendingRolls(), 0);
+});
+
+test('equal Need rolls break ties by original party join order', async () => {
+  const f = fixture('need_greed');
+  await f.engine.attack(f.a, 'm1');
+  const roll = f.messages.find((m) => m.type === 'loot_roll');
+  await f.engine.choose(f.b, roll.roll_id, 'need');
+  await f.engine.choose(f.a, roll.roll_id, 'need');
+  assert.equal(f.grants.find((g) => g.kind === 'good').userId, 'ua');
+});
+
+test('forged session objects cannot attack or submit loot choices', async () => {
+  const f = fixture('need_greed');
+  await assert.rejects(() => f.engine.attack({ ...f.a }, 'm1'), /Authenticated hunter/);
+  await f.engine.attack(f.a, 'm1');
+  const roll = f.messages.find((m) => m.type === 'loot_roll');
+  await assert.rejects(() => f.engine.choose({ ...f.b }, roll.roll_id, 'need'), /Authenticated hunter/);
 });
