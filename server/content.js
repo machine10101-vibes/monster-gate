@@ -102,7 +102,7 @@ export function spawnPoseFromRow(row, hello = {}) {
   const y = Number.isFinite(hunter.y) ? hunter.y : Number.isFinite(row?.y) ? row.y : 3.2;
   const z = Number.isFinite(hunter.z) ? hunter.z : Number.isFinite(row?.z) ? row.z : 72.5;
   const yaw = Number.isFinite(hunter.yaw) ? hunter.yaw : 0;
-  const realm = hunter.realm === 'cave' ? 'cave' : 'over';
+  const realm = hunter.realm === 'cave' ? 'cave' : hunter.realm === 'rift' ? 'rift' : 'over';
   return {
     name: hello.name || row?.name || state.name || 'Hunter',
     x,
