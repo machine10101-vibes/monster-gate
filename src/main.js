@@ -3267,7 +3267,10 @@ class Game {
     this.net.update(dt);
     for (const r of this.remotes.values()) r.update(dt);
     if (!this.campParked) {
-      for (const m of this.monsters) m.update(dt);
+      for (const m of this.monsters) {
+        m.update(dt);
+        if (m.serverAuthoritative) this.mmo?.updateMonster?.(m);
+      }
       if (this.monsters.some((m) => m.remove)) {
         for (const m of this.monsters) if (m.remove) m.dispose();
         this.monsters = this.monsters.filter((m) => !m.remove);
