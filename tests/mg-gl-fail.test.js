@@ -228,6 +228,7 @@ test('Retry success waits out the 600ms minimum then continues boot', (t) => {
   let boots = 0;
   showGlFailPanel(doc, {
     probe: () => ({ ok: true }),
+    now: () => 0,
     onSuccess: () => { boots += 1; },
   });
   doc.btn.onclick({ preventDefault() {} });
