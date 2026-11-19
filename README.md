@@ -96,3 +96,15 @@ Both dragons can be forged into the full weapon list and three armor sets. Every
 - `MeshToonMaterial` with a stepped ramp gives the cartoon look; geometry between the camera and the hero dithers away.
 - Quality tiers (Low / Medium / High) pick shadow size, particle counts, pixel ratio and foliage density, with dynamic resolution scaling to hold frame rate.
 - Portrait phones see a "rotate your device" prompt; the HUD and touch controls are laid out for landscape.
+
+
+## Gilantre Colosseum PvP
+
+World 1 supports authenticated Colosseum matchmaking:
+
+- **Solo 1v1** queues individual hunters.
+- **Team 2v2 and 3v3** require a full party; the party leader queues the team from the Colosseum board.
+- Matches run in isolated `colosseum:<match-id>` zones. The server validates opponent, range, cooldowns, damage, evades, knockouts, forfeits, and disconnects.
+- Fighters return to their saved overworld or cave position when the match ends. Consumables and local-only skills are disabled during a match; melee and equipped ranged weapons use server-authoritative attacks.
+
+Choose **World 1 Online** in the game to connect, then open the **Colosseum Board** to invite teammates or queue.
