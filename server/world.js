@@ -16,7 +16,7 @@ import { PersistErrorCodes } from './persistence/index.js';
 import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
 import { createCombatLoot } from './combat-loot.js';
-import { DROPS, MATERIALS } from '../src/data/catalog.js';
+import { DROPS, GEAR_DROPS, MATERIALS } from '../src/data/catalog.js';
 import { GOODS } from '../src/data/gathering.js';
 
 function send(ws, type, extra) {
@@ -85,7 +85,8 @@ export class World {
         const amount = min + Math.floor(Math.random() * (max - min + 1));
         const kind = MATERIALS[drop.id] ? 'material' : GOODS[drop.id] ? 'good' : null;
         return kind ? [{ kind, id: drop.id, amount }] : [];
-      }),
+      }).concat((GEAR_DROPS[monster.type] || []).flatMap((drop) =>
+        Math.random() < drop.chance ? [{ kind: 'gear', id: drop.id, amount: 1 }] : [])),
       broadcast: (frame, audience) => {
         const targets = Array.isArray(audience) ? audience : [...this.players.values()];
         for (const player of targets) {
