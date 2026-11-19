@@ -1692,8 +1692,9 @@ class Game {
     this.projectiles = this.projectiles.filter((p) => !p.dead);
   }
 
-  onMonsterKilled(m) {
+  onMonsterKilled(m, { serverAuthoritative = false } = {}) {
     this.kills++;
+    if (!serverAuthoritative) {
     if (m.type === 'orcscout') {
       if (Math.random() < 0.72) {
         const n = m.def.gold[0] + Math.floor(Math.random() * (m.def.gold[1] - m.def.gold[0] + 1));
@@ -1729,6 +1730,7 @@ class Game {
     }
     if (fresh) this.hud.banner('Catalog updated', m.name, 3000);
     if (m.debugTank) grantDebugTankLoot(this, m);
+    }
     this.applyJournal(this.journal.onKill(m.type));
     if (this.bounties?.onKill(m.type) && this.hud.panelId === 'quest' && this.hud.journalRefresh) this.hud.journalRefresh();
     if (m.type === 'chicken') return;
