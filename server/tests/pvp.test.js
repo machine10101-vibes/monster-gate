@@ -49,6 +49,16 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     assert.equal(pb.hp, before - hit.damage);
     await waitUntil(() => aFrames.some(m => m.type === 'pvp_hit'));
     assert.ok(aFrames.some(m => m.type === 'pvp_hit'));
+    srv.world.pvp.roll(pb);
+    assert.throws(() => srv.world.pvp.attack(pa, pb.id), (err) => err.code === 'pvp_evade');
+    pb.pvpInvulnUntil = 0;
+    pa.weapon = 'budgebow';
+    pa.x = 1724.5; pb.x = 1714.5; pa.z = pb.z = 819.5;
+    srv.world.pvp.matches.get(pa.pvpMatchId).lastHit.delete(pa.id);
+    const rangedBefore = pb.hp;
+    const rangedHit = srv.world.pvp.attack(pa, pb.id);
+    assert.ok(rangedHit.damage > 0);
+    assert.equal(pb.hp, rangedBefore - rangedHit.damage);
     const returnPose = { ...pa.pvpReturnPose };
     srv.world.pvp.leave(pa);
     assert.equal(pa.pvpMatchId, null);
