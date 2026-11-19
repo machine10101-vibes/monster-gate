@@ -218,6 +218,7 @@ export class World {
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));
       else if (msg.type === 'pvp_queue') this.pvp.enqueue(session, String(msg.mode || '1v1'));
+      else if (msg.type === 'pvp_confirm') this.pvp.confirm(session, msg.proposal_id, msg.accept === true);
       else if (msg.type === 'pvp_cancel') this.pvp.cancel(session);
       else if (msg.type === 'pvp_attack') this.pvp.attack(session, msg.target_id);
       else if (msg.type === 'pvp_roll') this.pvp.roll(session);
