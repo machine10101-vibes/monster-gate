@@ -2570,6 +2570,27 @@ class Game {
     this.audio.select();
   }
 
+  syncServerRewardState(snapshot) {
+    if (!snapshot || !this.progress) return;
+    const mergeCounts = (local, server) => {
+      const next = { ...(local || {}) };
+      for (const [id, raw] of Object.entries(server || {})) {
+        const value = Math.max(0, Math.floor(Number(raw) || 0));
+        if (value > (Number(next[id]) || 0)) next[id] = value;
+      }
+      return next;
+    };
+    this.progress.data.gold = Math.max(this.progress.gold, Math.floor(Number(snapshot.gold) || 0));
+    this.progress.data.xp = mergeCounts(this.progress.data.xp, snapshot.xp);
+    this.progress.data.goods = mergeCounts(this.progress.data.goods, snapshot.goods);
+    this.progress.data.materials = mergeCounts(this.progress.data.materials, snapshot.materials);
+    this.progress.save(false);
+    this.gold = this.progress.gold;
+    this.hud?.setGold?.(this.gold);
+    this.itemsChanged?.();
+    this.refreshHud?.();
+  }
+
   applyServerReward(reward) {
     if (!reward || !this.progress || !(Number(reward.amount) > 0)) return;
     const amount = Math.floor(Number(reward.amount));
