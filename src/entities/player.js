@@ -727,7 +727,7 @@ export class Player {
         const crit = Math.random() < 0.12 + (mods.crit || 0);
         const dmgOut = Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee);
         g.strikeMonster(m, dmgOut, dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
-        g.gather.train('strength', 2 + dmgOut * 0.8);
+        if (!m.serverAuthoritative) g.gather.train('strength', 2 + dmgOut * 0.8);
         if (mods.poison && !m.dead) m.afflict('poison', 4 + (mods.poisonTime || 0), 4 + (mods.poisonBonus || 0));
         hits++;
       }
