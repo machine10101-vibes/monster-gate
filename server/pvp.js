@@ -70,7 +70,7 @@ export function createPvpRuntime(world, opts = {}) {
     }
   };
   const finish = (match, winner, reason = 'complete') => {
-    if (match.finished) return;
+    if (match.finished || match.winner !== undefined) return;
     match.winner = winner;
     match.reason = reason;
     applyRating(match, winner);
@@ -265,7 +265,7 @@ export function createPvpRuntime(world, opts = {}) {
   function attack(session, targetId) {
     const match = matches.get(session.pvpMatchId);
     const target = live(world, String(targetId || ''));
-    if (!match || match.finished || !target || target.pvpMatchId !== match.id || target.pvpTeam === session.pvpTeam) {
+    if (!match || match.finished || match.winner !== undefined || !target || target.pvpMatchId !== match.id || target.pvpTeam === session.pvpTeam) {
       throw new ProtocolError('pvp_target', 'That opponent is not in your match.');
     }
     if (session.pvpDead || target.pvpDead) throw new ProtocolError('pvp_dead', 'You cannot attack while defeated.');
@@ -300,7 +300,7 @@ export function createPvpRuntime(world, opts = {}) {
   }
   function roll(session) {
     const match = matches.get(session.pvpMatchId);
-    if (!match || match.finished || session.pvpDead) throw new ProtocolError('pvp_state', 'You are not able to evade right now.');
+    if (!match || match.finished || match.winner !== undefined || session.pvpDead) throw new ProtocolError('pvp_state', 'You are not able to evade right now.');
     const t = now();
     if (t - (session.pvpRollAt || 0) < 1200) throw new ProtocolError('pvp_roll_cooldown', 'Your evade is not ready yet.');
     session.pvpRollAt = t;
