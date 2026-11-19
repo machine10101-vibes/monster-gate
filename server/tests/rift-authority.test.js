@@ -41,7 +41,9 @@ function makeWorld({ x = 80, z = 98 } = {}) {
 
 test('Rift entry is server-validated and all waves are server-owned', async () => {
   const f = makeWorld();
-  await assert.rejects(() => f.world.enterRift({ ...f.session, x: 500 }), /Stand beside/);
+  f.session.x = 500;
+  await assert.rejects(() => f.world.enterRift(f.session), /Stand beside/);
+  f.session.x = 80;
   await f.world.enterRift(f.session);
   const run = [...f.world.riftRuns.values()][0];
   assert.equal(run.wave, 1);
