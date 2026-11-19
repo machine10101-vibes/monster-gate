@@ -71,7 +71,7 @@ export class World {
     this.combatLoot = opts.combatLoot || createCombatLoot({
       monsters: this.monsters,
       players: this.players,
-      parties: { partyOf: (id) => this.social?.parties?.partyOf(id) || null },
+      parties: { partyOf: (id) => this.social?.parties?.partyOf(id) || null, get: (id) => this.social?.parties?.parties?.get(id) || null },
       persist: this.persist,
       now: this.now,
       damageFor: (player) => Math.max(4, Math.min(18, 6 + (player.weapon ? 4 : 0))),
