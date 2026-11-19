@@ -40,6 +40,8 @@ test('server attack owns damage, kill, XP, gold, respawn and rejects forged rang
   assert.equal(f.monster.dead, true);
   assert.equal(f.grants.filter((g) => g.kind === 'xp').length, 2);
   assert.equal(f.grants.filter((g) => g.kind === 'gold').length, 2);
+  assert.equal(f.messages.filter((m) => m.type === 'reward_update' && m.kind === 'xp').length, 2);
+  assert.equal(f.messages.filter((m) => m.type === 'reward_update' && m.kind === 'gold').length, 2);
   await assert.rejects(() => f.engine.attack(f.a, 'm1'), /not alive/);
   f.advance(10_001);
   await f.engine.tick();
