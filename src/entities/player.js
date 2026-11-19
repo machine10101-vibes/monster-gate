@@ -421,6 +421,18 @@ export class Player {
       return true;
     }
     if (item.kind === 'light' || item.kind === 'none') return false;
+    if (this.game.mmo?.pvpMatchId && item.kind === 'melee') {
+      if (this.stamina < 3 || !this.game.mmo.pvpAttackNearest()) return false;
+      this.drawWeapon();
+      this.attackItem = item;
+      this.combo = this.comboT > 0 ? (this.combo + 1) % 3 : 0;
+      this.attackHit = true;
+      this.spend(item.stam);
+      this.stamDelay = 0.7;
+      this.setState('attack', 0.34);
+      this.game.audio.swing();
+      return true;
+    }
     if (item.kind === 'ranged' && !item.proj && !item.spell) {
       if (!this.game.progress.hasArrow()) {
         this.game.hud.toast(this.game.progress.data.armor.quiver ? 'The quiver is empty' : 'Equip a quiver of arrows', 1400);
