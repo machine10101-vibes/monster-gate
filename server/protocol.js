@@ -361,6 +361,11 @@ export function parseZoneCap(env = process.env, override) {
 
 export function inAoi(observer, other, radius = AOI_RADIUS) {
   if (!observer || !other) return false;
+  const arenaA = String(observer.zone || '').startsWith('colosseum:');
+  const arenaB = String(other.zone || '').startsWith('colosseum:');
+  if (arenaA || arenaB) {
+    if (!arenaA || !arenaB || observer.zone !== other.zone) return false;
+  }
   const caveA = observer.zone === 'cave';
   const caveB = other.zone === 'cave';
   if (caveA !== caveB) return false;

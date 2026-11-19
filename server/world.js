@@ -16,6 +16,7 @@ import { PersistErrorCodes } from './persistence/index.js';
 import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
 import { createCombatLoot } from './combat-loot.js';
+import { createPvpRuntime } from './pvp.js';
 import { DROPS, GEAR_DROPS, MATERIALS } from '../src/data/catalog.js';
 import { GOODS } from '../src/data/gathering.js';
 import { riftChestGold, riftChestGoods, riftScale, riftWaveSpawns, RIFT_COOLDOWN_MS, RIFT_WAVES } from '../src/data/rift.js';
@@ -105,6 +106,7 @@ export class World {
       partyMax: opts.partyMax,
       inviteTtl: opts.inviteTtl,
     });
+    this.pvp = opts.pvp || createPvpRuntime(this);
   }
 
   async idle() {
@@ -215,6 +217,10 @@ export class World {
       else if (msg.type === 'monster_move') this.moveMonster(session, msg);
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'pvp_queue') this.pvp.enqueue(session, String(msg.mode || '1v1'));
+      else if (msg.type === 'pvp_cancel') this.pvp.cancel(session);
+      else if (msg.type === 'pvp_attack') this.pvp.attack(session, msg.target_id);
+      else if (msg.type === 'pvp_leave') this.pvp.leave(session);
       else if (msg.type === 'rift_chest_claim') this.claimRiftChest(session).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_leave') this.leaveRift(session);
       else if (msg.type === TYPES.leave) this.drop(session, true);
@@ -397,6 +403,7 @@ export class World {
     if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
     }
+    if (session.pvpMatchId) session.zone = `colosseum:${session.pvpMatchId}`;
     if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
       this.rejectZoneFull(session, session.zone);
       session.x = prevX;
@@ -731,6 +738,7 @@ export class World {
       this.players.delete(session.id);
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
       this.dirty.delete(session.id);
+      this.pvp.disconnect(session);
       this.social.onLeave(session);
       for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
       if (session.riftRunId && session.riftReturnPose) {
@@ -787,6 +795,7 @@ export class World {
     }
 
     this.social.parties.expire();
+    this.pvp.tick();
     this.combatLoot.tick().catch((err) => console.warn('combatLoot.tick', err?.message || err));
     this.tickRiftRuns(t);
 
