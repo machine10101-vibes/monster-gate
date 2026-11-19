@@ -15,6 +15,7 @@ import {
 import { PersistErrorCodes } from './persistence/index.js';
 import { createSocialRuntime } from './social.js';
 import { openPersistence } from './store.js';
+import { createCombatLoot } from './combat-loot.js';
 
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
@@ -67,6 +68,23 @@ export class World {
     this.byNode = new Map(this.nodes.map((n) => [n.id, n]));
     this.pendingSaves = [];
     this._send = send;
+    this.combatLoot = opts.combatLoot || createCombatLoot({
+      monsters: this.monsters,
+      players: this.players,
+      parties: { partyOf: (id) => this.social?.parties?.partyOf(id) || null },
+      persist: this.persist,
+      now: this.now,
+      damageFor: (player) => Math.max(4, Math.min(18, 6 + (player.weapon ? 4 : 0))),
+      xpFor: (monster) => Math.max(5, monster.level * 18),
+      goldFor: (monster) => Math.max(2, monster.level * 5),
+      dropsFor: (monster) => [{ kind: 'good', id: 'copper_ore', amount: monster.level >= 10 ? 3 : 1 }],
+      broadcast: (frame) => {
+        for (const player of this.players.values()) {
+          if (frame.id && frame.type === 'monster_state' && !inAoi(player, this.monsters.find((m) => m.id === frame.id), this.aoi)) continue;
+          this._send(player.ws, frame.type, frame);
+        }
+      },
+    });
     this.social = opts.social || createSocialRuntime(this, {
       friends: opts.friends,
       friendsCap: opts.friendsCap,
@@ -178,6 +196,8 @@ export class World {
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
+      else if (msg.type === 'attack') void this.combatAction(session, msg);
+      else if (msg.type === 'loot_roll_choice') void this.lootChoice(session, msg);
       else if (msg.type === TYPES.leave) this.drop(session, true);
       else if (msg.type === TYPES.ping) send(session.ws, TYPES.pong, { t: msg.t ?? this.now() });
     } catch (err) {
@@ -365,6 +385,19 @@ export class World {
     this.persistPose(session);
   }
 
+  async combatAction(session, msg) {
+    if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to fight online.');
+    if (!session.limiter.allowMove()) throw new ProtocolError('rate', 'Slow down.');
+    const result = await this.combatLoot.attack(session, msg.monster_id);
+    send(session.ws, 'combat_result', { request_id: String(msg.request_id || ''), ...result });
+  }
+
+  async lootChoice(session, msg) {
+    if (!session.userId || session.guest) throw new ProtocolError('auth', 'Sign in to roll for loot.');
+    const result = await this.combatLoot.choose(session, msg.roll_id, msg.choice);
+    send(session.ws, 'loot_choice_result', { request_id: String(msg.request_id || ''), ...result });
+  }
+
   partyChat(session,msg) {
     if (!session.limiter.allowChat()) { send(session.ws,errorFrame('rate','Slow down.')); return; }
     const { text } = readChat(msg);
@@ -500,6 +533,7 @@ export class World {
     }
 
     this.social.parties.expire();
+    void this.combatLoot.tick();
 
     this.tickCount += 1;
     const farTick = this.tickCount % this.farEvery === 0;
