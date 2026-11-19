@@ -55,9 +55,7 @@ export function createCombatLoot({
     if (!result?.granted) { claimed.add(rewardId); return false; }
     claimed.add(rewardId);
     const frame = { type: 'loot_awarded', reward_id: rewardId, kind: item.kind, id: item.id, amount: item.amount, winner: winner.id };
-    const live = players.get(winner.id);
-    if (live) live.ws?.readyState === 1 && live.ws.send(JSON.stringify({ v: 1, ...frame }));
-    broadcast(frame, winner);
+    broadcast(frame, [winner]);
     return true;
   }
 
