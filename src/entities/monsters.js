@@ -290,6 +290,10 @@ export class Monster {
     if (!state || !Number.isFinite(Number(state.hp))) return;
     this.serverAuthoritative = true;
     const previousHp = this.hp;
+    if (Number.isFinite(Number(state.x))) this.x = Number(state.x);
+    if (Number.isFinite(Number(state.y))) this.y = Number(state.y);
+    if (Number.isFinite(Number(state.z))) this.z = Number(state.z);
+    if (Number.isFinite(Number(state.yaw))) this.yaw = Number(state.yaw);
     this.hp = Math.max(0, Math.min(this.maxHp, Number(state.hp)));
     if (this.hp < previousHp && this.hp > 0) {
       const dealt = previousHp - this.hp;
@@ -554,11 +558,11 @@ export class Monster {
         this.x = state.x;
         this.y = state.y;
         this.z = state.z;
+        this.yaw = state.yaw ?? this.yaw;
         this.hp = state.hp;
         this.obj.position.set(this.x, this.y, this.z);
-        this.animate(dt, 99);
+        this.obj.rotation.y = this.yaw;
       }
-      return;
     }
     if (this.puppet) {
       this.t += dt;
