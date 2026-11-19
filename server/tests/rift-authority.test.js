@@ -80,4 +80,9 @@ test('Rift chest claims distribute gold and each item once through reward persis
   assert.equal(run.claimed, true);
   await assert.rejects(() => f.world.claimRiftChest(f.session), /not ready/);
   assert.ok(f.frames.some((frame) => frame.type === 'rift_chest_result' && frame.ok));
+  f.session.riftRunId = null;
+  f.session.zone = 'Oakhollow';
+  f.session.x = 80;
+  f.session.z = 98;
+  await assert.rejects(() => f.world.enterRift(f.session), /still recovering/);
 });
