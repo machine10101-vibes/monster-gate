@@ -2589,11 +2589,13 @@ class Game {
       if (owned) this.progress.data.crafted[id] = true;
     }
     this.progress.save(false);
-    this.applyGear();
     this.gold = this.progress.gold;
-    this.hud?.setGold?.(this.gold);
-    this.itemsChanged?.();
-    this.refreshHud?.();
+    if (this.player) {
+      this.applyGear();
+      this.hud?.setGold?.(this.gold);
+      this.itemsChanged?.();
+      this.refreshHud?.();
+    }
   }
 
   applyServerReward(reward) {
