@@ -254,9 +254,13 @@ export function lootRiftChest(game) {
   const r = game.world?.rift;
   const run = game.riftRun;
   if (!r?.chest?.ready || r.chest.looted || !run || run.looted) return { ok: false };
-  if (run?.serverOwned && game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
-    game.mmo.claimRiftChest?.();
-    game.hud.toast('Claiming Rift rewards…', 2200);
+  if (run?.serverOwned) {
+    if (game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
+      game.mmo.claimRiftChest?.();
+      game.hud.toast('Claiming Rift rewards…', 2200);
+    } else {
+      game.hud.toast('Reconnect to claim this server Rift chest.', 2600);
+    }
     return { ok: false, pending: true };
   }
   r.chest.looted = true;
