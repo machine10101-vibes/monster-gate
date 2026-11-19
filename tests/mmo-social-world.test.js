@@ -86,14 +86,14 @@ test('signed-in friends persist in social store and whispers are private', async
   await Promise.all([aFriends, bFriends]);
 
   const whisperAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'whisper-1');
-  a.send(encode('whisper', { to: 'u_id-bea', text: 'Meet at the gate.', request_id: 'whisper-1' }));
+  a.send(encode('whisper', { to: `u_${BEA}`, text: 'Meet at the gate.', request_id: 'whisper-1' }));
   const privateMsg = await waitFor(b, m => m.type === 'chat' && m.channel === 'whisper');
   assert.equal((await whisperAck).ok, true);
   assert.equal(privateMsg.text, 'Meet at the gate.');
   assert.equal(cm.some(m => m.type === 'chat' && m.channel === 'whisper'), false);
 
-  a.send(encode('block', { user_id: 'id-cal' }));
-  await waitFor(a, m => m.type === 'friend_list' && m.blocked?.some(f => f.user_id === 'id-cal'));
+  a.send(encode('block', { user_id: CAL }));
+  await waitFor(a, m => m.type === 'friend_list' && m.blocked?.some(f => f.user_id === CAL));
   c.send(encode('chat', { channel: 'world', text: 'This should be hidden.' }));
   await new Promise(r => setTimeout(r, 60));
   assert.equal(am.some(m => m.type === 'chat' && m.text === 'This should be hidden.'), false);
