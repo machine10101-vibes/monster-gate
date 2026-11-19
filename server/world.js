@@ -431,6 +431,7 @@ export class World {
     const maxStep = (monster.speed || 2.8) * dt + 0.9;
     if (Math.hypot(x - monster.x, z - monster.z) > maxStep) return;
     if (Math.hypot(x - monster.homeX, z - monster.homeZ) > 36) return;
+    if (monster.rift && (x < 1600 || x >= 1636 || z < 800 || z >= 836)) return;
     if (Math.hypot(x - session.x, z - session.z) > (monster.aggro || 12) + 14) {
       if (monster.controllerId === session.id) monster.controllerId = null;
       return;
