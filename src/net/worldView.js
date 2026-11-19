@@ -15,7 +15,7 @@
  * Full contract: docs/worldView-interface.md
  *
  * Flags: ?mmo=1 mounts this module. ?mmo=1&mock=1 also starts a local crowd.
- * ?mmo=1&mockwake=1 simulates a 30s waking queue, then online.
+ * ?mmo=1&mockwake=1 simulates a 60s waking queue, then online.
  * ?mmo=1&mockwake=90 waits 90 seconds (Almost there…, Retry, Play offline).
  * ?mmo=1&mock=1&mockerr=name_taken shows the hunter-name prompt and stays final.
  */
@@ -43,8 +43,8 @@ export const STATUS = {
   error: 'error',
 };
 
-export const WAKE_SECONDS = 30;
-export const WAKE_STUCK_MS = 60000;
+export const WAKE_SECONDS = 60;
+export const WAKE_STUCK_MS = 75000;
 
 const ANIM_NAME = Object.fromEntries(Object.entries(ANIM).map(([k, v]) => [v, k]));
 
@@ -54,7 +54,7 @@ function paramsOf(search) {
   return new URLSearchParams(q);
 }
 
-/** `?mockwake=1` is 30s. `?mockwake=90` is 90 seconds. */
+/** `?mockwake=1` is 60s. `?mockwake=90` is 90 seconds. */
 export function parseWakeSeconds(search = '') {
   const q = typeof search === 'string' ? paramsOf(search) : search;
   const raw = q.get?.('mockwake') ?? q.get('mockwake');
@@ -77,7 +77,7 @@ export function parseMmoFlags(search = '') {
 }
 
 /**
- * Local countdown for the waking overlay. `secondsLeft` defaults to 30.
+ * Local countdown for the waking overlay. `secondsLeft` defaults to 60.
  * If no further setStatus updates arrive, remaining time counts down from
  * the last detail using `markedAt` → `now`.
  */
