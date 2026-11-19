@@ -246,6 +246,8 @@ export function playerView(p, extra = {}) {
     armor: p.armor,
     zone: p.zone,
     hp: p.hp,
+    pvp_team: p.pvpTeam ?? null,
+    pvp_dead: !!p.pvpDead,
     ...extra,
   };
 }
@@ -309,10 +311,12 @@ export function quantizedPlayer(p) {
     armor: p.armor || {},
     zone: p.zone,
     hp: p.hp,
+    pvp_team: p.pvpTeam ?? null,
+    pvp_dead: !!p.pvpDead,
   };
 }
 
-const POSE_KEYS = ['name', 'x', 'y', 'z', 'yaw', 'move', 'anim', 'held', 'sheath', 'zone', 'hp'];
+const POSE_KEYS = ['name', 'x', 'y', 'z', 'yaw', 'move', 'anim', 'held', 'sheath', 'zone', 'hp', 'pvp_team', 'pvp_dead'];
 
 function sameLook(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
