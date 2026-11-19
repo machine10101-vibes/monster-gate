@@ -3461,7 +3461,7 @@ function startGame() {
           wakeMs: flags.wakeSeconds ? flags.wakeSeconds * 1000 : undefined,
         });
         game.ensureWorldConnection = async () => {
-          if (game.mmo || flags.mock || flags.mockwake || q.get('mmo') === '0') return;
+          if (game.mmo || game.wallet?.kind === 'guest' || flags.mock || flags.mockwake || q.get('mmo') === '0') return;
           const view = await game.worldViewReady;
           const { attachMmo } = await import('./net/mmo.js');
           attachMmo(game, view, { search: worldSearch });
