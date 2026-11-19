@@ -596,7 +596,7 @@ export class MmoClient {
   }
 
   updateMonster(monster) {
-    if (!this.ws || this.ws.readyState !== 1 || !monster?.serverId || monster.dead) return false;
+    if (!this.ws || this.ws.readyState !== 1 || this.you?.guest !== false || !monster?.serverId || monster.dead) return false;
     const now = Date.now();
     const last = this.monsterMoveAt.get(monster.serverId) || 0;
     if (now - last < 220) return false;
@@ -608,7 +608,7 @@ export class MmoClient {
   }
 
   enterRift() {
-    if (this.ws?.readyState !== 1) return false;
+    if (this.ws?.readyState !== 1 || this.you?.guest !== false) return false;
     this.ws.send(encode('rift_enter'));
     return true;
   }
@@ -620,7 +620,7 @@ export class MmoClient {
   }
 
   claimRiftChest() {
-    if (this.ws?.readyState !== 1) return false;
+    if (this.ws?.readyState !== 1 || this.you?.guest !== false) return false;
     this.ws.send(encode('rift_chest_claim'));
     return true;
   }
