@@ -1,3 +1,7 @@
+# World 1 authoritative server protocol
+
+The server-side World 1 protocol is maintained in [server/PROTOCOL.md](server/PROTOCOL.md).
+
 # Monster Gate world protocol
 
 JSON WebSocket messages for the shared-world server (`server/`) and client (`src/net/mmo.js`).

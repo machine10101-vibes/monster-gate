@@ -1,18 +1,35 @@
-/** Protocol v1 helpers. See PROTOCOL.md. */
+/** Protocol v1 helpers. See server/PROTOCOL.md. */
 
 export const PROTOCOL = 1;
-export const TICK_HZ = 10;
+export const TICK_HZ = 15;
 export const CHAT_MAX = 120;
 export const NAME_MAX = 16;
 export const MAX_PAYLOAD = 8192;
 export const HELLO_MS = 5000;
 export const IDLE_MS = 30_000;
 export const PING_MS = 15_000;
+export const RESUME_MS = 60_000;
+
+/** Messages allowed before a successful hello. Excess is error `rate` + close 1008. */
+export const PRE_AUTH_PER_SEC = 2;
+export const PRE_AUTH_BURST = 5;
+/** WebSocket close: policy violation (pre-auth rate limit). */
+export const CLOSE_POLICY = 1008;
+/** WebSocket close: message too large (over MAX_PAYLOAD). */
+export const CLOSE_TOO_LARGE = 1009;
+export const AOI_RADIUS = 96;
+export const AOI_NEAR = 32;
+export const AOI_FAR_HZ = 4;
+export const QUANT_POS = 0.1;
+export const QUANT_YAW = 0.05;
+export const QUANT_MOVE = 0.05;
+export const SAVE_MS = 15_000;
+export const DEFAULT_ZONE_CAP = 150;
 
 export const SPEED_MAX = 16;
 export const TELEPORT_MAX = 40;
-export const WORLD_MIN = -50;
-export const WORLD_MAX = 1490;
+export const WORLD_MIN = -800;
+export const WORLD_MAX = 1700;
 
 export const MOVE_PER_SEC = 12;
 export const CHAT_PER_SEC = 2;
@@ -31,6 +48,27 @@ export const TYPES = {
   ping: 'ping',
   pong: 'pong',
   error: 'error',
+  gather: 'gather',
+  friend_request: 'friend_request',
+  friend_accept: 'friend_accept',
+  friend_decline: 'friend_decline',
+  friend_cancel: 'friend_cancel',
+  friend_remove: 'friend_remove',
+  friend_list: 'friend_list',
+  friend_presence: 'friend_presence',
+  block: 'block',
+  unblock: 'unblock',
+  ignore: 'ignore',
+  unignore: 'unignore',
+  party_invite: 'party_invite',
+  party_accept: 'party_accept',
+  party_decline: 'party_decline',
+  party_leave: 'party_leave',
+  party_kick: 'party_kick',
+  party_promote: 'party_promote',
+  party_loot: 'party_loot',
+  party_state: 'party_state',
+  whisper: 'whisper',
 };
 
 export class ProtocolError extends Error {
@@ -49,6 +87,12 @@ function clampNum(n, lo, hi, fallback = 0) {
 
 export function cleanName(raw) {
   return String(raw || 'Hunter').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX) || 'Hunter';
+}
+
+/** Trim a social *target* name. Empty or whitespace-only input stays empty; never defaults to Hunter. */
+export function cleanTargetName(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
 }
 
 export function cleanText(raw) {
@@ -119,17 +163,35 @@ export function parseMessage(raw) {
   if (!msg || typeof msg !== 'object' || Array.isArray(msg)) throw new ProtocolError('protocol', 'Not an object.');
   if (msg.v !== PROTOCOL) throw new ProtocolError('protocol', `Need protocol ${PROTOCOL}.`);
   if (typeof msg.type !== 'string' || !msg.type) throw new ProtocolError('protocol', 'Missing type.');
+  assertNoClientFlags(msg);
   return msg;
+}
+
+/** Client debug/unlock flags are never accepted on the world socket. */
+export function assertNoClientFlags(msg) {
+  if (!msg || typeof msg !== 'object') return;
+  const flagged = (obj) => obj && typeof obj === 'object'
+    && ['debug', 'unlock'].some((k) => {
+      const v = obj[k];
+      return v !== undefined && v !== null && v !== false && v !== 0 && v !== '0' && v !== '';
+    });
+  if (flagged(msg) || flagged(msg.flags)) {
+    throw new ProtocolError('debug', 'Debug and unlock flags are not accepted.');
+  }
 }
 
 export function readHello(msg) {
   if (msg.type !== TYPES.hello) throw new ProtocolError('protocol', 'Expected hello.');
   const token = typeof msg.token === 'string' ? msg.token.trim() : '';
+  const resume = typeof msg.resume === 'string' ? msg.resume.trim().slice(0, 128)
+    : typeof msg.resumeToken === 'string' ? msg.resumeToken.trim().slice(0, 128) : '';
   return {
     token: token.slice(0, 4096),
+    resume,
     name: cleanName(msg.name),
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
+    zone: cleanZone(msg.zone),
   };
 }
 
@@ -146,9 +208,9 @@ export function readMove(msg) {
     sheath: typeof msg.sheath === 'string' ? String(msg.sheath).slice(0, 24) : null,
     look: cleanLook(msg.look),
     armor: cleanArmor(msg.armor),
-    hp: clampNum(msg.hp, 0, 999, 20),
-    max_hp: clampNum(msg.max_hp, 1, 999, 20),
     zone: cleanZone(msg.zone),
+    hp: Number.isFinite(Number(msg.hp)) ? clampNum(msg.hp, 0, 200, 20) : undefined,
+    resume: msg.resume === true,
   };
 }
 
@@ -159,6 +221,13 @@ export function readChat(msg) {
   const text = cleanText(msg.text);
   if (!text) throw new ProtocolError('chat', 'Empty chat.');
   return { channel, text };
+}
+
+export function readGather(msg) {
+  if (msg.type !== TYPES.gather) throw new ProtocolError('protocol', 'Expected gather.');
+  const id = typeof msg.id === 'string' ? msg.id.trim().slice(0, 40) : '';
+  if (!id) throw new ProtocolError('gather', 'Missing node id.');
+  return { id };
 }
 
 export function playerView(p, extra = {}) {
@@ -181,6 +250,121 @@ export function playerView(p, extra = {}) {
   };
 }
 
+export function monsterView(m) {
+  return {
+    id: m.id,
+    type: m.type,
+    name: m.name,
+    x: m.x,
+    y: m.y,
+    z: m.z,
+    yaw: m.yaw || 0,
+    hp: m.hp,
+    maxHp: m.maxHp,
+    level: m.level,
+    dmg: m.dmg,
+    zone: m.zone,
+    alive: m.hp > 0,
+  };
+}
+
+export function nodeView(n) {
+  return {
+    id: n.id,
+    kind: n.kind,
+    type: n.type,
+    x: n.x,
+    y: n.y,
+    z: n.z,
+    zone: n.zone,
+    ready: !!n.ready,
+    respawnAt: n.respawnAt || 0,
+  };
+}
+
 export function errorFrame(code, message) {
   return encode(TYPES.error, { code, message: String(message || code) });
+}
+
+
+export function quant(n, step) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 0;
+  return Math.round((Math.round(v / step) * step) * 1e6) / 1e6;
+}
+
+export function quantizedPlayer(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    x: quant(p.x, QUANT_POS),
+    y: quant(p.y, QUANT_POS),
+    z: quant(p.z, QUANT_POS),
+    yaw: quant(p.yaw, QUANT_YAW),
+    move: quant(p.move, QUANT_MOVE),
+    anim: p.anim,
+    held: p.held,
+    sheath: p.sheath,
+    look: p.look ?? null,
+    armor: p.armor || {},
+    zone: p.zone,
+    hp: p.hp,
+  };
+}
+
+const POSE_KEYS = ['name', 'x', 'y', 'z', 'yaw', 'move', 'anim', 'held', 'sheath', 'zone', 'hp'];
+
+function sameLook(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+function sameArmor(a, b) {
+  return JSON.stringify(a || {}) === JSON.stringify(b || {});
+}
+
+/**
+ * Sparse pose patch. First sighting (`full` or no `prev`) is a complete
+ * quantized view. Later ticks only include id + fields that changed.
+ * Clients must merge patches onto the last known player.
+ */
+export function playerPatch(prev, next, { full = false } = {}) {
+  if (full || !prev) {
+    return { ...next };
+  }
+  const patch = { id: next.id };
+  let changed = false;
+  for (const key of POSE_KEYS) {
+    if (prev[key] !== next[key]) {
+      patch[key] = next[key];
+      changed = true;
+    }
+  }
+  if (!sameLook(prev.look, next.look)) {
+    patch.look = next.look;
+    changed = true;
+  }
+  if (!sameArmor(prev.armor, next.armor)) {
+    patch.armor = next.armor;
+    changed = true;
+  }
+  return changed ? patch : null;
+}
+
+export function parseZoneCap(env = process.env, override) {
+  if (override != null && Number.isFinite(Number(override))) return Math.max(0, Math.floor(Number(override)));
+  const raw = env?.ZONE_CAP;
+  if (raw === undefined || raw === '') return DEFAULT_ZONE_CAP;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_ZONE_CAP;
+  return Math.floor(n);
+}
+
+export function inAoi(observer, other, radius = AOI_RADIUS) {
+  if (!observer || !other) return false;
+  const caveA = observer.zone === 'cave';
+  const caveB = other.zone === 'cave';
+  if (caveA !== caveB) return false;
+  const dx = (other.x ?? 0) - (observer.x ?? 0);
+  const dz = (other.z ?? 0) - (observer.z ?? 0);
+  return Math.hypot(dx, dz) <= radius;
 }

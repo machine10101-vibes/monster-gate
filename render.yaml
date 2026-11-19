@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: monster-gate-world-1
+    runtime: node
+    plan: free
+    buildCommand: npm run ci:server
+    startCommand: npm run start:server
+    healthCheckPath: /healthz
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "https://monstergate.online,http://monstergate.online,https://www.monstergate.online,https://machine10101-vibes.github.io"

@@ -36,6 +36,7 @@ jobs:
         run: env -u VITE_BASE npm run build
         env:
           MG_WORLD_URL: wss://monster-gate-world-1.onrender.com
+          VITE_WORLD_URL: wss://monster-gate-world-1.onrender.com
           VITE_BUILD_ID: ${{ github.sha }}
 
       - name: Publish dist to gh-pages

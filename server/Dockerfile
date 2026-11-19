@@ -1,0 +1,14 @@
+FROM node:22-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY server ./server
+COPY src/data ./src/data
+# Persistence talks to Supabase only when those env vars are set.
+WORKDIR /app/server/persistence
+RUN if [ -f package.json ]; then npm ci --omit=dev; fi
+WORKDIR /app
+ENV PORT=8080
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "server/index.js"]

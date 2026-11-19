@@ -117,6 +117,14 @@ function dropChest(game) {
   dropChestMesh(game, r.arena.x, r.heightAt(r.arena.x, r.arena.z), r.arena.z);
 }
 
+export function showServerRiftChest(game) {
+  const r = game.world?.rift;
+  if (!r) return false;
+  if (!r.chest) dropChest(game);
+  if (r.chest) r.chest.ready = true;
+  return !!r.chest;
+}
+
 function dropChestMesh(game, x, y, z) {
   const r = game.world.rift;
   if (r.chest) {
@@ -160,6 +168,7 @@ export function restoreOverworldRealms(game) {
 }
 
 export function enterRift(game, opts = {}) {
+  const serverOwned = opts.serverOwned ?? (game.mmo?.enterRift?.() === true);
   const w = game.world;
   const r = w.rift;
   if (!r || !game.player) return false;
@@ -175,7 +184,7 @@ export function enterRift(game, opts = {}) {
   w.group.visible = false;
   r.group.visible = true;
   r.cool = 1.2;
-  game.riftRun = { party, scale, wave: 0, follow, looted: false };
+  game.riftRun = { party, scale, wave: 0, follow, looted: false, serverOwned };
   // Spawn just inside the arena, not on the south-side exit threshold.
   // Clear momentum from the overworld so it cannot carry the player straight back out.
   const spawnZ = r.spawn.z - 1.5;
@@ -192,7 +201,10 @@ export function enterRift(game, opts = {}) {
   game.snapCamera();
   game.hud.setArea('Waygate Rift');
   game.hud.banner('Rift', 'A tear in the gate', 2600);
-  if (!follow) {
+  if (serverOwned) {
+    clearRiftMobs(game);
+    if (follow) game.hud.toast('The host opened a rift. Waves scale with the party.', 3200);
+  } else if (!follow) {
     clearRiftMobs(game);
     startWave(game, 1);
   } else {
@@ -216,6 +228,7 @@ export function startWave(game, wave) {
     const m = game.spawner.spawn(type, cx + Math.cos(a) * rad, cz + Math.sin(a) * rad, true);
     scaleSpawn(m, run.scale);
   });
+  game.mmo?.syncAuthoritativeMonsters?.();
   game.hud.banner(spec?.title || `Wave ${wave}`, `${types.length} in the tear`, 2400);
   game.hud.toast(`Wave ${wave} of ${RIFT_WAVES.length}. Party ${run.party}.`, 2800);
 }
@@ -232,7 +245,7 @@ export function updateRift(game, dt) {
     return;
   }
   const run = game.riftRun;
-  if (run.follow) return;
+  if (run.serverOwned || run.follow) return;
   if (r.chest?.ready && !r.chest.looted) return;
   const live = game.monsters.some((m) => m.realm === 'rift' && !m.dead && !m.remove);
   if (live) return;
@@ -259,6 +272,15 @@ export function lootRiftChest(game) {
   const r = game.world?.rift;
   const run = game.riftRun;
   if (!r?.chest?.ready || r.chest.looted || !run || run.looted) return { ok: false };
+  if (run.serverOwned) {
+    if (game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
+      game.mmo.claimRiftChest?.();
+      game.hud.toast('Claiming Rift rewards…', 2200);
+    } else {
+      game.hud.toast('Reconnect to claim this server Rift chest.', 2600);
+    }
+    return { ok: false, pending: true };
+  }
   r.chest.looted = true;
   run.looted = true;
   game.progress.data.riftClearAt = Date.now();
@@ -277,6 +299,7 @@ export function lootRiftChest(game) {
 }
 
 export function leaveRift(game) {
+  game.mmo?.leaveRift?.();
   const w = game.world;
   const r = w.rift;
   if (!r) return;

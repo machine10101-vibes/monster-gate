@@ -1,10 +1,10 @@
 node_modules
 dist
 .git
-src
 tests
 docs
 supabase
 *.log
 .env
 server/.env
+server/persistence/node_modules

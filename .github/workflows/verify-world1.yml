@@ -1,0 +1,32 @@
+name: World 1 production verification
+
+on:
+  pull_request:
+    branches: [mg-servers/world-1-live]
+  push:
+    branches: [mg-servers/world-1-live]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install game dependencies
+        run: npm ci
+      - name: Install persistence dependencies
+        run: npm ci --prefix server/persistence
+      - name: Run client and live server tests
+        run: node --test tests/*.js server/tests/*.test.js
+      - name: Run persistence tests
+        run: npm run test --prefix server/persistence
+      - name: Build production client
+        run: npm run build
