@@ -293,7 +293,7 @@ test('mockwake=90 lasts ninety seconds', () => {
   const flags = parseMmoFlags('?mmo=1&mockwake=90');
   assert.equal(flags.mockwake, true);
   assert.equal(flags.wakeSeconds, 90);
-  assert.equal(parseMmoFlags('?mmo=1&mockwake=1').wakeSeconds, 30);
+  assert.equal(parseMmoFlags('?mmo=1&mockwake=1').wakeSeconds, 60);
 });
 
 test('offline cursor uses local gear; mmo uses snapshot held for the local id', () => {
