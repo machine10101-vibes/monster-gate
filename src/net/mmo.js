@@ -383,6 +383,7 @@ export class MmoClient {
         if (monster.serverId !== msg.id) continue;
         monster.applyServerState?.(msg);
       }
+      this.syncAuthoritativeMonsters();
       this.view?.applyMonsterState?.(msg);
       return;
     }
