@@ -29,6 +29,7 @@ export const WAKE_ETA_SEC = 60;
 export const WAKE_GIVE_UP_SEC = 75;
 export const WAKE_POLL_MS = 2500;
 export const WAKE_TICK_MS = 1000;
+export const WAKE_INITIAL_PROBE_MS = 3000;
 export const WAKE_PROBE_MS = 65_000;
 
 /** https:// (or http://) /healthz for a wss:// or ws:// world URL. */
@@ -303,6 +304,7 @@ export class MmoClient {
     const giveUpSec = wake.giveUpSec ?? WAKE_GIVE_UP_SEC;
     const pollMs = wake.pollMs ?? WAKE_POLL_MS;
     const tickMs = wake.tickMs ?? WAKE_TICK_MS;
+    const initialProbeMs = wake.initialProbeMs ?? WAKE_INITIAL_PROBE_MS;
     const probeMs = wake.probeMs ?? WAKE_PROBE_MS;
     const now = this.opts.now || Date.now;
     const started = now();
@@ -314,12 +316,21 @@ export class MmoClient {
       this.setStatus('waking', { secondsLeft: secondsLeft(), elapsedMs: elapsedMs() });
     };
 
-    // Show the queue immediately, while the first long-lived probe wakes Render.
+    // Fast-path an already-awake service without flashing the queue. If it is
+    // asleep, keep the next health request open for the full Render cold start.
+    let ok = await this.probeHealthz(initialProbeMs);
+    if (!alive()) return;
+    if (ok) {
+      this.clearWake();
+      this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
+      this.openSocket();
+      return;
+    }
+
     announce();
     this.wakeTick = setInterval(announce, tickMs);
-
     while (alive()) {
-      const ok = await this.probeHealthz(probeMs);
+      ok = await this.probeHealthz(probeMs);
       if (!alive()) return;
       if (ok) {
         this.clearWake();
