@@ -1,5 +1,6 @@
 /** Skill levels, rocks, trees, fishing spots and the goods they yield. */
 import { COAL_ROCK, METALS, metalBarGood, metalOreGood, metalRock, metalSmelt, miningUnlocks, smithingUnlocks } from './metals.js';
+import { WOODS, logGood, shaftGood, treeRecord } from './woods.js';
 
 export const MAX_LEVEL = 99;
 
@@ -121,7 +122,7 @@ export const LEVEL_SKILLS = {
     id: 'woodcutting',
     name: 'Woodcutting',
     color: '#7dcc4a',
-    blurb: 'Chop the groves west of Oakhollow with the woodcutter axe. Birch and oak from the start, maple once you are practised.',
+    blurb: 'Chop with the woodcutter axe. Birch and oak stand in the Whispering Wood. Pine, spruce and the hardwoods are scattered across the map. The rare exotics grow only where high-level monsters hunt.',
     effect: (lvl) => `${Math.round(chopChance(TREES.birch, lvl) * 100)}% birch chop chance`,
     unlocks: [
       [1, 'Birch logs'],
@@ -134,7 +135,7 @@ export const LEVEL_SKILLS = {
     id: 'firemaking',
     name: 'Firemaking',
     color: '#ff7a22',
-    blurb: 'A tinderbox and logs make a campfire. Light logs from the inventory. Higher levels catch more often.',
+    blurb: 'A tinderbox and logs make a campfire. Light logs from the inventory. Richer woods need a higher Firemaking level, and higher levels catch more often.',
     effect: (lvl) => `${Math.round(lightChance(TREES.birch, lvl) * 100)}% birch light chance`,
     unlocks: [
       [1, 'Birch fires'],
@@ -334,6 +335,7 @@ export const TREES = {
     chip: [0x7a4030, 0xe0b070, 0xe24a22],
   },
 };
+for (const w of WOODS) TREES[w.id] = treeRecord(w);
 
 export const GOODS = {
   copper_ore: { id: 'copper_ore', name: 'Copper ore', desc: 'Orange-veined ore from the Greyrock Pit.', price: 4, kind: 'ore' },
@@ -383,6 +385,11 @@ Object.assign(GOODS, {
   birch_shaft: { id: 'birch_shaft', name: 'Birch arrow shaft', desc: 'Shaved from a birch log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 1, kind: 'part', wood: 'birch' },
   oak_shaft: { id: 'oak_shaft', name: 'Oak arrow shaft', desc: 'Shaved from an oak log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 2, kind: 'part', wood: 'oak' },
   maple_shaft: { id: 'maple_shaft', name: 'Maple arrow shaft', desc: 'Shaved from a maple log with the carving knife. One log makes fifteen. Fletch it with a feather at the forge.', price: 3, kind: 'part', wood: 'maple' },
+  ...Object.fromEntries(WOODS.flatMap((w) => {
+    const log = logGood(w);
+    const shaft = shaftGood(w);
+    return [[log.id, log], [shaft.id, shaft]];
+  })),
   iron_arrow: { id: 'iron_arrow', name: 'Iron arrow', desc: 'An iron head on a wooden shaft. A quiver holds 99.', price: 3, kind: 'arrow' },
   __debug_pouch: {
     id: '__debug_pouch',
@@ -399,8 +406,11 @@ const BAR_IDS = METALS.map((m) => m.barId);
 export const GOODS_ORDER = [
   ...ORE_IDS, 'coal',
   ...BAR_IDS,
-  'arrowhead', 'feather', 'birch_shaft', 'oak_shaft', 'maple_shaft', 'iron_arrow',
+  'arrowhead', 'feather', 'birch_shaft', 'oak_shaft', 'maple_shaft',
+  ...WOODS.map((w) => `${w.id}_shaft`),
+  'iron_arrow',
   ...FISH_GOODS, 'burnt_fish', 'birch_logs', 'oak_logs', 'maple_logs',
+  ...WOODS.map((w) => `${w.id}_logs`),
 ];
 
 /** Named smithy recipes. `ins` is [good, count] pairs. `n` is bars produced. `level` is Smithing. */
@@ -430,7 +440,17 @@ export const SHAFT_FROM_LOG = {
   birch_logs: 'birch_shaft',
   oak_logs: 'oak_shaft',
   maple_logs: 'maple_shaft',
+  ...Object.fromEntries(WOODS.map((w) => [`${w.id}_logs`, `${w.id}_shaft`])),
 };
+
+function woodUnlocks(suffix, extra) {
+  const rows = Object.values(TREES).map((t) => [t.level, `${t.name} ${suffix}`]);
+  rows.push(extra);
+  rows.sort((a, b) => a[0] - b[0]);
+  return rows;
+}
+LEVEL_SKILLS.woodcutting.unlocks = woodUnlocks('logs', [25, 'Quicker chops']);
+LEVEL_SKILLS.firemaking.unlocks = woodUnlocks('fires', [25, 'Surer flames']);
 export const SHAFT_LOGS = Object.keys(SHAFT_FROM_LOG);
 export const SHAFT_IDS = Object.values(SHAFT_FROM_LOG);
 
