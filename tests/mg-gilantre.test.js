@@ -7,7 +7,7 @@ import { openSouthfordDesert } from '../src/world/desert.js';
 import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.js';
 import { World } from '../src/world/world.js';
 import { TILES } from '../src/world/tiles.js';
-import { GILANTRE_SPOTS, dressGilantre } from '../src/world/gilantre.js';
+import { GILANTRE_SPOTS, dressGilantre, yawAlong } from '../src/world/gilantre.js';
 import { questById, questGiverNpc } from '../src/data/quests.js';
 
 function world() {
@@ -64,6 +64,25 @@ function climb(w, sx, sz, gx, gz) {
   }
   return { ok: false, x: p.x, z: p.z, y: p.y };
 }
+
+test('wall and arcade pieces lie along the tangent, not the radius', () => {
+  const head = (yaw) => [Math.cos(yaw), -Math.sin(yaw)];
+  for (const a of [0, Math.PI / 4, 1.2, 2.4, 4.1]) {
+    const tx = -Math.sin(a);
+    const tz = Math.cos(a);
+    const [hx, hz] = head(yawAlong(tx, tz));
+    assert.ok(Math.abs(hx - tx) < 1e-9 && Math.abs(hz - tz) < 1e-9, `circle ${a}`);
+    const ex = -9.05 * Math.sin(a);
+    const ez = 7.35 * Math.cos(a);
+    const len = Math.hypot(ex, ez);
+    const [bx, bz] = head(yawAlong(ex, ez));
+    assert.ok(Math.abs(bx - ex / len) < 1e-9 && Math.abs(bz - ez / len) < 1e-9, `ellipse ${a}`);
+  }
+  const skew = Math.PI / 4 + Math.PI / 2;
+  const [sx, sz] = head(skew);
+  const dot = sx * -Math.sin(Math.PI / 4) + sz * Math.cos(Math.PI / 4);
+  assert.ok(Math.abs(dot) < 0.05, 'the old yaw is sideways at the diagonal');
+});
 
 test('tiles 57, 58, 67 and 68 are the four quarters of Gilantre', () => {
   for (const [n, kind] of [[57, 'gilantreNw'], [58, 'gilantreNe'], [67, 'gilantreSw'], [68, 'gilantreSe']]) {

@@ -759,6 +759,14 @@ function paintCountry(land) {
   }
 }
 
+/**
+ * Yaw that lays a mesh's local +X along (tx, tz).
+ * Three.js sends local +X to (cos θ, −sin θ).
+ */
+export function yawAlong(tx, tz) {
+  return Math.atan2(-tz, tx);
+}
+
 /** True when this curtain angle is the east or west drawbridge mouth. */
 function gateMouth(a) {
   const rel = Math.atan2(Math.sin(a), Math.cos(a));
@@ -800,19 +808,20 @@ function drop(world, parts, x, z, rot, scale, r, limit = 28) {
 function dressWall(world, parts) {
   const radius = 29.2;
   const seg = 28 * 0.075;
-  const count = Math.round((Math.PI * 2 * radius) / (seg * 0.82));
+  const count = Math.round((Math.PI * 2 * radius) / (seg * 0.74));
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2;
     const x = CX + Math.cos(a) * radius;
     const z = CZ + Math.sin(a) * radius;
     if (gateMouth(a)) continue;
-    world.putAt(parts.wall, x, z, a + Math.PI / 2, 1);
+    const yaw = yawAlong(-Math.sin(a), Math.cos(a));
+    world.putAt(parts.wall, x, z, yaw, 1);
     world.circle(x, z, 0.92);
     world.occupy(x, z, 1.05);
     if (i % 7 === 0) {
       const bx = CX + Math.cos(a) * 27.6;
       const bz = CZ + Math.sin(a) * 27.6;
-      world.putAt(parts.cloth, bx, bz, a + Math.PI / 2, 1, { y: world.heightAt(bx, bz) + 2.35 });
+      world.putAt(parts.cloth, bx, bz, yaw, 1, { y: world.heightAt(bx, bz) + 2.35 });
     }
     if (i % 5 === 2) world.torch(CX + Math.cos(a) * 27.8, CZ + Math.sin(a) * 27.8, 0xffa040);
   }
@@ -898,16 +907,19 @@ function dressArena(world, parts) {
   const rx = 9.05;
   const rz = 7.35;
   let bayN = 0;
-  for (const p of ellipseRing(rx, rz, 15)) {
+  for (const p of ellipseRing(rx, rz, 16)) {
     if (arenaMouth(p.a)) continue;
     const x = ARENA.x + p.x;
     const z = ARENA.z + p.z;
     if (Math.hypot(x - CX, z - CZ) > 28.4) continue;
-    world.putAt(parts.bay, x, z, p.a + Math.PI / 2, 1);
+    const yaw = yawAlong(-rx * Math.sin(p.a), rz * Math.cos(p.a));
+    world.putAt(parts.bay, x, z, yaw, 1);
     world.circle(x, z, 0.7);
     world.occupy(x, z, 0.9);
     if (bayN % 2 === 0) {
-      world.putAt(parts.banner, x, z, p.a, 0.9, { y: world.heightAt(x, z) + 3.1 });
+      const nx = Math.cos(p.a) / rx;
+      const nz = Math.sin(p.a) / rz;
+      world.putAt(parts.banner, x, z, yawAlong(nx, nz), 0.9, { y: world.heightAt(x, z) + 3.1 });
     }
     bayN++;
   }
@@ -919,7 +931,8 @@ function dressArena(world, parts) {
       if (Math.abs(rel) < 0.4) continue;
       const x = ARENA.x + p.x;
       const z = ARENA.z + p.z;
-      world.putAt(parts.seat, x, z, p.a + Math.PI, 1);
+      const along = yawAlong(-sx * Math.sin(p.a), sz * Math.cos(p.a));
+      world.putAt(parts.seat, x, z, along + Math.PI, 1);
       world.circle(x, z, 0.42);
     }
   }
@@ -928,14 +941,14 @@ function dressArena(world, parts) {
     const x = ARENA.x + p.x;
     const z = ARENA.z + p.z;
     if (Math.hypot(x - CX, z - CZ) > 28) continue;
-    world.putAt(parts.column, x, z, p.a, 0.85);
+    world.putAt(parts.column, x, z, yawAlong(-8.15 * Math.sin(p.a), 6.55 * Math.cos(p.a)), 0.85);
     world.circle(x, z, 0.22);
   }
   for (const p of ellipseRing(5.55, 4.45, 18)) {
     if (arenaMouth(p.a)) continue;
     const x = ARENA.x + p.x;
     const z = ARENA.z + p.z;
-    world.putAt(parts.quay, x, z, p.a, 0.7);
+    world.putAt(parts.quay, x, z, yawAlong(-5.55 * Math.sin(p.a), 4.45 * Math.cos(p.a)), 0.7);
     world.circle(x, z, 0.16);
   }
   const boxZ = ARENA.z - 6.4;
