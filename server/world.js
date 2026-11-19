@@ -446,6 +446,7 @@ export class World {
       this.riftRuns.set(key, run);
     }
     if (!run.participants.includes(session.id)) run.participants.push(session.id);
+    const previousZone = session.zone;
     session.riftReturnPose = { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone };
     session.riftRunId = run.id;
     session.zone = 'rift';
@@ -455,6 +456,8 @@ export class World {
     session.yaw = Math.PI;
     session.move = 0;
     this.sendSnapshot(session);
+    this.social.onZone(session, previousZone);
+    this.social.onPose?.(session);
     send(session.ws, 'rift_entered', { run_id: run.id, party_size: run.partySize, wave: run.wave });
     if (run.wave === 0) this.spawnRiftWave(run, 1);
   }
@@ -519,19 +522,27 @@ export class World {
     const goods = riftChestGoods(run.partySize).map((item) => ({
       kind: 'good', id: item.id, amount: item.n,
     }));
-    await this.combatLoot.distribute([
-      { kind: 'gold', id: 'gold', amount: riftChestGold(run.partySize) },
-      ...goods,
-    ], members, run.partyId, `rift:${run.id}:chest`);
-    for (const member of members) this._send(member.ws, 'rift_chest_result', { run_id: run.id, ok: true });
+    try {
+      await this.combatLoot.distribute([
+        { kind: 'gold', id: 'gold', amount: riftChestGold(run.partySize) },
+        ...goods,
+      ], members, run.partyId, `rift:${run.id}:chest`);
+      for (const member of members) this._send(member.ws, 'rift_chest_result', { run_id: run.id, ok: true });
+    } catch (err) {
+      run.claimed = false;
+      throw err;
+    }
   }
 
   leaveRift(session) {
     if (!session.riftRunId || !session.riftReturnPose) return;
+    const previousZone = session.zone;
     Object.assign(session, session.riftReturnPose);
     session.riftRunId = null;
     session.riftReturnPose = null;
     this.sendSnapshot(session);
+    this.social.onZone(session, previousZone);
+    this.social.onPose?.(session);
     this.persistPose(session, true);
     send(session.ws, 'rift_left', { x: session.x, y: session.y, z: session.z, zone: session.zone });
   }
