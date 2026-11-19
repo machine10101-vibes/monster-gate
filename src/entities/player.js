@@ -425,23 +425,27 @@ export class Player {
       return true;
     }
     if (item.kind === 'light' || item.kind === 'none') return false;
-    if (this.game.mmo?.pvpMatchId && item.kind === 'melee') {
-      if (this.stamina < 3 || !this.game.mmo.pvpAttackNearest()) return false;
-      this.drawWeapon();
-      this.attackItem = item;
-      this.combo = this.comboT > 0 ? (this.combo + 1) % 3 : 0;
-      this.attackHit = true;
-      this.spend(item.stam);
-      this.stamDelay = 0.7;
-      this.setState('attack', 0.34);
-      this.game.audio.swing();
-      return true;
-    }
     if (item.kind === 'ranged' && !item.proj && !item.spell) {
       if (!this.game.progress.hasArrow()) {
         this.game.hud.toast(this.game.progress.data.armor.quiver ? 'The quiver is empty' : 'Equip a quiver of arrows', 1400);
         return false;
       }
+    }
+    if (this.game.mmo?.pvpMatchId && (item.kind === 'melee' || item.kind === 'ranged')) {
+      if (this.stamina < 3) return false;
+      if (item.kind === 'ranged' && !item.proj && !item.spell && !this.game.progress.drawArrow()) return false;
+      const range = item.kind === 'ranged' ? 13 : 4.5;
+      if (!this.game.mmo.pvpAttackNearest(range)) return false;
+      this.drawWeapon();
+      this.attackItem = item;
+      this.combo = item.kind === 'melee' && this.comboT > 0 ? (this.combo + 1) % 3 : 0;
+      this.attackHit = true;
+      this.spend(item.stam);
+      this.stamDelay = 0.7;
+      const swing = skillMods(this.game).speed ?? 1;
+      this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
+      this.game.audio.swing();
+      return true;
     }
     if (this.stamina < 3) return false;
     this.drawWeapon();
@@ -459,6 +463,7 @@ export class Player {
   tryRoll(dir) {
     if (this.state === 'gather' && !this.dead) this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger' || this.stamina < 18) return false;
+    if (this.game.mmo?.pvpMatchId && !this.game.mmo.sendPvp('pvp_roll')) return false;
     this.spend(22);
     this.game.gather.train('agility', 6);
     this.stamDelay = 0.8;
