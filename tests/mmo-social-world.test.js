@@ -28,17 +28,22 @@ function collect(ws) {
   ws.on('message', raw => messages.push(JSON.parse(String(raw))));
   return messages;
 }
+const ANN = '11111111-1111-4111-8111-111111111111';
+const BEA = '22222222-2222-4222-8222-222222222222';
+const CAL = '33333333-3333-4333-8333-333333333333';
+const verifyToken = async (token) => ({ userId: ({ 'token-ann': ANN, 'token-bea': BEA, 'token-cal': CAL })[token], name: 'Account' });
+
 function hello(ws, name, token = '') {
   ws.send(encode('hello', { name, token }));
   return waitFor(ws, m => m.type === 'welcome');
 }
 
 test('World 1 parties require acceptance, broadcast authoritative state, promote and disband', async () => {
-  const srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), memory: true, tickMs: 40 });
+  const srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), memory: true, tickMs: 40, verifyToken });
   const a = await open(`ws://127.0.0.1:${srv.port}`);
   const b = await open(`ws://127.0.0.1:${srv.port}`);
   const am = collect(a), bm = collect(b);
-  await hello(a, 'Ann'); await hello(b, 'Bea');
+  await hello(a, 'Ann', 'token-ann'); await hello(b, 'Bea', 'token-bea');
   const inviteAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'party-1');
   a.send(encode('party_invite', { name: 'Bea', request_id: 'party-1' }));
   const invite = await waitFor(b, m => m.type === 'party_invite');
@@ -60,29 +65,24 @@ test('World 1 parties require acceptance, broadcast authoritative state, promote
 });
 
 test('signed-in friends persist in social store and whispers are private', async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async url => ({
-    ok: true,
-    async json() { return { id: String(url).includes('user') ? (globalThis.__socialTestUser || 'id-ann') : 'id-ann', user_metadata: { name: 'Account' } }; },
-  });
   const env = { SUPABASE_URL: 'https://social-test.invalid', SUPABASE_ANON_KEY: 'anon' };
   const socialStore = createMemorySocialStore();
-  const srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), socialStore, env, tickMs: 40 });
+  const srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), socialStore, env, tickMs: 40, verifyToken });
   const a = await open(`ws://127.0.0.1:${srv.port}`);
   const b = await open(`ws://127.0.0.1:${srv.port}`);
   const c = await open(`ws://127.0.0.1:${srv.port}`);
   const am = collect(a), bm = collect(b), cm = collect(c);
-  globalThis.__socialTestUser = 'id-ann'; await hello(a, 'Ann', 'token-ann');
-  globalThis.__socialTestUser = 'id-bea'; await hello(b, 'Bea', 'token-bea');
-  globalThis.__socialTestUser = 'id-cal'; await hello(c, 'Cal', 'token-cal');
+  await hello(a, 'Ann', 'token-ann');
+  await hello(b, 'Bea', 'token-bea');
+  await hello(c, 'Cal', 'token-cal');
 
   const requestAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'friend-1');
   a.send(encode('friend_request', { name: 'Bea', request_id: 'friend-1' }));
   await waitFor(b, m => m.type === 'friend_request');
   assert.equal((await requestAck).pending, true);
-  const aFriends = waitFor(a, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-bea'));
-  const bFriends = waitFor(b, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === 'id-ann'));
-  b.send(encode('friend_accept', { user_id: 'id-ann' }));
+  const aFriends = waitFor(a, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === BEA));
+  const bFriends = waitFor(b, m => m.type === 'friend_list' && m.friends?.some(f => f.user_id === ANN));
+  b.send(encode('friend_accept', { user_id: ANN }));
   await Promise.all([aFriends, bFriends]);
 
   const whisperAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'whisper-1');
@@ -99,6 +99,4 @@ test('signed-in friends persist in social store and whispers are private', async
   assert.equal(am.some(m => m.type === 'chat' && m.text === 'This should be hidden.'), false);
 
   a.close(); b.close(); c.close(); await srv.close();
-  globalThis.fetch = originalFetch;
-  delete globalThis.__socialTestUser;
 });
