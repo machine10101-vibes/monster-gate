@@ -401,7 +401,7 @@ test('setStatus waking counts down locally and exposes retry / stuck states', ()
   const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
   let t = 1000;
   view._now = () => t;
-  view.setStatus('waking', { secondsLeft: 30, elapsedMs: 0 });
+  view.setStatus('waking', { secondsLeft: 60, elapsedMs: 0 });
   assert.equal(view.wakeActive(), true);
   assert.equal(view.pollWake(t).phase, 'queue');
   assert.equal(view.pollWake(t).secondsLeft, 60);
