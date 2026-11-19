@@ -69,7 +69,7 @@ test('all-pass need/greed falls back to round robin; duplicate and forged choice
   const f = fixture('need_greed');
   await f.engine.attack(f.a, 'm1');
   const roll = f.messages.find((m) => m.type === 'loot_roll');
-  await assert.rejects(() => f.engine.choose({ id: 'intruder' }, roll.roll_id, 'need'), /Not eligible/);
+  await assert.rejects(() => f.engine.choose({ id: 'intruder' }, roll.roll_id, 'need'), /Authenticated hunter/);
   await f.engine.choose(f.a, roll.roll_id, 'pass');
   await assert.rejects(() => f.engine.choose(f.a, roll.roll_id, 'need'), /Choice already/);
   await f.engine.choose(f.b, roll.roll_id, 'pass');
