@@ -44,6 +44,7 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     const hit = srv.world.pvp.attack(pa, pb.id);
     assert.ok(hit.damage > 0);
     assert.equal(pb.hp, before - hit.damage);
+    await waitUntil(() => aFrames.some(m => m.type === 'pvp_hit'));
     assert.ok(aFrames.some(m => m.type === 'pvp_hit'));
     const returnPose = { ...pa.pvpReturnPose };
     srv.world.pvp.leave(pa);
@@ -52,6 +53,7 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     assert.equal(pa.zone, returnPose.zone);
     assert.equal(pa.x, returnPose.x);
     assert.equal(pa.z, returnPose.z);
+    await waitUntil(() => aFrames.some(m => m.type === 'pvp_match_end'));
     assert.ok(aFrames.some(m => m.type === 'pvp_match_end'));
   });
 });
