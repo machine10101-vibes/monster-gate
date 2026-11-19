@@ -84,10 +84,32 @@ export function createPvpRuntime(world, opts = {}) {
     return match;
   };
   const matchQueues = () => {
+    const release = (mode, group) => {
+      for (const id of group) {
+        const p = live(world, id);
+        if (!p || p.pvpQueued !== mode) continue;
+        p.pvpQueued = null;
+        send(p, 'pvp_queue', { mode, status: 'cancelled', message: 'Your team or activity changed before a match was found.' });
+      }
+    };
+    const eligible = (mode, group) => {
+      const members = group.map(id => live(world, id));
+      if (members.some(p => !p || p.pvpQueued !== mode || p.pvpMatchId || p.riftRunId || p.zone.startsWith('colosseum'))) return false;
+      try {
+        const current = teamFor(mode, members[0]);
+        return current.length === group.length && current.every(p => group.includes(p.id));
+      } catch {
+        return false;
+      }
+    };
     for (const [mode, queue] of queues) {
       while (queue.length >= 2) {
         const a = queue.shift(), b = queue.shift();
-        if (a.some(id => !live(world, id)) || b.some(id => !live(world, id))) continue;
+        if (!eligible(mode, a) || !eligible(mode, b)) {
+          release(mode, a);
+          release(mode, b);
+          continue;
+        }
         begin(mode, a.map(id => live(world, id)), b.map(id => live(world, id)));
       }
     }
