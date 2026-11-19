@@ -117,6 +117,14 @@ function dropChest(game) {
   dropChestMesh(game, r.arena.x, r.heightAt(r.arena.x, r.arena.z), r.arena.z);
 }
 
+export function showServerRiftChest(game) {
+  const r = game.world?.rift;
+  if (!r) return false;
+  if (!r.chest) dropChest(game);
+  if (r.chest) r.chest.ready = true;
+  return !!r.chest;
+}
+
 function dropChestMesh(game, x, y, z) {
   const r = game.world.rift;
   if (r.chest) {
@@ -193,7 +201,10 @@ export function enterRift(game, opts = {}) {
   game.snapCamera();
   game.hud.setArea('Waygate Rift');
   game.hud.banner('Rift', 'A tear in the gate', 2600);
-  if (!follow) {
+  if (serverOwned) {
+    clearRiftMobs(game);
+    if (follow) game.hud.toast('The host opened a rift. Waves scale with the party.', 3200);
+  } else if (!follow) {
     clearRiftMobs(game);
     startWave(game, 1);
   } else {
@@ -234,7 +245,7 @@ export function updateRift(game, dt) {
     return;
   }
   const run = game.riftRun;
-  if (run.follow) return;
+  if (run.serverOwned || run.follow) return;
   if (r.chest?.ready && !r.chest.looted) return;
   const live = game.monsters.some((m) => m.realm === 'rift' && !m.dead && !m.remove);
   if (live) return;
