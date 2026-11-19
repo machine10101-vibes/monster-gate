@@ -33,6 +33,19 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
   return {
     kind: 'supabase',
 
+    async grantOnce(reward) {
+      const { data, error } = await db.rpc('grant_world_reward', {
+        p_reward_id: reward.rewardId,
+        p_user_id: requireUserId(reward.userId),
+        p_kind: reward.kind,
+        p_item_id: reward.id,
+        p_amount: reward.amount,
+      });
+      if (error) throw wrap(error, { table: 'world_reward_claims', userId: reward.userId });
+      const row = Array.isArray(data) ? data[0] : data;
+      return { granted: !!row?.granted };
+    },
+
     async load(userId) {
       const id = requireUserId(userId);
       const { data, error } = await db.from('characters').select('*').eq('user_id', id).maybeSingle();
