@@ -44,7 +44,7 @@ export function createPersistence(options = {}) {
   }
 
   function remember(row) {
-    if (row?.userId) versions.set(row.userId, row.version);
+    if (row?.userId) versions.set(row.userId, Math.max(versions.get(row.userId) || 0, row.version));
     return row;
   }
 
