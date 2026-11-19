@@ -103,6 +103,11 @@ export function createPvpRuntime(world, opts = {}) {
       }
     };
     for (const [mode, queue] of queues) {
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (eligible(mode, queue[i])) continue;
+        const [invalid] = queue.splice(i, 1);
+        release(mode, invalid);
+      }
       while (queue.length >= 2) {
         const a = queue.shift(), b = queue.shift();
         if (!eligible(mode, a) || !eligible(mode, b)) {
