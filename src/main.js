@@ -2584,6 +2584,11 @@ class Game {
     enterRift(this, { party: info?.party_size || 1, follow: false });
   }
 
+  leaveRiftFromServer() {
+    if (this.world?.realm !== 'rift') return;
+    leaveRift(this);
+  }
+
   syncServerRewardState(snapshot) {
     if (!snapshot || !this.progress) return;
     const mergeCounts = (local, server) => {
