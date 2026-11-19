@@ -151,8 +151,9 @@ test('auth errors stop reconnect and go offline', async () => {
   client.connect();
   await new Promise((r) => setTimeout(r, 20));
   client.ws.push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
-  assert.equal(client.fatal, true);
-  assert.equal(client.closed, true);
+  assert.equal(client.authHold, true);
+  assert.equal(client.fatal, false);
+  assert.equal(client.closed, false);
   assert.ok(toasts.some((t) => /sign in/i.test(t)));
 });
 
@@ -175,9 +176,9 @@ test('MG-MMO-4: setToken after auth rejection reconnects without a reload', asyn
   client.connect();
   await new Promise((r) => setTimeout(r, 30));
   sockets[0].push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
-  assert.equal(client.fatal, true);
+  assert.equal(client.authHold, true);
   client.retry();
-  assert.equal(client.fatal, true);
+  assert.equal(client.authHold, true);
   assert.equal(sockets.length, 1);
 
   client.setToken('fresh-token');
@@ -211,20 +212,20 @@ test('MG-MMO-4: resetAuth and retry work once a new token is present', async () 
   client.connect();
   await new Promise((r) => setTimeout(r, 30));
   sockets[0].push({ v: 1, type: 'error', code: 'auth', message: 'Sign in to hunt online. Guests stay solo.' });
-  assert.equal(client.fatal, true);
+  assert.equal(client.authHold, true);
   client.resetAuth();
-  assert.equal(client.fatal, false);
+  assert.equal(client.authHold, false);
   client.setToken('after-reset');
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(sockets.length, 2);
   assert.equal(parseFrame(sockets[1].sent[0]).token, 'after-reset');
 
   sockets[1].push({ v: 1, type: 'error', code: 'auth', message: 'That sign-in is not valid.' });
-  assert.equal(client.fatal, true);
+  assert.equal(client.authHold, true);
   client.opts = { ...client.opts, token: 'brand-new' };
   client.retry();
   await new Promise((r) => setTimeout(r, 30));
-  assert.equal(client.fatal, false);
+  assert.equal(client.authHold, false);
   assert.equal(sockets.length, 3);
   assert.equal(parseFrame(sockets[2].sent[0]).token, 'brand-new');
   client.dispose();
