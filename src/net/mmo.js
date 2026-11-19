@@ -362,9 +362,14 @@ export class MmoClient {
       return;
     }
     if (msg.type === 'loot_awarded') {
+      this.game?.applyServerReward?.(msg);
       toast(this.game, msg.winner === this.you?.id
         ? `Loot received: ${msg.amount} ${msg.id}.`
         : 'Party loot was awarded.');
+      return;
+    }
+    if (msg.type === 'reward_update') {
+      this.game?.applyServerReward?.(msg);
       return;
     }
     if (msg.type === 'combat_result') {
