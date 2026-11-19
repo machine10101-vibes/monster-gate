@@ -119,6 +119,7 @@ export class MmoClient {
     this.lootQueue = [];
     this.rewardSnapshot = null;
     this.monsterMoveAt = new Map();
+    this.monsterMovePos = new Map();
     this.riftEnterPending = false;
   }
 
@@ -620,10 +621,15 @@ export class MmoClient {
     if (!this.ws || this.ws.readyState !== 1 || this.you?.guest !== false || !monster?.serverId || monster.dead) return false;
     const now = Date.now();
     const last = this.monsterMoveAt.get(monster.serverId) || 0;
+    const previous = this.monsterMovePos.get(monster.serverId);
+    const yaw = monster.yaw || 0;
+    if (previous && Math.hypot(monster.x - previous.x, monster.z - previous.z) < 0.25
+      && Math.abs(yaw - previous.yaw) < 0.12) return false;
     if (now - last < 220) return false;
     this.monsterMoveAt.set(monster.serverId, now);
+    this.monsterMovePos.set(monster.serverId, { x: monster.x, z: monster.z, yaw });
     this.ws.send(encode('monster_move', {
-      id: monster.serverId, x: monster.x, y: monster.y, z: monster.z, yaw: monster.yaw || 0,
+      id: monster.serverId, x: monster.x, y: monster.y, z: monster.z, yaw,
     }));
     return true;
   }
