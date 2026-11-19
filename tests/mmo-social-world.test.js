@@ -38,10 +38,13 @@ function hello(ws, name, token = '') {
   return waitFor(ws, m => m.type === 'welcome');
 }
 
-test('World 1 parties require acceptance, broadcast authoritative state, promote and disband', async () => {
-  const srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), memory: true, tickMs: 40, verifyToken });
-  const a = await open(`ws://127.0.0.1:${srv.port}`);
-  const b = await open(`ws://127.0.0.1:${srv.port}`);
+test('World 1 parties require acceptance, broadcast authoritative state, promote and disband', async (t) => {
+  let srv = null;
+  const sockets = [];
+  t.after(async () => { for (const ws of sockets) { try { ws.terminate(); } catch {} } if (srv) await srv.close().catch(() => {}); });
+  srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), memory: true, tickMs: 40, verifyToken });
+  const a = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(a);
+  const b = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(b);
   const am = collect(a), bm = collect(b);
   await hello(a, 'Ann', 'token-ann'); await hello(b, 'Bea', 'token-bea');
   const inviteAck = waitFor(a, m => m.type === 'social_result' && m.request_id === 'party-1');
@@ -61,16 +64,19 @@ test('World 1 parties require acceptance, broadcast authoritative state, promote
   const leaderPartyCleared = waitFor(a, m => m.type === 'party_state' && m.party === null);
   b.send(encode('party_leave'));
   await leaderPartyCleared;
-  a.close(); b.close(); await srv.close();
+  a.close(); b.close(); await srv.close(); srv = null;
 });
 
-test('signed-in friends persist in social store and whispers are private', async () => {
+test('signed-in friends persist in social store and whispers are private', async (t) => {
+  let srv = null;
+  const sockets = [];
+  t.after(async () => { for (const ws of sockets) { try { ws.terminate(); } catch {} } if (srv) await srv.close().catch(() => {}); });
   const env = { SUPABASE_URL: 'https://social-test.invalid', SUPABASE_ANON_KEY: 'anon' };
   const socialStore = createMemorySocialStore();
-  const srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), socialStore, env, tickMs: 40, verifyToken });
-  const a = await open(`ws://127.0.0.1:${srv.port}`);
-  const b = await open(`ws://127.0.0.1:${srv.port}`);
-  const c = await open(`ws://127.0.0.1:${srv.port}`);
+  srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), socialStore, env, tickMs: 40, verifyToken });
+  const a = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(a);
+  const b = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(b);
+  const c = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(c);
   const am = collect(a), bm = collect(b), cm = collect(c);
   await hello(a, 'Ann', 'token-ann');
   await hello(b, 'Bea', 'token-bea');
@@ -98,5 +104,5 @@ test('signed-in friends persist in social store and whispers are private', async
   await new Promise(r => setTimeout(r, 60));
   assert.equal(am.some(m => m.type === 'chat' && m.text === 'This should be hidden.'), false);
 
-  a.close(); b.close(); c.close(); await srv.close();
+  a.close(); b.close(); c.close(); await srv.close(); srv = null;
 });
