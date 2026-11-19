@@ -26,6 +26,7 @@ export function createCombatLoot({
   monsters, players, parties, persist, now = () => Date.now(),
   random = () => randomInt(1, 101), damageFor = (player) => player.serverDamage ?? 8,
   dropsFor = (monster) => monster.drops || [],
+  rangeFor = (player) => player.held === 'bow' ? 22 : ATTACK_RANGE,
   xpFor = (monster) => Math.max(1, Math.round((monster.level || 1) * 12)),
   goldFor = (monster) => Math.max(1, Math.round((monster.level || 1) * 3)),
   broadcast = () => {},
@@ -128,7 +129,9 @@ export function createCombatLoot({
       player = livePlayer;
       const monster = monsters.find((m) => m.id === String(monsterId));
       if (!monster || monster.dead || monster.hp <= 0) throw new Error('Monster is not alive.');
-      if (monster.zone !== player.zone || distance(player, monster) > ATTACK_RANGE) throw new Error('Monster is out of range.');
+      if (monster.zone !== player.zone || distance(player, monster) > Math.max(ATTACK_RANGE, Number(rangeFor(player)) || ATTACK_RANGE)) {
+        throw new Error('Monster is out of range.');
+      }
       const last = cooldowns.get(player.id) || 0;
       if (now() - last < ATTACK_COOLDOWN_MS) throw new Error('Attack is not ready.');
       cooldowns.set(player.id, now());
