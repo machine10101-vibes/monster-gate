@@ -2734,6 +2734,61 @@ class Game {
     m.takeHit(dmg, dx, dz, knock, crit);
   }
 
+  enterPvpArenaFromServer(info) {
+    const w = this.world, arena = w?.colosseum, pose = info?.pose;
+    if (!w || !arena || !pose || !this.player || w.realm === 'rift') return false;
+    if (w.cave) w.cave.group.visible = false;
+    if (w.rift) w.rift.group.visible = false;
+    w.group.visible = false;
+    arena.group.visible = true;
+    w.realm = 'colosseum';
+    this.player.pos.set(Number(pose.x) || arena.arena.x, Number(pose.y) || 2.2, Number(pose.z) || arena.arena.z);
+    this.player.yaw = Number(pose.yaw) || 0;
+    this.player.vel?.set(0, 0, 0);
+    this.player.knock?.set(0, 0, 0);
+    this.player.syncObj?.();
+    this.player.hp = Number(info.hp) || this.player.hp;
+    this.player.dead = false;
+    this.player.setState?.('idle');
+    this.cam.targetYaw = this.player.yaw;
+    this.sky.indoors = true;
+    this.snapCamera();
+    this.zone = 'colosseum';
+    this.hud.setArea('Gilantre Colosseum');
+    this.hud.banner('Colosseum', info.mode || 'Match begins', 2600);
+    this.refreshHud?.();
+    return true;
+  }
+
+  leavePvpArenaFromServer(info) {
+    const w = this.world, arena = w?.colosseum, pose = info?.return_pose;
+    if (!w || !arena || !this.player) return false;
+    arena.group.visible = false;
+    const zone = String(pose?.zone || 'Oakhollow');
+    const realm = zone === 'cave' ? 'cave' : zone === 'rift' ? 'rift' : 'over';
+    w.realm = realm;
+    w.group.visible = realm === 'over';
+    if (w.cave) w.cave.group.visible = realm === 'cave';
+    if (w.rift) w.rift.group.visible = realm === 'rift';
+    if (pose) {
+      this.player.pos.set(Number(pose.x) || 72, Number(pose.y) || 3, Number(pose.z) || 72.5);
+      this.player.yaw = Number(pose.yaw) || 0;
+    }
+    this.player.vel?.set(0, 0, 0);
+    this.player.knock?.set(0, 0, 0);
+    this.player.syncObj?.();
+    this.player.hp = Number(info.hp) || this.player.hp;
+    this.player.dead = false;
+    this.player.setState?.('idle');
+    this.cam.targetYaw = this.player.yaw;
+    this.sky.indoors = realm !== 'over';
+    this.snapCamera();
+    this.zone = zone;
+    this.hud.setArea(zone === 'cave' ? 'Darksycle Den' : zone === 'rift' ? 'Waygate Rift' : zone);
+    this.refreshHud?.();
+    return true;
+  }
+
   enterRiftFromServer(info) {
     if (this.world?.realm === 'rift') return;
     enterRift(this, { party: info?.party_size || 1, follow: false, serverOwned: true });
@@ -3717,6 +3772,17 @@ class Game {
       this.ember += (0 - this.ember) * Math.min(1, dt * 2);
       return;
     }
+    if (this.world.realm === 'colosseum') {
+      if (this.zone !== 'colosseum') {
+        this.zone = 'colosseum';
+        this.hud.setArea('Gilantre Colosseum');
+      }
+      this.forestAmt += (0 - this.forestAmt) * Math.min(1, dt * 1.5);
+      this.chill += (0 - this.chill) * Math.min(1, dt * 2);
+      this.ember += (0 - this.ember) * Math.min(1, dt * 2);
+      return;
+    }
+
     const land = this.world.landAt(P.x, P.z);
     const oasisName = oasisAreaName(P.x, P.z);
     if (oasisName) {
