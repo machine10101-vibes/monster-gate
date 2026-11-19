@@ -2182,16 +2182,21 @@ class Game {
       return;
     }
     if (this.mmo?.ws?.readyState === 1) {
+      if (m.serverAuthoritative && m.serverId) {
+        this.mmo.attackMonster(m.serverId);
+        return;
+      }
       const serverMob = (this.mmo.entities?.monsters || [])
         .filter((candidate) => candidate.type === m.type)
         .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
         .sort((a, b) => a.distance - b.distance)[0];
-      if (serverMob && serverMob.distance <= 14) {
+      if (serverMob && serverMob.distance <= 18) {
         m.serverId = serverMob.candidate.id;
         m.serverAuthoritative = true;
         this.mmo.attackMonster(serverMob.candidate.id);
         return;
       }
+      if (m.realm === 'rift') return;
     }
     m.takeHit(dmg, dx, dz, knock, crit);
   }
