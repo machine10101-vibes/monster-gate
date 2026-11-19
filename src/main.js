@@ -2183,11 +2183,11 @@ class Game {
       this.net.relayHit(m, dmg, dx, dz, knock, crit);
       return;
     }
+    if (m.serverAuthoritative) {
+      if (this.mmo?.ws?.readyState === 1 && m.serverId) this.mmo.attackMonster(m.serverId);
+      return;
+    }
     if (this.mmo?.ws?.readyState === 1) {
-      if (m.serverAuthoritative && m.serverId) {
-        this.mmo.attackMonster(m.serverId);
-        return;
-      }
       const serverMob = (this.mmo.entities?.monsters || [])
         .filter((candidate) => candidate.type === m.type)
         .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
