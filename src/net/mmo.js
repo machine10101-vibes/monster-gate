@@ -299,51 +299,11 @@ export class MmoClient {
   async wakeThenOpen() {
     this.clearWake();
     const gen = ++this.wakeGen;
-    const wake = this.opts.wake || {};
-    const etaSec = wake.etaSec ?? WAKE_ETA_SEC;
-    const giveUpSec = wake.giveUpSec ?? WAKE_GIVE_UP_SEC;
-    const pollMs = wake.pollMs ?? WAKE_POLL_MS;
-    const tickMs = wake.tickMs ?? WAKE_TICK_MS;
-    const initialProbeMs = wake.initialProbeMs ?? WAKE_INITIAL_PROBE_MS;
-    const probeMs = wake.probeMs ?? WAKE_PROBE_MS;
-    const now = this.opts.now || Date.now;
-    const started = now();
-    const alive = () => gen === this.wakeGen && !this.closed && !this.fatal;
-    const elapsedMs = () => Math.max(0, now() - started);
-    const secondsLeft = () => Math.max(0, etaSec - Math.floor(elapsedMs() / 1000));
-    const announce = () => {
-      if (!alive()) return;
-      this.setStatus('waking', { secondsLeft: secondsLeft(), elapsedMs: elapsedMs() });
-    };
-
-    // Fast-path an already-awake service without flashing the queue. If it is
-    // asleep, keep the next health request open for the full Render cold start.
-    let ok = await this.probeHealthz(initialProbeMs);
-    if (!alive()) return;
-    if (ok) {
-      this.clearWake();
-      this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
-      this.openSocket();
-      return;
-    }
-
-    announce();
-    this.wakeTick = setInterval(announce, tickMs);
-    while (alive()) {
-      ok = await this.probeHealthz(probeMs);
-      if (!alive()) return;
-      if (ok) {
-        this.clearWake();
-        this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
-        this.openSocket();
-        return;
-      }
-      // Past 75s the view shows Retry from elapsedMs; keep probing so a late
-      // wake still moves to connecting/online. onRetry starts a fresh countdown.
-      await new Promise((resolve) => {
-        this.wakePoll = setTimeout(resolve, pollMs);
-      });
-    }
+    if (gen !== this.wakeGen || this.closed || this.fatal) return;
+    // Choosing World 1 starts the hunt on the socket. A health probe must not
+    // hold the player on the login-queue screen.
+    this.setStatus(this.attempt ? 'reconnecting' : 'connecting');
+    this.openSocket();
   }
 
   openSocket() {

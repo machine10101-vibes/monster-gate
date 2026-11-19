@@ -274,12 +274,11 @@ test('a live /healthz skips waking and goes connecting then online', async () =>
   client.dispose();
 });
 
-test('a sleeping /healthz counts down secondsLeft and then connects', async () => {
+test('a sleeping /healthz still opens the socket without a login queue', async () => {
   let calls = 0;
   const fetch = async () => {
     calls += 1;
-    if (calls < 3) return { ok: false, status: 502, json: async () => ({ ok: false }) };
-    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    return { ok: false, status: 502, json: async () => ({ ok: false }) };
   };
   const view = stubView();
   const client = new MmoClient({ character: { name: 'Ann' } }, view, {
@@ -288,33 +287,18 @@ test('a sleeping /healthz counts down secondsLeft and then connects', async () =
     token: 'ann',
     guest: false,
     fetch,
-    wake: { pollMs: 15, tickMs: 15, probeMs: 15, etaSec: 30, giveUpSec: 60 },
   });
   client.connect();
-  await new Promise((r) => {
-    const t = Date.now();
-    const tick = () => {
-      if (view.statuses.some((s) => s.status === 'connecting')) return r();
-      if (Date.now() - t > 2000) return r();
-      setTimeout(tick, 10);
-    };
-    tick();
-  });
-  const waking = view.statuses.filter((s) => s.status === 'waking');
-  assert.ok(waking.length >= 1);
-  assert.equal(typeof waking[0].secondsLeft, 'number');
-  assert.equal(typeof waking[0].elapsedMs, 'number');
-  assert.ok(waking[0].secondsLeft <= 30);
-  assert.ok(waking[0].secondsLeft >= 0);
-  assert.ok(waking[0].elapsedMs >= 0);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(calls, 0);
+  assert.equal(view.statuses.some((s) => s.status === 'waking'), false);
   assert.ok(view.statuses.some((s) => s.status === 'connecting'));
+  assert.ok(client.ws);
   client.dispose();
 });
 
-test('secondsLeft stays at 0 after the ETA, and onRetry restarts the wake check', async () => {
+test('retry opens the socket again without a wake countdown', async () => {
   let retryCb = null;
-  let up = false;
-  const fetch = async () => (up ? { ok: true, json: async () => ({ ok: true }) } : { ok: false, status: 503, json: async () => ({ ok: false }) });
   const view = stubView();
   view.onRetry = (cb) => { retryCb = cb; };
   const client = new MmoClient({ character: { name: 'Ann' } }, view, {
@@ -322,36 +306,17 @@ test('secondsLeft stays at 0 after the ETA, and onRetry restarts the wake check'
     WebSocket: FakeSocket,
     token: 'ann',
     guest: false,
-    fetch,
-    wake: { pollMs: 10, tickMs: 10, probeMs: 10, etaSec: 0, giveUpSec: 60 },
+    fetch: async () => ({ ok: false, status: 503, json: async () => ({ ok: false }) }),
   });
   client.connect();
-  await new Promise((r) => {
-    const t = Date.now();
-    const tick = () => {
-      const waking = view.statuses.filter((s) => s.status === 'waking');
-      if (waking.some((s) => s.secondsLeft === 0 && s.elapsedMs > 0) && retryCb) return r();
-      if (Date.now() - t > 2000) return r();
-      setTimeout(tick, 10);
-    };
-    tick();
-  });
-  const waking = view.statuses.filter((s) => s.status === 'waking');
-  assert.ok(waking.some((s) => s.secondsLeft === 0));
-  assert.ok(waking.every((s) => typeof s.elapsedMs === 'number' && s.elapsedMs >= 0));
-  assert.equal(view.statuses.some((s) => s.status === 'error'), false);
+  await new Promise((r) => setTimeout(r, 30));
   assert.equal(typeof retryCb, 'function');
-  up = true;
+  assert.equal(view.statuses.some((s) => s.status === 'waking'), false);
+  const first = client.ws;
   retryCb();
-  await new Promise((r) => {
-    const t = Date.now();
-    const tick = () => {
-      if (view.statuses.some((s) => s.status === 'connecting')) return r();
-      if (Date.now() - t > 2000) return r();
-      setTimeout(tick, 10);
-    };
-    tick();
-  });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.ok(client.ws);
+  assert.notEqual(client.ws, first);
   assert.ok(view.statuses.some((s) => s.status === 'connecting'));
   client.dispose();
 });

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { test } from 'node:test';
-import { attachMmo, WAKE_INITIAL_PROBE_MS, WAKE_PROBE_MS } from '../src/net/mmo.js';
+import { attachMmo } from '../src/net/mmo.js';
 
 class FakeSocket {
   constructor(url) {
@@ -41,26 +41,12 @@ function stubView() {
   };
 }
 
-test('?mmo=1 keeps a long-lived health probe open through a 10s Render cold start', async () => {
-  const asleepMs = 10_000;
-  const wokeAt = Date.now() + asleepMs;
+test('?mmo=1 opens World 1 immediately instead of holding a login queue', async () => {
   let healthRequests = 0;
   const server = http.createServer((req, res) => {
-    const path = (req.url || '/').split('?')[0];
-    if (path !== '/healthz') {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
     healthRequests += 1;
-    const wait = Math.max(0, wokeAt - Date.now());
-    setTimeout(() => {
-      res.writeHead(200, {
-        'content-type': 'application/json',
-        'access-control-allow-origin': '*',
-      });
-      res.end(JSON.stringify({ ok: true, protocol: 1 }));
-    }, wait);
+    res.writeHead(503);
+    res.end();
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
@@ -75,41 +61,22 @@ test('?mmo=1 keeps a long-lived health probe open through a 10s Render cold star
     guest: false,
   });
   assert.ok(client);
-  assert.ok(WAKE_INITIAL_PROBE_MS < asleepMs, 'the quick probe should preserve the awake-server fast path');
-  assert.ok(WAKE_PROBE_MS >= asleepMs, 'the follow-up probe timeout must cover a Render cold start');
   try {
     await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('timed out waiting for waking queue')), 7000);
+      const timer = setTimeout(() => reject(new Error('timed out waiting for the socket')), 1000);
       const tick = () => {
-        if (view.statuses.some((s) => s.status === 'waking') && healthRequests >= 2) {
+        if (client.ws && view.statuses.some((s) => s.status === 'connecting')) {
           clearTimeout(timer);
           return resolve();
         }
-        setTimeout(tick, 25);
+        setTimeout(tick, 10);
       };
       tick();
     });
-    assert.equal(healthRequests, 2, 'the first short probe should be followed by one long-lived wake request');
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('timed out waiting for connecting')), 20_000);
-      const tick = () => {
-        if (view.statuses.some((s) => s.status === 'connecting')) {
-          clearTimeout(timer);
-          return resolve();
-        }
-        setTimeout(tick, 50);
-      };
-      tick();
-    });
-    const waited = Date.now() - started;
-    const waking = view.statuses.filter((s) => s.status === 'waking');
-    assert.ok(waking.length >= 1, 'expected waking statuses while the server slept');
-    assert.ok(waking.every((s) => typeof s.secondsLeft === 'number' && typeof s.elapsedMs === 'number'));
-    assert.ok(waking[0].secondsLeft <= 60);
-    assert.ok(waking.at(-1).elapsedMs >= 1000);
-    assert.ok(waited >= 7000, `expected to wait most of the 10s sleep, got ${waited}ms`);
+    assert.ok(Date.now() - started < 1000);
+    assert.equal(view.statuses.some((s) => s.status === 'waking'), false);
+    assert.equal(healthRequests, 0);
     assert.ok(view.statuses.some((s) => s.status === 'connecting'));
-    
   } finally {
     client.dispose();
     await new Promise((resolve) => server.close(resolve));

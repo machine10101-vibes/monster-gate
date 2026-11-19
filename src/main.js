@@ -950,8 +950,8 @@ class Game {
     }
     this.hideWorldPicker();
     this.charSelect?.hideWorldMenu?.();
-    await this.ensureOnlineClient();
     this.enterWorld(char);
+    await this.ensureOnlineClient();
   }
 
   pickWorldOnline() {
