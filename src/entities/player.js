@@ -397,6 +397,10 @@ export class Player {
     if (this.state === 'use' && !(this.sipping && item.kind !== 'use' && item.kind !== 'light' && item.kind !== 'none')) {
       return false;
     }
+    if (item.kind === 'use' && this.game.mmo?.pvpMatchId) {
+      this.game.hud.toast('Consumables are disabled in the Colosseum', 1400);
+      return false;
+    }
     if (item.kind === 'use') {
       const heal = item.heal || 0;
       const mana = item.mana || 0;
