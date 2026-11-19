@@ -422,6 +422,7 @@ class Game {
     this.scene.add(this.world.group);
     if (this.world.cave) this.scene.add(this.world.cave.group);
     if (this.world.rift) this.scene.add(this.world.rift.group);
+    if (this.world.colosseum) this.scene.add(this.world.colosseum.group);
     this.sky = new Sky(this.scene, this.quality);
     this.snowfall = new Snowfall(this.scene);
     this.ashfall = new Ashfall(this.scene);
