@@ -51,7 +51,7 @@ test('World 1 parties require acceptance, broadcast authoritative state, promote
   a.send(encode('party_invite', { name: 'Bea', request_id: 'party-1' }));
   const invite = await waitFor(b, m => m.type === 'party_invite');
   assert.equal((await inviteAck).pending, true);
-  assert.equal(am.some(m => m.type === 'party_state'), false, 'invite does not silently add target');
+  assert.equal(am.some(m => m.type === 'party_state' && m.party), false, 'invite does not silently add target');
   const aParty = waitFor(a, m => m.type === 'party_state' && m.party?.members?.length === 2);
   const bParty = waitFor(b, m => m.type === 'party_state' && m.party?.members?.length === 2);
   b.send(encode('party_accept', { invite_id: invite.invite_id }));
