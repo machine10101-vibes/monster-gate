@@ -211,6 +211,7 @@ export class World {
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) this.gather(session, msg);
       else if (msg.type === 'attack') this.combatAction(session, msg).catch((err) => this.actionError(session, err));
+      else if (msg.type === 'monster_move') this.moveMonster(session, msg);
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));
       else if (msg.type === 'rift_chest_claim') this.claimRiftChest(session).catch((err) => this.actionError(session, err));
@@ -411,6 +412,36 @@ export class World {
     this.social.onHp(session, prevHp);
     this.social.onPose?.(session);
     this.persistPose(session);
+  }
+
+  moveMonster(session, msg) {
+    const monster = this.monsters.find((entry) => entry.id === String(msg.id || ''));
+    if (!monster || monster.dead || monster.hp <= 0 || monster.zone !== session.zone) return;
+    if (monster.controllerId && monster.controllerId !== session.id) return;
+    const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), yaw = Number(msg.yaw);
+    if (![x, y, z, yaw].every(Number.isFinite)) return;
+    const t = this.now();
+    if (monster.lastMoveAt && t - monster.lastMoveAt < 120) return;
+    const dt = monster.lastMoveAt ? Math.max(0.12, Math.min(0.6, (t - monster.lastMoveAt) / 1000)) : 0.25;
+    const maxStep = (monster.speed || 2.8) * dt + 0.9;
+    if (Math.hypot(x - monster.x, z - monster.z) > maxStep) return;
+    if (Math.hypot(x - monster.homeX, z - monster.homeZ) > 36) return;
+    if (Math.hypot(x - session.x, z - session.z) > (monster.aggro || 12) + 14) return;
+    if (Math.abs(y - monster.y) > 3) return;
+    monster.controllerId = session.id;
+    monster.lastMoveAt = t;
+    monster.x = x;
+    monster.y = y;
+    monster.z = z;
+    monster.yaw = ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    for (const player of this.players.values()) {
+      if (inAoi(player, monster, this.aoi)) {
+        this._send(player.ws, 'monster_state', {
+          id: monster.id, hp: monster.hp, alive: true,
+          x: monster.x, y: monster.y, z: monster.z, yaw: monster.yaw,
+        });
+      }
+    }
   }
 
   actionError(session, err) {
@@ -670,6 +701,7 @@ export class World {
       if (this.byUser.get(session.userId) === session) this.byUser.delete(session.userId);
       this.dirty.delete(session.id);
       this.social.onLeave(session);
+      for (const monster of this.monsters) if (monster.controllerId === session.id) monster.controllerId = null;
       this.rememberResume(session);
       if (session.riftRunId && session.riftReturnPose) {
         Object.assign(session, session.riftReturnPose);
