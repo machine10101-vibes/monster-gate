@@ -160,7 +160,7 @@ export function restoreOverworldRealms(game) {
 }
 
 export function enterRift(game, opts = {}) {
-  game.mmo?.enterRift?.();
+  const serverOwned = game.mmo?.enterRift?.() === true;
   const w = game.world;
   const r = w.rift;
   if (!r || !game.player) return false;
@@ -254,7 +254,7 @@ export function lootRiftChest(game) {
   const r = game.world?.rift;
   const run = game.riftRun;
   if (!r?.chest?.ready || r.chest.looted || !run || run.looted) return { ok: false };
-  if (game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
+  if (run?.serverOwned && game.mmo?.ws?.readyState === 1 && game.mmo.you?.guest === false) {
     game.mmo.claimRiftChest?.();
     game.hud.toast('Claiming Rift rewards…', 2200);
     return { ok: false, pending: true };
