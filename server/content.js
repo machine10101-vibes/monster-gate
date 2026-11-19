@@ -176,6 +176,14 @@ export function createRiftMonster(id, type, x, z, hpMultiplier = 1) {
 
 export function createMonsters() {
   const list = [];
+  const commonSpawns = [
+    ['slime', 60, 40], ['slime', 84, 44], ['voidslime', 68, 28], ['wraith', 78, 29],
+    ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70],
+    ['slime', 76, 102], ['budgedragon', 120, 74],
+  ];
+  commonSpawns.forEach(([type, x, z], i) => {
+    list.push(monster(`field_${type}_${i}`, type, x, z, 3.2, zoneAt(x, z)));
+  });
   const demon = keepPosts(3, 1, 72, 66, 0); // Hellspire
   demon.posts.forEach((p, i) => {
     list.push(monster(`demonknight_${i}`, 'demonknight', p[0], p[1], 3.6, 'Hellspire'));
