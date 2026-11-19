@@ -403,7 +403,11 @@ export class World {
     if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
     }
-    if (session.pvpMatchId) session.zone = `colosseum:${session.pvpMatchId}`;
+    if (session.pvpMatchId) {
+      session.zone = `colosseum:${session.pvpMatchId}`;
+      session.x = Math.max(1599, Math.min(1636, session.x));
+      session.z = Math.max(799, Math.min(836, session.z));
+    }
     if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
       this.rejectZoneFull(session, session.zone);
       session.x = prevX;
