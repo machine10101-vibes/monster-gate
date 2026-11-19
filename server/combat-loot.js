@@ -78,11 +78,11 @@ export function createCombatLoot({
     const need = entries.filter(([, c]) => c.choice === 'need').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
     const greed = entries.filter(([, c]) => c.choice === 'greed').sort((a,b) => b[1].value-a[1].value || a[1].order-b[1].order);
     const winnerId = (need[0] || greed[0])?.[0];
-    const winner = players.get(winnerId);
+    let winner = players.get(winnerId);
     if (winner) await deliver(roll.item, winner, roll.rewardId);
-    else await roundRobin(roll.item, roll.members, roll.partyId, roll.rewardId);
+    else winner = await roundRobin(roll.item, roll.members, roll.partyId, roll.rewardId);
     rolls.delete(roll.id);
-    broadcast({ type: 'loot_roll_result', roll_id: roll.id, reward_id: roll.rewardId, winner: winner?.id || null, item: roll.item });
+    broadcast({ type: 'loot_roll_result', roll_id: roll.id, reward_id: roll.rewardId, winner: winner?.id || null, item: roll.item }, roll.members);
   }
 
   async function kill(monster, killer) {
