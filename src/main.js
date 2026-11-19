@@ -337,6 +337,7 @@ class Game {
     this.scene.add(this.world.group);
     if (this.world.cave) this.scene.add(this.world.cave.group);
     if (this.world.rift) this.scene.add(this.world.rift.group);
+    if (this.world.colosseum) this.scene.add(this.world.colosseum.group);
     this.sky = new Sky(this.scene, this.quality);
     this.snowfall = new Snowfall(this.scene);
     this.ashfall = new Ashfall(this.scene);
@@ -2579,6 +2580,57 @@ class Game {
     this.talkQuest = false;
     if (result.ok) this.applyJournal(result);
     this.audio.select();
+  }
+
+  enterPvpArenaFromServer(info) {
+    const w = this.world, arena = w?.colosseum, pose = info?.pose;
+    if (!w || !arena || !pose || !this.player) return false;
+    if (w.realm === 'rift') return false;
+    if (w.cave) w.cave.group.visible = false;
+    if (w.rift) w.rift.group.visible = false;
+    w.group.visible = false;
+    arena.group.visible = true;
+    w.realm = 'colosseum';
+    this.pvpReturnRealm = 'over';
+    this.player.pos.set(Number(pose.x) || arena.arena.x, Number(pose.y) || 2.2, Number(pose.z) || arena.arena.z);
+    this.player.yaw = Number(pose.yaw) || 0;
+    this.player.vel?.set?.(0, 0, 0);
+    this.player.syncObj?.();
+    this.player.hp = Number(info.hp) || this.player.hp;
+    this.cam.targetYaw = this.player.yaw;
+    this.sky.indoors = true;
+    this.snapCamera();
+    this.zone = 'colosseum';
+    this.hud.setArea('Gilantre Colosseum');
+    this.hud.banner('Colosseum', info.mode || 'Match begins', 2600);
+    this.refreshHud?.();
+    return true;
+  }
+
+  leavePvpArenaFromServer(info) {
+    const w = this.world, arena = w?.colosseum, pose = info?.return_pose;
+    if (!w || !arena || !this.player) return false;
+    arena.group.visible = false;
+    const zone = String(pose?.zone || 'Oakhollow');
+    const realm = zone === 'cave' ? 'cave' : zone === 'rift' ? 'rift' : 'over';
+    w.realm = realm;
+    w.group.visible = realm === 'over';
+    if (w.cave) w.cave.group.visible = realm === 'cave';
+    if (w.rift) w.rift.group.visible = realm === 'rift';
+    if (pose) {
+      this.player.pos.set(Number(pose.x) || 72, Number(pose.y) || 3, Number(pose.z) || 72.5);
+      this.player.yaw = Number(pose.yaw) || 0;
+    }
+    this.player.vel?.set?.(0, 0, 0);
+    this.player.syncObj?.();
+    this.player.hp = Number(info.hp) || this.player.hp;
+    this.cam.targetYaw = this.player.yaw;
+    this.sky.indoors = realm !== 'over';
+    this.snapCamera();
+    this.zone = zone;
+    this.hud.setArea(zone === 'cave' ? 'Whispering Cave' : zone === 'rift' ? 'Waygate Rift' : zone);
+    this.refreshHud?.();
+    return true;
   }
 
   enterRiftFromServer(info) {
