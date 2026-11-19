@@ -607,6 +607,17 @@ export class World {
           userId: member.userId, kind: 'rift_clear', id: 'rift', amount: 1,
         });
         member.riftClearAt = this.now();
+        const saved = await this.persist.loadCharacter(member.userId);
+        if (saved?.state) {
+          this._send(member.ws, 'reward_snapshot', {
+            gold: Number(saved.state.gold ?? saved.gold) || 0,
+            xp: saved.state.xp || {},
+            goods: saved.state.goods || {},
+            materials: saved.state.materials || {},
+            crafted: saved.state.crafted || {},
+            riftClearAt: Number(saved.state.riftClearAt) || member.riftClearAt,
+          });
+        }
         this._send(member.ws, 'rift_chest_result', { run_id: run.id, ok: true });
       }
     } catch (err) {
