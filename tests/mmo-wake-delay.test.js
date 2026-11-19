@@ -75,6 +75,7 @@ test('?mmo=1 shows waking with elapsedMs until a 10s-asleep /healthz answers', a
     guest: false,
   });
   assert.ok(client);
+  assert.ok(view.statuses.some((s) => s.status === 'waking'), 'show the queue before the long health probe resolves');
   assert.ok(WAKE_PROBE_MS >= asleepMs, 'health probe timeout must cover a Render cold start');
   try {
     await new Promise((resolve, reject) => {
