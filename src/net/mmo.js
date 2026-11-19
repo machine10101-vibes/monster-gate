@@ -54,13 +54,18 @@ export function resolveServerUrl(search = '', opts = {}) {
 }
 
 export function readAccessToken(opts = {}) {
-  if (typeof opts.token === 'string' && opts.token) return opts.token;
-  if (typeof sessionStorage === 'undefined') return '';
-  for (const store of [sessionStorage, typeof localStorage !== 'undefined' ? localStorage : null]) {
-    if (!store) continue;
+  const walletToken = typeof opts.wallet?.accessToken === 'string' ? opts.wallet.accessToken.trim() : '';
+  if (walletToken) return walletToken;
+  const explicit = typeof opts.token === 'string' ? opts.token.trim() : '';
+  if (explicit) return explicit;
+  const stores = [];
+  if (typeof sessionStorage !== 'undefined') stores.push(sessionStorage);
+  if (typeof localStorage !== 'undefined') stores.push(localStorage);
+  for (const store of stores) {
     try {
       const raw = JSON.parse(store.getItem(SESSION_KEY) || 'null');
-      if (raw && typeof raw.accessToken === 'string') return raw.accessToken;
+      const token = raw && typeof raw.accessToken === 'string' ? raw.accessToken.trim() : '';
+      if (token) return token;
     } catch {
       /* try the other store */
     }
@@ -107,6 +112,9 @@ export class MmoClient {
     this.fatal = false;
     this.fatalReason = null;
     this.authRejectedToken = null;
+    this.authHold = false;
+    this.rejectedToken = '';
+    this.lastHelloToken = '';
     this.entities = { monsters: [], nodes: [] };
     this.nearby = new Map();
     this.wakeGen = 0;
@@ -148,7 +156,7 @@ export class MmoClient {
   }
 
   currentToken() {
-    const stored = readAccessToken({ ...this.opts, token: '' });
+    const stored = readAccessToken({ ...this.opts, wallet: this.game?.wallet, token: '' });
     const explicit = typeof this.opts?.token === 'string' ? this.opts.token : '';
     if (explicit) {
       if (stored && stored !== explicit) return stored;
@@ -167,6 +175,8 @@ export class MmoClient {
     this.fatalReason = null;
     this.closed = false;
     this.authRejectedToken = null;
+    this.authHold = false;
+    this.rejectedToken = '';
     clearTimeout(this.timer);
     this.timer = 0;
   }
@@ -180,6 +190,9 @@ export class MmoClient {
     this.opts = { ...this.opts, token: next };
     if (next && next !== this.authRejectedToken && (!this.fatalReason || this.fatalReason === 'auth')) {
       this.resetAuth();
+      this.authHold = false;
+      this.rejectedToken = '';
+      this.view.authReject = false;
       this.connect();
     }
     return next;
@@ -191,9 +204,25 @@ export class MmoClient {
     if (token && token !== this.authRejectedToken) this.resetAuth();
   }
 
+  pollToken() {
+    if (this.closed || !this.authHold) return false;
+    const token = this.currentToken();
+    if (!token || token === this.rejectedToken) return false;
+    this.authHold = false;
+    this.rejectedToken = '';
+    this.authRejectedToken = null;
+    this.fatal = false;
+    this.fatalReason = null;
+    if (this.view) this.view.authReject = false;
+    this.view?.clearAuthLatch?.();
+    this.attempt = 0;
+    this.connect();
+    return true;
+  }
+
   connect() {
     this.maybeClearAuthRejection();
-    if (this.closed || this.fatal || !this.url || !this.Socket) return;
+    if (this.closed || this.fatal || this.authHold || !this.url || !this.Socket) return;
     this.bind();
     void this.wakeThenOpen();
   }
@@ -295,6 +324,7 @@ export class MmoClient {
       this.attempt = 0;
       this.startPing();
       const token = this.currentToken();
+      this.lastHelloToken = token;
       const payload = {
         token,
         name: localName(this.game),
@@ -308,7 +338,7 @@ export class MmoClient {
       this.stopPing();
       if (this.ws !== ws) return;
       this.ws = null;
-      if (!this.closed && !this.fatal) this.schedule();
+      if (!this.closed && !this.fatal && !this.authHold) this.schedule();
     };
     if (typeof ws.addEventListener === 'function') {
       ws.addEventListener('open', onOpen);
@@ -432,6 +462,7 @@ export class MmoClient {
     if (msg.type === TYPES.welcome) {
       this.you = msg.you || null;
       this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
+      this.startPing();
       if (this.game?.riftRun?.serverOwned && msg.pose?.zone !== 'rift') this.game.leaveRiftFromServer?.();
       this.syncAuthoritativeMonsters();
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
@@ -479,11 +510,20 @@ export class MmoClient {
         this.dispose('error', { code: 'name_taken', message });
         return;
       }
-      if (msg.code === 'auth' || (msg.code === 'zone_full' && !this.you)) {
+      if (msg.code === 'auth') {
+        this.authHold = true;
+        this.rejectedToken = this.lastHelloToken || this.currentToken();
+        this.authRejectedToken = this.rejectedToken;
+        this.stopPing();
+        if (this.view) this.view.authReject = true;
+        toast(this.game, msg.message || 'Sign in to hunt online. Guests stay solo.');
+        this.setStatus('error', { code: 'auth', message: msg.message || 'Sign in to hunt online.' });
+        return;
+      }
+      if (msg.code === 'zone_full' && !this.you) {
         this.fatal = true;
-        this.fatalReason = msg.code === 'auth' ? 'auth' : 'zone_full';
-        if (msg.code === 'auth') this.authRejectedToken = this.currentToken();
-        toast(this.game, msg.message || (msg.code === 'zone_full' ? 'That town is full.' : 'Sign in to hunt online. Guests stay solo.'));
+        this.fatalReason = 'zone_full';
+        toast(this.game, msg.message || 'That town is full.');
         this.dispose('offline', msg.message);
         return;
       }
