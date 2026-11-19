@@ -166,6 +166,42 @@ export function createCombatLoot({
         }
       }
     },
+    async distribute(items, members, partyId, rewardPrefix) {
+      const eligible = (members || []).filter((member) => member?.userId && players.get(member.id) === member);
+      if (!eligible.length) throw new Error('No eligible hunters for this reward.');
+      const party = partyId ? parties?.get?.(partyId) : null;
+      const mode = LOOT_MODES.has(party?.loot) ? party.loot : 'round_robin';
+      for (const [index, raw] of (items || []).entries()) {
+        const item = {
+          kind: raw.kind,
+          id: String(raw.id || ''),
+          amount: Math.max(1, Math.min(99, Math.floor(raw.amount || 1))),
+        };
+        if (item.kind === 'gold') {
+          for (const member of eligible) {
+            const rewardId = `${rewardPrefix}:gold:${member.userId}`;
+            const result = await grant({ rewardId, kind: 'gold', id: 'gold', amount: item.amount }, member.userId);
+            if (result?.granted) broadcast({ type: 'reward_update', kind: 'gold', id: 'gold', amount: item.amount }, [member]);
+          }
+          continue;
+        }
+        const rewardId = `${rewardPrefix}:item:${index}`;
+        if (mode === 'need_greed' && party && eligible.length > 1) {
+          const roll = {
+            id: randomUUID(), rewardId, item, partyId, members: eligible,
+            choices: new Map(), expiresAt: now() + ROLL_TTL_MS,
+          };
+          rolls.set(roll.id, roll);
+          broadcast({
+            type: 'loot_roll', roll_id: roll.id, reward_id: rewardId, item,
+            expires_at: roll.expiresAt, members: eligible.map((member) => member.id),
+          }, eligible);
+        } else {
+          await roundRobin(item, eligible, party?.id, rewardId);
+        }
+      }
+      return { ok: true, items: (items || []).length };
+    },
     pendingRolls: () => rolls.size,
   };
 }
