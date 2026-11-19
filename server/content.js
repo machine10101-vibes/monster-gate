@@ -1,12 +1,9 @@
 /**
- * Server-owned World 1 content: tile names, knight / Darksycle spawns,
- * and shared gathering nodes. Coordinates follow the live client
+ * Server-owned World 1 content: shared field/boss/Rift monster spawns,
+ * stats, tile names, and gathering nodes. Coordinates follow the live client
  * (src/world/tiles.js, volcanic.js, keeps.js, cave.js, gatherSite.js,
  * entities/monsters.js). Tree offsets are a simplified grove layout;
  * mine, fish, and boss posts match the client.
- *
- * Combat resolution and inventory credit are TODO: this module syncs
- * spawn positions, HP, and node ready/respawn state only.
  */
 
 import { cleanZone } from './protocol.js';
