@@ -41,6 +41,11 @@ export function createPersistence(options = {}) {
     adapter,
     queue,
 
+    async grantOnce(reward) {
+      if (typeof adapter.grantOnce !== 'function') throw new Error('Transactional reward grants require the Supabase persistence adapter.');
+      return adapter.grantOnce(reward);
+    },
+
     async loadCharacter(userId) {
       return remember(await adapter.load(userId));
     },
