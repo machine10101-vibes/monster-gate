@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { TILE } from '../src/engine/materials.js';
 import { QUALITIES, survivalBudget } from '../src/engine/quality.js';
-import { paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
+import { originOf, paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
+import { chartedWeight, oceanWeight, rasterPlaymap } from '../src/world/playmap.js';
 import { sideTilesFor } from '../src/world/terrain.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
@@ -54,18 +55,20 @@ test('world map samples blend biome borders instead of darkening tile edges', ()
   const tiles = src('src/world/tiles.js');
   const map = src('src/ui/worldmap.js');
   const world = src('src/world/world.js');
+  const play = src('src/world/playmap.js');
   assert.match(tiles, /export function sampleBlended/);
   assert.doesNotMatch(tiles, /if \(edge < 0\.02\)/);
   assert.match(map, /paintTileMap\(c, tile\)/);
-  assert.match(map, /const band = 16/);
-  assert.match(world, /function blendMinimapSeams/);
-  assert.match(world, /MAP_BORDER_PX \* scale/);
-  assert.match(world, /paintTileMap\(planned, tile\)/);
+  assert.match(map, /#6d5a44/);
+  assert.match(world, /rasterPlaymap/);
   assert.match(world, /export const MAP_PX = 1/);
   assert.doesNotMatch(world, /function blurMinimap/);
-  assert.match(world, /#1d4e86/);
-  assert.doesNotMatch(world, /#cbb894/);
-  assert.doesNotMatch(world, /jagged/);
+  assert.doesNotMatch(world, /function blendMinimapSeams/);
+  assert.doesNotMatch(world, /paintTileMap\(planned, tile\)/);
+  assert.match(play, /uncharted/);
+  assert.match(play, /oceanWeight/);
+  assert.match(play, /chartedWeight/);
+  assert.doesNotMatch(tiles, /Math\.floor\(v \* 14\) % 2/);
   assert.match(tiles, /MAP_BORDER_PX = 24/);
   assert.match(tiles, /MAP_WARP_PX = 16/);
   assert.match(tiles, /const wx = tile\.tx \+ u/);
@@ -177,7 +180,7 @@ test('cloud shadows darken the ground and never cover the play view', () => {
   assert.doesNotMatch(sky, /CircleGeometry/);
   assert.doesNotMatch(sky, /rng\.range\(6, 11\)/);
   assert.match(mats, /cloudShade/);
-  assert.match(mats, /mix\(1\.0, 0\.78/);
+  assert.match(mats, /mix\(1\.0, 0\.70/);
   assert.match(mats, /#include <opaque_fragment>/);
   assert.match(world, /cloudShade\(p, uCloudTime, uCloudAmt\)/);
   assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
@@ -224,14 +227,19 @@ test('world map raster is one resolution with a 16-24px warped border, not a glo
   const world = src('src/world/world.js');
   const hud = src('src/ui/hud.js');
   const style = src('src/style.css');
+  const play = src('src/world/playmap.js');
   assert.doesNotMatch(tiles, /Math\.round\(Math\.max\(0\.06/);
   assert.doesNotMatch(tiles, /\* 0\.42/);
   assert.doesNotMatch(tiles, /const band = 0\.44/);
   assert.doesNotMatch(world, /function blurMinimap/);
   assert.match(world, /MAP_PX = 1/);
   assert.match(world, /stampTownIcon/);
+  assert.match(world, /rasterPlaymap/);
   assert.match(hud, /imageSmoothingEnabled = false/);
   assert.match(style, /\.bigmap \{[\s\S]*image-rendering:\s*auto/);
+  assert.match(style, /font-size: 13px/);
+  assert.match(play, /applyFrame/);
+  assert.match(play, /compass/);
   const snow = TILES.find((t) => t.kind === 'snowfall');
   const gold = TILES.find((t) => t.kind === 'goldmead');
   const sea = TILES.find((t) => t.biome === 'sea');
@@ -267,6 +275,27 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
   assert.doesNotMatch(mats, /patch < 0\.32/);
   assert.match(player, /RingGeometry/);
+});
+
+test('hunter map paints uncharted parchment and one ocean, not biome blocks', () => {
+  const unbuilt = TILES.find((t) => !t.built && t.biome !== 'sea');
+  const sea = TILES.find((t) => t.biome === 'sea');
+  const built = TILES.find((t) => t.kind === 'oakhollow');
+  assert.ok(unbuilt && sea && built);
+  const uo = originOf(unbuilt);
+  const so = originOf(sea);
+  assert.ok(chartedWeight(72, 76) > 0.8, 'oakhollow stays charted');
+  assert.ok(chartedWeight(uo.x + 72, uo.z + 72) < 0.2, 'planned interior is uncharted');
+  assert.ok(oceanWeight(so.x + 72, so.z + 72) > 0.7, 'south sea is one ocean');
+  const rgba = rasterPlaymap({ width: 96, height: 96, minX: -48, minZ: 1080, scale: 1 });
+  let blue = 0;
+  for (let y = 40; y < 56; y++) {
+    for (let x = 40; x < 56; x++) {
+      const i = (y * 96 + x) * 4;
+      if (rgba[i + 2] > rgba[i] && rgba[i + 2] > 70) blue++;
+    }
+  }
+  assert.ok(blue > 80, 'far south raster is ocean, not yellow blocks');
 });
 
 test('debug teleport snaps the camera look to the hunter', () => {

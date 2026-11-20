@@ -10,10 +10,16 @@ function thumb(tile, game) {
   c = document.createElement('canvas');
   c.width = CELL;
   c.height = CELL;
+  const ctx = c.getContext('2d');
+  if (!tile.built) {
+    ctx.fillStyle = '#6d5a44';
+    ctx.fillRect(0, 0, CELL, CELL);
+    thumbs.set(tile.id, c);
+    return c;
+  }
   paintTileMap(c, tile);
-  const land = tile.built && game.world.tileCanvas?.[tile.id];
+  const land = game.world.tileCanvas?.[tile.id];
   if (land) {
-    const ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = 0.84;
     ctx.drawImage(land, 0, 0, CELL, CELL);
@@ -160,7 +166,11 @@ export function mountWorldMap(body, game) {
       sctx.imageSmoothingEnabled = true;
       sctx.imageSmoothingQuality = 'high';
       sctx.drawImage(land, 0, 0, 384, 384);
-    } else paintTileMap(shot, sel);
+    } else if (sel.built) paintTileMap(shot, sel);
+    else {
+      sctx.fillStyle = '#6d5a44';
+      sctx.fillRect(0, 0, 384, 384);
+    }
     right.appendChild(shot);
     const cap = document.createElement('p');
     cap.className = 'wm-cap';

@@ -5,7 +5,7 @@ import { mountStats } from './stats.js';
 import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
 import { FARM, GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
-import { TILE_SIZE, TILES } from '../world/tiles.js';
+import { TILE_SIZE, TILES, originOf } from '../world/tiles.js';
 import { CAVE_MOUTH } from '../world/southford.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
@@ -95,6 +95,14 @@ function landMapLabels(world) {
     { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24, landmark: true },
   );
   for (const mark of world.farmMarks || []) labels.push(mark);
+  const named = new Set(labels.map((l) => l.name));
+  for (const tile of TILES) {
+    if (tile.built || tile.biome === 'sea') continue;
+    if (named.has(tile.name)) continue;
+    if ((tile.tx + tile.tz * 2) % 4 !== 1) continue;
+    const o = originOf(tile);
+    labels.push({ name: tile.name, x: o.x + TILE_SIZE / 2, z: o.z + TILE_SIZE / 2, uncharted: true });
+  }
   return labels;
 }
 
@@ -690,7 +698,7 @@ export class HUD {
       for (const label of placed) {
         if (!label.visible) continue;
         const b = document.createElement('b');
-        b.className = 'playmap-label' + (label.city ? ' city' : label.kind === 'minor' ? ' minor' : ' landmark');
+        b.className = 'playmap-label' + (label.city ? ' city' : label.kind === 'uncharted' ? ' uncharted' : label.kind === 'minor' ? ' minor' : ' landmark');
         b.textContent = label.name;
         b.style.left = label.x.toFixed(2) + '%';
         b.style.top = label.y.toFixed(2) + '%';

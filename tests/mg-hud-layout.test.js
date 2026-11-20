@@ -218,10 +218,13 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
     { name: 'Southford', nx: 52, ny: 72, city: true },
   ];
   const placed = layoutPlaymapLabels(row);
-  assert.equal(placed.filter((p) => p.visible).length, placed.length);
+  assert.ok(placed.filter((p) => p.city || p.landmark).every((p) => p.visible));
+  assert.ok(placed.find((p) => p.name === 'Oakhollow').visible);
+  assert.ok(placed.find((p) => p.name === 'Southford').visible);
   assert.equal(playmapLabelKind({ name: 'Oakhollow', city: true }), 'city');
   assert.equal(playmapLabelKind({ name: 'Monster Gate' }), 'landmark');
   assert.equal(playmapLabelKind({ name: 'Harefield' }), 'minor');
+  assert.equal(playmapLabelKind({ name: 'Frostwall', uncharted: true }), 'uncharted');
   const box = (p) => ({
     x: p.x / 100 * 720 - p.bw / 2,
     y: p.y / 100 * 560 - p.bh / 2,

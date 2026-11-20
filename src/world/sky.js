@@ -244,7 +244,7 @@ export class Sky {
 
     cloudShadowUniforms.uCloudTime.value = time;
     if (!this.indoors) {
-      cloudShadowUniforms.uCloudAmt.value = (1 - night) * 0.92 + night * 0.18;
+      cloudShadowUniforms.uCloudAmt.value = (1 - night) * 1.0 + night * 0.22;
     }
     this.state = { night, sunDir, lightDir, ...s };
   }
