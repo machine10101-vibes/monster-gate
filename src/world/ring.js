@@ -753,6 +753,19 @@ function specEdges(kind, oak, south, made) {
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
+function stitchSilverrunToGilantre(lands) {
+  const byKind = Object.fromEntries(lands.map((land) => [land.kind, land]));
+  for (const [sourceKind, targetKind] of [['gilantreSw', 'silverrunNorth'], ['gilantreSe', 'silverrunEast']]) {
+    const source = byKind[sourceKind];
+    const target = byKind[targetKind];
+    if (!source || !target) continue;
+    for (let x = 0; x < W; x++) {
+      target.data.H[x] = source.data.H[(W - 1) * W + x];
+    }
+    reslope(target.data.H, target.data.slope);
+  }
+}
+
 export function generateRing(oak, south) {
   const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
   const made = {};
@@ -802,6 +815,7 @@ export function generateRing(oak, south) {
   frostGoldmead(made.goldmead);
   carveDesert(lands.filter((l) => DESERT_SPECS[l.kind]));
   carveGilantre(lands);
+  stitchSilverrunToGilantre(lands);
   return lands;
 }
 
