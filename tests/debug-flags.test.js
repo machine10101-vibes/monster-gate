@@ -9,6 +9,8 @@ import { GOODS } from '../src/data/gathering.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
 import { Progress, saveKey } from '../src/systems/progress.js';
 import { TILES } from '../src/world/tiles.js';
+import { JUNGLE_SPECS } from '../src/world/jungle.js';
+import { PORTALS } from '../src/data/portals.js';
 
 const mem = new Map();
 
@@ -126,6 +128,12 @@ test('every built tile has a debug tp key', () => {
   const pirateTile = TILES.find((t) => t.kind === 'pirateshore');
   assert.equal(pirateTile.name, 'Pirate Shore');
   assert.notEqual(String(pirateTile.name).toLowerCase(), 'dunes');
+  assert.equal(JUNGLE_SPECS.pirateshore.banner[1], 'Pirate Shore');
+  assert.notEqual(JUNGLE_SPECS.pirateshore.banner[1], 'Dunes');
+  const piratePortal = PORTALS.find((p) => p.id === 'pirates');
+  assert.equal(piratePortal.banner[1], 'Pirate Shore');
+  assert.doesNotMatch(piratePortal.place, /Dunes/);
+  assert.doesNotMatch(piratePortal.banner.join(' '), /Dunes/);
   const sun = resolveSpot('sunspill');
   const pirate = resolveSpot('pirateshore');
   for (const key of ['dunes', 'dune', 'desert', 'sand', 'sands']) {

@@ -52,7 +52,7 @@ export const JUNGLE_SPECS = {
     dress: { giants: 11, broadleaf: 50, palms: 12, bananas: 8, bamboo: 10, bigLeaves: 64, ferns: 62, heliconia: 12, orchids: 24, hibiscus: 4, bushes: 24, mangrove: 6, rocks: 24, boulders: 8 },
   },
   pirateshore: {
-    banner: ['Where the Jungle Meets the Sea', 'Dunes'], jungle: true, coast: true, shade: 0, forest: 0.5, amp: 2.4, base: 3.2, seed: 75,
+    banner: ['Where the Jungle Meets the Sea', 'Pirate Shore'], jungle: true, coast: true, shade: 0, forest: 0.5, amp: 2.4, base: 3.2, seed: 75,
     rim: { e: true },
     knolls: [[28, 30, 8, 2.2], [112, 40, 8, 2.4], [60, 44, 6, 1.8]],
     roads: [[[72, 0], [70, 40], [72, 84], [72, 100]], [[0, 100], [30, 100], [60, 100], [104, 100], [130, 98]]],
