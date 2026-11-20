@@ -5,24 +5,34 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <meta name="mg-build" content="05bb9b8" />
+    <meta name="mg-build" content="5606522" />
     <style>html,body{background:#070308}</style>
     <script>
       (function () {
         var meta = document.querySelector('meta[name="mg-build"]');
         var mine = meta && meta.getAttribute('content');
-        if (!mine || mine === 'dev' || mine === '05bb9b8') return;
+        if (!mine || mine === 'dev' || mine === '5606522') return;
+        function go(build) {
+          try {
+            if (sessionStorage.getItem('mg-build-reload') === build) return;
+            sessionStorage.setItem('mg-build-reload', build);
+          } catch (e) {}
+          var u = new URL(location.href);
+          u.searchParams.set('mgb', build);
+          location.replace(u.toString());
+        }
+        window.__mgApplyBuildReload = go;
         fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
           return r.ok ? r.json() : null;
         }).then(function (v) {
           if (!v || !v.build || v.build === mine) return;
-          try {
-            if (sessionStorage.getItem('mg-build-reload') === v.build) return;
-            sessionStorage.setItem('mg-build-reload', v.build);
-          } catch (e) {}
-          var u = new URL(location.href);
-          u.searchParams.set('mgb', v.build);
-          location.replace(u.toString());
+          var hunting = !!(window.__mgHuntStarted || (document.body && document.body.classList.contains('hunting')));
+          if (hunting) {
+            window.__mgPendingBuild = v.build;
+            if (typeof window.__mgOfferBuildReload === 'function') window.__mgOfferBuildReload(v.build);
+            return;
+          }
+          go(v.build);
         }).catch(function () {});
       })();
     </script>
@@ -51,12 +61,12 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-Cgrc0mNH.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/account-C-CeCt-L.js">
-    <link rel="modulepreload" crossorigin href="/assets/materials-BA5JuwBK.js">
+    <script type="module" crossorigin src="/assets/index-ti141IVN.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/account-CH_XWwdA.js">
+    <link rel="modulepreload" crossorigin href="/assets/materials-B6nRr3xC.js">
     <link rel="modulepreload" crossorigin href="/assets/roster-BeIh94gW.js">
-    <link rel="stylesheet" crossorigin href="/assets/account-DbHgCLXb.css">
-    <link rel="stylesheet" crossorigin href="/assets/index-CulVtPTv.css">
+    <link rel="stylesheet" crossorigin href="/assets/account-BDRBy1jF.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-C-BmqrA7.css">
   </head>
   <body>
     <div id="app">
@@ -164,6 +174,7 @@
       <div id="vignette"></div>
       <div id="hurt-flash"></div>
       <div id="toast"></div>
+      <button id="build-reload" class="hidden" type="button">New version available, reload?</button>
       <div id="banner"><span id="banner-sub">Village</span><b id="banner-main">Oakhollow</b></div>
       <div id="dialog" class="mg-frame hidden"><b id="dlg-name"></b><p id="dlg-text"></p><div id="dlg-choices" class="hidden"></div><small>Tap or press F to continue</small></div>
 

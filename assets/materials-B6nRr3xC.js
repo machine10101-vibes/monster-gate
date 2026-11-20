@@ -35,23 +35,20 @@ ${pc}`).replace(`#include <clipping_planes_fragment>`,`#include <clipping_planes
     if (bayer > t * t * 0.92) discard;
   }
 }`).replace(`#include <opaque_fragment>`,`outgoingLight *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);
-#include <opaque_fragment>`)},e.customProgramCacheKey=()=>t+`cloudShadow`,e)}function lc(e){let t=new Uint8Array(e.length*4);e.forEach((e,n)=>{let r=Math.round(Us(e,0,1)*255);t[n*4]=r,t[n*4+1]=r,t[n*4+2]=r,t[n*4+3]=255});let n=new si(t,e.length,1,N);return n.minFilter=f,n.magFilter=f,n.generateMipmaps=!1,n.needsUpdate=!0,n}var uc=lc([.22,.36,.5,.64,.76,.86,.94,1]);function dc(e={}){return new ko({gradientMap:uc,...e})}var fc={uCloudTime:{value:0},uCloudAmt:{value:1},uCloudDark:{value:.42},uCloudForce:{value:0}},pc=`
+#include <opaque_fragment>`)},e.customProgramCacheKey=()=>t+`cloudShadow`,e)}function lc(e){let t=new Uint8Array(e.length*4);e.forEach((e,n)=>{let r=Math.round(Us(e,0,1)*255);t[n*4]=r,t[n*4+1]=r,t[n*4+2]=r,t[n*4+3]=255});let n=new si(t,e.length,1,N);return n.minFilter=f,n.magFilter=f,n.generateMipmaps=!1,n.needsUpdate=!0,n}var uc=lc([.22,.36,.5,.64,.76,.86,.94,1]);function dc(e={}){return new ko({gradientMap:uc,...e})}var fc={uCloudTime:{value:0},uCloudAmt:{value:1},uCloudDark:{value:.58},uCloudForce:{value:0}},pc=`
 float cloudHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float cloudNoise(vec2 p){
   vec2 i = floor(p); vec2 f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(cloudHash(i), cloudHash(i + vec2(1.0, 0.0)), f.x), mix(cloudHash(i + vec2(0.0, 1.0)), cloudHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-float cloudFbm(vec2 p){
-  float a = 0.0; float w = 0.5;
-  for (int i = 0; i < 3; i++) { a += w * cloudNoise(p); p = p * 2.07 + 13.1; w *= 0.5; }
-  return a;
-}
 float cloudShade(vec2 xz, float t, float amt){
   vec2 drift = vec2(t * 2.8, t * -2.2);
-  float n = cloudFbm((xz + drift) * 0.014);
-  n += 0.28 * cloudFbm((xz + drift * 0.55) * 0.006 + 4.7);
-  float sh = max(smoothstep(0.24, 0.48, n), uCloudForce);
+  float n = cloudNoise((xz + drift) * 0.04);
+  n = n * 0.74 + 0.26 * cloudNoise((xz + drift * 0.7) * 0.09 + 5.3);
+  float lo = mix(0.52, 0.42, uCloudForce);
+  float hi = mix(0.66, 0.58, uCloudForce);
+  float sh = smoothstep(lo, hi, n);
   return mix(1.0, uCloudDark, sh * amt);
 }
 `;function mc(e,t=`terrainGlow`){if(!e)return e;e.onBeforeCompile=e=>{sc(e),e.fragmentShader=e.fragmentShader.replace(`#include <emissivemap_fragment>`,`#include <emissivemap_fragment>
