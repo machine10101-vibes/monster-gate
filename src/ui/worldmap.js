@@ -4,18 +4,30 @@ import { captureTileView } from '../world/tileview.js';
 const thumbs = new Map();
 const CELL = 36;
 
+function hash21(x, y) {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
 function thumb(tile, game) {
   let c = thumbs.get(tile.id);
   if (c) return c;
   c = document.createElement('canvas');
   c.width = CELL;
   c.height = CELL;
-  const ctx = c.getContext('2d');
+  paintTileMap(c, tile);
   const land = tile.built && game.world.tileCanvas?.[tile.id];
   if (land) {
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(land, 0, 0, CELL, CELL);
-  } else paintTileMap(c, tile);
+    const tmp = document.createElement('canvas');
+    tmp.width = CELL;
+    tmp.height = CELL;
+    const tctx = tmp.getContext('2d');
+    tctx.imageSmoothingEnabled = true;
+    tctx.drawImage(land, 0, 0, CELL, CELL);
+    const ctx = c.getContext('2d');
+    const inset = 9;
+    ctx.drawImage(tmp, inset, inset, CELL - inset * 2, CELL - inset * 2, inset, inset, CELL - inset * 2, CELL - inset * 2);
+  }
   thumbs.set(tile.id, c);
   return c;
 }
@@ -34,14 +46,15 @@ function blendThumbs() {
   const src = actx.getImageData(0, 0, w, w);
   const out = actx.createImageData(w, w);
   out.data.set(src.data);
-  const band = 7;
+  const band = 13;
   const mix = (x, y, nx, ny, t) => {
     if (nx < 0 || ny < 0 || nx >= w || ny >= w || t <= 0) return;
     const i = (y * w + x) * 4;
     const j = (ny * w + nx) * 4;
-    out.data[i] += (src.data[j] - out.data[i]) * t;
-    out.data[i + 1] += (src.data[j + 1] - out.data[i + 1]) * t;
-    out.data[i + 2] += (src.data[j + 2] - out.data[i + 2]) * t;
+    const k = Math.max(0, Math.min(1, t));
+    out.data[i] += (src.data[j] - out.data[i]) * k;
+    out.data[i + 1] += (src.data[j + 1] - out.data[i + 1]) * k;
+    out.data[i + 2] += (src.data[j + 2] - out.data[i + 2]) * k;
   };
   for (let tz = 0; tz < GRID; tz++) {
     for (let tx = 0; tx < GRID; tx++) {
@@ -49,10 +62,13 @@ function blendThumbs() {
         for (let lx = 0; lx < CELL; lx++) {
           const x = tx * CELL + lx;
           const y = tz * CELL + ly;
-          if (lx < band && tx > 0) mix(x, y, x - (band - lx), y, 1 - lx / band);
-          if (lx >= CELL - band && tx < GRID - 1) mix(x, y, x + (lx - (CELL - band) + 1), y, (lx - (CELL - band) + 1) / band);
-          if (ly < band && tz > 0) mix(x, y, x, y - (band - ly), 1 - ly / band);
-          if (ly >= CELL - band && tz < GRID - 1) mix(x, y, x, y + (ly - (CELL - band) + 1), (ly - (CELL - band) + 1) / band);
+          const jagged = (hash21(x * 0.35, y * 0.35) - 0.5) * 8;
+          const jx = jagged;
+          const jy = (hash21(y * 0.31, x * 0.29) - 0.5) * 8;
+          if (lx + jx < band && tx > 0) mix(x, y, x - (band - lx), y, 1 - (lx + jx) / band);
+          if (lx - jx >= CELL - band && tx < GRID - 1) mix(x, y, x + (lx - (CELL - band) + 1), y, (lx - jx - (CELL - band) + 1) / band);
+          if (ly + jy < band && tz > 0) mix(x, y, x, y - (band - ly), 1 - (ly + jy) / band);
+          if (ly - jy >= CELL - band && tz < GRID - 1) mix(x, y, x, y + (ly - (CELL - band) + 1), (ly - jy - (CELL - band) + 1) / band);
         }
       }
     }
@@ -69,6 +85,10 @@ function ensureThumbs(game) {
   if (thumbs.size >= TILES.length) return;
   for (const tile of TILES) thumb(tile, game);
   blendThumbs();
+}
+
+export function resetWorldMapThumbs() {
+  thumbs.clear();
 }
 
 /** The 100-tile world map. Selecting a tile shows that plot from above. */

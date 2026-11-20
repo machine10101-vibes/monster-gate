@@ -1756,6 +1756,7 @@ class Game {
 
   drawStats() {
     const info = this.renderer?.info?.render || {};
+    const mem = this.renderer?.info?.memory || {};
     return {
       triangles: info.triangles | 0,
       calls: info.calls | 0,
@@ -1763,6 +1764,9 @@ class Game {
       camFar: this.camera?.far ?? 0,
       streamRadius: this.world?.streamRadius ?? 0,
       parked: this.world?.parked?.length | 0,
+      geometries: mem.geometries | 0,
+      textures: mem.textures | 0,
+      heap: (typeof performance !== 'undefined' && performance.memory && performance.memory.usedJSHeapSize) || 0,
     };
   }
 
@@ -4006,9 +4010,19 @@ class Game {
           this.bootFrames = -1;
         }
       }
-      if (this.world?.parked?.length && this.player) {
-        const budget = this.quality?.id === 'low' ? 10 : this.safeBoot ? 20 : 18;
-        this.world.revealAround(this.player.pos.x, this.player.pos.z, budget);
+      if (this.world && this.player && this.started) {
+        const px = this.player.pos.x;
+        const pz = this.player.pos.z;
+        const moved = (px - (this._streamX ?? px)) ** 2 + (pz - (this._streamZ ?? pz)) ** 2;
+        if (this._streamX == null || moved > 20 * 20) {
+          this.world.parkBeyond(px, pz, this.viewDistance());
+          this._streamX = px;
+          this._streamZ = pz;
+        }
+        if (this.world.parked?.length) {
+          const budget = this.quality?.id === 'low' ? 10 : this.safeBoot ? 20 : 18;
+          this.world.revealAround(px, pz, budget);
+        }
       }
     } catch (err) {
       this.reportFault(err);

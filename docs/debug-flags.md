@@ -58,10 +58,17 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `lira` | `alchemy`, `alchemist` | In front of Lira the Alchemist |
 | `dalla` | `market`, `dalla's market` | In front of Dalla's Market |
 | `brookside` | | West of Oakhollow |
-| `lagoon` | `mirrormere oasis` | Mirrormere Oasis |
-| `canopy` | `silverrun canopy` | Silverrun Canopy jungle |
-| `snowfall` | | Frozen meadow east of Goldmead |
-| `ashroad` | `ashen road` | Ashen Road volcanic approach |
+| `lagoon` | `mirrormere oasis` | East-west road south of the lagoon pool (water in frame, not inside the trees) |
+| `canopy` | `silverrun canopy`, `jungle`, `forest` | Silverrun Canopy road south of the temple |
+| `snowfall` | `snow` | Frozen meadow east of Goldmead |
+| `ashroad` | `ashen road`, `ash`, `waste`, `volcanic` | Ashen Road volcanic approach |
+| `sunspill` | `desert`, `sand`, `dunes`, `dune` | Open western dunes (not the pirate beach) |
+| `greenbowl` | `oasis` | Desert oasis pool |
+| `shellbeach` | `beach` | White-sand beach |
+| `pirateshore` | `pirate shore`, `piratedocks` | Dunes beach and pirate docks |
+| `cinderfall` | `lava` | Cinderfall volcano |
+| `icewind` | `ice` | Icewind Reach |
+| `glimmerfrost` | `arctic` | Glimmerfrost glacier |
 
 Every **built** tile also has a `tp` key equal to its `kind` (lowercase): `southford`, `harefield`, `eastleas`, `icewind`, `rimefang`, `sunspill`, `longacre`, `hayfield`, and the Silverrun / Gilantre quarters. Tile names with a unique label (`Harefield`, `Snowfall`, `Deepwell`, …) work too.
 

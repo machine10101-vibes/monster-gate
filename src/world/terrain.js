@@ -201,16 +201,21 @@ export function generateWorld() {
       let g = 1;
       let b = 1;
       const zn = zone[i];
-      const fieldTint = [0.98, 1.04, 0.86];
-      const forestTint = [0.66, 0.9, 0.78];
+      const fieldTint = [0.92, 1.06, 0.78];
+      const forestTint = [0.62, 0.92, 0.82];
       const mix3 = (a, c, t) => [lerp(a[0], c[0], t), lerp(a[1], c[1], t), lerp(a[2], c[2], t)];
       const dn = fbm(x * 0.045 + 10, z * 0.045 + 3, 1, 4);
       const forestAmt = smoothstep(64, 54, z + (fbm(x * 0.12, z * 0.12, 2, 3) - 0.5) * 12);
       forest[i] = forestAmt;
       let t3 = mix3(fieldTint, forestTint, forestAmt);
       const low = fbm(x * 0.02 + 4, z * 0.02, 17, 3);
+      const hue = fbm(x * 0.033, z * 0.03, 21, 3);
       const pv = 0.86 + patch * 0.22 + (low - 0.5) * 0.16;
-      t3 = [t3[0] * pv, t3[1] * pv, t3[2] * pv];
+      t3 = [
+        t3[0] * pv * (0.92 + hue * 0.18),
+        t3[1] * pv * (0.96 + (1 - hue) * 0.06),
+        t3[2] * pv * (0.88 + (1 - hue) * 0.2),
+      ];
 
       if (zn === ZONE.MOUNTAIN || h > 8) {
         const high = smoothstep(8, 24, h);

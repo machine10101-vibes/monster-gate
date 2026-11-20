@@ -547,13 +547,13 @@ export class HUD {
       ctx.fillStyle = '#14343a';
       ctx.fillRect(toX(world.waygate.x) - 1, toZ(world.waygate.z) - 1, 3, 3);
     }
-    ctx.fillStyle = '#f4fbff';
+    ctx.fillStyle = '#5aa8d4';
     for (const p of world.teleports || []) {
       if (!inView(p.x, p.z)) continue;
       ctx.fillRect(toX(p.x) - 2, toZ(p.z) - 2, 5, 5);
-      ctx.fillStyle = '#2f6f99';
+      ctx.fillStyle = '#1d4a66';
       ctx.fillRect(toX(p.x) - 1, toZ(p.z) - 1, 3, 3);
-      ctx.fillStyle = '#f4fbff';
+      ctx.fillStyle = '#5aa8d4';
     }
     if (world.smithy && inView(world.smithy.x, world.smithy.z)) {
       ctx.fillStyle = '#e07030';
@@ -662,8 +662,13 @@ export class HUD {
           ctx.fillStyle = '#7ef6ff';
           ctx.fillRect(game.world.waygate.x - ox - 2, game.world.waygate.z - oz - 2, 5, 5);
         }
-        ctx.fillStyle = '#f4fbff';
-        for (const p of game.world.teleports || []) ctx.fillRect(p.x - ox - 2, p.z - oz - 2, 5, 5);
+        ctx.fillStyle = '#5aa8d4';
+        for (const p of game.world.teleports || []) {
+          ctx.fillRect(p.x - ox - 2, p.z - oz - 2, 5, 5);
+          ctx.fillStyle = '#1d4a66';
+          ctx.fillRect(p.x - ox - 1, p.z - oz - 1, 3, 3);
+          ctx.fillStyle = '#5aa8d4';
+        }
         if (game.world.smithy) {
           ctx.fillStyle = '#e07030';
           ctx.fillRect(game.world.smithy.x - ox - 2, game.world.smithy.z - oz - 2, 5, 4);
@@ -677,7 +682,7 @@ export class HUD {
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
         : inRift
           ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
-          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. White square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
+          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);

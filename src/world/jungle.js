@@ -216,7 +216,7 @@ export function paintJungleCell(out, H, x, z, kind, isPath, n, spec) {
   const slope = localSlope(H, x, z);
   const dense = slope > 1.2 && nA > 0.4;
   if (dense) set(ZONE.FOREST, TILE.MOSS_STONE, 0.72, 0.9, 0.7);
-  else if (nB > 0.82) set(ZONE.FOREST, TILE.DIRT, 0.68, 0.6, 0.42);
+  else if (nB > 0.94) set(ZONE.FOREST, TILE.FLOWER_GRASS, 0.36 + nA * 0.1, 0.68, 0.3);
   else if (n > 0.62 && h < 5) set(ZONE.FOREST, TILE.FLOWER_GRASS, 0.4 + nA * 0.1, 0.7, 0.34);
   else set(ZONE.FOREST, TILE.GRASS, 0.22 + nA * 0.1, 0.52 + (1 - nA) * 0.14, 0.24 + nA * 0.08);
 }
