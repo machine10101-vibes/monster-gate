@@ -67,7 +67,9 @@ function landMapLabels(world) {
   for (const land of world.lands || []) {
     if (land.role === 'oak') continue;
     const tile = TILES.find((t) => t.id === land.tileId || t.kind === land.kind);
-    const name = tile?.name || land.banner?.[1];
+    const name = tile?.kind === 'pirateshore' || land.kind === 'pirateshore'
+      ? 'Pirate Shore'
+      : (land.banner?.[1] || tile?.name);
     if (!name) continue;
     if (name === 'Gilantre') {
       gilantre = gilantre || { name, x: 0, z: 0, n: 0, city: true };
