@@ -29,6 +29,60 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const _sphereC = new THREE.Vector3();
 const _sphereE = new THREE.Vector3();
 
+/** Soften hard tile rectangles on the hunter Map so snow, ash and meadow meet. */
+function blendMinimapSeams(map, lands, minX, minZ) {
+  const w = map.width;
+  const h = map.height;
+  if (w < 2 || h < 2 || !lands?.length) return;
+  const ctx = map.getContext('2d');
+  const src = ctx.getImageData(0, 0, w, h);
+  const out = ctx.createImageData(w, h);
+  out.data.set(src.data);
+  const d = src.data;
+  const o = out.data;
+  const band = 22;
+  const mix = (x, y, nx, ny, t) => {
+    if (t <= 0 || nx < 0 || ny < 0 || nx >= w || ny >= h) return;
+    const i = (y * w + x) * 4;
+    const j = (ny * w + nx) * 4;
+    const k = t < 1 ? t : 1;
+    o[i] += (d[j] - o[i]) * k;
+    o[i + 1] += (d[j + 1] - o[i + 1]) * k;
+    o[i + 2] += (d[j + 2] - o[i + 2]) * k;
+  };
+  for (const land of lands) {
+    const x0 = land.x0 - minX;
+    const z0 = land.z0 - minZ;
+    for (let lz = 0; lz < W; lz++) {
+      const y = z0 + lz;
+      if (y < 0 || y >= h) continue;
+      for (let b = 0; b < band; b++) {
+        const jagged = (hash2(land.x0 + W - b, land.z0 + lz, 91) - 0.5) * 12;
+        const east = x0 + W - 1 - b;
+        const west = x0 + b;
+        const te = 1 - (b + jagged) / band;
+        const tw = 1 - (b - jagged) / band;
+        if (east >= 0 && east < w) mix(east, y, east + b + 1, y, te * 0.62);
+        if (west >= 0 && west < w) mix(west, y, west - b - 1, y, tw * 0.62);
+      }
+    }
+    for (let lx = 0; lx < W; lx++) {
+      const x = x0 + lx;
+      if (x < 0 || x >= w) continue;
+      for (let b = 0; b < band; b++) {
+        const jagged = (hash2(land.x0 + lx, land.z0 + W - b, 92) - 0.5) * 12;
+        const south = z0 + W - 1 - b;
+        const north = z0 + b;
+        const ts = 1 - (b + jagged) / band;
+        const tn = 1 - (b - jagged) / band;
+        if (south >= 0 && south < h) mix(x, south, x, south + b + 1, ts * 0.62);
+        if (north >= 0 && north < h) mix(x, north, x, north - b - 1, tn * 0.62);
+      }
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
 /** World-space footprint. Instanced props keep their bounds on the mesh, not the shared geometry. */
 function meshSphere(obj) {
   if (!obj) return null;
@@ -1417,12 +1471,12 @@ export class World {
       else if (t === TILE.ASH) [r, g, b] = [96, 94, 100];
       else if (t === TILE.LAVA) [r, g, b] = [255, 110, 30];
       else if (t === TILE.CINDER) [r, g, b] = [86, 52, 40];
-      else if (t === TILE.FLAGSTONE) [r, g, b] = [150, 146, 138];
-      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [118, 122, 128];
-      else if (t === TILE.COBBLE) [r, g, b] = [132, 132, 138];
+      else if (t === TILE.FLAGSTONE) [r, g, b] = [126, 114, 98];
+      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [108, 110, 116];
+      else if (t === TILE.COBBLE) [r, g, b] = [120, 108, 96];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];
       else if (t === TILE.SAND) [r, g, b] = [225, 205, 150];
-      else if (t === TILE.GRAVEL) [r, g, b] = [150, 146, 142];
+      else if (t === TILE.GRAVEL) [r, g, b] = [128, 116, 100];
       else if (t === TILE.DIRT) [r, g, b] = [150, 112, 78];
       else if (t === TILE.FARMLAND) [r, g, b] = [200, 170, 70];
       else {
@@ -1511,6 +1565,7 @@ export class World {
     for (const land of this.lands) {
       mctx.drawImage(this.tileCanvas[land.tileId], land.x0 - minX, land.z0 - minZ);
     }
+    blendMinimapSeams(map, this.lands, minX, minZ);
     this.minimapCanvas = map;
     this.minimapOrigin = { x: minX, z: minZ };
   }

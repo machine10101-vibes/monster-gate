@@ -58,7 +58,7 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `lira` | `alchemy`, `alchemist` | In front of Lira the Alchemist |
 | `dalla` | `market`, `dalla's market` | In front of Dalla's Market |
 | `brookside` | | West of Oakhollow |
-| `lagoon` | `mirrormere oasis` | Open south shore of the lagoon pool (water in frame, not inside the trees) |
+| `lagoon` | `mirrormere oasis` | East-west road south of the lagoon pool (water in frame, not inside the trees) |
 | `canopy` | `silverrun canopy`, `jungle`, `forest` | Silverrun Canopy road south of the temple |
 | `snowfall` | `snow` | Frozen meadow east of Goldmead |
 | `ashroad` | `ashen road`, `ash`, `waste`, `volcanic` | Ashen Road volcanic approach |

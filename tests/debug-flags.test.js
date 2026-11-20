@@ -124,7 +124,8 @@ test('every built tile has a debug tp key', () => {
   const desert = resolveSpot('desert');
   assert.equal(desert.id, 'sunspill');
   const lagoon = resolveSpot('lagoon');
-  assert.ok(lagoon.z >= 76, 'lagoon spawn is south of the pool, not in the tree cluster');
+  assert.ok(lagoon.z >= 80, 'lagoon spawn is on the road south of the pool, not in the palm belt');
+  assert.ok(lagoon.x > -210, 'lagoon spawn sits east of the pool so the water is in frame');
   assert.ok(Math.hypot(lagoon.x + 216, lagoon.z - 72) > 5, 'lagoon spawn is not the tile center');
 });
 

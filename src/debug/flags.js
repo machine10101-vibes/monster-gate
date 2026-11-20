@@ -22,9 +22,10 @@ const SAND_MINE = { x: -74, z: 514 };
  */
 const OASIS_DRY = { x: OASIS.x, z: OASIS.z + OASIS.r + 52 };
 export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
-/** South shore of the main lagoon pool (local 70, 78 on the lagoon tile). */
-const LAGOON_SHORE = { x: -218, z: 78 };
-export const LAGOON_CAM = { pitch: 0.34, dist: 24, lookAhead: 18 };
+/** East-west road south of the main lagoon pool (local 100, 84). Giants stay off the path. */
+const LAGOON_POOL = { x: -211, z: 59.5 };
+const LAGOON_SHORE = { x: -188, z: 84 };
+export const LAGOON_CAM = { pitch: 0.36, dist: 22, lookAhead: 16 };
 /** ~18 Hunter Blade hits; ~20s of steady auto-attack at low level. */
 export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;
@@ -702,7 +703,7 @@ export function teleportDebug(game, raw) {
     }
   }
   if (spot.id === 'lagoon') {
-    const yaw = Math.atan2(-226 - spot.x, 50 - spot.z);
+    const yaw = Math.atan2(LAGOON_POOL.x - spot.x, LAGOON_POOL.z - spot.z);
     game.player.yaw = yaw;
     if (game.cam) {
       game.cam.targetYaw = yaw + Math.PI;
@@ -752,6 +753,7 @@ export function attachDebug(game, search) {
   freezeSaves(true);
   if (game.progress) game.progress.sessionOnly = true;
   game.debug = flags;
+  game.teleportDebug = (raw) => teleportDebug(game, raw);
   showBadge();
   const start = game.start?.bind(game);
   if (start && !game._debugStartWrapped) {

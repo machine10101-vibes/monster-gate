@@ -54,8 +54,12 @@ test('world map samples blend biome borders instead of darkening tile edges', ()
   assert.doesNotMatch(tiles, /if \(edge < 0\.02\)/);
   assert.match(map, /paintTileMap\(c, tile\)/);
   assert.match(map, /const band = 13/);
+  assert.match(world, /function blendMinimapSeams/);
+  assert.match(world, /const band = 22/);
   assert.doesNotMatch(world, /\[240, 245, 255\]/);
   assert.match(world, /\[168, 186, 210\]/);
+  assert.match(world, /\[120, 108, 96\]/);
+  assert.doesNotMatch(world, /\[150, 146, 138\]/);
   const snow = TILES.find((t) => t.kind === 'snowfall');
   const gold = TILES.find((t) => t.kind === 'goldmead');
   const ash = TILES.find((t) => t.kind === 'ashroad');
