@@ -46,8 +46,8 @@ float cloudShade(vec2 xz, float t, float amt){
   vec2 drift = vec2(t * 2.8, t * -2.2);
   float n = cloudNoise((xz + drift) * 0.04);
   n = n * 0.74 + 0.26 * cloudNoise((xz + drift * 0.7) * 0.09 + 5.3);
-  float lo = mix(0.52, 0.42, uCloudForce);
-  float hi = mix(0.66, 0.58, uCloudForce);
+  float lo = mix(0.52, 0.28, uCloudForce);
+  float hi = mix(0.66, 0.48, uCloudForce);
   float sh = smoothstep(lo, hi, n);
   return mix(1.0, uCloudDark, sh * amt);
 }
