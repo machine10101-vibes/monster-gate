@@ -913,11 +913,137 @@ function dressOrcCamp(world, land) {
   }
 }
 
+function dressSilverrun(world, land, spec) {
+  const m = world.models;
+  const data = land.data;
+  const seed = spec.seed;
+  const X = (lx) => land.x0 + lx + 0.5;
+  const Z = (lz) => land.z0 + lz + 0.5;
+  const nearRiver = (lx, lz, radius = 12) => spec.silverrunRiver
+    && Math.abs(land.x0 + lx - silverrunRiverCenterX(land.z0 + lz)) < radius;
+  const reserved = (lx, lz) => {
+    const i = lz * W + lx;
+    return data.pathMask[i] || data.zone[i] === ZONE.WATER || nearRiver(lx, lz, 9) || data.H[i] > 8.2;
+  };
+
+  if (land.kind === 'silverrunRiver') {
+    const bridgeZ = Z(72);
+    const bridgeWorldX = silverrunRiverCenterX(land.z0 + 72) + 0.5;
+    const deckY = 3.2;
+    world.forestBridge = {
+      x: bridgeWorldX, z: bridgeZ, deckY, halfX: 10.5, halfZ: 4.5,
+      contains(x, z) { return Math.abs(x - this.x) <= this.halfX && Math.abs(z - this.z) <= this.halfZ; },
+    };
+    world.putAt(m.forestBridge, bridgeWorldX, bridgeZ, 0, 1, { y: deckY - 3.75 });
+    world.box(bridgeWorldX, bridgeZ - 3.75, 10.2, 0.2);
+    world.box(bridgeWorldX, bridgeZ + 3.75, 10.2, 0.2);
+  }
+
+  // Ancient canopy giants rise above the mixed oak-and-pine understory.
+  const giantTarget = land.kind === 'silverrunRiver' ? 7 : 9;
+  let giants = 0;
+  for (let n = 0; n < 420 && giants < giantTarget; n++) {
+    const lx = 9 + Math.floor(hash2(n, 2, seed + 11) * (W - 18));
+    const lz = 9 + Math.floor(hash2(n, 5, seed + 11) * (W - 18));
+    if (reserved(lx, lz) || data.H[lz * W + lx] > 7.6 || !world.free(X(lx), Z(lz), 2.2)) continue;
+    const parts = m.giants[n % m.giants.length];
+    const scale = 1.02 + hash2(n, 8, seed) * 0.28;
+    world.putAt(parts, X(lx), Z(lz), hash2(n, 9, seed) * 6, scale);
+    world.circle(X(lx), Z(lz), 0.65);
+    world.occupy(X(lx), Z(lz), 2.1);
+    world.treeDots.push({ x: X(lx), z: Z(lz) });
+    giants++;
+  }
+
+  const treeTarget = land.kind === 'silverrunRiver' ? 70 : 82;
+  let trees = 0;
+  for (let n = 0; n < 900 && trees < treeTarget; n++) {
+    const lx = 6 + Math.floor(hash2(n, 2, seed + 21) * (W - 12));
+    const lz = 6 + Math.floor(hash2(n, 5, seed + 21) * (W - 12));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.25 || data.H[i] > 8.2 || data.zone[i] === ZONE.MOUNTAIN) continue;
+    if (!world.free(X(lx), Z(lz), 1.25)) continue;
+    const roll = hash2(n, 8, seed + 31);
+    let parts = m.oaks[n % m.oaks.length];
+    if (roll < 0.42) parts = m.pines[n % m.pines.length];
+    else if (roll > 0.91) parts = m.blossoms[n % m.blossoms.length];
+    else if (roll > 0.82) parts = m.autumn[n % m.autumn.length];
+    const scale = 0.9 + hash2(n, 9, seed + 41) * 0.38;
+    world.putAt(parts, X(lx), Z(lz), roll * 6, scale);
+    world.circle(X(lx), Z(lz), 0.38);
+    world.occupy(X(lx), Z(lz), 1.25);
+    world.treeDots.push({ x: X(lx), z: Z(lz) });
+    trees++;
+  }
+
+  // Layer the forest floor with ferns, flowers, berry shrubs and mushrooms.
+  let coverCount = 0;
+  for (let n = 0; n < 1500 && coverCount < 150; n++) {
+    const lx = 3 + Math.floor(hash2(n, 3, seed + 51) * (W - 6));
+    const lz = 3 + Math.floor(hash2(n, 7, seed + 51) * (W - 6));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.0 || data.H[i] > 8.5) continue;
+    const roll = hash2(n, 4, seed + 61);
+    let parts = m.tuftsForest[n % m.tuftsForest.length];
+    if (roll > 0.72) parts = m.ferns[n % m.ferns.length];
+    else if (roll > 0.52) parts = m.bushes[n % m.bushes.length];
+    else if (roll > 0.42) parts = m.flowers[n % m.flowers.length];
+    else if (roll > 0.34) parts = m.mushRed[n % m.mushRed.length];
+    else if (roll > 0.30) parts = m.mushGlow[n % m.mushGlow.length];
+    if (!world.free(X(lx), Z(lz), 0.38)) continue;
+    world.putAt(parts, X(lx), Z(lz), roll * 6, 0.82 + hash2(n, 9, seed) * 0.42, { cover: true });
+    coverCount++;
+  }
+
+  if (spec.silverrunRiver) {
+    let reeds = 0;
+    for (let z = 3; z < W - 3 && reeds < 44; z += 3) {
+      for (let x = 3; x < W - 3 && reeds < 44; x += 3) {
+        const i = z * W + x;
+        if (data.zone[i] === ZONE.WATER || data.H[i] < 0.35 || data.H[i] > 2.8) continue;
+        let wet = false;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (data.zone[(z + dz) * W + (x + dx)] === ZONE.WATER) wet = true;
+        }
+        if (!wet || data.pathMask[i] || !world.free(X(x), Z(z), 0.35)) continue;
+        world.putAt(m.reeds[(x + z) % m.reeds.length], X(x), Z(z), 0, 0.95 + hash2(x, z, seed) * 0.35);
+        reeds++;
+      }
+    }
+  }
+
+  for (let n = 0; n < 34; n++) {
+    const lx = 5 + Math.floor(hash2(n, 2, seed + 71) * (W - 10));
+    const lz = 5 + Math.floor(hash2(n, 6, seed + 71) * (W - 10));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.2 || data.H[i] > 10 || !world.free(X(lx), Z(lz), 0.8)) continue;
+    const parts = data.H[i] > 6 ? m.boulders[n % m.boulders.length] : m.rocks[n % m.rocks.length];
+    world.putAt(parts, X(lx), Z(lz), n * 0.7, 0.8 + hash2(n, 4, seed) * 0.45);
+    world.occupy(X(lx), Z(lz), 0.9);
+  }
+
+  if (land.kind === 'silverrunPeak') {
+    const sx = X(9);
+    const sz = Z(83);
+    world.putAt(m.boulders[0], sx, sz, 0.4, 0.72, { y: 29 });
+    for (let n = 0; n < 7; n++) {
+      const a = (n / 7) * Math.PI * 2;
+      const lx = 9 + Math.cos(a) * 10.5;
+      const lz = 78 + Math.sin(a) * 10.5;
+      world.putAt(m.rocks[n % m.rocks.length], X(Math.round(lx)), Z(Math.round(lz)), a, 0.72, { y: 29 });
+    }
+  }
+}
+
 function dressLand(world, land) {
   if (typeof land.kind === 'string' && land.kind.startsWith('gilantre')) return;
   const m = world.models;
   const spec = SPECS[land.kind];
   const seed = spec.seed;
+  if (spec.silverrun) {
+    dressSilverrun(world, land, spec);
+    return;
+  }
   const data = land.data;
   const trees = [];
   if (land.kind === 'brookside') dressOrcCamp(world, land);
