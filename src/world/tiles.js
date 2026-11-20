@@ -32,8 +32,8 @@ const CODES = [
   'RRMMMFIIWA',
   'MRLMOMAHMM',
   'CRMMRMAHDD',
-  'SCCQQRHDDS',
-  'SSCQQHDDSS',
+  'SCCQQRFFDS',
+  'SSCQQHFFSS',
   'SSSCSCSSSS',
 ];
 
@@ -65,6 +65,10 @@ const RING = {
   '4,8': ['greenbowl', 'South of Glassroad. The Oasis is the living heart of this desert bowl: palms, reeds and still water, drying to dune and then to the southern sea.'],
   '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Mara\'s Acre and Wend Farm sit on the long fields, with a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
+  '6,7': ['silverrunNorth', 'The upper Silverrun forest. Ancient trees, thick fern beds and a river that bends west through the woodland.'],
+  '7,7': ['silverrunEast', 'The Elderwood. A deep, lush forest with towering old-growth trees, mossy clearings and winding woodland paths.'],
+  '6,8': ['silverrunRiver', 'Silverrun Crossing. The river pours in from the southern sea beneath a timber bridge, while a forest trail climbs toward the mountain ridge.'],
+  '7,8': ['silverrunPeak', 'Greystone Summit. A great mountain rises on the western border, with a winding climb to a broad, flat summit above the forest canopy.'],
   '6,5': ['gilantreNw', 'Northwest quarter of Gilantre. Forest and prairie outside the brick wall, and the west drawbridge where the Eastleas road comes in.'],
   '7,5': ['gilantreNe', 'Northeast quarter of Gilantre. The Roman arena stands inside the wall, with prairie beyond the moat.'],
   '6,6': ['gilantreSw', 'Southwest quarter of Gilantre. Ironhaven Forge and the smiths sit inside the wall, with forest outside.'],
@@ -79,8 +83,8 @@ const NAMES = [
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Gilantre', 'Gilantre', 'Reedbank', 'Frogmarsh'],
   ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Gilantre', 'Gilantre', 'Broken Arch', 'Old Stones'],
-  ['Seagate', 'Shellbeach', 'Dunes', 'Sunspill', 'Glassroad', 'Reedford', 'Saltfen', 'Drowned Hall', 'Sunken Yard', 'Grey Sea'],
-  ['Open Water', 'West Deep', 'Pale Shore', 'Deepwell', 'Oasis', 'Sedge', 'Ruinwater', 'Black Reef', 'South Deep', 'East Deep'],
+  ['Seagate', 'Shellbeach', 'Dunes', 'Sunspill', 'Glassroad', 'Reedford', 'Silverrun Reach', 'Elderwood', 'Sunken Yard', 'Grey Sea'],
+  ['Open Water', 'West Deep', 'Pale Shore', 'Deepwell', 'Oasis', 'Sedge', 'Silverrun Crossing', 'Greystone Summit', 'South Deep', 'East Deep'],
   ['Far West', 'Whale Road', 'Glass Sea', 'South Strand', 'Midsea', 'East Strand', 'Kelp', 'Quiet Deep', 'Last Water', 'Far East'],
 ];
 
