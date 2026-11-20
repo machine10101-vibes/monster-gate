@@ -254,7 +254,10 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*font-size: 12px/);
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*#7a4a18/);
   const layout = src('../src/ui/hudLayout.js');
-  assert.match(layout, /d < 4\.2/);
+  assert.match(layout, /d < 8/);
+  assert.match(layout, /PLAYMAP_FRAME_PAD_PX/);
+  assert.match(layout, /PLAYMAP_MAX_PIN_PX = 30/);
+  assert.match(layout, /PLAYMAP_SIDES/);
   const jungle = layoutPlaymapLabels([
     { name: 'Silverrun Canopy', nx: 22, ny: 52 },
     { name: 'The Lagoon', nx: 32, ny: 52 },
@@ -269,8 +272,6 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
     h: p.bh,
   });
   assert.equal(overlap(jbox(canopy), jbox(lagoon), 2), false, 'Silverrun Canopy x The Lagoon');
-  assert.match(layout, /Bramblewood:/);
-  assert.match(layout, /Dawnspire:/);
   const keeps = layoutPlaymapLabels([
     { name: 'Dawnspire', nx: 32, ny: 24, city: true },
     { name: 'Bramblewood', nx: 22, ny: 24, uncharted: true },
@@ -279,6 +280,12 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   const bramble = keeps.find((p) => p.name === 'Bramblewood');
   assert.ok(dawn.visible && bramble.visible);
   assert.equal(overlap(jbox(dawn), jbox(bramble), 2), false, 'Bramblewood x Dawnspire');
+  const brambleBox = jbox(bramble);
+  assert.ok(brambleBox.x >= 40, `Bramblewood left ${brambleBox.x} stays inside the parchment`);
+  const pinPx = Math.hypot((bramble.x - bramble.ax) / 100 * 720, (bramble.y - bramble.ay) / 100 * 560);
+  assert.ok(pinPx <= 32, `Bramblewood ${pinPx.toFixed(1)}px from its marker`);
+  const dawnPin = Math.hypot((dawn.x - dawn.ax) / 100 * 720, (dawn.y - dawn.ay) / 100 * 560);
+  assert.ok(dawnPin <= 32, `Dawnspire ${dawnPin.toFixed(1)}px from its marker`);
 });
 
 test('Map panel contain size stays above 300px at desktop, laptop and phone landscape', () => {

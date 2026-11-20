@@ -173,9 +173,9 @@ export function paintJungleCell(out, H, x, z, kind, isPath, n, spec) {
     set(
       ZONE.WATER,
       TILE.SAND,
-      deep ? 0.16 + foam * 0.08 : 0.38 + foam * 0.18,
-      deep ? 0.42 + foam * 0.08 : 0.78 + foam * 0.12,
-      deep ? 0.48 + foam * 0.06 : 0.82 + foam * 0.14,
+      deep ? 0.05 + foam * 0.02 : 0.07 + foam * 0.03,
+      deep ? 0.22 + foam * 0.04 : 0.28 + foam * 0.05,
+      deep ? 0.38 + foam * 0.04 : 0.44 + foam * 0.05,
     );
     return;
   }

@@ -81,12 +81,18 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const supabase = resolveSupabaseConfig();
 const BUILD_STAMP = shortSha();
 
+/** Stamp only the meta token. Never replaceAll: the boot guard also mentioned __MG_BUILD__. */
+export function stampIndexHtml(html, stamp) {
+  const id = String(stamp || 'dev');
+  return String(html).replace('content="__MG_BUILD__"', `content="${id}"`);
+}
+
 function versionJsonPlugin(id) {
   const stamp = String(id || 'dev');
   return {
     name: 'mg-version-json',
     transformIndexHtml(html) {
-      return String(html).replaceAll('__MG_BUILD__', stamp);
+      return stampIndexHtml(html, stamp);
     },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ build: stamp })}\n` });

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { publicBase, resolveBuildId, resolveMmoUrl } from '../vite.config.js';
+import { createContext, runInContext } from 'node:vm';
+import { publicBase, resolveBuildId, resolveMmoUrl, stampIndexHtml } from '../vite.config.js';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -46,15 +47,67 @@ test('Pages index.html cache-busts the build tag via version.json', () => {
   assert.match(html, /name="mg-build"/);
   assert.match(html, /version\.json\?t=/);
   assert.match(html, /cache: 'no-store'/);
-  assert.match(html, /mg-build-reload/);
+  assert.match(html, /'__MG_' \+ 'BUILD__'/);
+  assert.match(html, /searchParams\.get\('mgb'\) === build\) return/);
+  assert.doesNotMatch(html, /cache: 'reload'/);
   assert.match(html, /__mgHuntStarted/);
   assert.match(html, /__mgOfferBuildReload/);
   assert.match(html, /id="build-reload"/);
   assert.match(html, /New version available, reload\?/);
+  assert.doesNotMatch(html, /mg-build-reload/);
   assert.match(main, /offerBuildReload/);
+  assert.match(main, /syncPublishedBuild/);
+  assert.match(main, /cache: 'no-store'/);
+  assert.match(main, /remote === BUILD_ID/);
+  assert.match(main, /searchParams\.get\('mgb'\) === remote\) return/);
   assert.match(main, /captureHunter\(\)/);
   assert.match(main, /progress\?\.save\?\.\(false\)/);
   assert.match(vite, /fileName: 'version\.json'/);
   assert.match(vite, /transformIndexHtml/);
-  assert.match(vite, /__MG_BUILD__/);
+  assert.match(vite, /stampIndexHtml/);
+  assert.match(vite, /content="__MG_BUILD__"/);
+  assert.doesNotMatch(vite, /replaceAll\('__MG_BUILD__'/);
+});
+
+test('MG-SYS-10: stamping index.html leaves the version.json guard and fetch intact', async () => {
+  const stamp = 'deadbee';
+  const html = src('../index.html');
+  const naive = html.replaceAll('__MG_BUILD__', stamp);
+  assert.doesNotMatch(naive, /mine === 'deadbee'/);
+  assert.match(naive, /'__MG_' \+ 'BUILD__'/);
+
+  const out = stampIndexHtml(html, stamp);
+  assert.match(out, /name="mg-build" content="deadbee"/);
+  assert.match(out, /'__MG_' \+ 'BUILD__'/);
+  assert.doesNotMatch(out, /mine === 'deadbee'/);
+  assert.doesNotMatch(out, /content="__MG_BUILD__"/);
+  assert.match(out, /version\.json\?t=/);
+  assert.match(out, /cache: 'no-store'/);
+
+  const boot = out.match(/<script>\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)/)?.[1];
+  assert.ok(boot, 'inline boot script');
+
+  const fetches = [];
+  const sandbox = {
+    Date,
+    URL,
+    document: {
+      querySelector: (sel) => (String(sel).includes('mg-build') ? { getAttribute: () => stamp } : null),
+      body: { classList: { contains: () => false } },
+    },
+    location: { href: 'https://monstergate.online/', search: '' },
+    window: {},
+    fetch(url, opts) {
+      fetches.push({ url: String(url), cache: opts?.cache });
+      return Promise.resolve({ ok: true, json: async () => ({ build: stamp }) });
+    },
+  };
+  sandbox.window = sandbox;
+  runInContext(boot, createContext(sandbox));
+  await Promise.resolve();
+  await Promise.resolve();
+  const hit = fetches.find((f) => String(f.url).includes('version.json'));
+  assert.ok(hit, `boot script must fetch version.json, got ${JSON.stringify(fetches)}`);
+  assert.match(String(hit.url), /[?&]t=/);
+  assert.equal(hit.cache, 'no-store');
 });

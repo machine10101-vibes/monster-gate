@@ -159,6 +159,8 @@ test('every built tile has a debug tp key', () => {
   assert.equal(parseCloudShadowFlag('?debug=1'), false);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=1'), false);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong'), true);
+  assert.match(readFileSync(new URL('../src/main.js', import.meta.url), 'utf8'), /this\.debug && this\.sky\?\.cloudShadowStrong/);
+  assert.doesNotMatch(readFileSync(new URL('../src/main.js', import.meta.url), 'utf8'), /rememberHunter\([^)]*hour/);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong&mmo=1'), false);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong', { mmo: true }), false);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong', { worldView: true }), false);

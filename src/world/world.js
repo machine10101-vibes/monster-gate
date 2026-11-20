@@ -526,8 +526,8 @@ export class World {
   buildWater() {
     const mat = new THREE.ShaderMaterial({
       transparent: true,
-      depthWrite: false,
-      fog: true,
+      depthWrite: true,
+      fog: false,
       uniforms: THREE.UniformsUtils.merge([
         THREE.UniformsLib.fog,
         {
@@ -593,19 +593,17 @@ export class World {
           col = mix(col, uDeep * 0.72, smoothstep(0.28, 1.0, macro) * 0.45 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float wobble = 0.10 * sin(uTime * 1.65 + p.x * 2.1 + p.z * 1.7);
+          float wobble = 0.10 * sin(uTime * 1.65 + p.x * 2.1 + p.y * 1.7);
           float grain = vn(p * 0.72 + vec2(uTime * 0.08, -uTime * 0.06));
           float d = vShore + wobble * 0.10 + (grain - 0.5) * 0.12;
-          float foam = smoothstep(0.95, 0.18, d) * (0.85 + 0.15 * sin(uTime * 1.9 + p.z * 2.6 + grain * 4.0));
+          float foam = smoothstep(1.15, 0.10, d) * (0.88 + 0.12 * sin(uTime * 1.9 + p.y * 2.6 + grain * 4.0));
           col = mix(col, uFoam, foam);
           col *= uLight;
-          col *= mix(1.0, cloudShade(p, uCloudTime, uCloudAmt), 0.12);
-          float alpha = mix(0.93, 0.99, depthK);
+          float alpha = mix(0.97, 1.0, depthK);
           alpha = mix(alpha, 1.0, foam);
           gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
-          #include <fog_fragment>
         }`,
     });
     this.waterMat = mat;
@@ -675,6 +673,7 @@ export class World {
       geo.setIndex(pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
       geo.computeBoundingSphere();
       const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'mg-water';
       mesh.renderOrder = 2;
       mesh.frustumCulled = true;
       this.group.add(mesh);
@@ -1334,7 +1333,7 @@ export class World {
         for (const child of [...obj.children]) pull(child);
         return;
       }
-      if (obj.name === 'gilantre-colosseum-signup-board') return;
+      if (obj.name === 'gilantre-colosseum-signup-board' || obj.name === 'mg-water') return;
       const sphere = meshSphere(obj);
       if (!sphere) {
         if (obj.children?.length) for (const child of [...obj.children]) pull(child);

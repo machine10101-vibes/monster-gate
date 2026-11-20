@@ -187,14 +187,17 @@ test('cloud shadows darken the ground and never cover the play view', () => {
   assert.match(mats, /cloudShade/);
   assert.match(mats, /mix\(1\.0, uCloudDark/);
   assert.match(mats, /uCloudForce/);
-  assert.match(mats, /mix\(0\.52, 0\.42, uCloudForce\)/);
+  assert.match(mats, /mix\(0\.52, 0\.28, uCloudForce\)/);
   assert.doesNotMatch(mats, /max\(smoothstep/);
   assert.match(mats, /outgoingLight \*= cloudShade/);
   assert.match(mats, /#include <opaque_fragment>/);
-  assert.match(world, /cloudShade\(p, uCloudTime, uCloudAmt\)/);
   assert.match(world, /uCloudDark: cloudShadowUniforms\.uCloudDark/);
   assert.match(src('src/world/sky.js'), /cloudShadowStrong/);
+  assert.match(src('src/world/sky.js'), /uCloudDark\.value = 0\.25/);
+  assert.match(src('src/world/sky.js'), /_cloudTimeFrozen/);
   assert.match(src('src/main.js'), /parseCloudShadowFlag/);
+  assert.match(src('src/main.js'), /this\.debug && this\.sky\?\.cloudShadowStrong/);
+  assert.doesNotMatch(src('src/main.js'), /rememberHunter\([\s\S]{0,400}hour/);
   assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
   assert.match(mats, /0xd2ae78/);
   assert.match(terrain, /matchTop \? 0\.96/);
@@ -213,10 +216,15 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
   assert.match(world, /cornerDist/);
-  assert.match(world, /smoothstep\(0\.95, 0\.18, d\)/);
+  assert.match(world, /smoothstep\(1\.15, 0\.10, d\)/);
   assert.match(world, /0x124a78/);
   assert.match(world, /0x4eb8c4/);
-  assert.match(world, /mix\(0\.93, 0\.99, depthK\)/);
+  assert.match(world, /mix\(0\.97, 1\.0, depthK\)/);
+  assert.match(world, /depthWrite:\s*true/);
+  assert.match(world, /name = 'mg-water'/);
+  assert.match(world, /vec2 p = vWorld\.xz/);
+  assert.match(world, /p\.y \* 1\.7/);
+  assert.doesNotMatch(world, /p\.z \*/);
   assert.doesNotMatch(world, /smoothstep\(0\.0, 0\.03, vDepth\)/);
   assert.doesNotMatch(world, /foamNoise/);
   assert.doesNotMatch(world, /fwidth|dFdx|dFdy/);
@@ -296,6 +304,8 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.match(player, /color: 0xf4efe0/);
   assert.match(player, /opacity: 0\.8/);
   assert.match(player, /depthTest:\s*false/);
+  assert.match(player, /groundRing\.visible = false/);
+  assert.match(player, /_modelReady/);
   assert.match(player, /heightAt\?\.\(this\.pos\.x, this\.pos\.z\)/);
   assert.match(player, /\+ 0\.12/);
   assert.doesNotMatch(player, /opacity: 0\.95/);
@@ -305,7 +315,8 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.match(terrain, /weldCorner/);
   assert.match(terrain, /skirtOk/);
   assert.match(terrain, /nt !== TILE\.LAVA/);
-  assert.match(terrain, /nh - 0\.05/);
+  assert.match(terrain, /nh - \(nextWater \? 0\.28 : 0\.08\)/);
+  assert.doesNotMatch(terrain, /waterDrop \? 4\.001/);
 });
 
 test('Oakhollow NE of the Guild still has 1-unit grass terraces that the skirt covers', () => {
