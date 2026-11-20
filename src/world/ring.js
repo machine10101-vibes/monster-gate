@@ -821,6 +821,75 @@ function stitchSilverrunRiver(lands) {
   }
 }
 
+function blendEcotonePair(a, b, orientation, band = 28, transitionTop = TILE.DIRT) {
+  if (!a || !b) return;
+  const ad = a.data;
+  const bd = b.data;
+  const edgeA = (along) => orientation === 'ew' ? (W - 1) * 0 + along * W + (W - 1) : (W - 1) * W + along;
+  const edgeB = (along) => orientation === 'ew' ? along * W : along;
+  const indexA = (along, depth) => orientation === 'ew' ? along * W + (W - 1 - depth) : (W - 1 - depth) * W + along;
+  const indexB = (along, depth) => orientation === 'ew' ? along * W + depth : depth * W + along;
+  const protectedCell = (data, i) => data.zone[i] === ZONE.WATER
+    || data.zone[i] === ZONE.MOUNTAIN
+    || data.pathMask[i]
+    || data.top[i] === TILE.FARMLAND
+    || data.top[i] === TILE.PATH;
+  for (let along = 0; along < W; along++) {
+    const ai = edgeA(along);
+    const bi = edgeB(along);
+    const edgeHeight = (ad.H[ai] + bd.H[bi]) * 0.5;
+    const slopeA = edgeHeight - ad.H[indexA(along, 1)];
+    const slopeB = bd.H[indexB(along, 1)] - edgeHeight;
+    const sharedSlope = clamp((slopeA + slopeB) * 0.5, -0.28, 0.28);
+    const sharedTint = [0, 1, 2].map((k) => (ad.tint[ai * 3 + k] + bd.tint[bi * 3 + k]) * 0.5);
+    const sharedForest = (ad.forest[ai] + bd.forest[bi]) * 0.5;
+    for (let depth = 0; depth <= band; depth++) {
+      const ia = indexA(along, depth);
+      const ib = indexB(along, depth);
+      const blend = smoothstep(1, band, depth);
+      const targetA = edgeHeight - sharedSlope * depth;
+      const targetB = edgeHeight + sharedSlope * depth;
+      ad.H[ia] = lerp(targetA, ad.H[ia], blend);
+      bd.H[ib] = lerp(targetB, bd.H[ib], blend);
+      for (let k = 0; k < 3; k++) {
+        ad.tint[ia * 3 + k] = lerp(sharedTint[k], ad.tint[ia * 3 + k], blend);
+        bd.tint[ib * 3 + k] = lerp(sharedTint[k], bd.tint[ib * 3 + k], blend);
+      }
+      ad.forest[ia] = lerp(sharedForest, ad.forest[ia], blend);
+      bd.forest[ib] = lerp(sharedForest, bd.forest[ib], blend);
+      // A mottled mineral/soil transition avoids a perfectly straight material seam.
+      // Roads, water, mountain faces and cultivated ground remain untouched.
+      const fade = 1 - smoothstep(2, band, depth);
+      if (fade > 0.02) {
+        const wxA = a.x0 + (orientation === 'ew' ? W - 1 - depth : along);
+        const wzA = a.z0 + (orientation === 'ew' ? along : W - 1 - depth);
+        const wxB = b.x0 + (orientation === 'ew' ? depth : along);
+        const wzB = b.z0 + (orientation === 'ew' ? along : depth);
+        if (!protectedCell(ad, ia) && hash2(wxA, wzA, 9107) < fade * 0.78) ad.top[ia] = transitionTop;
+        if (!protectedCell(bd, ib) && hash2(wxB, wzB, 9107) < fade * 0.78) bd.top[ib] = transitionTop;
+      }
+    }
+  }
+  reslope(ad.H, ad.slope);
+  reslope(bd.H, bd.slope);
+}
+
+function blendSilverrunEcotones(lands) {
+  const byKind = Object.fromEntries(lands.map((land) => [land.kind, land]));
+  // The west edge is a gradual desert-to-woodland ecotone; the north edge
+  // eases Gilantre's outer country into the Silverrun canopy.
+  blendEcotonePair(byKind.glassroad, byKind.silverrunWest, 'ew', 32, TILE.DIRT);
+  blendEcotonePair(byKind.gilantreSw, byKind.silverrunNorth, 'ns', 28, TILE.GRASS);
+  blendEcotonePair(byKind.gilantreSe, byKind.silverrunEast, 'ns', 28, TILE.GRASS);
+}
+
+function silverrunEdgeDensity(land, lx, lz) {
+  let density = 1;
+  if (land.kind === 'silverrunWest') density = Math.min(density, smoothstep(0, 30, lx));
+  if (land.kind === 'silverrunNorth' || land.kind === 'silverrunEast') density = Math.min(density, smoothstep(0, 28, lz));
+  return density;
+}
+
 export function generateRing(oak, south) {
   const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
   const made = {};
@@ -872,6 +941,7 @@ export function generateRing(oak, south) {
   carveGilantre(lands);
   stitchSilverrunToGilantre(lands);
   stitchSilverrunRiver(lands);
+  blendSilverrunEcotones(lands);
   return lands;
 }
 
@@ -1015,7 +1085,7 @@ function dressSilverrun(world, land, spec) {
   for (let n = 0; n < 420 && giants < giantTarget; n++) {
     const lx = 9 + Math.floor(hash2(n, 2, seed + 11) * (W - 18));
     const lz = 9 + Math.floor(hash2(n, 5, seed + 11) * (W - 18));
-    if (reserved(lx, lz) || data.H[lz * W + lx] > 7.6 || !world.free(X(lx), Z(lz), 2.2)) continue;
+    if (reserved(lx, lz) || data.H[lz * W + lx] > 7.6 || hash2(n, 12, seed + 17) > silverrunEdgeDensity(land, lx, lz) || !world.free(X(lx), Z(lz), 2.2)) continue;
     const parts = m.giants[n % m.giants.length];
     const scale = 1.02 + hash2(n, 8, seed) * 0.28;
     world.putAt(parts, X(lx), Z(lz), hash2(n, 9, seed) * 6, scale);
@@ -1031,7 +1101,7 @@ function dressSilverrun(world, land, spec) {
     const lx = 6 + Math.floor(hash2(n, 2, seed + 21) * (W - 12));
     const lz = 6 + Math.floor(hash2(n, 5, seed + 21) * (W - 12));
     const i = lz * W + lx;
-    if (reserved(lx, lz) || data.H[i] < 1.25 || data.H[i] > 8.2 || data.zone[i] === ZONE.MOUNTAIN) continue;
+    if (reserved(lx, lz) || data.H[i] < 1.25 || data.H[i] > 8.2 || data.zone[i] === ZONE.MOUNTAIN || hash2(n, 13, seed + 19) > silverrunEdgeDensity(land, lx, lz)) continue;
     if (!world.free(X(lx), Z(lz), 1.25)) continue;
     const roll = hash2(n, 8, seed + 31);
     let parts = m.oaks[n % m.oaks.length];
@@ -1053,7 +1123,7 @@ function dressSilverrun(world, land, spec) {
     const lx = 3 + Math.floor(hash2(n, 3, seed + 51) * (W - 6));
     const lz = 3 + Math.floor(hash2(n, 7, seed + 51) * (W - 6));
     const i = lz * W + lx;
-    if (reserved(lx, lz) || data.H[i] < 1.0 || data.H[i] > 8.5) continue;
+    if (reserved(lx, lz) || data.H[i] < 1.0 || data.H[i] > 8.5 || hash2(n, 14, seed + 23) > silverrunEdgeDensity(land, lx, lz)) continue;
     const roll = hash2(n, 4, seed + 61);
     let parts = m.tuftsForest[n % m.tuftsForest.length];
     if (roll > 0.72) parts = m.ferns[n % m.ferns.length];
@@ -1073,7 +1143,7 @@ function dressSilverrun(world, land, spec) {
     const lx = 7 + Math.floor(hash2(n, 3, seed + 81) * (W - 14));
     const lz = 7 + Math.floor(hash2(n, 8, seed + 81) * (W - 14));
     const i = lz * W + lx;
-    if (reserved(lx, lz) || data.H[i] < 1.1 || data.H[i] > 7.8 || !world.free(X(lx), Z(lz), 1.35)) continue;
+    if (reserved(lx, lz) || data.H[i] < 1.1 || data.H[i] > 7.8 || hash2(n, 15, seed + 29) > silverrunEdgeDensity(land, lx, lz) || !world.free(X(lx), Z(lz), 1.35)) continue;
     const stump = hash2(n, 5, seed + 83) > 0.62;
     const parts = stump ? m.stumps[n % m.stumps.length] : m.logs[n % m.logs.length];
     const scale = 0.72 + hash2(n, 9, seed + 83) * 0.28;
