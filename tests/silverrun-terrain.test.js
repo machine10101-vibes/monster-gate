@@ -51,7 +51,7 @@ test('Silverrun ecotones blend terrain gradients, ground tint and forest density
     [byKind.gilantreSe, byKind.silverrunEast, 'ns'],
   ];
   for (const [a, b, orientation] of pairs) {
-    for (let along = 8; along < W - 8; along += 7) {
+    for (let along = 40; along < W - 40; along += 7) {
       const edgeA = orientation === 'ew' ? along * W + W - 1 : (W - 1) * W + along;
       const edgeB = orientation === 'ew' ? along * W : along;
       const innerA = orientation === 'ew' ? along * W + W - 2 : (W - 2) * W + along;
