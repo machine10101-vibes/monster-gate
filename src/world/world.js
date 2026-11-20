@@ -5,7 +5,8 @@ import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
-import { STARTER, TILES, TILE_SIZE, originOf, paintTileMap, MAP_BORDER_PX } from './tiles.js';
+import { STARTER, TILES, TILE_SIZE, originOf } from './tiles.js';
+import { rasterPlaymap } from './playmap.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
@@ -31,64 +32,6 @@ const TOWN_KINDS = new Set(['oakhollow', 'southford', 'hellspire', 'dawnspire'])
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const _sphereC = new THREE.Vector3();
 const _sphereE = new THREE.Vector3();
-
-/** 16–24px noise-warped mix at tile edges. Zone interiors stay crisp — no global blur. */
-function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
-  const w = map.width;
-  const h = map.height;
-  if (w < 2 || h < 2 || !lands?.length) return;
-  const ctx = map.getContext('2d');
-  const src = ctx.getImageData(0, 0, w, h);
-  const out = ctx.createImageData(w, h);
-  out.data.set(src.data);
-  const d = src.data;
-  const o = out.data;
-  const tile = W * scale;
-  const band = Math.max(12, Math.round(MAP_BORDER_PX * scale));
-  const mix = (x, y, nx, ny, t) => {
-    if (t <= 0 || nx < 0 || ny < 0 || nx >= w || ny >= h) return;
-    const i = (y * w + x) * 4;
-    const j = (ny * w + nx) * 4;
-    const k = t < 1 ? t : 1;
-    o[i] += (d[j] - o[i]) * k;
-    o[i + 1] += (d[j + 1] - o[i + 1]) * k;
-    o[i + 2] += (d[j + 2] - o[i + 2]) * k;
-  };
-  const fall = (b, warp) => {
-    const t = 1 - (b + warp) / band;
-    if (t <= 0) return 0;
-    return t * t * (3 - 2 * t) * 0.62;
-  };
-  for (const land of lands) {
-    const x0 = Math.round((land.x0 - minX) * scale);
-    const z0 = Math.round((land.z0 - minZ) * scale);
-    for (let lz = 0; lz < tile; lz++) {
-      const y = z0 + lz;
-      if (y < 0 || y >= h) continue;
-      for (let b = 0; b < band; b++) {
-        const warp = (hash2(land.x0 + b, land.z0 + lz / scale, 91) - 0.5) * 16 * scale;
-        const t = fall(b, warp);
-        const east = x0 + tile - 1 - b;
-        const west = x0 + b;
-        if (east >= 0 && east < w) mix(east, y, east + b + 1, y, t);
-        if (west >= 0 && west < w) mix(west, y, west - b - 1, y, t);
-      }
-    }
-    for (let lx = 0; lx < tile; lx++) {
-      const x = x0 + lx;
-      if (x < 0 || x >= w) continue;
-      for (let b = 0; b < band; b++) {
-        const warp = (hash2(land.x0 + lx / scale, land.z0 + b, 92) - 0.5) * 16 * scale;
-        const t = fall(b, warp);
-        const south = z0 + tile - 1 - b;
-        const north = z0 + b;
-        if (south >= 0 && south < h) mix(x, south, x, south + b + 1, t);
-        if (north >= 0 && north < h) mix(x, north, x, north - b - 1, t);
-      }
-    }
-  }
-  ctx.putImageData(out, 0, 0);
-}
 
 function stampTownIcon(ctx, x, y) {
   const ix = Math.round(x);
@@ -1615,26 +1558,17 @@ export class World {
     map.height = (maxZ - minZ) * px;
     const mctx = map.getContext('2d');
     mctx.imageSmoothingEnabled = false;
-    mctx.fillStyle = '#1d4e86';
-    mctx.fillRect(0, 0, map.width, map.height);
-    for (const tile of TILES) {
-      const o = originOf(tile);
-      const planned = document.createElement('canvas');
-      planned.width = W * px;
-      planned.height = W * px;
-      paintTileMap(planned, tile);
-      mctx.drawImage(planned, (o.x - minX) * px, (o.z - minZ) * px);
-    }
-    const atlasLands = TILES.map((tile) => {
-      const o = originOf(tile);
-      return { x0: o.x, z0: o.z };
+    const rgba = rasterPlaymap({
+      width: map.width,
+      height: map.height,
+      minX,
+      minZ,
+      scale: px,
+      tileCanvas: this.tileCanvas,
     });
-    for (const land of this.lands) {
-      const src = this.tileCanvas[land.tileId];
-      if (!src) continue;
-      mctx.drawImage(src, (land.x0 - minX) * px, (land.z0 - minZ) * px, W * px, W * px);
-    }
-    blendMinimapSeams(map, atlasLands, minX, minZ, px);
+    const img = mctx.createImageData(map.width, map.height);
+    img.data.set(rgba);
+    mctx.putImageData(img, 0, 0);
     let gx = 0;
     let gz = 0;
     let gn = 0;

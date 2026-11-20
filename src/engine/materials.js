@@ -101,7 +101,7 @@ float cloudShade(vec2 xz, float t, float amt){
   float n = cloudFbm(xz * 0.018 + vec2(t * 0.012, t * 0.007));
   n += 0.32 * cloudFbm(xz * 0.007 - vec2(t * 0.005, -t * 0.004) + 4.7);
   float sh = smoothstep(0.40, 0.62, n);
-  return mix(1.0, 0.78, sh * amt);
+  return mix(1.0, 0.70, sh * amt);
 }
 `;
 

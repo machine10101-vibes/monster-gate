@@ -465,9 +465,12 @@ export const PLAYMAP_LANDMARKS = new Set([
   'Darksycle Den',
 ]);
 
+const CLUSTER = new Set(['Oakhollow', 'Southmead', 'Southford', 'Broadshire', 'Brookside']);
+
 export function playmapLabelKind(label) {
   if (label?.city) return 'city';
   if (label?.landmark || PLAYMAP_LANDMARKS.has(label?.name)) return 'landmark';
+  if (label?.uncharted) return 'uncharted';
   return 'minor';
 }
 
@@ -485,7 +488,7 @@ const PLAYMAP_NUDGES = [
 const PLAYMAP_PIN_NUDGES = {
   'Monster Gate': [0, -2.4],
   'Greyrock Pit': [2.2, -0.4],
-  Oakhollow: [0, 1.6],
+  Oakhollow: [0, -0.2],
   Harefield: [-1.6, -0.4],
   Northleas: [0, -1.2],
   Goldmead: [1.4, -0.35],
@@ -494,7 +497,9 @@ const PLAYMAP_PIN_NUDGES = {
   Hellspire: [0.4, -0.2],
   Runmouth: [-1.4, 0.2],
   Southmead: [0.2, -1.1],
-  Southford: [0, 0.4],
+  Southford: [0, 2.4],
+  Broadshire: [1.6, 0.8],
+  Brookside: [-2.2, 0.3],
 };
 
 /**
@@ -507,7 +512,7 @@ export function layoutPlaymapLabels(labels, opts = {}) {
   const mapH = Number(opts.mapH) > 0 ? Number(opts.mapH) : 560;
   const list = (labels || []).map((label, i) => {
     const kind = playmapLabelKind(label);
-    const font = kind === 'city' ? 12 : kind === 'landmark' ? 10.5 : 9;
+    const font = kind === 'city' ? 14 : kind === 'landmark' ? 13 : 12;
     const name = String(label.name || '');
     const twoLine = /\s/.test(name) || name.length > 10;
     const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.42 : 0.58) + 12));
@@ -525,7 +530,7 @@ export function layoutPlaymapLabels(labels, opts = {}) {
       y: Number(label.ny),
       visible: true,
       lead: false,
-      rank: kind === 'city' ? 0 : kind === 'landmark' ? 1 : 2,
+      rank: kind === 'city' ? 0 : kind === 'landmark' ? 1 : kind === 'uncharted' ? 3 : 2,
     };
   });
   list.sort((a, b) => a.rank - b.rank || a.i - b.i);
@@ -537,7 +542,16 @@ export function layoutPlaymapLabels(labels, opts = {}) {
     h: it.bh,
   });
   const blocked = (r) => used.some((u) => overlap(r, u, 6));
+  const clusters = list.filter((it) => it.kind === 'city' || CLUSTER.has(it.name));
+  const nearCluster = (it) => clusters.some((c) => Math.hypot(it.ax - c.ax, it.ay - c.ay) < 9);
   for (const it of list) {
+    if ((it.kind === 'minor' || it.kind === 'uncharted') && nearCluster(it) && !CLUSTER.has(it.name)) {
+      it.visible = false;
+      it.lead = false;
+      it.x = it.ax;
+      it.y = it.ay;
+      continue;
+    }
     const stepX = ((it.bw + 12) / mapW) * 100;
     const stepY = ((it.bh + 10) / mapH) * 100;
     const pin = PLAYMAP_PIN_NUDGES[it.name];
@@ -550,14 +564,14 @@ export function layoutPlaymapLabels(labels, opts = {}) {
       if (blocked(r)) continue;
       it.x = x;
       it.y = y;
-      it.lead = Math.hypot(x - it.ax, y - it.ay) > 0.7;
+      it.lead = it.kind === 'city' || it.kind === 'landmark' ? Math.hypot(x - it.ax, y - it.ay) > 0.7 : false;
       it.visible = true;
       used.push(r);
       placed = true;
       break;
     }
     if (!placed) {
-      it.visible = it.kind !== 'minor';
+      it.visible = it.kind === 'city' || it.kind === 'landmark';
       it.lead = false;
       it.x = it.ax;
       it.y = it.ay;

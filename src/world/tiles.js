@@ -233,10 +233,10 @@ export function sampleTile(tile, u, v) {
       b = 0.24;
       break;
     case 'farm':
-      h = 1.15 + (Math.floor(v * 14) % 2) * 0.08;
-      r = 0.55 + (Math.floor(v * 14) % 2) * 0.12;
-      g = 0.5;
-      b = 0.2;
+      h = 1.2 + n * 0.3;
+      r = 0.58 + n2 * 0.08;
+      g = 0.52 + n * 0.06;
+      b = 0.24;
       break;
     case 'marsh': {
       const pond = n2 > 0.62;
