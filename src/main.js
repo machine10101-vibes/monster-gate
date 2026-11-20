@@ -3788,7 +3788,7 @@ class Game {
     if (inp.take('rotateR')) this.cam.targetYaw += Math.PI / 4;
     if (inp.take('rotateL')) this.cam.targetYaw -= Math.PI / 4;
     if (inp.zoomDelta) {
-      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 10, 26);
+      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 8, 32);
       inp.zoomDelta = 0;
     }
 

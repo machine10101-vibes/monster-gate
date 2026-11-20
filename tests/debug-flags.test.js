@@ -155,8 +155,10 @@ test('every built tile has a debug tp key', () => {
   assert.equal(parsePhotoFlag('?debug=1'), false);
   assert.equal(parsePhotoFlag('?mmo=1&photo=1'), true);
   const lagoon = resolveSpot('lagoon');
-  assert.ok(lagoon.z >= 80, 'lagoon spawn is on the road south of the pool, not in the palm belt');
-  assert.ok(lagoon.x > -210, 'lagoon spawn sits east of the pool so the water is in frame');
+  assert.ok(lagoon.z >= 66 && lagoon.z <= 78, 'lagoon spawn is on the south beach of the pool');
+  assert.ok(lagoon.x < -218, 'lagoon spawn sits on the south sand, not the east grass road');
+  const pool = Math.hypot(lagoon.x + 226, lagoon.z - 50);
+  assert.ok(pool > 16 && pool < 28, 'lagoon spawn looks at the water from a clear beach');
   assert.ok(Math.hypot(lagoon.x + 216, lagoon.z - 72) > 5, 'lagoon spawn is not the tile center');
 });
 

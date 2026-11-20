@@ -148,6 +148,21 @@ export class World {
     if (this.docks) for (const p of this.docks) if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.y;
     const land = this.landAt(x, z);
     if (land) {
+      if (land.data.smooth) {
+        const fx = clamp(x - land.x0, 0, W - 1.001);
+        const fz = clamp(z - land.z0, 0, W - 1.001);
+        const x0 = Math.floor(fx);
+        const z0 = Math.floor(fz);
+        const x1 = Math.min(W - 1, x0 + 1);
+        const z1 = Math.min(W - 1, z0 + 1);
+        const tx = fx - x0;
+        const tz = fz - z0;
+        const h00 = land.data.H[z0 * W + x0];
+        const h10 = land.data.H[z0 * W + x1];
+        const h01 = land.data.H[z1 * W + x0];
+        const h11 = land.data.H[z1 * W + x1];
+        return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz;
+      }
       const lx = Math.floor(x) - land.x0;
       const lz = Math.floor(z) - land.z0;
       return land.data.H[lz * W + lx];
@@ -434,6 +449,7 @@ export class World {
       const mesh = buildTerrainMeshes(land.data, this.mats.terrain, {
         ox: land.x0,
         oz: land.z0,
+        smooth: !!land.data.smooth || !!land.desert,
         outside: (x, z) => sampleLands(this.lands, land.x0 + x, land.z0 + z),
       });
       this.group.add(mesh);
@@ -604,15 +620,15 @@ export class World {
           float mid = vn(p * 0.16 + vec2(uTime * 0.018, -uTime * 0.012));
           float fine = vn(p * 0.4 + vec2(-uTime * 0.02, uTime * 0.016));
           float n = macro * 0.45 + mid * 0.35 + fine * 0.2;
-          float depthK = smoothstep(0.12, 2.6, vDepth);
+          float depthK = smoothstep(0.06, 1.35, vDepth);
           vec3 col = mix(uShallow, uDeep, depthK);
           col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
           float foamWave = 0.55 + 0.45 * sin(uTime * 1.7 + p.x * 0.55 + p.y * 0.4);
           float foamNoise = vn(p * 1.8 + vec2(uTime * 0.12, -uTime * 0.08));
-          float foam = vShore * foamWave * smoothstep(0.28, 0.92, foamNoise);
-          col = mix(col, uFoam, foam * 0.78);
+          float foam = vShore * foamWave * smoothstep(0.16, 0.88, foamNoise);
+          col = mix(col, uFoam, foam * 0.92);
           col *= uLight;
           float alpha = mix(0.72, 0.88, depthK);
           gl_FragColor = vec4(col, alpha);
@@ -641,7 +657,7 @@ export class World {
           const h = hAt(land, x, z);
           if (h >= WATER_Y + 0.02) continue;
           let edge = 0;
-          for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+          for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step], [step, step], [step, -step], [-step, step], [-step, -step]]) {
             if (hAt(land, x + dx, z + dz) >= WATER_Y - 0.02) edge = 1;
           }
           const d = Math.max(0.05, WATER_Y - h);
@@ -1471,9 +1487,9 @@ export class World {
       else if (t === TILE.ASH) [r, g, b] = [96, 94, 100];
       else if (t === TILE.LAVA) [r, g, b] = [255, 110, 30];
       else if (t === TILE.CINDER) [r, g, b] = [86, 52, 40];
-      else if (t === TILE.FLAGSTONE) [r, g, b] = [176, 154, 112];
+      else if (t === TILE.FLAGSTONE) [r, g, b] = [198, 170, 118];
       else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [138, 124, 98];
-      else if (t === TILE.COBBLE) [r, g, b] = [186, 158, 112];
+      else if (t === TILE.COBBLE) [r, g, b] = [204, 172, 118];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];
       else if (t === TILE.SAND) [r, g, b] = [225, 205, 150];
       else if (t === TILE.GRAVEL) [r, g, b] = [168, 146, 108];

@@ -611,7 +611,7 @@ function makeTile(spec, edges) {
       else if (edges.s && z === W - 1) H[i] = edges.s[x];
       else if (edges.w && x === 0) H[i] = edges.w[z];
       else if (edges.e && x === W - 1) H[i] = edges.e[z];
-      else H[i] = Math.round(H[i] * 2) / 2;
+      else if (!spec.desert) H[i] = Math.round(H[i] * 2) / 2;
     }
   }
   if (spec.desert) {
@@ -621,8 +621,10 @@ function makeTile(spec, edges) {
         if (onBorder(x, z, edges)) continue;
         const i = z * W + x;
         if (kind[i] === WATER) continue;
-        const s = src[i] * 2 + src[i - 1] + src[i + 1] + src[i - W] + src[i + W];
-        H[i] = Math.round((s / 6) * 2) / 2;
+        const s = src[i] * 4
+          + src[i - 1] + src[i + 1] + src[i - W] + src[i + W]
+          + src[i - W - 1] + src[i - W + 1] + src[i + W - 1] + src[i + W + 1];
+        H[i] = s / 12;
       }
     }
   }
@@ -738,7 +740,7 @@ function makeTile(spec, edges) {
     }
   }
   reslope(H, slope);
-  return { H, zone, top, tint, pathMask: mask, slope, forest, climb };
+  return { H, zone, top, tint, pathMask: mask, slope, forest, climb, smooth: !!spec.desert };
 }
 
 function specEdges(kind, oak, south, made) {
@@ -943,6 +945,7 @@ export function generateRing(oak, south) {
       arctic: !!spec.arctic,
       volcanic: !!spec.volcanic,
       jungle: !!spec.jungle,
+      desert: !!spec.desert,
       silverrun: !!spec.silverrun,
       emberAt: spec.volcanic ? emberAmount(spec) : () => 0,
       chillAt: spec.arctic

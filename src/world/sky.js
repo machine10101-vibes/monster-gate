@@ -122,19 +122,19 @@ export class Sky {
     this.skyMesh.renderOrder = -10;
     scene.add(this.skyMesh);
 
-    this.cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, toneMapped: true });
+    this.cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: true });
     this.clouds = new THREE.Group();
-    this.cloudSpan = 170;
+    this.cloudSpan = 240;
     const rng = new RNG(77);
-    const nClouds = quality.id === 'low' ? 8 : 14;
+    const nClouds = quality.id === 'low' ? 12 : 20;
     for (let i = 0; i < nClouds; i++) {
       const parts = buildCloud(i + 1);
       const mesh = new THREE.Mesh(parts[0].geo, this.cloudMat);
-      mesh.scale.setScalar(rng.range(0.55, 1.0));
+      mesh.scale.setScalar(rng.range(0.7, 1.35));
       mesh.userData.ox = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
       mesh.userData.oz = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
-      mesh.userData.oy = rng.range(46, 62);
-      mesh.userData.speed = rng.range(0.4, 0.9);
+      mesh.userData.oy = rng.range(36, 70);
+      mesh.userData.speed = rng.range(0.35, 0.85);
       this.clouds.add(mesh);
     }
     scene.add(this.clouds);
@@ -245,7 +245,12 @@ export class Sky {
     this.skyMesh.position.copy(camera.position);
 
     const cloudBright = clamp(0.25 + s.hi * 0.55, 0.3, 1);
-    this.cloudMat.color.setRGB(cloudBright * (0.9 + (1 - night) * 0.1), cloudBright, cloudBright * (1 + night * 0.25));
+    const snow = chill * 0.55;
+    this.cloudMat.color.setRGB(
+      cloudBright * (0.82 - snow * 0.12) * (0.9 + (1 - night) * 0.1),
+      cloudBright * (0.84 - snow * 0.04),
+      cloudBright * (0.92 + snow * 0.08) * (1 + night * 0.18),
+    );
     const span = this.cloudSpan;
     const wrap = (v) => {
       let n = v + span * 0.5;

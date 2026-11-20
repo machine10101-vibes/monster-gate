@@ -23,7 +23,7 @@ import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
 import { BUILD_ID } from './buildId.js';
-import { applyHudLayout, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
+import { applyHudLayout, layoutPlaymapLabels, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
 import { QUALITIES } from '../engine/quality.js';
 import { canCreateWorld } from '../admin/gate.js';
@@ -87,12 +87,12 @@ function landMapLabels(world) {
   }
   if (gilantre) labels.push({ name: 'Gilantre', x: gilantre.x / gilantre.n, z: gilantre.z / gilantre.n, city: true });
   labels.push(
-    { name: 'Monster Gate', x: GATE.x, z: GATE.z - 14 },
-    { name: 'Greyrock Pit', x: MINE.x + 4, z: MINE.z - 14 },
+    { name: 'Monster Gate', x: GATE.x, z: GATE.z - 14, landmark: true },
+    { name: 'Greyrock Pit', x: MINE.x + 4, z: MINE.z - 14, landmark: true },
     { name: 'Oakhollow', x: TOWN.x - 10, z: TOWN.z + 18, city: true },
-    { name: "Tobin's Farm", x: FARM.x1 + 22, z: FARM.z1 + 16 },
-    { name: 'Mirrormere', x: LAKE.x - 32, z: LAKE.z + 34 },
-    { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24 },
+    { name: "Tobin's Farm", x: FARM.x1 + 22, z: FARM.z1 + 16, landmark: true },
+    { name: 'Mirrormere', x: LAKE.x - 32, z: LAKE.z + 34, landmark: true },
+    { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24, landmark: true },
   );
   for (const mark of world.farmMarks || []) labels.push(mark);
   return labels;
@@ -650,13 +650,35 @@ export class HUD {
       const frame = document.createElement('div');
       frame.className = 'playmap';
       frame.appendChild(c);
-      const labels = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
-      for (const label of labels) {
+      const raw = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
+      const pins = raw.map((label) => ({
+        ...label,
+        nx: ((label.x - ox) / src.width) * 100,
+        ny: ((label.z - oz) / src.height) * 100,
+      }));
+      const placed = layoutPlaymapLabels(pins);
+      const leads = document.createElement('canvas');
+      leads.className = 'playmap-leads';
+      leads.width = 720;
+      leads.height = Math.max(1, Math.round(720 * (src.height / src.width)));
+      const lctx = leads.getContext('2d');
+      lctx.strokeStyle = 'rgba(255, 248, 232, 0.55)';
+      lctx.lineWidth = 1.2;
+      for (const label of placed) {
+        if (!label.visible || !label.lead) continue;
+        lctx.beginPath();
+        lctx.moveTo(label.ax / 100 * leads.width, label.ay / 100 * leads.height);
+        lctx.lineTo(label.x / 100 * leads.width, label.y / 100 * leads.height);
+        lctx.stroke();
+      }
+      frame.appendChild(leads);
+      for (const label of placed) {
+        if (!label.visible) continue;
         const b = document.createElement('b');
-        b.className = 'playmap-label' + (label.city ? ' city' : '');
+        b.className = 'playmap-label' + (label.city ? ' city' : label.kind === 'minor' ? ' minor' : ' landmark');
         b.textContent = label.name;
-        b.style.left = ((label.x - ox) / src.width * 100).toFixed(2) + '%';
-        b.style.top = ((label.z - oz) / src.height * 100).toFixed(2) + '%';
+        b.style.left = label.x.toFixed(2) + '%';
+        b.style.top = label.y.toFixed(2) + '%';
         frame.appendChild(b);
       }
       body.appendChild(frame);

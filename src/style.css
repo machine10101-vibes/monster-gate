@@ -1265,6 +1265,13 @@ body.touch #top-right {
   color: #ffe8df;
 }
 .playmap { position: relative; }
+.playmap-leads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
 .bigmap {
   width: 100%;
   display: block;
@@ -1276,7 +1283,7 @@ body.touch #top-right {
 .playmap-label {
   position: absolute;
   transform: translate(-50%, -50%);
-  max-width: 11%;
+  max-width: 12%;
   margin: 0;
   color: #fff8e8;
   font-family: var(--font-body);
@@ -1289,7 +1296,9 @@ body.touch #top-right {
   text-shadow: 0 0 2px #000, 0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000;
   pointer-events: none;
 }
-.playmap-label.city { color: #ffe7a0; }
+.playmap-label.city { color: #ffe7a0; font-size: clamp(11px, 1.25vw, 13px); }
+.playmap-label.landmark { font-size: clamp(9px, 1.05vw, 11px); }
+.playmap-label.minor { font-size: clamp(8px, 0.95vw, 10px); font-weight: 500; }
 
 #faint {
   position: absolute;

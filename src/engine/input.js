@@ -179,14 +179,15 @@ export class Input {
       if (e.button === 0) this.attackHeld = false;
       if (e.button === 1) this.drag = false;
     });
-    c.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        this.zoomDelta += Math.sign(e.deltaY);
-      },
-      { passive: false }
-    );
+    const onWheel = (e) => {
+      if (!this.enabled) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.target?.closest?.('#panel, #dialog, #title, #world-chat, #loading')) return;
+      e.preventDefault();
+      this.zoomDelta += Math.sign(e.deltaY);
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
 
     window.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;

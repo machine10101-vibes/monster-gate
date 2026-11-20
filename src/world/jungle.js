@@ -127,7 +127,7 @@ export function jungleFeature(h, x, z, spec) {
     const d = Math.hypot((x - cx) / rx, (z - cz) / rz) + wob;
     if (d < 1.4 && h < 10) {
       if (d < 0.72) {
-        let bed = lerp(-0.7, 0.05, d / 0.72);
+        let bed = lerp(-1.85, 0.05, d / 0.72);
         for (const [ix, iz, ir, ih] of spec.islands || []) {
           const di = Math.hypot(x - ix, z - iz) / ir;
           if (di < 1) bed = Math.max(bed, lerp(ih, 0.1, smoothstep(0.55, 1, di)));
@@ -168,7 +168,15 @@ export function paintJungleCell(out, H, x, z, kind, isPath, n, spec) {
   };
   out.forest[i] = 0;
   if (kind === K_WATER || h < 0.35) {
-    set(ZONE.WATER, TILE.SAND, 0.62, 0.95, 0.95);
+    const deep = h < -0.7;
+    const foam = hash2(gx + 11, gz + 7, 88);
+    set(
+      ZONE.WATER,
+      TILE.SAND,
+      deep ? 0.16 + foam * 0.08 : 0.38 + foam * 0.18,
+      deep ? 0.42 + foam * 0.08 : 0.78 + foam * 0.12,
+      deep ? 0.48 + foam * 0.06 : 0.82 + foam * 0.14,
+    );
     return;
   }
   if (isPath) {
@@ -279,6 +287,7 @@ export function dressJungle(world, land, spec) {
     if (spec.clearing && Math.hypot(lx - spec.clearing.cx, lz - spec.clearing.cz) < spec.clearing.r) return true;
     if (spec.piers) for (const p of spec.piers) if (Math.abs(lx - p.x) < 14 && lz > 92) return true;
     if (spec.gate && Math.abs(lx - spec.gate.x) < 10 && Math.abs(lz - spec.gate.z) < 8) return true;
+    if (land.kind === 'lagoon' && lz > 54 && lz < 82 && Math.abs(lx - 62) < 14) return true;
     return false;
   };
   const nearWater = (lx, lz, r) => {
