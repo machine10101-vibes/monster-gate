@@ -19,7 +19,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, parseMapLabelsFlag, parsePhotoFlag, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
+import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, parseCloudShadowFlag, parseMapLabelsFlag, parsePhotoFlag, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { DEBUG_LOOT_ID, isUnsellableGood, markDebugGranted } from './debug/transient.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
@@ -481,6 +481,7 @@ class Game {
     if (this.world.rift) this.scene.add(this.world.rift.group);
     if (this.world.colosseum) this.scene.add(this.world.colosseum.group);
     this.sky = new Sky(this.scene, this.quality);
+    this.sky.cloudShadowStrong = parseCloudShadowFlag(location.search);
     this.snowfall = new Snowfall(this.scene);
     this.ashfall = new Ashfall(this.scene);
     this.chill = 0;

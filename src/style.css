@@ -1273,7 +1273,9 @@ body.touch #top-right {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  max-height: min(90vh, 920px);
+  /* max-height alone leaves the flex/contain map at 0px (a 4px speck). */
+  height: min(90dvh, 90vh, 920px);
+  max-height: min(90dvh, 90vh, 920px);
   width: min(920px, 96vw);
 }
 #panel.map-open #panel-body {
@@ -1285,6 +1287,22 @@ body.touch #top-right {
 }
 #panel.map-open .playmap-hint {
   flex: 0 0 auto;
+}
+@media (max-height: 520px) {
+  #panel.map-open .panel-card {
+    height: min(100dvh, 100vh);
+    max-height: min(100dvh, 100vh);
+    width: min(920px, 100vw);
+  }
+  #panel.map-open .panel-card h2 {
+    padding: 8px 48px 6px 12px;
+  }
+  #panel.map-open #panel-body {
+    padding: 4px 6px 2px;
+  }
+  #panel.map-open .playmap-hint {
+    display: none;
+  }
 }
 .playmap {
   position: relative;
@@ -4025,7 +4043,8 @@ body.touch #panel.map-open .panel-card {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: none;
+  height: min(100dvh, 100vh);
+  max-height: min(100dvh, 100vh);
 }
 body.touch .panel-card h2 {
   padding: 9px 56px 6px 10px;

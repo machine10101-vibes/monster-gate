@@ -194,6 +194,12 @@ export function parseMapLabelsFlag(search = '') {
   return paramsOf(search).get('maplabels') !== '0';
 }
 
+/** `?debug=1&cloudshadow=strong` forces a 0.35 ground multiply so testers can see the shader. */
+export function parseCloudShadowFlag(search = '') {
+  const q = paramsOf(search);
+  return q.get('debug') === '1' && q.get('cloudshadow') === 'strong';
+}
+
 export function canonicalSpot(raw) {
   const k = String(raw || '').trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
   if (!k) return '';

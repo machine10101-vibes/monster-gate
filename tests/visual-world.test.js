@@ -5,7 +5,8 @@ import { TILE, cloudShadeAt, CLOUD_DRIFT } from '../src/engine/materials.js';
 import { QUALITIES, survivalBudget } from '../src/engine/quality.js';
 import { originOf, paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
 import { chartedAnchor, chartedWeight, oceanWeight, rasterPlaymap } from '../src/world/playmap.js';
-import { sideTilesFor } from '../src/world/terrain.js';
+import { sideTilesFor, generateWorld, GUILD, W, WATER_Y } from '../src/world/terrain.js';
+import { JUNGLE_SPECS, jungleFeature } from '../src/world/jungle.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
 
@@ -180,9 +181,14 @@ test('cloud shadows darken the ground and never cover the play view', () => {
   assert.doesNotMatch(sky, /CircleGeometry/);
   assert.doesNotMatch(sky, /rng\.range\(6, 11\)/);
   assert.match(mats, /cloudShade/);
-  assert.match(mats, /mix\(1\.0, 0\.56/);
+  assert.match(mats, /mix\(1\.0, uCloudDark/);
+  assert.match(mats, /uCloudForce/);
+  assert.match(mats, /outgoingLight \*= cloudShade/);
   assert.match(mats, /#include <opaque_fragment>/);
   assert.match(world, /cloudShade\(p, uCloudTime, uCloudAmt\)/);
+  assert.match(world, /uCloudDark: cloudShadowUniforms\.uCloudDark/);
+  assert.match(src('src/world/sky.js'), /cloudShadowStrong/);
+  assert.match(src('src/main.js'), /parseCloudShadowFlag/);
   assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
   assert.match(mats, /0xd2ae78/);
   assert.match(terrain, /matchTop \? 0\.96/);
@@ -201,11 +207,11 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
   assert.match(world, /shoreBand/);
-  assert.match(world, /smoothstep\(0\.20, 0\.06, vDepth\)/);
+  assert.match(world, /max\(vShore, smoothstep\(0\.12, 0\.04, vDepth\)\)/);
   assert.doesNotMatch(world, /smoothstep\(0\.0, 0\.03, vDepth\)/);
   assert.doesNotMatch(world, /foamNoise/);
-  assert.doesNotMatch(world, /max\(vShore, shoreBand\)/);
   assert.doesNotMatch(world, /fwidth|dFdx|dFdy/);
+  assert.match(world, /x \+ 2 \* dx, z \+ 2 \* dz/);
   assert.match(world, /depthAt\(land, x \+ step, z \+ step\)/);
 });
 
@@ -278,8 +284,43 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
   assert.doesNotMatch(mats, /patch < 0\.32/);
   assert.match(player, /RingGeometry/);
-  assert.match(player, /opacity: 0\.8/);
-  assert.match(terrain, /h - nh <= 1\.001/);
+  assert.match(player, /opacity: 0\.95/);
+  assert.match(player, /depthTest:\s*false/);
+  assert.match(player, /toneMapped:\s*false/);
+  assert.match(player, /WATER_Y \+ 0\.1/);
+  assert.doesNotMatch(terrain, /skipThinGrassLips/);
+  assert.doesNotMatch(src('src/world/world.js'), /skipThinGrassLips/);
+  assert.match(terrain, /skirtOk/);
+  assert.match(terrain, /if \(skirt\[di\]\) continue/);
+  assert.match(terrain, /h - nh <= 1\.001|drop > 1\.001/);
+});
+
+test('Oakhollow NE of the Guild still has 1-unit grass terraces that the skirt covers', () => {
+  const data = generateWorld();
+  let lips = 0;
+  const x0 = Math.min(W - 1, GUILD.x + 2);
+  const x1 = Math.min(W, GUILD.x + 30);
+  const z0 = Math.max(0, GUILD.z - 28);
+  const z1 = Math.min(W, GUILD.z + 6);
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      const i = z * W + x;
+      const h = data.H[i];
+      const tl = data.top[i];
+      const grassy = tl === TILE.GRASS || tl === TILE.FLOWER_GRASS;
+      if (!grassy) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const nz = z + dz;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= W) continue;
+        const nh = data.H[nz * W + nx];
+        const nt = data.top[nz * W + nx];
+        const nbGrassy = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
+        if (nbGrassy && h - nh > 0.05 && h - nh <= 1.001) lips++;
+      }
+    }
+  }
+  assert.ok(lips > 30, `Oakhollow NE of Guild still has terrace drops to skirt (${lips})`);
 });
 
 test('hunter map paints uncharted parchment and one ocean, not biome blocks', () => {
@@ -350,10 +391,16 @@ test('charted tile edges are noise-warped on all four sides, including charted n
 
 test('cloud shadows drift a few world units per second on ground materials', () => {
   const mats = src('src/engine/materials.js');
+  const world = src('src/world/world.js');
   assert.match(mats, /t \* 2\.8/);
   assert.match(mats, /t \* -2\.2/);
   assert.match(mats, /injectCloudShadows|vCloudWorld/);
   assert.match(mats, /patchHide[\s\S]*cloudShade/);
+  assert.match(mats, /patchTerrainGlow[\s\S]*injectCloudShadows/);
+  assert.match(world, /terrain:\s*patchTerrainGlow/);
+  assert.match(world, /solid:\s*patchHide/);
+  assert.match(world, /cover:\s*patchHide/);
+  assert.match(src('src/world/sky.js'), /uCloudTime\.value = time/);
   const speed = Math.hypot(CLOUD_DRIFT.x, CLOUD_DRIFT.z);
   assert.ok(speed >= 2 && speed <= 4.2, `drift ${speed}`);
   let changed = 0;
@@ -368,4 +415,32 @@ test('cloud shadows drift a few world units per second on ground materials', () 
   assert.ok(changed >= 2, `cloud field should move in 10s (max Δ ${maxDelta.toFixed(3)})`);
   assert.ok(cloudShadeAt(72, 72, 0, 1) <= 1);
   assert.ok(cloudShadeAt(72, 72, 0, 1) >= CLOUD_DRIFT.dark - 0.02);
+});
+
+test('lagoon south and east shores have water cells next to land for foam', () => {
+  const spec = { ...JUNGLE_SPECS.lagoon, ox: 0, oz: 0 };
+  const hOf = (x, z) => jungleFeature(3.1, x, z, spec)?.h ?? 3.1;
+  const countShore = (x0, x1, z0, z1) => {
+    let water = 0;
+    let edge = 0;
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
+        if (hOf(x, z) >= WATER_Y + 0.02) continue;
+        water++;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (hOf(x + dx, z + dz) >= WATER_Y - 0.08) {
+            edge++;
+            break;
+          }
+        }
+      }
+    }
+    return { water, edge };
+  };
+  const south = countShore(40, 85, 62, 78);
+  const east = countShore(82, 100, 36, 64);
+  assert.ok(south.water > 8, `south water cells ${south.water}`);
+  assert.ok(south.edge > 6, `south shore foam cells ${south.edge}`);
+  assert.ok(east.water > 8, `east water cells ${east.water}`);
+  assert.ok(east.edge > 6, `east shore foam cells ${east.edge}`);
 });

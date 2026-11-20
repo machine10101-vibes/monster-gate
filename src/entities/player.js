@@ -35,16 +35,17 @@ export class Player {
 
     this.shadowBlob = null;
     this.groundRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.48, 0.86, 48),
+      new THREE.RingGeometry(0.42, 0.98, 48),
       new THREE.MeshBasicMaterial({
-        color: 0xf4efe0,
+        color: 0xffffff,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.95,
         depthWrite: false,
-        depthTest: true,
+        depthTest: false,
+        toneMapped: false,
         polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
         side: THREE.DoubleSide,
       })
     );
@@ -232,7 +233,10 @@ export class Player {
   syncObj() {
     this.obj.position.copy(this.pos);
     this.obj.rotation.y = this.yaw;
-    if (this.groundRing) this.groundRing.position.set(this.pos.x, this.pos.y + 0.08, this.pos.z);
+    if (this.groundRing) {
+      const y = this.pos.y < WATER_Y + 0.45 ? WATER_Y + 0.1 : this.pos.y + 0.08;
+      this.groundRing.position.set(this.pos.x, y, this.pos.z);
+    }
   }
 
   /** Frost slows the hunter for a few seconds. */

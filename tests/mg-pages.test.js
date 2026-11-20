@@ -37,3 +37,16 @@ test('gh-pages build stamps origin/main, not the deploy-branch SHA', () => {
   assert.match(src('../.github/workflows/publish-pages.yml'), /steps\.buildid\.outputs\.short/);
   assert.doesNotMatch(src('../.github/workflows/publish-pages.yml'), /VITE_BUILD_ID: \$\{{\s*github\.sha\s*\}\}/);
 });
+
+test('Pages index.html cache-busts the build tag via version.json', () => {
+  const html = src('../index.html');
+  const vite = src('../vite.config.js');
+  assert.match(html, /Cache-Control" content="no-cache, no-store, must-revalidate"/);
+  assert.match(html, /name="mg-build"/);
+  assert.match(html, /version\.json\?t=/);
+  assert.match(html, /cache: 'no-store'/);
+  assert.match(html, /mg-build-reload/);
+  assert.match(vite, /fileName: 'version\.json'/);
+  assert.match(vite, /transformIndexHtml/);
+  assert.match(vite, /__MG_BUILD__/);
+});

@@ -15,6 +15,7 @@ import {
   hudRects,
   layoutPlaymapLabels,
   playmapLabelKind,
+  playmapPanelInner,
   touchActionRects,
   overlap,
   overlapsOf,
@@ -254,4 +255,32 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*#c49658/);
   const layout = src('../src/ui/hudLayout.js');
   assert.match(layout, /d < 4\.2/);
+  const jungle = layoutPlaymapLabels([
+    { name: 'Silverrun Canopy', nx: 22, ny: 52 },
+    { name: 'The Lagoon', nx: 32, ny: 52 },
+  ]);
+  const canopy = jungle.find((p) => p.name === 'Silverrun Canopy');
+  const lagoon = jungle.find((p) => p.name === 'The Lagoon');
+  assert.ok(canopy.visible && lagoon.visible);
+  const jbox = (p) => ({
+    x: p.x / 100 * 720 - p.bw / 2,
+    y: p.y / 100 * 560 - p.bh / 2,
+    w: p.bw,
+    h: p.bh,
+  });
+  assert.equal(overlap(jbox(canopy), jbox(lagoon), 2), false, 'Silverrun Canopy x The Lagoon');
+});
+
+test('Map panel contain size stays above 300px at desktop, laptop and phone landscape', () => {
+  const style = src('../src/style.css');
+  assert.match(style, /#panel\.map-open \.panel-card \{[\s\S]*height:\s*min\(90dvh,\s*90vh,\s*920px\)/);
+  assert.match(style, /@media \(max-height: 520px\) \{[\s\S]*#panel\.map-open \.panel-card \{[\s\S]*height:\s*min\(100dvh,\s*100vh\)/);
+  for (const vp of [
+    { name: 'desktop', w: 1920, h: 1080 },
+    { name: 'laptop', w: 1280, h: 800 },
+    { name: 'phone-landscape', w: 844, h: 390 },
+  ]) {
+    const inner = playmapPanelInner(vp.w, vp.h);
+    assert.ok(inner.map > 300, `${vp.name} map ${inner.map.toFixed(1)}px`);
+  }
 });
