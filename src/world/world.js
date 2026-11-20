@@ -88,6 +88,7 @@ export class World {
     if (this.colosseum?.contains(x, z)) return this.colosseum.heightAt(x, z);
     if (this.rift?.contains(x, z)) return this.rift.heightAt(x, z);
     if (this.cave?.contains(x, z)) return this.cave.heightAt(x, z);
+    if (this.forestBridge?.contains(x, z)) return this.forestBridge.deckY;
     const d = this.dock;
     if (d && x > d.x0 && x < d.x1 && z > d.z - d.hw && z < d.z + d.hw) return d.y;
     if (this.docks) for (const p of this.docks) if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.y;
@@ -109,7 +110,7 @@ export class World {
     return this.heightAt(x, z) < WATER_Y;
   }
   zoneAt(x, z) {
-    if (this.colosseum?.contains(x, z) || this.rift?.contains(x, z) || this.cave?.contains(x, z)) return ZONE.FIELD;
+    if (this.colosseum?.contains(x, z) || this.rift?.contains(x, z) || this.cave?.contains(x, z) || this.forestBridge?.contains(x, z)) return ZONE.FIELD;
     const land = this.landAt(x, z);
     if (!land) return ZONE.MOUNTAIN;
     const lx = Math.floor(x) - land.x0;
@@ -125,6 +126,7 @@ export class World {
     if (this.colosseum?.contains(x, z)) return this.colosseum.walkable(x, z);
     if (this.rift?.contains(x, z)) return this.rift.walkable(x, z);
     if (this.cave?.contains(x, z)) return this.cave.walkable(x, z);
+    if (this.forestBridge?.contains(x, z)) return true;
     const h = this.heightAt(x, z);
     if (Math.hypot(x - CENTER.x, z - CENTER.z) < PLAY_RADIUS) return true;
     if (z >= 108 && z < SOUTH_Z && x >= 50 && x <= 72) return true;
@@ -141,12 +143,12 @@ export class World {
     // Cinderfall's cone keeps climbing past the rim cap. The cap is what sealed
     // the hillside at height 9. Lava in the crater stays closed, and so do the
     // north and west rims, which are not part of the cone.
-    if (h >= 8.6) return this.onCinderSlope(land, x, z);
+    if (h >= 8.6) return this.onMarkedClimb(land, x, z);
     return true;
   }
 
-  /** Cone cells marked climbable. Rim walls and the lava pit are not. */
-  onCinderSlope(land, x, z) {
+  /** Only terrain cells explicitly marked as a climb route may exceed the normal height cap. */
+  onMarkedClimb(land, x, z) {
     const climb = land?.data?.climb;
     if (!climb) return false;
     const lx = Math.floor(x) - land.x0;
@@ -155,13 +157,17 @@ export class World {
     return climb[lz * W + lx] === 1;
   }
 
+  onCinderSlope(land, x, z) {
+    return this.onMarkedClimb(land, x, z);
+  }
+
   /** can a body walk from height `fromY` to (x,z)? */
   canStep(x, z, fromY) {
     const h = this.heightAt(x, z);
     if (h - fromY > 1.01) return false;
     if (!this.playable(x, z)) return false;
     if (h < 9) return true;
-    return this.onCinderSlope(this.landAt(x, z), x, z);
+    return this.onMarkedClimb(this.landAt(x, z), x, z);
   }
 
   /* ---------------------------- colliders ---------------------------- */
@@ -480,6 +486,7 @@ export class World {
       jungle: buildJungleModels(),
       desert: buildDesertModels(),
       keeps: buildKeepModels(),
+      forestBridge: M.buildForestBridge(87),
     };
     void q;
   }
