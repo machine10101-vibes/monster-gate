@@ -352,6 +352,44 @@ class Game {
         }
       };
       this.renderer = r;
+      r.debug.checkShaderErrors = true;
+      const gl = r.getContext();
+      const shaderErrors = [];
+      const shaderStatus = [];
+      this.shaderErrors = shaderErrors;
+      if (typeof window !== 'undefined') {
+        window.__mgShaderErrors = shaderErrors;
+        window.__mgShaderStatus = shaderStatus;
+      }
+      try {
+        if (gl && typeof gl.compileShader === 'function') {
+          const compile = gl.compileShader.bind(gl);
+          gl.compileShader = (shader) => {
+            compile(shader);
+            const ok = !!gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+            shaderStatus.push({ kind: 'compile', ok });
+            if (!ok) shaderErrors.push({ kind: 'compile', log: gl.getShaderInfoLog(shader) });
+          };
+          const link = gl.linkProgram.bind(gl);
+          gl.linkProgram = (program) => {
+            link(program);
+            const ok = !!gl.getProgramParameter(program, gl.LINK_STATUS);
+            shaderStatus.push({ kind: 'link', ok });
+            if (!ok) shaderErrors.push({ kind: 'link', log: gl.getProgramInfoLog(program) });
+          };
+        }
+      } catch { /* some GL implementations freeze the context methods */ }
+      r.debug.onShaderError = (ctx, program, vs, fs) => {
+        shaderErrors.push({
+          kind: 'three',
+          vsOk: ctx.getShaderParameter(vs, ctx.COMPILE_STATUS),
+          fsOk: ctx.getShaderParameter(fs, ctx.COMPILE_STATUS),
+          linked: ctx.getProgramParameter(program, ctx.LINK_STATUS),
+          vs: ctx.getShaderInfoLog(vs),
+          fs: ctx.getShaderInfoLog(fs),
+          prog: ctx.getProgramInfoLog(program),
+        });
+      };
       this.glWatch = armContextLost(this.canvas, {
         onFail: () => showBootGlFail(),
       });
@@ -1490,11 +1528,16 @@ class Game {
       const remote = String(v?.build || '').trim();
       if (!remote || remote === BUILD_ID) return;
       const u = new URL(location.href);
-      if (u.searchParams.get('mgb') === remote) return;
       const hunting = !!(window.__mgHuntStarted || document.body?.classList.contains('hunting') || this.started);
       if (hunting) {
         window.__mgPendingBuild = remote;
         this.offerBuildReload(remote);
+        return;
+      }
+      // Fastly ignores ?mgb=, so a replace after the first one is the same
+      // stale object. Stay on the title screen and wait (MG-SYS-11).
+      if (u.searchParams.has('mgb')) {
+        this.showStaleBuildNotice();
         return;
       }
       if (typeof window.__mgApplyBuildReload === 'function') window.__mgApplyBuildReload(remote);
@@ -1503,6 +1546,11 @@ class Game {
         location.replace(u.toString());
       }
     }).catch(() => {});
+  }
+
+  showStaleBuildNotice() {
+    const el = document.getElementById('build-stale');
+    if (el) el.classList.remove('hidden');
   }
 
   offerBuildReload(build) {
@@ -1514,7 +1562,8 @@ class Game {
     btn.onclick = () => {
       this.captureHunter();
       this.progress?.save?.(false);
-      if (typeof window.__mgApplyBuildReload === 'function') window.__mgApplyBuildReload(tag);
+      if (typeof window.__mgForceBuildReload === 'function') window.__mgForceBuildReload(tag);
+      else if (typeof window.__mgApplyBuildReload === 'function') window.__mgApplyBuildReload(tag);
       else location.reload();
     };
   }

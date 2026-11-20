@@ -26,15 +26,16 @@ export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
 const LAGOON_POOL = { x: -226, z: 50 };
 const LAGOON_SHORE = { x: -226, z: 69 };
 export const LAGOON_CAM = { pitch: 0.58, dist: 16, lookAhead: 0 };
-/** Dry sand just north of the brown-ship pier, looking south at the hull and sea. */
+/** Beach sand ~8 wu north of the water, looking south at the hulls and sea.
+ *  Water sits about 36 wu south of the inland tile center (-216, 360) → z≈396. */
 function pirateOrigin() {
   const tile = TILES.find((t) => t.kind === 'pirateshore');
   return tile ? originOf(tile) : { x: -288, z: 288 };
 }
 const _pirateO = pirateOrigin();
-export const PIRATE_SHORE = { x: _pirateO.x + 34, z: _pirateO.z + 96 };
+export const PIRATE_SHORE = { x: _pirateO.x + 52, z: _pirateO.z + 104 };
 export const PIRATE_SHIP = { x: _pirateO.x + 50.8, z: _pirateO.z + 125 };
-export const PIRATE_CAM = { pitch: 0.34, dist: 24, lookAhead: 0 };
+export const PIRATE_CAM = { pitch: 0.30, dist: 22, lookAhead: 0 };
 /** ~18 Hunter Blade hits; ~20s of steady auto-attack at low level. */
 export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;
@@ -265,6 +266,12 @@ export function resolveSpot(raw, world) {
 
 export function debugSpotKeys() {
   return Object.keys(DEBUG_SPOTS);
+}
+
+/** Built land kinds plus visual-critical shores, for the SwiftShader compile pass. */
+export function shaderCompileSpots() {
+  const kinds = TILES.filter((t) => t.built).map((t) => String(t.kind).toLowerCase());
+  return [...new Set([...kinds, 'lagoon', 'pirateshore', 'oasis', 'brookside', 'oakhollow'])];
 }
 
 export function debugTpHelp() {

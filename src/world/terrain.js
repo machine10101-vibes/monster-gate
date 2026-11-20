@@ -443,11 +443,16 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             if (tx < 0 || tz < 0 || tx >= width || tz >= depth) return -1;
             return top[tz * width + tx];
           };
+          const inTile = (cx, cz) => cx >= 0 && cz >= 0 && cx < width && cz < depth;
           const weldCorner = (vx, vz) => {
             let y = h;
             if (!skirtOk(tl)) return y;
             for (const [cx, cz] of [[vx - 1, vz - 1], [vx - 1, vz], [vx, vz - 1], [vx, vz]]) {
               if (cx === x && cz === z) continue;
+              // Never weld across a tile border. Neighbour tiles have their
+              // own mesh, so a shared T-junction showed fog 0xbfe0f4 as a
+              // pale-blue triangle at 1920x1200 / Social (Brookside BL).
+              if (!inTile(cx, cz)) continue;
               const nh = hAt(cx, cz);
               const drop = h - nh;
               // Cap at 1 wu even on water. Welding a 2–4 wu brook/lagoon drop
@@ -469,7 +474,8 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             y11 = weldCorner(x + 1, z + 1);
             y10 = weldCorner(x + 1, z);
           }
-          const pad = grassy ? 0.015 : 0;
+          const border = x === 0 || z === 0 || x === width - 1 || z === depth - 1;
+          const pad = grassy ? (border ? 0.04 : 0.015) : 0;
           const ps = [
             [x + ox - pad, y00, z + oz - pad],
             [x + ox - pad, y01, z + oz + 1 + pad],
@@ -527,15 +533,29 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           ];
           for (let di = 0; di < dirs.length; di++) {
             const [dx, dz] = dirs[di];
-            const nh = hAt(x + dx, z + dz);
-            if (nh >= h) continue;
-            if (roll && !cliffCell(x + dx, z + dz)) continue;
-            const nextWater = cliffCell(x + dx, z + dz) || cliffCell(x, z);
-            if (!nextWater && edgeY[di][0] <= nh + 0.001 && edgeY[di][1] <= nh + 0.001) continue;
+            const nCellX = x + dx;
+            const nCellZ = z + dz;
+            const offTile = !inTile(nCellX, nCellZ);
+            let nh = hAt(nCellX, nCellZ);
+            const voidEdge = offTile && (nh == null || nh < -2.4);
+            // Matching neighbour height still needs a lip: both meshes meet
+            // at the integer seam with no overlap, so grazing cameras see
+            // the fog colour through the T-junction.
+            if (offTile) {
+              if (voidEdge) nh = -1.6;
+              else if (!(nh < h - 0.02)) nh = h - 0.14;
+            }
+            if (!offTile && nh >= h) continue;
+            if (roll && !offTile && !cliffCell(nCellX, nCellZ)) continue;
+            const nextWater = offTile || cliffCell(nCellX, nCellZ) || cliffCell(x, z);
+            // Interior welded ramps stay skirt-less so the meadow reads smooth.
+            // Tile-border cells still get a wall — those are the grazing
+            // sky triangles at dist=36 / 1920x1200 (Brookside south edge).
+            if (!offTile && !border && !nextWater && edgeY[di][0] <= nh + 0.001 && edgeY[di][1] <= nh + 0.001) continue;
             const rx = dz;
             const rz = -dx;
-            const mx = x + 0.5 + dx * 0.54;
-            const mz = z + 0.5 + dz * 0.54;
+            const mx = x + 0.5 + dx * (offTile ? (voidEdge ? 1.15 : 0.72) : 0.54);
+            const mz = z + 0.5 + dz * (offTile ? (voidEdge ? 1.15 : 0.72) : 0.54);
             const ax = mx - rx * 0.5;
             const az = mz - rz * 0.5;
             const bx = mx + rx * 0.5;
@@ -579,6 +599,32 @@ export function buildTerrainMeshes(data, material, opt = {}) {
               );
               yt = yb;
               seg++;
+            }
+            if (offTile) {
+              const out = voidEdge ? 8 : 4;
+              const ay = h - 0.05;
+              const xA = x + ox + (dx === 1 ? 1.08 : dx === -1 ? -out : 0);
+              const xB = x + ox + (dx === 1 ? 1 + out : dx === -1 ? -0.08 : 1);
+              const zA = z + oz + (dz === 1 ? 1.08 : dz === -1 ? -out : 0);
+              const zB = z + oz + (dz === 1 ? 1 + out : dz === -1 ? -0.08 : 1);
+              const tu = uvOf(tl);
+              const ac = [tr * 0.96, tg * 0.96, tb * 0.96];
+              quad(
+                [
+                  [xA, ay, zA],
+                  [xB, ay, zA],
+                  [xB, ay, zB],
+                  [xA, ay, zB],
+                ],
+                [0, 1, 0],
+                [
+                  [tu.u0, tu.vBot],
+                  [tu.u1, tu.vBot],
+                  [tu.u1, tu.vTop],
+                  [tu.u0, tu.vTop],
+                ],
+                [ac, ac, ac, ac]
+              );
             }
           }
         }

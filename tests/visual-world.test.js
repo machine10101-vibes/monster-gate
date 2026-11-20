@@ -165,7 +165,7 @@ test('desert dunes keep a continuous heightfield instead of 0.5-unit terraces', 
   assert.match(ring, /smooth: !!spec\.desert/);
   assert.match(ring, /H\[i\] = s \/ 12/);
   assert.match(terrain, /const roll = smooth && !cliffCell/);
-  assert.match(terrain, /if \(roll && !cliffCell\(x \+ dx, z \+ dz\)\) continue/);
+  assert.match(terrain, /if \(roll && !offTile && !cliffCell\(nCellX, nCellZ\)\) continue/);
   assert.match(terrain, /tile === TILE\.SAND/);
   assert.match(desert, /top\[i\] = TILE\.SAND/);
   assert.doesNotMatch(desert, /n < 0\.18 \? TILE\.DIRT/);
@@ -314,6 +314,8 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.doesNotMatch(terrain, /skipThinGrassLips/);
   assert.doesNotMatch(src('src/world/world.js'), /skipThinGrassLips/);
   assert.match(terrain, /weldCorner/);
+  assert.match(terrain, /!inTile\(cx, cz\)/);
+  assert.match(terrain, /offTile/);
   assert.match(terrain, /skirtOk/);
   assert.match(terrain, /nt !== TILE\.LAVA/);
   assert.match(terrain, /nh - \(nextWater \? 0\.28 : 0\.08\)/);
@@ -431,6 +433,40 @@ test('grass terrace T-junctions weld so a 1-unit drop has one height per vertex'
   const { cracks, samples } = grassCracks({ H, top }, mesh, 1, 5, 1, 5);
   assert.ok(samples > 4, `expected skirt samples, got ${samples}`);
   assert.equal(cracks, 0, `synthetic terrace should not show sky cracks (${cracks})`);
+});
+
+test('tile borders emit overlapping skirts even when the neighbour matches height', () => {
+  const w = 6;
+  const H = new Float32Array(w * w);
+  const top = new Uint8Array(w * w);
+  const tint = new Float32Array(w * w * 3);
+  const zone = new Uint8Array(w * w);
+  for (let z = 0; z < w; z++) {
+    for (let x = 0; x < w; x++) {
+      const i = z * w + x;
+      top[i] = TILE.GRASS;
+      tint[i * 3] = 0.4;
+      tint[i * 3 + 1] = 0.72;
+      tint[i * 3 + 2] = 0.3;
+      H[i] = 2;
+    }
+  }
+  const mesh = buildTerrainMeshes({ H, top, tint, zone }, new THREE.MeshBasicMaterial(), {
+    width: w,
+    depth: w,
+    outside: () => 2,
+  });
+  let southLips = 0;
+  mesh.traverse((m) => {
+    const pos = m.geometry?.attributes?.position;
+    const nor = m.geometry?.attributes?.normal;
+    if (!pos || !nor) return;
+    for (let i = 0; i < pos.count; i++) {
+      if (nor.getY(i) > 0.25) continue;
+      if (pos.getZ(i) > w - 0.55 && pos.getY(i) < 1.96) southLips += 1;
+    }
+  });
+  assert.ok(southLips > 8, `south tile-edge should skirt into the neighbour (${southLips})`);
 });
 
 test('pass 41 waterline sits under shore sand with a thin foam line', () => {

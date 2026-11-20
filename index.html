@@ -14,16 +14,36 @@
         // Split so Vite's meta stamp cannot rewrite this into `mine === '<sha>'`
         // and return before version.json is fetched (MG-SYS-10).
         if (!mine || mine === 'dev' || mine === '__MG_' + 'BUILD__') return;
+        function notice() {
+          var show = function () {
+            var el = document.getElementById('build-stale');
+            if (el) el.classList.remove('hidden');
+          };
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show);
+          else show();
+        }
         function go(build) {
           if (mine === build) return;
           var u = new URL(location.href);
-          // Fastly caches index.html for max-age=600. One replace with ?mgb=
-          // is the correction; do not loop if the HTML is still stale (MG-SYS-11).
-          if (u.searchParams.get('mgb') === build) return;
+          // Fastly ignores ?t= and ?mgb=, so a second replace can land on the
+          // same stale index. One shot only; then a title-screen notice (MG-SYS-11).
+          if (u.searchParams.has('mgb')) {
+            notice();
+            return;
+          }
           u.searchParams.set('mgb', build);
           location.replace(u.toString());
         }
+        function force(build) {
+          var u = new URL(location.href);
+          if (u.searchParams.has('mgb')) {
+            location.reload();
+            return;
+          }
+          go(build);
+        }
         window.__mgApplyBuildReload = go;
+        window.__mgForceBuildReload = force;
         fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
           return r.ok ? r.json() : null;
         }).then(function (v) {
@@ -243,6 +263,7 @@
         <div class="title-inner mg-frame">
           <small>A 3D pixel monster hunting adventure</small>
           <h1>MONSTER <em>GATE</em></h1>
+          <p id="build-stale" class="hidden" role="status">New version available, it'll load in a few minutes</p>
           <p id="wallet-status" class="wallet-status" aria-live="polite">Play as a guest on this device, or sign in to keep the hunt on your account.</p>
           <div id="account-choices" class="account-choices">
             <button id="btn-guest" class="start" type="button">Play as guest</button>
