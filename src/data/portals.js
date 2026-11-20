@@ -22,11 +22,11 @@ export const PORTALS = [
   {
     id: 'pirates',
     name: 'Pirate Shore Portal',
-    place: 'The Dunes, by the pirate docks',
+    place: 'Pirate Shore, by the pirate docks',
     x: -244,
     z: 384,
     yaw: 0,
-    banner: ['Pirate Shore', 'The Dunes'],
+    banner: ['The pirate docks', 'Pirate Shore'],
   },
   {
     id: 'warfield',
