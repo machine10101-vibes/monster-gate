@@ -44,6 +44,40 @@ test('all four Silverrun tile seams meet exactly, including the Gilantre boundar
   assertNorthSouth(byKind.gilantreSe, byKind.silverrunEast);
 });
 
+test('Silverrun ecotones blend terrain gradients, ground tint and forest density across neighboring tiles', () => {
+  const pairs = [
+    [byKind.glassroad, byKind.silverrunWest, 'ew'],
+    [byKind.gilantreSw, byKind.silverrunNorth, 'ns'],
+    [byKind.gilantreSe, byKind.silverrunEast, 'ns'],
+  ];
+  for (const [a, b, orientation] of pairs) {
+    for (let along = 40; along < W - 40; along += 7) {
+      const edgeA = orientation === 'ew' ? along * W + W - 1 : (W - 1) * W + along;
+      const edgeB = orientation === 'ew' ? along * W : along;
+      const innerA = orientation === 'ew' ? along * W + W - 2 : (W - 2) * W + along;
+      const innerB = orientation === 'ew' ? along * W + 1 : W + along;
+      assert.ok(Math.abs(a.data.H[edgeA] - b.data.H[edgeB]) < 1e-5, `${a.kind}/${b.kind} height seam`);
+      assert.ok(Math.abs((a.data.H[edgeA] - a.data.H[innerA]) - (b.data.H[innerB] - b.data.H[edgeB])) < 1e-5,
+        `${a.kind}/${b.kind} first terrain gradients match`);
+      assert.ok(Math.abs(a.data.forest[edgeA] - b.data.forest[edgeB]) < 1e-5,
+        `${a.kind}/${b.kind} forest density meets at edge`);
+      for (let channel = 0; channel < 3; channel++) {
+        assert.ok(Math.abs(a.data.tint[edgeA * 3 + channel] - b.data.tint[edgeB * 3 + channel]) < 1e-5,
+          `${a.kind}/${b.kind} ground tint meets at edge channel ${channel}`);
+      }
+      const nearTintA = a.data.tint[innerA * 3 + 1];
+      const nearTintB = b.data.tint[innerB * 3 + 1];
+      assert.ok(Number.isFinite(nearTintA) && Number.isFinite(nearTintB), 'blended ground tint remains finite');
+    }
+  }
+  // The west woodland edge is an ecotone, not a hard forest-density step.
+  const desert = byKind.glassroad.data;
+  const wood = byKind.silverrunWest.data;
+  const row = 70 * W;
+  assert.ok(Math.abs(desert.forest[row + W - 1] - wood.forest[row]) < 1e-5);
+  assert.ok(wood.forest[row + 18] > wood.forest[row], 'forest density grows gradually into Reedford');
+});
+
 test('Silverrun river runs from the southern ocean through tiles 87 and 77', () => {
   const lower = byKind.silverrunRiver;
   const upper = byKind.silverrunNorth;
