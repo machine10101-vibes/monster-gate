@@ -34,7 +34,7 @@ function paintBoard() {
 
 /**
  * Centered on the south approach, between the door and the east-west road.
- * The face tilts up toward the game camera, which sits south of the hunter.
+ * The face stands vertical and points south, toward the hunter and the camera.
  */
 export const COLOSSEUM_BOARD = { x: 446, z: 143.35 };
 const BOARD_POST = 2.35;
@@ -138,7 +138,7 @@ export function buildColosseumSignUpBoard(world) {
   group.name = 'gilantre-colosseum-signup-board';
   const { x, z } = COLOSSEUM_BOARD;
   const y = world.heightAt(x, z);
-  const mesh = buildBoard(group, x, z, y, 0, 0.72);
+  const mesh = buildBoard(group, x, z, y, 0, 0);
   world.group.add(group);
   world.circle(x - BOARD_POST, z, 0.28);
   world.circle(x + BOARD_POST, z, 0.28);

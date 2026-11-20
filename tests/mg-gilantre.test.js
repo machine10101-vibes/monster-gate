@@ -8,7 +8,8 @@ import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.j
 import { World } from '../src/world/world.js';
 import { TILES } from '../src/world/tiles.js';
 import { GILANTRE_SPOTS, dressGilantre, yawAlong } from '../src/world/gilantre.js';
-import { COLOSSEUM_BOARD } from '../src/world/colosseum.js';
+import * as THREE from 'three';
+import { COLOSSEUM_BOARD, buildColosseumSignUpBoard } from '../src/world/colosseum.js';
 import { questById, questGiverNpc } from '../src/data/quests.js';
 
 function world() {
@@ -93,6 +94,31 @@ test('the Colosseum sign-up board stands in front of the Gilantre door', () => {
   assert.ok(dz > 12.4 && dz < 13.8, `between the door and the road, dz ${dz}`);
   assert.ok(COLOSSEUM_BOARD.z < 143.7, 'north of the east-west road');
   assert.ok(Math.hypot(COLOSSEUM_BOARD.x - 432, COLOSSEUM_BOARD.z - 144) < 26, 'inside the city wall');
+});
+
+test('the Colosseum sign stands straight up and down', () => {
+  const prev = globalThis.document;
+  const ctx = new Proxy({}, { get: () => () => {} });
+  globalThis.document = {
+    createElement() {
+      return { width: 0, height: 0, getContext: () => ctx };
+    },
+  };
+  try {
+    const group = new THREE.Group();
+    const board = buildColosseumSignUpBoard({
+      heightAt: () => 3,
+      group,
+      circle() {},
+    });
+    assert.equal(board.mesh.rotation.x, 0);
+    assert.equal(board.mesh.rotation.y, 0);
+    assert.equal(board.mesh.rotation.order, 'YXZ');
+    assert.equal(board.group.name, 'gilantre-colosseum-signup-board');
+  } finally {
+    if (prev === undefined) delete globalThis.document;
+    else globalThis.document = prev;
+  }
 });
 
 test('tiles 57, 58, 67 and 68 are the four quarters of Gilantre', () => {

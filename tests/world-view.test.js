@@ -722,6 +722,9 @@ test('world wire errors stay online, do not paint, and snap a far hunter to spaw
   assert.equal(isWorldWireError({ code: 'protocol', message: 'Say hello first.' }), 'protocol');
   assert.equal(isWorldWireError({ code: 'auth' }), '');
   assert.equal(isWorldWireError({ code: 'name_taken' }), '');
+  assert.equal(isWorldWireError({ code: 'combat', message: 'Attack is not ready.' }), 'combat');
+  assert.equal(isWorldWireError({ code: 'loot', message: 'Invalid loot roll.' }), 'loot');
+  assert.equal(isWorldWireError({ code: 'zone_full', message: 'Gilantre is full.' }), 'zone_full');
 
   const game = stubGame();
   game.player.pos.x = 800;
@@ -745,4 +748,11 @@ test('world wire errors stay online, do not paint, and snap a far hunter to spaw
   view.setStatus({ status: 'online', detail: 'teleport' });
   assert.equal(game.player.pos.x, 12, 'snaps only once');
   assert.equal(view.status, STATUS.online);
+
+  view.setStatus('error', { code: 'combat', message: 'Attack is not ready.' });
+  assert.equal(view.status, STATUS.online);
+  view.setStatus('error', { code: 'zone_full', message: 'Gilantre is full (40 hunters).' });
+  assert.equal(view.status, STATUS.online);
+  view.paintHud();
+  assert.equal(worldModeLabel(view.status, view.authReject), 'Online');
 });

@@ -2713,26 +2713,26 @@ class Game {
       this.net.relayHit(m, dmg, dx, dz, knock, crit);
       return;
     }
+    const riftOwned = m.realm === 'rift' && this.riftRun?.serverOwned;
     const serverCombat = this.mmo?.ws?.readyState === 1 && this.mmo.you?.guest === false;
-    if (m.serverAuthoritative) {
-      if (serverCombat && m.serverId) this.mmo.attackMonster(m.serverId);
+    if (!riftOwned) {
+      m.takeHit(dmg, dx, dz, knock, crit);
       return;
     }
-    if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
-    if (serverCombat) {
-      const serverMob = (this.mmo.entities?.monsters || [])
-        .filter((candidate) => candidate.type === m.type)
-        .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
-        .sort((a, b) => a.distance - b.distance)[0];
-      if (serverMob && serverMob.distance <= 18) {
-        m.serverId = serverMob.candidate.id;
-        m.serverAuthoritative = true;
-        this.mmo.attackMonster(serverMob.candidate.id);
-        return;
-      }
-      if (m.realm === 'rift' && this.riftRun?.serverOwned) return;
+    if (!serverCombat) return;
+    if (m.serverAuthoritative && m.serverId) {
+      this.mmo.attackMonster(m.serverId);
+      return;
     }
-    m.takeHit(dmg, dx, dz, knock, crit);
+    const serverMob = (this.mmo.entities?.monsters || [])
+      .filter((candidate) => candidate.zone === 'rift' && candidate.type === m.type)
+      .map((candidate) => ({ candidate, distance: Math.hypot(candidate.x - m.x, candidate.z - m.z) }))
+      .sort((a, b) => a.distance - b.distance)[0];
+    if (serverMob && serverMob.distance <= 18) {
+      m.serverId = serverMob.candidate.id;
+      m.serverAuthoritative = true;
+      this.mmo.attackMonster(serverMob.candidate.id);
+    }
   }
 
   enterPvpArenaFromServer(info) {
@@ -3073,6 +3073,11 @@ class Game {
     const wd = w ? Math.hypot(p.x - w.x, p.z - w.z) : 99;
     const npcNear = this.ambient.npcs.find((n) => n.near);
     const nd = npcNear ? Math.hypot(p.x - npcNear.x, p.z - npcNear.z) : 99;
+    if (this.world.realm === 'colosseum' && (this.mmo?.pvpMatchId || this.mmo?.pvpProposalId)) {
+      this.mmo.showPvpPanel();
+      this.audio.select();
+      return;
+    }
     if (this.world.realm === 'rift') {
       const chest = this.world.rift?.chest;
       if (chest?.ready && !chest.looted && Math.hypot(p.x - chest.x, p.z - chest.z) < 2.4) {
@@ -3380,8 +3385,7 @@ class Game {
       this.audio.select();
       return;
     }
-    ui.q('[data-panel]').style.display = 'block';
-    ui.root.style.display = 'block';
+    this.mmo.showPvpPanel();
     this.audio.select();
   }
 
@@ -3393,13 +3397,18 @@ class Game {
     this.colosseumNear = d < 4.8 && this.started && this.world.realm === 'over';
     if (this.colosseumNear && !this.colosseumHinted) {
       this.colosseumHinted = true;
-      this.hud.toast('Colosseum board — press F to sign up for PvP', 2600);
+      this.hud.toast('Click the Colosseum board to sign up for PvP', 2600);
     }
     if (this.colosseumNear) {
       const [sx, sy, vis] = this.screenOf(b.x, b.y + 2.6, b.z, true);
-      this.hud.plate('colosseum', 'Colosseum board<small>F · sign up</small>');
+      this.hud.plate('colosseum', 'Colosseum board<small>click or F · sign up</small>');
       this.hud.placePlate('colosseum', sx, sy, vis, { dist: d });
-    } else this.hud.removePlate('colosseum');
+    } else {
+      this.hud.removePlate('colosseum');
+      const mmo = this.mmo;
+      const busy = mmo && (mmo.pvpMatchId || mmo.pvpQueueMode || mmo.pvpProposalId || mmo.pendingPartyInvite);
+      if (!busy) mmo?.hidePvpPanel?.();
+    }
   }
 
   clickColosseumBoard() {

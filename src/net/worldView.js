@@ -34,7 +34,7 @@ export const AUTH_SOLO_BTN = 'Play solo';
 export const WORLD_SPAWN = { x: 72, y: 3.2, z: 72.5 };
 
 /** Move/chat/hello rejects from the world socket — not sign-in failures. */
-export const WORLD_WIRE_CODES = ['rate', 'teleport', 'protocol', 'chat'];
+export const WORLD_WIRE_CODES = ['rate', 'teleport', 'protocol', 'chat', 'combat', 'loot', 'zone_full'];
 
 function bagText(bag) {
   if (bag == null || bag === '') return '';

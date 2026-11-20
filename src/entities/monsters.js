@@ -292,6 +292,7 @@ export class Monster {
   }
 
   applyServerState(state) {
+    if ((this.realm || 'over') !== 'rift') return;
     if (!state || !Number.isFinite(Number(state.hp))) return;
     this.serverAuthoritative = true;
     const previousHp = this.hp;
@@ -562,6 +563,10 @@ export class Monster {
     if (this.dead) {
       this.deadAnim(dt);
       return;
+    }
+    if (this.serverAuthoritative && (this.realm || 'over') !== 'rift') {
+      this.serverAuthoritative = false;
+      this.serverId = null;
     }
     if (this.serverAuthoritative) {
       const state = g.mmo?.entities?.monsters?.find((entry) => entry.id === this.serverId);

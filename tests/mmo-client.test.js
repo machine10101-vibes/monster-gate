@@ -393,6 +393,105 @@ test('Colosseum ranged attacks can select an opponent at bow range', () => {
 });
 
 
+test('a live hunter stays online when an attack is rejected', async () => {
+  const toasts = [];
+  const view = stubView();
+  const game = { hud: { toast: (t) => toasts.push(t) }, wallet: { kind: 'account' }, character: { name: 'Ann' } };
+  const client = new MmoClient(game, view, {
+    url: 'ws://world.test',
+    WebSocket: FakeSocket,
+    token: 'ann-token',
+    guest: false,
+    fetch: okFetch(),
+  });
+  client.connect();
+  await new Promise((r) => setTimeout(r, 20));
+  client.ws.push({
+    v: 1, type: 'welcome', protocol: 1, you: { id: 'u_ann', name: 'Ann', guest: false }, online: 1,
+  });
+  client.ws.push({ v: 1, type: 'error', code: 'combat', message: 'Attack is not ready.' });
+  client.ws.push({ v: 1, type: 'error', code: 'zone_full', message: 'Gilantre is full (40 hunters).' });
+  assert.ok(view.statuses.some((s) => s.status === 'online'));
+  assert.equal(view.statuses.some((s) => s.status === 'error'), false);
+  assert.ok(toasts.some((t) => /not ready/i.test(t)));
+  assert.ok(toasts.some((t) => /full/i.test(t)));
+  client.dispose();
+});
+
+test('overworld monsters keep local movement and damage on World 1', () => {
+  const slime = {
+    type: 'slime', realm: 'over', dead: false, x: 60, z: 40, hp: 30,
+    serverAuthoritative: true, serverId: 'field_slime_0',
+    applyServerState() { this.applied = true; this.serverAuthoritative = true; },
+  };
+  const game = {
+    monsters: [slime],
+    world: { realm: 'over' },
+    spawner: { spawn() { throw new Error('overworld copies must stay local'); } },
+  };
+  const client = new MmoClient(game, stubView(), { url: 'ws://world.test', WebSocket: FakeSocket, guest: false });
+  client.you = { guest: false, id: 'you' };
+  client.entities = {
+    monsters: [{ id: 'field_slime_0', type: 'slime', x: 60, z: 40, hp: 8, alive: true, zone: 'Oakhollow' }],
+    nodes: [],
+  };
+  client.syncAuthoritativeMonsters();
+  assert.equal(slime.serverAuthoritative, false);
+  assert.equal(slime.serverId, null);
+  assert.equal(slime.applied, undefined);
+  assert.equal(slime.hp, 30);
+  client.onFrame(JSON.stringify({ v: 1, type: 'monster_state', id: 'field_slime_0', hp: 8, alive: true }));
+  assert.equal(slime.hp, 30);
+  assert.equal(slime.serverAuthoritative, false);
+});
+
+test('rift monsters stay on the server while the tear is open', () => {
+  const slime = {
+    type: 'slime', realm: 'rift', dead: false, x: 1610, z: 810, hp: 40,
+    applyServerState(state) { this.hp = state.hp; this.serverAuthoritative = true; },
+  };
+  const game = { monsters: [slime], world: { realm: 'rift' }, spawner: { spawn() { return null; } } };
+  const client = new MmoClient(game, stubView(), { url: 'ws://world.test', WebSocket: FakeSocket, guest: false });
+  client.you = { guest: false, id: 'you' };
+  client.entities = {
+    monsters: [{ id: 'rift_1', type: 'slime', zone: 'rift', x: 1610, z: 810, hp: 22, alive: true }],
+    nodes: [],
+  };
+  client.syncAuthoritativeMonsters();
+  assert.equal(slime.serverId, 'rift_1');
+  assert.equal(slime.serverAuthoritative, true);
+  assert.equal(slime.hp, 22);
+});
+
+test('the Colosseum menu is not pinned to the HUD', () => {
+  const root = { style: { display: 'none' }, querySelectorAll: () => [] };
+  const panel = { style: { display: 'none' } };
+  const bits = () => ({ style: {}, textContent: '', disabled: false, dataset: { queue: '1v1' } });
+  const client = new MmoClient({ player: { pos: { x: 0, z: 0 } } }, stubView(), {
+    url: 'ws://world.test', WebSocket: FakeSocket, guest: false,
+  });
+  client.pvpBoard = {
+    root,
+    q(sel) {
+      if (sel === '[data-open]') throw new Error('HUD button should be gone');
+      if (sel === '[data-panel]') return panel;
+      return bits();
+    },
+  };
+  client.you = { guest: false, id: 'you', pvp_rating: 1000, pvp_wins: 0, pvp_losses: 0 };
+  client.updatePvpBoard();
+  assert.equal(root.style.display, 'none');
+  assert.equal(panel.style.display, 'none');
+  client.showPvpPanel();
+  assert.equal(root.style.display, 'block');
+  assert.equal(panel.style.display, 'block');
+  client.hidePvpPanel();
+  assert.equal(root.style.display, 'none');
+  client.onFrame(JSON.stringify({ v: 1, type: 'pvp_match_found', proposal_id: 'proposal-9', mode: '1v1' }));
+  assert.equal(root.style.display, 'block');
+  assert.equal(panel.style.display, 'block');
+});
+
 test('Colosseum match offers require an explicit confirmation frame', () => {
   const client = new MmoClient({ player: { pos: { x: 0, z: 0 } } }, stubView(), { url: 'ws://world.test', WebSocket: FakeSocket, guest: false });
   const sent = [];
