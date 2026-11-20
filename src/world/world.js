@@ -535,7 +535,7 @@ export class World {
           uLight: { value: 1 },
           uDeep: { value: new THREE.Color(0x124a78) },
           uShallow: { value: new THREE.Color(0x4eb8c4) },
-          uFoam: { value: new THREE.Color(0xe8f4fa) },
+          uFoam: { value: new THREE.Color(0xffffff) },
           uSky: { value: new THREE.Color(0xcfe9ff) },
           uCloudTime: cloudShadowUniforms.uCloudTime,
           uCloudAmt: cloudShadowUniforms.uCloudAmt,
@@ -589,14 +589,14 @@ export class World {
           col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float shoreBand = smoothstep(0.34, 0.05, vDepth) * smoothstep(0.0, 0.03, vDepth);
-          float foamWave = 0.96 + 0.04 * sin(uTime * 1.45 + p.x * 0.28);
+          float shoreBand = smoothstep(0.20, 0.06, vDepth);
+          float foamWave = 0.97 + 0.03 * sin(uTime * 1.45 + p.x * 0.28);
           float foam = shoreBand * foamWave;
           col = mix(col, uFoam, foam);
           col *= uLight;
           col *= cloudShade(p, uCloudTime, uCloudAmt);
-          float alpha = mix(0.78, 0.92, depthK);
-          alpha = max(alpha, foam * 0.98);
+          float alpha = mix(0.84, 0.94, depthK);
+          alpha = mix(alpha, 1.0, foam);
           gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>

@@ -27,44 +27,100 @@ function builtAt(tx, tz) {
   return !!tileAt(tx, tz)?.built;
 }
 
-/** 1 inside charted land, 0 in uncharted. Sample coords are noise-warped so the edge is a coastline. */
-export function chartedWeight(wx, wz) {
-  const { ftx, ftz } = worldToTileUv(wx, wz);
-  const n = fbm(ftx * 2.55, ftz * 2.55, 17, 3) - 0.5;
-  const n2 = fbm(ftx * 4.6 + 3.1, ftz * 4.6, 19, 2) - 0.5;
-  const wtx = ftx + n * 0.34;
-  const wtz = ftz + n2 * 0.34;
-  const tx = Math.floor(wtx);
-  const tz = Math.floor(wtz);
-  if (builtAt(tx, tz)) return 1;
-  let bleed = 0;
-  const u = wtx - tx;
-  const v = wtz - tz;
-  if (builtAt(tx - 1, tz)) bleed = Math.max(bleed, smoothstep(0.16, 0, u));
-  if (builtAt(tx + 1, tz)) bleed = Math.max(bleed, smoothstep(0.16, 0, 1 - u));
-  if (builtAt(tx, tz - 1)) bleed = Math.max(bleed, smoothstep(0.16, 0, v));
-  if (builtAt(tx, tz + 1)) bleed = Math.max(bleed, smoothstep(0.16, 0, 1 - v));
-  return bleed;
+function seaAt(tx, tz) {
+  return tileAt(tx, tz)?.biome === 'sea';
 }
 
-/** Continuous ocean. Shoreline is a warped world curve, never a per-tile square. */
-export function oceanWeight(wx, wz) {
+/** Warp tile UV so every charted, parchment and sea edge is a coastline, not a square. */
+function warpUv(wx, wz, seed, amp) {
   const { ftx, ftz } = worldToTileUv(wx, wz);
-  const n = fbm(ftx * 1.32, ftz * 1.32, 41, 3);
-  const n2 = fbm(ftx * 3.05 + 2, ftz * 3.05, 43, 2);
-  const wtx = ftx + (n - 0.5) * 0.38;
-  const wtz = ftz + (n2 - 0.5) * 0.24;
-  const tile = tileAt(Math.floor(wtx), Math.floor(wtz));
-  if (tile?.biome === 'sea') return 1;
+  const n = fbm(ftx * 2.15, ftz * 2.15, seed, 3) - 0.5;
+  const n2 = fbm(ftx * 4.4 + 2.7, ftz * 4.1, seed + 3, 2) - 0.5;
+  const n3 = fbm(ftx * 8.2 + 1.1, ftz * 7.6, seed + 8, 2) - 0.5;
+  return {
+    ftx,
+    ftz,
+    wtx: ftx + n * amp + n3 * amp * 0.38,
+    wtz: ftz + n2 * amp + n3 * amp * 0.32,
+  };
+}
+
+function neighborBleed(tx, tz, u, v, band, test) {
+  let b = 0;
+  if (test(tx - 1, tz)) b = Math.max(b, smoothstep(band, 0, u));
+  if (test(tx + 1, tz)) b = Math.max(b, smoothstep(band, 0, 1 - u));
+  if (test(tx, tz - 1)) b = Math.max(b, smoothstep(band, 0, v));
+  if (test(tx, tz + 1)) b = Math.max(b, smoothstep(band, 0, 1 - v));
+  if (test(tx - 1, tz - 1)) b = Math.max(b, Math.min(smoothstep(band, 0, u), smoothstep(band, 0, v)));
+  if (test(tx + 1, tz - 1)) b = Math.max(b, Math.min(smoothstep(band, 0, 1 - u), smoothstep(band, 0, v)));
+  if (test(tx - 1, tz + 1)) b = Math.max(b, Math.min(smoothstep(band, 0, u), smoothstep(band, 0, 1 - v)));
+  if (test(tx + 1, tz + 1)) b = Math.max(b, Math.min(smoothstep(band, 0, 1 - u), smoothstep(band, 0, 1 - v)));
+  return b;
+}
+
+/** 1 inside charted land, 0 in uncharted. All four sides of every tile are noise-warped. */
+export function chartedWeight(wx, wz) {
+  const w = warpUv(wx, wz, 17, 0.42);
+  const tx = Math.floor(w.wtx);
+  const tz = Math.floor(w.wtz);
+  if (builtAt(tx, tz)) return 1;
+  return neighborBleed(tx, tz, w.wtx - tx, w.wtz - tz, 0.24, builtAt);
+}
+
+/** Continuous ocean. Shoreline bleeds from sea tiles with the same warped UV as land. */
+export function oceanWeight(wx, wz) {
+  const w = warpUv(wx, wz, 41, 0.46);
+  const tx = Math.floor(w.wtx);
+  const tz = Math.floor(w.wtz);
+  if (seaAt(tx, tz)) return 1;
+  if (tx < 0 || tz < 0 || tx >= 10 || tz >= 10) {
+    const n = fbm(w.ftx * 1.4, w.ftz * 1.4, 41, 3);
+    const shore = 8.05 + (n - 0.5) * 0.72 + 0.2 * Math.sin(w.ftx * 1.7) + 0.12 * Math.sin(w.ftx * 4.2 + n);
+    return smoothstep(shore - 0.24, shore + 0.2, w.wtz);
+  }
+  const u = w.wtx - tx;
+  const v = w.wtz - tz;
+  let sea = neighborBleed(tx, tz, u, v, 0.32, seaAt);
+  const tile = tileAt(tx, tz);
   if (tile?.biome === 'coast' && !tile.built) {
-    const v = wtz - Math.floor(wtz);
-    return smoothstep(0.26, 0.58, v + (n - 0.5) * 0.12);
+    const n = fbm(w.ftx * 1.32, w.ftz * 1.32, 41, 3);
+    sea = Math.max(sea, smoothstep(0.18, 0.78, v + (n - 0.5) * 0.34));
   }
-  if (!tile?.built && ftz > 7.45) {
-    const shore = 8.02 + (n - 0.5) * 0.42 + 0.08 * Math.sin(ftx * 2.1);
-    return smoothstep(shore - 0.14, shore + 0.22, ftz);
+  return sea;
+}
+
+/** Move a pin onto charted land inside its tile, or null if none is nearby. */
+export function chartedAnchor(wx, wz) {
+  if (chartedWeight(wx, wz) > 0.5) return { x: wx, z: wz };
+  const { ftx, ftz } = worldToTileUv(wx, wz);
+  const tile = tileAt(Math.floor(ftx + 1e-6), Math.floor(ftz + 1e-6));
+  if (tile?.built) {
+    const o = originOf(tile);
+    let best = null;
+    let bestS = -1;
+    for (let vv = 0.16; vv <= 0.84; vv += 0.08) {
+      for (let uu = 0.16; uu <= 0.84; uu += 0.08) {
+        const x = o.x + uu * TILE_SIZE;
+        const z = o.z + vv * TILE_SIZE;
+        const cw = chartedWeight(x, z);
+        if (cw < 0.55) continue;
+        const s = cw - Math.hypot(uu - 0.5, vv - 0.5) * 0.25;
+        if (s > bestS) {
+          bestS = s;
+          best = { x, z };
+        }
+      }
+    }
+    if (best) return best;
   }
-  return 0;
+  for (let r = 12; r <= 72; r += 12) {
+    for (let a = 0; a < 10; a++) {
+      const x = wx + Math.cos((a / 10) * Math.PI * 2) * r;
+      const z = wz + Math.sin((a / 10) * Math.PI * 2) * r;
+      if (chartedWeight(x, z) > 0.55) return { x, z };
+    }
+  }
+  return null;
 }
 
 function parchment(wx, wz) {
@@ -114,53 +170,61 @@ function colorFromSample(tile, u, v) {
   return [s.r * 255, s.g * 255, s.b * 255];
 }
 
-function colorOfBuilt(tile, wx, wz, cache) {
+function sampleBuiltUv(tile, u, v, cache) {
   if (!tile?.built) return null;
+  const uu = clamp01(u);
+  const vv = clamp01(v);
   const o = originOf(tile);
-  return colorFromLand(tile, wx, wz, cache) || colorFromSample(tile, (wx - o.x) / TILE_SIZE, (wz - o.z) / TILE_SIZE);
+  const wx = o.x + uu * (TILE_SIZE - 1e-4);
+  const wz = o.z + vv * (TILE_SIZE - 1e-4);
+  return colorFromLand(tile, wx, wz, cache) || colorFromSample(tile, uu, vv);
 }
 
 function chartedColor(wx, wz, cache) {
-  const { ftx, ftz } = worldToTileUv(wx, wz);
-  const n = fbm(ftx * 2.4, ftz * 2.4, 29, 3) - 0.5;
-  const n2 = fbm(ftx * 1.7 + 6, ftz * 1.7, 31, 2) - 0.5;
-  const wtx = ftx + n * 0.24;
-  const wtz = ftz + n2 * 0.24;
-  let tile = tileAt(Math.floor(wtx), Math.floor(wtz));
+  const w = warpUv(wx, wz, 29, 0.42);
+  const tx = Math.floor(w.wtx);
+  const tz = Math.floor(w.wtz);
+  let tile = tileAt(tx, tz);
+  let u = w.wtx - tx;
+  let v = w.wtz - tz;
   if (!tile?.built) {
     let best = null;
-    let bestD = 4;
-    const tx0 = Math.floor(ftx);
-    const tz0 = Math.floor(ftz);
+    let bestB = 0;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
-        const t = tileAt(tx0 + dx, tz0 + dz);
+        if (!dx && !dz) continue;
+        const t = tileAt(tx + dx, tz + dz);
         if (!t?.built) continue;
-        const d = (ftx - t.tx - 0.5) ** 2 + (ftz - t.tz - 0.5) ** 2;
-        if (d < bestD) {
-          bestD = d;
+        const bu = dx < 0 ? u : dx > 0 ? 1 - u : 1;
+        const bv = dz < 0 ? v : dz > 0 ? 1 - v : 1;
+        const b = dx && dz
+          ? Math.min(smoothstep(0.24, 0, bu), smoothstep(0.24, 0, bv))
+          : smoothstep(0.24, 0, dx ? bu : bv);
+        if (b > bestB) {
+          bestB = b;
           best = t;
         }
       }
     }
+    if (!best) return null;
     tile = best;
+    u = w.wtx - tile.tx;
+    v = w.wtz - tile.tz;
   }
-  if (!tile?.built) return null;
-  let col = colorOfBuilt(tile, wx, wz, cache);
-  const tx = tile.tx;
-  const tz = tile.tz;
-  const u = wtx - Math.floor(wtx);
-  const v = wtz - Math.floor(wtz);
-  const band = 0.16;
-  const mixEdge = (other, t) => {
-    if (!other?.built || t <= 0 || !col) return;
-    const oc = colorOfBuilt(other, wx, wz, cache);
-    if (oc) col = mix3(col, oc, t * 0.45);
+  let col = sampleBuiltUv(tile, u, v, cache);
+  if (!col) return null;
+  const band = 0.22;
+  const mixN = (dx, dz, t) => {
+    if (t <= 0) return;
+    const other = tileAt(tile.tx + dx, tile.tz + dz);
+    if (!other?.built) return;
+    const oc = sampleBuiltUv(other, u - dx, v - dz, cache);
+    if (oc) col = mix3(col, oc, t * 0.5);
   };
-  mixEdge(tileAt(tx - 1, tz), smoothstep(band, 0, u));
-  mixEdge(tileAt(tx + 1, tz), smoothstep(band, 0, 1 - u));
-  mixEdge(tileAt(tx, tz - 1), smoothstep(band, 0, v));
-  mixEdge(tileAt(tx, tz + 1), smoothstep(band, 0, 1 - v));
+  mixN(-1, 0, smoothstep(band, 0, u));
+  mixN(1, 0, smoothstep(band, 0, 1 - u));
+  mixN(0, -1, smoothstep(band, 0, v));
+  mixN(0, 1, smoothstep(band, 0, 1 - v));
   return col;
 }
 
@@ -349,25 +413,35 @@ export function collectPlaymapLabels() {
     }
     if (tile.kind === 'oakhollow') continue;
     if (tile.built) {
+      const pin = chartedAnchor(x, z);
+      if (!pin) continue;
       labels.push({
         name: tile.kind === 'pirateshore' ? 'Pirate Shore' : tile.name,
-        x,
-        z,
+        x: pin.x,
+        z: pin.z,
         city: CITY_NAMES.has(tile.name),
+        charted: true,
       });
     } else if (tile.biome !== 'sea' && (tile.tx + tile.tz * 2) % 4 === 1) {
       labels.push({ name: tile.name, x, z, uncharted: true });
     }
   }
-  if (gilantre) labels.push({ name: 'Gilantre', x: gilantre.x / gilantre.n, z: gilantre.z / gilantre.n, city: true });
-  labels.push(
+  if (gilantre) {
+    const pin = chartedAnchor(gilantre.x / gilantre.n, gilantre.z / gilantre.n);
+    if (pin) labels.push({ name: 'Gilantre', x: pin.x, z: pin.z, city: true, charted: true });
+  }
+  const marks = [
     { name: 'Monster Gate', x: GATE.x, z: GATE.z - 14, landmark: true },
     { name: 'Greyrock Pit', x: MINE.x + 4, z: MINE.z - 14, landmark: true },
     { name: 'Oakhollow', x: TOWN.x - 10, z: TOWN.z + 18, city: true },
     { name: "Tobin's Farm", x: FARM.x1 + 22, z: FARM.z1 + 16, landmark: true },
     { name: 'Mirrormere', x: LAKE.x - 32, z: LAKE.z + 34, landmark: true },
     { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24, landmark: true },
-  );
+  ];
+  for (const mark of marks) {
+    const pin = chartedAnchor(mark.x, mark.z) || { x: mark.x, z: mark.z };
+    labels.push({ ...mark, x: pin.x, z: pin.z, charted: chartedWeight(pin.x, pin.z) > 0.45 });
+  }
   return labels;
 }
 
@@ -379,9 +453,9 @@ export function stampLabelsOnRaster(data, w, h, minX, minZ, scale, placed) {
     const city = label.kind === 'city' || label.city;
     const uncharted = label.kind === 'uncharted' || label.uncharted;
     drawPlaymapText(data, w, h, cx, cy, label.name, {
-      scale: city ? 3 : 2,
-      fill: city ? [255, 231, 160] : uncharted ? [210, 196, 168] : [255, 248, 232],
-      outline: [10, 7, 3],
+      scale: city ? 3 : uncharted ? 3 : 2,
+      fill: city ? [255, 231, 160] : uncharted ? [196, 154, 86] : [255, 248, 232],
+      outline: uncharted ? [42, 28, 12] : [10, 7, 3],
       italic: uncharted,
     });
   }

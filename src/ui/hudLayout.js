@@ -512,7 +512,7 @@ export function layoutPlaymapLabels(labels, opts = {}) {
   const mapH = Number(opts.mapH) > 0 ? Number(opts.mapH) : 560;
   const list = (labels || []).map((label, i) => {
     const kind = playmapLabelKind(label);
-    const font = kind === 'city' ? 14 : kind === 'landmark' ? 13 : 12;
+    const font = kind === 'city' ? 14 : kind === 'landmark' ? 13 : kind === 'uncharted' ? 12 : 12;
     const name = String(label.name || '');
     const twoLine = /\s/.test(name) || name.length > 10;
     const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.42 : 0.58) + 12));
@@ -557,14 +557,18 @@ export function layoutPlaymapLabels(labels, opts = {}) {
     const pin = PLAYMAP_PIN_NUDGES[it.name];
     const slots = pin ? [pin, ...PLAYMAP_NUDGES] : PLAYMAP_NUDGES;
     let placed = false;
-    for (const [dx, dy] of slots) {
-      const x = Math.min(96.5, Math.max(3.5, it.ax + dx * stepX));
-      const y = Math.min(96.5, Math.max(3.5, it.ay + dy * stepY));
+    for (let s = 0; s < slots.length; s++) {
+      const [dx, dy] = slots[s];
+      const sx = pin && s === 0 ? 5.2 : stepX;
+      const sy = pin && s === 0 ? 5.4 : stepY;
+      const x = Math.min(96.5, Math.max(3.5, it.ax + dx * sx));
+      const y = Math.min(96.5, Math.max(3.5, it.ay + dy * sy));
       const r = boxAt(it, x, y);
       if (blocked(r)) continue;
       it.x = x;
       it.y = y;
-      it.lead = it.kind === 'city' || it.kind === 'landmark' ? Math.hypot(x - it.ax, y - it.ay) > 0.7 : false;
+      const d = Math.hypot(x - it.ax, y - it.ay);
+      it.lead = (it.kind === 'city' || it.kind === 'landmark') && it.uncharted !== true && it.charted !== false && d > 0.7 && d < 4.2;
       it.visible = true;
       used.push(r);
       placed = true;

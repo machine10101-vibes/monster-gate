@@ -6,6 +6,7 @@ import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
 import { FARM, GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
 import { TILE_SIZE, TILES, originOf } from '../world/tiles.js';
+import { chartedAnchor, chartedWeight } from '../world/playmap.js';
 import { CAVE_MOUTH } from '../world/southford.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
@@ -78,22 +79,34 @@ function landMapLabels(world) {
       gilantre.n += 1;
       continue;
     }
+    const cx = land.x0 + TILE_SIZE / 2;
+    const cz = land.z0 + TILE_SIZE / 2;
+    const pin = chartedAnchor(cx, cz);
+    if (!pin) continue;
     labels.push({
       name,
-      x: land.x0 + TILE_SIZE / 2,
-      z: land.z0 + TILE_SIZE / 2,
+      x: pin.x,
+      z: pin.z,
       city: CITY_NAMES.has(name),
+      charted: true,
     });
   }
-  if (gilantre) labels.push({ name: 'Gilantre', x: gilantre.x / gilantre.n, z: gilantre.z / gilantre.n, city: true });
-  labels.push(
+  if (gilantre) {
+    const pin = chartedAnchor(gilantre.x / gilantre.n, gilantre.z / gilantre.n);
+    if (pin) labels.push({ name: 'Gilantre', x: pin.x, z: pin.z, city: true, charted: true });
+  }
+  const marks = [
     { name: 'Monster Gate', x: GATE.x, z: GATE.z - 14, landmark: true },
     { name: 'Greyrock Pit', x: MINE.x + 4, z: MINE.z - 14, landmark: true },
     { name: 'Oakhollow', x: TOWN.x - 10, z: TOWN.z + 18, city: true },
     { name: "Tobin's Farm", x: FARM.x1 + 22, z: FARM.z1 + 16, landmark: true },
     { name: 'Mirrormere', x: LAKE.x - 32, z: LAKE.z + 34, landmark: true },
     { name: 'Darksycle Cave', x: CAVE_MOUTH.x + 2, z: CAVE_MOUTH.z - 24, landmark: true },
-  );
+  ];
+  for (const mark of marks) {
+    const pin = chartedAnchor(mark.x, mark.z) || { x: mark.x, z: mark.z };
+    labels.push({ ...mark, x: pin.x, z: pin.z, charted: chartedWeight(pin.x, pin.z) > 0.45 });
+  }
   for (const mark of world.farmMarks || []) labels.push(mark);
   const named = new Set(labels.map((l) => l.name));
   for (const tile of TILES) {
@@ -623,7 +636,7 @@ export class HUD {
     this.runCleanup();
     this.panelId = name;
     this.el.panel.classList.toggle('map-open', name === 'map');
-    this.el.panel.classList.toggle('labels-off', name === 'map' && this.mapLabels === false);
+    this.el.panel.classList.toggle('labels-off', name === 'map' && !this.mapLabels);
     const card = this.el.panel.querySelector('.panel-card');
     const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
     card?.classList.toggle('wide', wide);
@@ -671,8 +684,12 @@ export class HUD {
       ctx.fillStyle = '#000';
       ctx.fillRect(mx - 1, mz - 1, 2, 2);
       const frame = document.createElement('div');
-      frame.className = 'playmap' + (this.mapLabels === false ? ' labels-off' : '');
-      frame.appendChild(c);
+      frame.className = 'playmap' + (!this.mapLabels ? ' labels-off' : '');
+      frame.style.setProperty('--map-w', String(c.width));
+      frame.style.setProperty('--map-h', String(c.height));
+      const fit = document.createElement('div');
+      fit.className = 'playmap-fit';
+      fit.appendChild(c);
       const raw = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
       const pins = raw.map((label) => ({
         ...label,
@@ -694,7 +711,7 @@ export class HUD {
         lctx.lineTo(label.x / 100 * leads.width, label.y / 100 * leads.height);
         lctx.stroke();
       }
-      frame.appendChild(leads);
+      fit.appendChild(leads);
       for (const label of placed) {
         if (!label.visible) continue;
         const b = document.createElement('b');
@@ -702,8 +719,9 @@ export class HUD {
         b.textContent = label.name;
         b.style.left = label.x.toFixed(2) + '%';
         b.style.top = label.y.toFixed(2) + '%';
-        frame.appendChild(b);
+        fit.appendChild(b);
       }
+      frame.appendChild(fit);
       body.appendChild(frame);
       if (!instanced) {
         if (game.world.waygate) {
@@ -1004,7 +1022,7 @@ export class HUD {
   }
 
   setMapLabels(on) {
-    this.mapLabels = on !== false;
+    this.mapLabels = !!on;
     this.el.panel?.classList.toggle('labels-off', this.panelId === 'map' && !this.mapLabels);
     this.el.panel?.querySelector('.playmap')?.classList.toggle('labels-off', !this.mapLabels);
     document.body.classList.toggle('map-labels-off', !this.mapLabels);

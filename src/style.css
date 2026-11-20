@@ -1269,7 +1269,42 @@ body.touch #top-right {
   border-color: #d37a62;
   color: #ffe8df;
 }
-.playmap { position: relative; }
+#panel.map-open .panel-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: min(90vh, 920px);
+  width: min(920px, 96vw);
+}
+#panel.map-open #panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#panel.map-open .playmap-hint {
+  flex: 0 0 auto;
+}
+.playmap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.playmap-fit {
+  position: relative;
+  --mw: var(--map-w, 1);
+  --mh: var(--map-h, 1);
+  width: min(100cqw, calc(100cqh * (var(--mw) / var(--mh))));
+  height: min(100cqh, calc(100cqw * (var(--mh) / var(--mw))));
+  max-width: 100%;
+  max-height: 100%;
+}
 .playmap-leads {
   position: absolute;
   inset: 0;
@@ -1279,7 +1314,9 @@ body.touch #top-right {
 }
 .bigmap {
   width: 100%;
+  height: 100%;
   display: block;
+  object-fit: contain;
   image-rendering: auto;
   border-radius: 4px;
   border: 2px solid #4a4d56;
@@ -1307,12 +1344,24 @@ body.touch #top-right {
 .playmap-label.city { color: #ffe7a0; font-size: 14px; }
 .playmap-label.landmark { font-size: 13px; }
 .playmap-label.minor { font-size: 12px; font-weight: 500; }
-.playmap-label.uncharted { font-size: 12px; font-style: italic; font-weight: 500; color: #d2c4a8; opacity: 0.62; }
+.playmap-label.uncharted {
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+  color: #c49658;
+  opacity: 0.94;
+  text-shadow:
+    0 0 3px #2a1c0c, 0 0 6px #2a1c0c,
+    0 1px 0 #2a1c0c, 1px 0 0 #2a1c0c, -1px 0 0 #2a1c0c, 0 -1px 0 #2a1c0c;
+}
 .playmap.labels-off .playmap-label,
 .playmap.labels-off .playmap-leads,
 #panel.labels-off .playmap-label,
 #panel.labels-off .playmap-leads,
-#panel.labels-off .playmap-hint {
+#panel.labels-off .playmap-hint,
+body.map-labels-off .playmap-label,
+body.map-labels-off .playmap-leads,
+body.map-labels-off .playmap-hint {
   display: none !important;
 }
 
@@ -3972,6 +4021,12 @@ body.touch .panel-card.wide {
   padding-bottom: 8px;
   box-shadow: 0 0 0 2px #0a0b0d, 0 10px 28px rgba(0, 0, 0, 0.65);
 }
+body.touch #panel.map-open .panel-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: none;
+}
 body.touch .panel-card h2 {
   padding: 9px 56px 6px 10px;
   font-size: 10px;
@@ -4075,6 +4130,7 @@ body.touch .stash-ask input { min-height: 40px; }
 @media (max-height: 520px) {
   body.touch .panel-card { display: flex; flex-direction: column; overflow: hidden; }
   body.touch #panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  body.touch #panel.map-open #panel-body { overflow: hidden; }
   body.touch #panel-body:has(.cg) { display: flex; flex-direction: column; }
   body.touch .cg { flex: 1; min-height: 0; }
   body.touch #panel {
