@@ -336,6 +336,38 @@ export function buildStump(seed) {
   return bundle([[M, 0.125, 7, 0, 7]]);
 }
 
+/** Heavy timber span with a plank deck, cross-beams, stone-height piles and raised rails. */
+export function buildForestBridge(seed = 1) {
+  const B = new VoxelModel(56, 18, 24);
+  const dark = (x, y, z) => J(0x4b3020, x, y, z, seed, 0.06);
+  const beam = (x, y, z) => J(0x694328, x, y, z, seed + 1, 0.07);
+  const plank = (x, y, z) => {
+    const palette = [0x9a6a3c, 0x85552f, 0xb27a48, 0x76502f];
+    return J(palette[Math.floor(hash3(x >> 1, y, z, seed + 2) * palette.length)], x, y, z, seed + 2, 0.06);
+  };
+  B.box(0, 6, 3, 56, 9, 6, dark);
+  B.box(0, 6, 18, 56, 9, 21, dark);
+  for (let x = 4; x < 56; x += 8) {
+    B.box(x, 5, 2, x + 2, 8, 22, beam);
+  }
+  for (let x = 0; x < 56; x += 3) {
+    B.box(x, 8, 3, Math.min(56, x + 2), 10, 21, plank);
+  }
+  for (const x of [3, 51]) {
+    B.box(x, 0, 4, x + 3, 8, 7, dark);
+    B.box(x, 0, 17, x + 3, 8, 20, dark);
+  }
+  for (let x = 1; x < 56; x += 8) {
+    B.box(x, 10, 1, x + 2, 16, 4, beam);
+    B.box(x, 10, 20, x + 2, 16, 23, beam);
+  }
+  B.box(0, 12, 1, 56, 14, 3, beam);
+  B.box(0, 12, 21, 56, 14, 23, beam);
+  B.box(0, 15, 1, 56, 17, 3, dark);
+  B.box(0, 15, 21, 56, 17, 23, dark);
+  return bundle([[B, 0.375, 28, 0, 12]]);
+}
+
 export function buildLog(seed) {
   const M = new VoxelModel(24, 9, 9);
   for (let x = 0; x < 24; x++) {

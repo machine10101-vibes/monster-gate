@@ -255,7 +255,7 @@ function pullEdge(h, edgeH, dist) {
   return lerp(h, edgeH, w);
 }
 
-function stampRoad(H, kind, mask, pts, edges) {
+function stampRoad(H, kind, mask, pts, edges, climb = null) {
   const samples = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const [ax, az] = pts[i];
@@ -283,6 +283,7 @@ function stampRoad(H, kind, mask, pts, edges) {
         if (xx < 0 || zz < 0 || xx >= W || zz >= W) continue;
         const i = zz * W + xx;
         mask[i] = 1;
+        if (climb) climb[i] = 1;
         if (onBorder(xx, zz, edges)) continue;
         H[i] = h;
         kind[i] = PATH;
@@ -340,6 +341,31 @@ const SPECS = {
     hay: true,
     knolls: [[80, 50, 8, 3], [40, 90, 6, 2], [100, 80, 5, -1]],
     roads: [[[0, 92], [36, 86], [70, 60]]],
+  },
+  silverrunNorth: {
+    banner: ['Silverrun Forest', 'The Upper Canopy'], silverrun: true, silverrunRiver: true,
+    shade: 0.03, forest: 0.96, amp: 2.5, base: 3.4, seed: 77,
+    rim: {}, knolls: [[38, 42, 12, 2.2], [98, 76, 14, 2.6], [70, 116, 10, 1.8]], roads: [],
+  },
+  silverrunEast: {
+    banner: ['The Elderwood', 'Elderwood Glade'], silverrun: true,
+    shade: 0.02, forest: 0.94, amp: 2.8, base: 3.5, seed: 78,
+    rim: {}, knolls: [[34, 34, 11, 2.4], [108, 46, 13, 2.8], [82, 112, 12, 2.1]],
+    clearing: [88, 74, 17], roads: [[[0, 104], [28, 94], [58, 82], [88, 74], [118, 62], [143, 48]]],
+  },
+  silverrunRiver: {
+    banner: ['Silverrun Crossing', 'The River Bridge'], silverrun: true, silverrunRiver: true, silverrunMountain: true,
+    shade: 0.02, forest: 0.95, amp: 2.4, base: 3.3, seed: 87,
+    rim: {}, knolls: [[28, 34, 10, 1.8], [88, 38, 12, 2.2], [92, 126, 10, 1.7]],
+    roads: [[[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]]],
+    climbRoads: [[[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]]],
+  },
+  silverrunPeak: {
+    banner: ['Greystone Mountain', 'The Flat Summit'], silverrun: true, silverrunMountain: true,
+    shade: 0.02, forest: 0.92, amp: 2.7, base: 3.4, seed: 88,
+    rim: {}, knolls: [[96, 28, 10, 2.2], [106, 116, 12, 2.1]],
+    roads: [[[0, 122], [10, 116], [22, 108], [32, 98], [34, 88], [30, 80], [22, 72], [14, 68], [8, 76]]],
+    climbRoads: [[[0, 122], [10, 116], [22, 108], [32, 98], [34, 88], [30, 80], [22, 72], [14, 68], [8, 76]]],
   },
   ...ARCTIC_SPECS,
   ...VOLCANIC_SPECS,
@@ -448,7 +474,55 @@ function stampLane(H, kind, mask, lane) {
   }
 }
 
+function silverrunSummit(gx, gz) {
+  return Math.abs(gx - 440) <= 10 && Math.abs(gz - 510) <= 12;
+}
+
+export function silverrunRiverCenterX(worldZ) {
+  const t = clamp((576 - worldZ) / 288, 0, 1);
+  return 350 - 80 * t + Math.sin(worldZ * 0.025) * 4.8 + Math.sin(worldZ * 0.061) * 1.8;
+}
+
+function silverrunMountainHeight(gx, gz) {
+  if (silverrunSummit(gx, gz)) return 29;
+  const d = Math.hypot((gx - 440) / 52, (gz - 510) / 56);
+  return 3.3 + 25.7 * (1 - smoothstep(0.18, 1.0, d));
+}
+
+function silverrunRidgeEdge() {
+  const edge = new Float32Array(W);
+  for (let z = 0; z < W; z++) edge[z] = silverrunMountainHeight(432, 432 + z);
+  return edge;
+}
+
+function silverrunOceanEdge() {
+  return new Float32Array(W).fill(0.1);
+}
+
+function silverrunFeature(h, x, z, spec) {
+  const gx = spec.ox + x;
+  const gz = spec.oz + z;
+  let out = null;
+  if (spec.silverrunMountain) {
+    const summit = silverrunSummit(gx, gz);
+    const peak = silverrunMountainHeight(gx, gz);
+    if (peak > h || summit) {
+      h = summit ? 29 : peak;
+      out = { h, kind: h >= 8 ? STONE : AUTO, climb: summit };
+    }
+  }
+  if (spec.silverrunRiver) {
+    const centre = silverrunRiverCenterX(gz);
+    const width = 4.2 + 3.4 * smoothstep(500, 576, gz);
+    const d = Math.abs(gx - centre);
+    if (d < width) return { h: -0.55, kind: WATER };
+    if (d < width + 10) return { h: lerp(0.15, Math.min(h, 2.8), (d - width) / 10), kind: AUTO };
+  }
+  return out;
+}
+
 function applyFeature(h, x, z, spec) {
+  if (spec.silverrunRiver || spec.silverrunMountain) return silverrunFeature(h, x, z, spec);
   if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.volcanic) return volcanicFeature(h, x, z, spec);
   if (spec.jungle) return jungleFeature(h, x, z, spec);
@@ -524,7 +598,16 @@ function makeTile(spec, edges) {
       else H[i] = Math.round(H[i] * 2) / 2;
     }
   }
-  for (const road of spec.roads) stampRoad(H, kind, mask, road, edges);
+  for (const road of spec.roads) stampRoad(H, kind, mask, road, edges, spec.silverrunMountain ? climb : null);
+  if (spec.silverrunMountain) {
+    for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) {
+      if (!silverrunSummit(spec.ox + x, spec.oz + z)) continue;
+      const i = z * W + x;
+      H[i] = 29;
+      if (kind[i] !== PATH) kind[i] = STONE;
+      climb[i] = 1;
+    }
+  }
   if (spec.cone) gradeCinderCone(H, climb);
   for (let z = 0; z < W; z++) {
     for (let x = 0; x < W; x++) {
@@ -662,12 +745,29 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'gilantreNe') return { n: rowOf(made.icewind, W - 1), w: colOf(made.gilantreNw, W - 1) };
   if (kind === 'gilantreSw') return { n: rowOf(made.gilantreNw, W - 1), w: colOf(made.hayfield, W - 1) };
   if (kind === 'gilantreSe') return { n: rowOf(made.gilantreNe, W - 1), w: colOf(made.gilantreSw, W - 1) };
+  if (kind === 'silverrunNorth') return { n: rowOf(made.gilantreSw, W - 1) };
+  if (kind === 'silverrunEast') return { n: rowOf(made.gilantreSe, W - 1), w: colOf(made.silverrunNorth, W - 1) };
+  if (kind === 'silverrunRiver') return { n: rowOf(made.silverrunNorth, W - 1), e: silverrunRidgeEdge(), s: silverrunOceanEdge() };
+  if (kind === 'silverrunPeak') return { n: rowOf(made.silverrunEast, W - 1), w: colOf(made.silverrunRiver, W - 1), s: silverrunOceanEdge() };
   return {};
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
+function stitchSilverrunToGilantre(lands) {
+  const byKind = Object.fromEntries(lands.map((land) => [land.kind, land]));
+  for (const [sourceKind, targetKind] of [['gilantreSw', 'silverrunNorth'], ['gilantreSe', 'silverrunEast']]) {
+    const source = byKind[sourceKind];
+    const target = byKind[targetKind];
+    if (!source || !target) continue;
+    for (let x = 0; x < W; x++) {
+      target.data.H[x] = source.data.H[(W - 1) * W + x];
+    }
+    reslope(target.data.H, target.data.slope);
+  }
+}
+
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -701,6 +801,7 @@ export function generateRing(oak, south) {
       arctic: !!spec.arctic,
       volcanic: !!spec.volcanic,
       jungle: !!spec.jungle,
+      silverrun: !!spec.silverrun,
       emberAt: spec.volcanic ? emberAmount(spec) : () => 0,
       chillAt: spec.arctic
         ? spec.blend
@@ -714,6 +815,7 @@ export function generateRing(oak, south) {
   frostGoldmead(made.goldmead);
   carveDesert(lands.filter((l) => DESERT_SPECS[l.kind]));
   carveGilantre(lands);
+  stitchSilverrunToGilantre(lands);
   return lands;
 }
 
@@ -825,11 +927,137 @@ function dressOrcCamp(world, land) {
   }
 }
 
+function dressSilverrun(world, land, spec) {
+  const m = world.models;
+  const data = land.data;
+  const seed = spec.seed;
+  const X = (lx) => land.x0 + lx + 0.5;
+  const Z = (lz) => land.z0 + lz + 0.5;
+  const nearRiver = (lx, lz, radius = 12) => spec.silverrunRiver
+    && Math.abs(land.x0 + lx - silverrunRiverCenterX(land.z0 + lz)) < radius;
+  const reserved = (lx, lz) => {
+    const i = lz * W + lx;
+    return data.pathMask[i] || data.zone[i] === ZONE.WATER || nearRiver(lx, lz, 9) || data.H[i] > 8.2;
+  };
+
+  if (land.kind === 'silverrunRiver') {
+    const bridgeZ = Z(72);
+    const bridgeWorldX = silverrunRiverCenterX(land.z0 + 72) + 0.5;
+    const deckY = 2.5;
+    world.forestBridge = {
+      x: bridgeWorldX, z: bridgeZ, deckY, halfX: 10.5, halfZ: 4.5,
+      contains(x, z) { return Math.abs(x - this.x) <= this.halfX && Math.abs(z - this.z) <= this.halfZ; },
+    };
+    world.putAt(m.forestBridge, bridgeWorldX, bridgeZ, 0, 1, { y: deckY - 3.75 });
+    world.box(bridgeWorldX, bridgeZ - 3.75, 10.2, 0.2);
+    world.box(bridgeWorldX, bridgeZ + 3.75, 10.2, 0.2);
+  }
+
+  // Ancient canopy giants rise above the mixed oak-and-pine understory.
+  const giantTarget = land.kind === 'silverrunRiver' ? 7 : 9;
+  let giants = 0;
+  for (let n = 0; n < 420 && giants < giantTarget; n++) {
+    const lx = 9 + Math.floor(hash2(n, 2, seed + 11) * (W - 18));
+    const lz = 9 + Math.floor(hash2(n, 5, seed + 11) * (W - 18));
+    if (reserved(lx, lz) || data.H[lz * W + lx] > 7.6 || !world.free(X(lx), Z(lz), 2.2)) continue;
+    const parts = m.giants[n % m.giants.length];
+    const scale = 1.02 + hash2(n, 8, seed) * 0.28;
+    world.putAt(parts, X(lx), Z(lz), hash2(n, 9, seed) * 6, scale);
+    world.circle(X(lx), Z(lz), 0.65);
+    world.occupy(X(lx), Z(lz), 2.1);
+    world.treeDots.push({ x: X(lx), z: Z(lz) });
+    giants++;
+  }
+
+  const treeTarget = land.kind === 'silverrunRiver' ? 70 : 82;
+  let trees = 0;
+  for (let n = 0; n < 900 && trees < treeTarget; n++) {
+    const lx = 6 + Math.floor(hash2(n, 2, seed + 21) * (W - 12));
+    const lz = 6 + Math.floor(hash2(n, 5, seed + 21) * (W - 12));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.25 || data.H[i] > 8.2 || data.zone[i] === ZONE.MOUNTAIN) continue;
+    if (!world.free(X(lx), Z(lz), 1.25)) continue;
+    const roll = hash2(n, 8, seed + 31);
+    let parts = m.oaks[n % m.oaks.length];
+    if (roll < 0.42) parts = m.pines[n % m.pines.length];
+    else if (roll > 0.91) parts = m.blossoms[n % m.blossoms.length];
+    else if (roll > 0.82) parts = m.autumn[n % m.autumn.length];
+    const scale = 0.9 + hash2(n, 9, seed + 41) * 0.38;
+    world.putAt(parts, X(lx), Z(lz), roll * 6, scale);
+    world.circle(X(lx), Z(lz), 0.38);
+    world.occupy(X(lx), Z(lz), 1.25);
+    world.treeDots.push({ x: X(lx), z: Z(lz) });
+    trees++;
+  }
+
+  // Layer the forest floor with ferns, flowers, berry shrubs and mushrooms.
+  let coverCount = 0;
+  for (let n = 0; n < 1500 && coverCount < 150; n++) {
+    const lx = 3 + Math.floor(hash2(n, 3, seed + 51) * (W - 6));
+    const lz = 3 + Math.floor(hash2(n, 7, seed + 51) * (W - 6));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.0 || data.H[i] > 8.5) continue;
+    const roll = hash2(n, 4, seed + 61);
+    let parts = m.tuftsForest[n % m.tuftsForest.length];
+    if (roll > 0.72) parts = m.ferns[n % m.ferns.length];
+    else if (roll > 0.52) parts = m.bushes[n % m.bushes.length];
+    else if (roll > 0.42) parts = m.flowers[n % m.flowers.length];
+    else if (roll > 0.34) parts = m.mushRed[n % m.mushRed.length];
+    else if (roll > 0.30) parts = m.mushGlow[n % m.mushGlow.length];
+    if (!world.free(X(lx), Z(lz), 0.38)) continue;
+    world.putAt(parts, X(lx), Z(lz), roll * 6, 0.82 + hash2(n, 9, seed) * 0.42, { cover: true });
+    coverCount++;
+  }
+
+  if (spec.silverrunRiver) {
+    let reeds = 0;
+    for (let z = 3; z < W - 3 && reeds < 44; z += 3) {
+      for (let x = 3; x < W - 3 && reeds < 44; x += 3) {
+        const i = z * W + x;
+        if (data.zone[i] === ZONE.WATER || data.H[i] < 0.35 || data.H[i] > 2.8) continue;
+        let wet = false;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (data.zone[(z + dz) * W + (x + dx)] === ZONE.WATER) wet = true;
+        }
+        if (!wet || data.pathMask[i] || !world.free(X(x), Z(z), 0.35)) continue;
+        world.putAt(m.reeds[(x + z) % m.reeds.length], X(x), Z(z), 0, 0.95 + hash2(x, z, seed) * 0.35);
+        reeds++;
+      }
+    }
+  }
+
+  for (let n = 0; n < 34; n++) {
+    const lx = 5 + Math.floor(hash2(n, 2, seed + 71) * (W - 10));
+    const lz = 5 + Math.floor(hash2(n, 6, seed + 71) * (W - 10));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.2 || data.H[i] > 10 || !world.free(X(lx), Z(lz), 0.8)) continue;
+    const parts = data.H[i] > 6 ? m.boulders[n % m.boulders.length] : m.rocks[n % m.rocks.length];
+    world.putAt(parts, X(lx), Z(lz), n * 0.7, 0.8 + hash2(n, 4, seed) * 0.45);
+    world.occupy(X(lx), Z(lz), 0.9);
+  }
+
+  if (land.kind === 'silverrunPeak') {
+    const sx = X(9);
+    const sz = Z(83);
+    world.putAt(m.boulders[0], sx, sz, 0.4, 0.72, { y: 29 });
+    for (let n = 0; n < 7; n++) {
+      const a = (n / 7) * Math.PI * 2;
+      const lx = 9 + Math.cos(a) * 10.5;
+      const lz = 78 + Math.sin(a) * 10.5;
+      world.putAt(m.rocks[n % m.rocks.length], X(Math.round(lx)), Z(Math.round(lz)), a, 0.72, { y: 29 });
+    }
+  }
+}
+
 function dressLand(world, land) {
   if (typeof land.kind === 'string' && land.kind.startsWith('gilantre')) return;
   const m = world.models;
   const spec = SPECS[land.kind];
   const seed = spec.seed;
+  if (spec.silverrun) {
+    dressSilverrun(world, land, spec);
+    return;
+  }
   const data = land.data;
   const trees = [];
   if (land.kind === 'brookside') dressOrcCamp(world, land);
