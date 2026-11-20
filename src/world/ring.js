@@ -342,6 +342,11 @@ const SPECS = {
     knolls: [[80, 50, 8, 3], [40, 90, 6, 2], [100, 80, 5, -1]],
     roads: [[[0, 92], [36, 86], [70, 60]]],
   },
+  silverrunWest: {
+    banner: ['Reedford Reach', 'The Western River Bend'], silverrun: true, silverrunRiver: true,
+    shade: 0.04, forest: 0.93, amp: 2.4, base: 3.25, seed: 76,
+    rim: {}, knolls: [[32, 40, 12, 1.8], [92, 92, 15, 2.1], [54, 122, 9, 1.4]], roads: [],
+  },
   silverrunNorth: {
     banner: ['Silverrun Forest', 'The Upper Canopy'], silverrun: true, silverrunRiver: true,
     shade: 0.03, forest: 0.96, amp: 2.5, base: 3.4, seed: 77,
@@ -357,8 +362,14 @@ const SPECS = {
     banner: ['Silverrun Crossing', 'The River Bridge'], silverrun: true, silverrunRiver: true, silverrunMountain: true,
     shade: 0.02, forest: 0.95, amp: 2.4, base: 3.3, seed: 87,
     rim: {}, knolls: [[28, 34, 10, 1.8], [88, 38, 12, 2.2], [92, 126, 10, 1.7]],
-    roads: [[[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]]],
-    climbRoads: [[[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]]],
+    roads: [
+      [[30, 72], [23, 72], [17, 68], [13, 60], [12, 50]],
+      [[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]],
+    ],
+    climbRoads: [
+      [[30, 72], [23, 72], [17, 68], [13, 60], [12, 50]],
+      [[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]],
+    ],
   },
   silverrunPeak: {
     banner: ['Greystone Mountain', 'The Flat Summit'], silverrun: true, silverrunMountain: true,
@@ -486,7 +497,12 @@ export function silverrunRiverCenterX(worldZ) {
 function silverrunMountainHeight(gx, gz) {
   if (silverrunSummit(gx, gz)) return 29;
   const d = Math.hypot((gx - 440) / 52, (gz - 510) / 56);
-  return 3.3 + 25.7 * (1 - smoothstep(0.18, 1.0, d));
+  const mass = 3.3 + 25.7 * (1 - smoothstep(0.18, 1.0, d));
+  const fade = smoothstep(0.2, 0.48, d) * (1 - smoothstep(0.88, 1.12, d));
+  const strata = Math.sin(d * 23 + fbm(gx * 0.018, gz * 0.018, 889, 3) * 4.2) * 0.85;
+  const fracture = (fbm(gx * 0.073, gz * 0.073, 891, 3) - 0.5) * 2.4;
+  const ridge = Math.sin(gx * 0.11 + Math.sin(gz * 0.067) * 2.1) * 0.55;
+  return Math.max(3.1, mass + (strata + fracture + ridge) * fade);
 }
 
 function silverrunRidgeEdge() {
@@ -746,6 +762,7 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'gilantreSw') return { n: rowOf(made.gilantreNw, W - 1), w: colOf(made.hayfield, W - 1) };
   if (kind === 'gilantreSe') return { n: rowOf(made.gilantreNe, W - 1), w: colOf(made.gilantreSw, W - 1) };
   if (kind === 'silverrunNorth') return { n: rowOf(made.gilantreSw, W - 1) };
+  if (kind === 'silverrunWest') return { w: colOf(made.glassroad, W - 1), e: colOf(made.silverrunNorth, 0) };
   if (kind === 'silverrunEast') return { n: rowOf(made.gilantreSe, W - 1), w: colOf(made.silverrunNorth, W - 1) };
   if (kind === 'silverrunRiver') return { n: rowOf(made.silverrunNorth, W - 1), e: silverrunRidgeEdge(), s: silverrunOceanEdge() };
   if (kind === 'silverrunPeak') return { n: rowOf(made.silverrunEast, W - 1), w: colOf(made.silverrunRiver, W - 1), s: silverrunOceanEdge() };
@@ -766,8 +783,34 @@ function stitchSilverrunToGilantre(lands) {
   }
 }
 
+function stitchSilverrunRiver(lands) {
+  for (const land of lands) {
+    if (!['silverrunWest', 'silverrunNorth', 'silverrunRiver'].includes(land.kind)) continue;
+    const { H, zone, top, tint, pathMask, forest, slope } = land.data;
+    for (let z = 0; z < W; z++) {
+      const worldZ = land.z0 + z;
+      const centre = silverrunRiverCenterX(worldZ);
+      const width = 4.2 + 3.4 * smoothstep(500, 576, worldZ);
+      for (let x = 0; x < W; x++) {
+        const worldX = land.x0 + x;
+        if (Math.abs(worldX - centre) >= width) continue;
+        const i = z * W + x;
+        H[i] = -0.55;
+        zone[i] = ZONE.WATER;
+        top[i] = TILE.SAND;
+        pathMask[i] = 0;
+        forest[i] = 0;
+        tint[i * 3] = 0.48;
+        tint[i * 3 + 1] = 0.78;
+        tint[i * 3 + 2] = 0.96;
+      }
+    }
+    reslope(H, slope);
+  }
+}
+
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -816,6 +859,7 @@ export function generateRing(oak, south) {
   carveDesert(lands.filter((l) => DESERT_SPECS[l.kind]));
   carveGilantre(lands);
   stitchSilverrunToGilantre(lands);
+  stitchSilverrunRiver(lands);
   return lands;
 }
 
@@ -954,7 +998,7 @@ function dressSilverrun(world, land, spec) {
   }
 
   // Ancient canopy giants rise above the mixed oak-and-pine understory.
-  const giantTarget = land.kind === 'silverrunRiver' ? 7 : 9;
+  const giantTarget = land.kind === 'silverrunRiver' ? 8 : land.kind === 'silverrunWest' ? 10 : 11;
   let giants = 0;
   for (let n = 0; n < 420 && giants < giantTarget; n++) {
     const lx = 9 + Math.floor(hash2(n, 2, seed + 11) * (W - 18));
@@ -969,7 +1013,7 @@ function dressSilverrun(world, land, spec) {
     giants++;
   }
 
-  const treeTarget = land.kind === 'silverrunRiver' ? 70 : 82;
+  const treeTarget = land.kind === 'silverrunRiver' ? 82 : land.kind === 'silverrunWest' ? 90 : 96;
   let trees = 0;
   for (let n = 0; n < 900 && trees < treeTarget; n++) {
     const lx = 6 + Math.floor(hash2(n, 2, seed + 21) * (W - 12));
@@ -992,7 +1036,8 @@ function dressSilverrun(world, land, spec) {
 
   // Layer the forest floor with ferns, flowers, berry shrubs and mushrooms.
   let coverCount = 0;
-  for (let n = 0; n < 1500 && coverCount < 150; n++) {
+  const coverTarget = land.kind === 'silverrunRiver' ? 175 : 220;
+  for (let n = 0; n < 2200 && coverCount < coverTarget; n++) {
     const lx = 3 + Math.floor(hash2(n, 3, seed + 51) * (W - 6));
     const lz = 3 + Math.floor(hash2(n, 7, seed + 51) * (W - 6));
     const i = lz * W + lx;
@@ -1007,6 +1052,23 @@ function dressSilverrun(world, land, spec) {
     if (!world.free(X(lx), Z(lz), 0.38)) continue;
     world.putAt(parts, X(lx), Z(lz), roll * 6, 0.82 + hash2(n, 9, seed) * 0.42, { cover: true });
     coverCount++;
+  }
+
+  // Fallen trunks and old stumps break up the understory with larger natural forms.
+  const debrisTarget = land.kind === 'silverrunRiver' ? 8 : 13;
+  let debris = 0;
+  for (let n = 0; n < 520 && debris < debrisTarget; n++) {
+    const lx = 7 + Math.floor(hash2(n, 3, seed + 81) * (W - 14));
+    const lz = 7 + Math.floor(hash2(n, 8, seed + 81) * (W - 14));
+    const i = lz * W + lx;
+    if (reserved(lx, lz) || data.H[i] < 1.1 || data.H[i] > 7.8 || !world.free(X(lx), Z(lz), 1.35)) continue;
+    const stump = hash2(n, 5, seed + 83) > 0.62;
+    const parts = stump ? m.stumps[n % m.stumps.length] : m.logs[n % m.logs.length];
+    const scale = 0.72 + hash2(n, 9, seed + 83) * 0.28;
+    world.putAt(parts, X(lx), Z(lz), hash2(n, 4, seed + 83) * Math.PI * 2, scale);
+    world.occupy(X(lx), Z(lz), 1.05);
+    world.circle(X(lx), Z(lz), 0.55);
+    debris++;
   }
 
   if (spec.silverrunRiver) {
