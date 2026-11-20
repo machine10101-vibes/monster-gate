@@ -416,7 +416,7 @@ export function collectPlaymapLabels() {
       const pin = chartedAnchor(x, z);
       if (!pin) continue;
       labels.push({
-        name: tile.kind === 'pirateshore' ? 'Pirate Shore' : tile.name,
+        name: tile.kind === 'pirateshore' ? 'Pirate Shore' : tile.kind === 'lagoon' ? 'The Lagoon' : tile.kind === 'canopy' ? 'Silverrun Canopy' : tile.name,
         x: pin.x,
         z: pin.z,
         city: CITY_NAMES.has(tile.name),

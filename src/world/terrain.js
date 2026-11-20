@@ -348,6 +348,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
   const { H, top, tint, zone } = data;
   const group = new THREE.Group();
   const smooth = !!opt.smooth || !!data.smooth;
+  const skipThinLips = !!opt.skipThinGrassLips;
   const hAt = (x, z) => {
     if (x >= 0 && z >= 0 && x < width && z < depth) return H[z * width + x];
     const outside = opt.outside?.(x, z);
@@ -478,8 +479,8 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             const nz = z + dz;
             const nt = nx >= 0 && nz >= 0 && nx < width && nz < depth ? top[nz * width + nx] : -1;
             const nbGrassy = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
-            if (grassy && nbGrassy && h - nh <= 1.001) continue;
-            if ((tl === TILE.PATH || grassy) && (nbGrassy || nt === TILE.PATH) && h - nh <= 1.001) continue;
+            if (skipThinLips && grassy && nbGrassy && h - nh <= 1.001) continue;
+            if (skipThinLips && (tl === TILE.PATH || grassy) && (nbGrassy || nt === TILE.PATH) && h - nh <= 1.001) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;

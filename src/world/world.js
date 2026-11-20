@@ -409,6 +409,7 @@ export class World {
         ox: land.x0,
         oz: land.z0,
         smooth: !!land.data.smooth || !!land.desert,
+        skipThinGrassLips: land.kind === 'brookside',
         outside: (x, z) => sampleLands(this.lands, land.x0 + x, land.z0 + z),
       });
       this.group.add(mesh);

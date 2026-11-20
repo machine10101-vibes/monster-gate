@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TILE_SIZE, TILES, originOf } from '../src/world/tiles.js';
 import { collectPlaymapLabels, rasterPlaymap, stampLabelsOnRaster } from '../src/world/playmap.js';
-import { layoutPlaymapLabels } from '../src/ui/hudLayout.js';
+import { layoutPlaymapLabels, playmapPanelInner } from '../src/ui/hudLayout.js';
 
 function crcTable() {
   const t = new Uint32Array(256);
@@ -112,10 +112,68 @@ function containInto(src, sw, sh, vw, vh, bg = [18, 16, 14, 255]) {
   return out;
 }
 
+function paintPanel(src, sw, sh, vw, vh) {
+  const inner = playmapPanelInner(vw, vh);
+  const scale = Math.min(inner.innerW / sw, inner.innerH / sh);
+  const dw = Math.max(1, Math.round(sw * scale));
+  const dh = Math.max(1, Math.round(sh * scale));
+  const cardX = Math.floor((vw - inner.cardW) / 2);
+  const cardY = Math.floor((vh - inner.cardH) / 2);
+  const ox = cardX + Math.floor((inner.cardW - dw) / 2);
+  const oy = cardY + Math.floor((inner.cardH - dh) / 2);
+  const framed = new Uint8ClampedArray(vw * vh * 4);
+  for (let i = 0; i < framed.length; i += 4) {
+    framed[i] = 12;
+    framed[i + 1] = 14;
+    framed[i + 2] = 18;
+    framed[i + 3] = 255;
+  }
+  const gold = [196, 158, 74];
+  for (let y = cardY; y < cardY + inner.cardH; y++) {
+    for (let x = cardX; x < cardX + inner.cardW; x++) {
+      if (x < 0 || y < 0 || x >= vw || y >= vh) continue;
+      const i = (y * vw + x) * 4;
+      const edge = x < cardX + 3 || y < cardY + 3 || x >= cardX + inner.cardW - 3 || y >= cardY + inner.cardH - 3;
+      if (edge) {
+        framed[i] = gold[0];
+        framed[i + 1] = gold[1];
+        framed[i + 2] = gold[2];
+      } else {
+        framed[i] = 28;
+        framed[i + 1] = 30;
+        framed[i + 2] = 36;
+      }
+    }
+  }
+  for (let y = 0; y < dh; y++) {
+    const sy = Math.min(sh - 1, Math.floor(y / scale));
+    for (let x = 0; x < dw; x++) {
+      const sx = Math.min(sw - 1, Math.floor(x / scale));
+      const px = ox + x;
+      const py = oy + y;
+      if (px < 0 || py < 0 || px >= vw || py >= vh) continue;
+      const si = (sy * sw + sx) * 4;
+      const di = (py * vw + px) * 4;
+      framed[di] = src[si];
+      framed[di + 1] = src[si + 1];
+      framed[di + 2] = src[si + 2];
+      framed[di + 3] = 255;
+    }
+  }
+  return { rgba: framed, map: Math.min(dw, dh), inner };
+}
+
 const dir = dirname(outOff);
-const desk = join(dir, 'map-1920x1080.png');
-const phone = join(dir, 'map-844x390.png');
-writePNG(desk, 1920, 1080, containInto(labelsOn, w, h, 1920, 1080));
-writePNG(phone, 844, 390, containInto(labelsOn, w, h, 844, 390));
+const sizes = [
+  [1920, 1080],
+  [1280, 800],
+  [844, 390],
+];
+for (const [vw, vh] of sizes) {
+  const painted = paintPanel(labelsOn, w, h, vw, vh);
+  const dest = join(dir, `map-${vw}x${vh}.png`);
+  writePNG(dest, vw, vh, painted.rgba);
+  if (painted.map <= 300) throw new Error(`${vw}x${vh} map ${painted.map}px <= 300`);
+  console.log(`wrote ${dest} map ${painted.map}px`);
+}
 console.log(`wrote ${outOff} and ${outOn} ${w}x${h}`);
-console.log(`wrote ${desk} and ${phone}`);

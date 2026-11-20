@@ -5,7 +5,7 @@ import { TILE, cloudShadeAt, CLOUD_DRIFT } from '../src/engine/materials.js';
 import { QUALITIES, survivalBudget } from '../src/engine/quality.js';
 import { originOf, paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
 import { chartedAnchor, chartedWeight, oceanWeight, rasterPlaymap } from '../src/world/playmap.js';
-import { sideTilesFor } from '../src/world/terrain.js';
+import { sideTilesFor, generateWorld, GUILD, W } from '../src/world/terrain.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
 
@@ -279,7 +279,37 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.doesNotMatch(mats, /patch < 0\.32/);
   assert.match(player, /RingGeometry/);
   assert.match(player, /opacity: 0\.8/);
+  assert.match(terrain, /skipThinGrassLips/);
   assert.match(terrain, /h - nh <= 1\.001/);
+  assert.match(src('src/world/world.js'), /skipThinGrassLips:\s*land\.kind === 'brookside'/);
+});
+
+test('Oakhollow keeps grass terrace lips northeast of the Guild hall', () => {
+  const data = generateWorld();
+  let lips = 0;
+  const x0 = Math.min(W - 1, GUILD.x + 2);
+  const x1 = Math.min(W, GUILD.x + 30);
+  const z0 = Math.max(0, GUILD.z - 28);
+  const z1 = Math.min(W, GUILD.z + 6);
+  for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
+      const i = z * W + x;
+      const h = data.H[i];
+      const tl = data.top[i];
+      const grassy = tl === TILE.GRASS || tl === TILE.FLOWER_GRASS;
+      if (!grassy) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const nz = z + dz;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= W) continue;
+        const nh = data.H[nz * W + nx];
+        const nt = data.top[nz * W + nx];
+        const nbGrassy = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
+        if (nbGrassy && h - nh > 0.05 && h - nh <= 1.001) lips++;
+      }
+    }
+  }
+  assert.ok(lips > 30, `Oakhollow NE of Guild still has terrace lips (${lips})`);
 });
 
 test('hunter map paints uncharted parchment and one ocean, not biome blocks', () => {

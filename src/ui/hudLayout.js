@@ -500,6 +500,8 @@ const PLAYMAP_PIN_NUDGES = {
   Southford: [0, 2.4],
   Broadshire: [1.6, 0.8],
   Brookside: [-2.2, 0.3],
+  'The Lagoon': [1.4, 1.8],
+  'Silverrun Canopy': [-1.6, -1.8],
 };
 
 /**
@@ -584,4 +586,23 @@ export function layoutPlaymapLabels(labels, opts = {}) {
   }
   list.sort((a, b) => a.i - b.i);
   return list;
+}
+
+/**
+ * Inner map size after the Map panel chrome. Models the CSS contract:
+ * `#panel.map-open .panel-card` has a real height (not only max-height) so
+ * the contain/flex map is not a 0px speck.
+ */
+export function playmapPanelInner(vw, vh) {
+  const w = Math.max(1, Number(vw) || 0);
+  const h = Math.max(1, Number(vh) || 0);
+  const short = h <= 520;
+  const cardW = Math.min(920, short ? w : w * 0.96);
+  const cardH = short ? h : Math.min(0.9 * h, 920);
+  const chromeX = short ? 16 : 36;
+  const chromeY = short ? 44 : 96;
+  const innerW = Math.max(0, cardW - chromeX);
+  const innerH = Math.max(0, cardH - chromeY);
+  const map = Math.min(innerW, innerH);
+  return { cardW, cardH, innerW, innerH, map };
 }
