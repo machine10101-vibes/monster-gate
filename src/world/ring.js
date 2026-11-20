@@ -843,23 +843,27 @@ function blendEcotonePair(a, b, orientation, band = 28, transitionTop = TILE.DIR
     const sharedSlope = clamp((slopeA + slopeB) * 0.5, -0.28, 0.28);
     const sharedTint = [0, 1, 2].map((k) => (ad.tint[ai * 3 + k] + bd.tint[bi * 3 + k]) * 0.5);
     const sharedForest = (ad.forest[ai] + bd.forest[bi]) * 0.5;
+    // Fade the ecotone along its length near three-tile corners so it never
+    // overwrites a perpendicular seam shared by two other neighboring tiles.
+    const alongFade = smoothstep(0, band, along) * (1 - smoothstep(W - band, W - 1, along));
     for (let depth = 0; depth <= band; depth++) {
       const ia = indexA(along, depth);
       const ib = indexB(along, depth);
-      const blend = smoothstep(1, band, depth);
+      const blend = 1 - alongFade * (1 - smoothstep(1, band, depth));
+      const surfaceBlend = 1 - alongFade * (1 - smoothstep(0, band, depth));
       const targetA = edgeHeight - sharedSlope * depth;
       const targetB = edgeHeight + sharedSlope * depth;
       ad.H[ia] = lerp(targetA, ad.H[ia], blend);
       bd.H[ib] = lerp(targetB, bd.H[ib], blend);
       for (let k = 0; k < 3; k++) {
-        ad.tint[ia * 3 + k] = lerp(sharedTint[k], ad.tint[ia * 3 + k], blend);
-        bd.tint[ib * 3 + k] = lerp(sharedTint[k], bd.tint[ib * 3 + k], blend);
+        ad.tint[ia * 3 + k] = lerp(sharedTint[k], ad.tint[ia * 3 + k], surfaceBlend);
+        bd.tint[ib * 3 + k] = lerp(sharedTint[k], bd.tint[ib * 3 + k], surfaceBlend);
       }
-      ad.forest[ia] = lerp(sharedForest, ad.forest[ia], blend);
-      bd.forest[ib] = lerp(sharedForest, bd.forest[ib], blend);
+      ad.forest[ia] = lerp(sharedForest, ad.forest[ia], surfaceBlend);
+      bd.forest[ib] = lerp(sharedForest, bd.forest[ib], surfaceBlend);
       // A mottled mineral/soil transition avoids a perfectly straight material seam.
       // Roads, water, mountain faces and cultivated ground remain untouched.
-      const fade = 1 - smoothstep(2, band, depth);
+      const fade = alongFade * (1 - smoothstep(2, band, depth));
       if (fade > 0.02) {
         const wxA = a.x0 + (orientation === 'ew' ? W - 1 - depth : along);
         const wzA = a.z0 + (orientation === 'ew' ? along : W - 1 - depth);
