@@ -89,7 +89,15 @@ test('every documented tp key resolves', () => {
   assert.equal(resolveSpot("Bram's forge").id, 'forge');
   assert.equal(resolveSpot('endless field').id, 'endlessfield');
   assert.equal(resolveSpot('dawnspire keep').id, 'dawnspire');
-  assert.equal(resolveSpot('nope'), null);
+  const warns = [];
+  const origWarn = console.warn;
+  console.warn = (...a) => warns.push(a.map(String).join(' '));
+  try {
+    assert.equal(resolveSpot('nope'), null);
+    assert.ok(warns.some((w) => /Unknown tp key "nope"/i.test(w) && /sunspill|desert|lagoon/i.test(w)));
+  } finally {
+    console.warn = origWarn;
+  }
   assert.ok(DEBUG_SPOTS.oakhollow);
   const oasis = resolveSpot('oasis');
   assert.ok(Math.hypot(oasis.x - 0, oasis.z - 432) > 32, 'oasis spawn is outside the pool');
@@ -109,6 +117,15 @@ test('every built tile has a debug tp key', () => {
   }
   assert.equal(canonicalSpot('ashen road'), 'ashroad');
   assert.equal(canonicalSpot('silverrun canopy'), 'canopy');
+  assert.equal(canonicalSpot('desert'), 'sunspill');
+  assert.equal(canonicalSpot('sand'), 'sunspill');
+  assert.equal(canonicalSpot('dunes'), 'sunspill');
+  assert.equal(canonicalSpot('dune'), 'sunspill');
+  const desert = resolveSpot('desert');
+  assert.equal(desert.id, 'sunspill');
+  const lagoon = resolveSpot('lagoon');
+  assert.ok(lagoon.z >= 76, 'lagoon spawn is south of the pool, not in the tree cluster');
+  assert.ok(Math.hypot(lagoon.x + 216, lagoon.z - 72) > 5, 'lagoon spawn is not the tile center');
 });
 
 test('debug monster spawn is inert without ?debug=1 and picks a zone mob with the flag', () => {

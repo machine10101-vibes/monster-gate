@@ -1252,6 +1252,12 @@ export class World {
     this.instances.clear();
   }
 
+  /** Park land that is now out of range, then reveal what is around the hunter. */
+  streamAround(x, z, radius, budget = 24) {
+    this.parkBeyond(x, z, radius);
+    return this.revealAround(x, z, budget);
+  }
+
   /**
    * Take distant land out of the scene before the first picture.
    * iPadOS kills the tab when the first frame uploads every tile at once.
@@ -1404,16 +1410,16 @@ export class World {
       let g = 150;
       let b = 70;
       if (h < WATER_Y) [r, g, b] = [60, 130, 190];
-      else if (t === TILE.SNOW) [r, g, b] = [240, 245, 255];
-      else if (t === TILE.ICE) [r, g, b] = [165, 215, 245];
-      else if (t === TILE.FROST_GRASS) [r, g, b] = [185, 215, 190];
+      else if (t === TILE.SNOW) [r, g, b] = [168, 186, 210];
+      else if (t === TILE.ICE) [r, g, b] = [132, 176, 206];
+      else if (t === TILE.FROST_GRASS) [r, g, b] = [148, 186, 156];
       else if (t === TILE.BASALT || t === TILE.OBSIDIAN) [r, g, b] = [52, 50, 58];
       else if (t === TILE.ASH) [r, g, b] = [96, 94, 100];
       else if (t === TILE.LAVA) [r, g, b] = [255, 110, 30];
       else if (t === TILE.CINDER) [r, g, b] = [86, 52, 40];
-      else if (t === TILE.FLAGSTONE) [r, g, b] = [214, 210, 202];
-      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [130, 135, 142];
-      else if (t === TILE.COBBLE) [r, g, b] = [170, 170, 176];
+      else if (t === TILE.FLAGSTONE) [r, g, b] = [150, 146, 138];
+      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [118, 122, 128];
+      else if (t === TILE.COBBLE) [r, g, b] = [132, 132, 138];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];
       else if (t === TILE.SAND) [r, g, b] = [225, 205, 150];
       else if (t === TILE.GRAVEL) [r, g, b] = [150, 146, 142];
@@ -1423,7 +1429,7 @@ export class World {
         const fo = data.forest[i];
         [r, g, b] = [105 - fo * 55, 175 - fo * 60, 75 - fo * 15];
       }
-      const sh = 0.78 + clamp(h / 18, 0, 1) * 0.35;
+      const sh = 0.8 + clamp(h / 18, 0, 1) * 0.18;
       img.data[i * 4] = r * sh;
       img.data[i * 4 + 1] = g * sh;
       img.data[i * 4 + 2] = b * sh;
@@ -1457,7 +1463,7 @@ export class World {
     }
     const oak = this.tileCanvas[STARTER.id];
     const octx = oak.getContext('2d');
-    const woodInk = { birch: '#f4efe4', oak: '#3f9f47', maple: '#e24a22' };
+    const woodInk = { birch: '#7db24a', oak: '#3f9f47', maple: '#c45a28' };
     for (const n of this.treeNodes || []) {
       octx.fillStyle = woodInk[n.type] || '#7dcc4a';
       octx.fillRect(Math.floor(n.x) - 1, Math.floor(n.z) - 1, 3, 3);
@@ -1471,8 +1477,8 @@ export class World {
       const canvas = land && this.tileCanvas[land.tileId];
       if (!canvas) continue;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#f4fbff';
-      ctx.fillRect(Math.floor(p.x - land.x0) - 2, Math.floor(p.z - land.z0) - 2, 4, 4);
+      ctx.fillStyle = '#5aa8d4';
+      ctx.fillRect(Math.floor(p.x - land.x0) - 1, Math.floor(p.z - land.z0) - 1, 3, 3);
     }
     octx.fillStyle = '#6a3d86';
     octx.fillRect(70, 84, 4, 3);

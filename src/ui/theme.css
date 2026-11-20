@@ -957,9 +957,12 @@ body.touch #top-left:has(#quest.open) {
   font-family: var(--font-px);
   font-size: 11px;
   letter-spacing: 0.4px;
-  color: rgba(243, 226, 176, 0.82);
+  color: rgba(243, 226, 176, 0.95);
   pointer-events: none;
-  text-shadow: 0 1px 0 #000, 0 0 4px rgba(0, 0, 0, 0.65);
+  text-shadow: 0 1px 0 #000;
+  background: rgba(8, 10, 16, 0.72);
+  padding: 3px 7px;
+  border-radius: 8px;
 }
 #faint {
   background: rgba(7, 13, 22, 0.84);

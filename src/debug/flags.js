@@ -22,6 +22,9 @@ const SAND_MINE = { x: -74, z: 514 };
  */
 const OASIS_DRY = { x: OASIS.x, z: OASIS.z + OASIS.r + 52 };
 export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
+/** South shore of the main lagoon pool (local 70, 78 on the lagoon tile). */
+const LAGOON_SHORE = { x: -218, z: 78 };
+export const LAGOON_CAM = { pitch: 0.34, dist: 24, lookAhead: 18 };
 /** ~18 Hunter Blade hits; ~20s of steady auto-attack at low level. */
 export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;
@@ -78,6 +81,8 @@ export const DEBUG_SPOTS = {
   dalla: { live: 'market', x: DALLA_STAND.x, z: DALLA_STAND.z, dx: DALLA_STAND.dx, dz: DALLA_STAND.dz },
   gilantre: { x: 446, z: 148 },
   greenbowl: { x: OASIS_DRY.x, z: OASIS_DRY.z },
+  lagoon: { x: LAGOON_SHORE.x, z: LAGOON_SHORE.z },
+  canopy: { x: -354, z: 110 },
 };
 
 export const DEBUG_ALIASES = {
@@ -117,7 +122,24 @@ export const DEBUG_ALIASES = {
   'rimefang mesa': 'rimefang',
   southmead: 'sunken',
   runmouth: 'tigerwood',
-  dunes: 'pirateshore',
+  dunes: 'sunspill',
+  dune: 'sunspill',
+  desert: 'sunspill',
+  sand: 'sunspill',
+  sands: 'sunspill',
+  waste: 'ashroad',
+  volcanic: 'ashroad',
+  ash: 'ashroad',
+  lava: 'cinderfall',
+  snow: 'snowfall',
+  ice: 'icewind',
+  arctic: 'glimmerfrost',
+  jungle: 'canopy',
+  beach: 'shellbeach',
+  meadow: 'goldmead',
+  forest: 'canopy',
+  'pirate shore': 'pirateshore',
+  piratedocks: 'pirateshore',
   reedford: 'silverrunwest',
   'reedford reach': 'silverrunwest',
   elderwood: 'silverruneast',
@@ -173,28 +195,72 @@ function tileCenter(kind) {
 /** Resolve a tp key to world x/z. `world` is optional (tests use baked fallbacks). */
 export function resolveSpot(raw, world) {
   const id = canonicalSpot(raw);
-  if (!id) return null;
+  if (!id) {
+    if (String(raw || '').trim()) warnUnknownSpot(raw);
+    return null;
+  }
   const spec = DEBUG_SPOTS[id];
+  let x;
+  let z;
   if (spec.live && world) {
     const live = world[spec.live];
     if (live && Number.isFinite(Number(live.x)) && Number.isFinite(Number(live.z))) {
-      return {
-        id,
-        x: Number(live.x) + (Number(spec.dx) || 0),
-        z: Number(live.z) + (Number(spec.dz) || 0),
-      };
+      x = Number(live.x) + (Number(spec.dx) || 0);
+      z = Number(live.z) + (Number(spec.dz) || 0);
     }
   }
-  if (spec.kind) {
+  if (x == null && spec.kind) {
     const c = tileCenter(spec.kind);
-    if (c) return { id, ...c };
+    if (c) {
+      x = c.x;
+      z = c.z;
+    }
   }
-  if (spec.x != null && spec.z != null) return { id, x: spec.x, z: spec.z };
-  return null;
+  if (x == null && spec.x != null && spec.z != null) {
+    x = spec.x;
+    z = spec.z;
+  }
+  if (x == null || z == null) return null;
+  const open = nudgeOpenSpot(world, x, z);
+  return { id, x: open.x, z: open.z };
 }
 
 export function debugSpotKeys() {
   return Object.keys(DEBUG_SPOTS);
+}
+
+export function debugTpHelp() {
+  const spots = Object.keys(DEBUG_SPOTS).sort();
+  const aliases = Object.keys(DEBUG_ALIASES).sort();
+  return { spots, aliases, text: `spots: ${spots.join(', ')} | aliases: ${aliases.join(', ')}` };
+}
+
+function warnUnknownSpot(raw) {
+  const help = debugTpHelp();
+  console.warn(`[Monster Gate] Unknown tp key "${raw}". Valid keys: ${help.text}`);
+}
+
+/** Walk off water, props and occupied footprints so a tp key lands in the open. */
+export function nudgeOpenSpot(world, x, z, r = 1.45) {
+  if (!world) return { x, z };
+  const ok = (px, pz) => {
+    if (world.isWater?.(px, pz)) return false;
+    if (world.playable && !world.playable(px, pz)) return false;
+    const h = world.heightAt?.(px, pz);
+    if (Number.isFinite(h) && (h < 0.9 || h > 10)) return false;
+    if (world.free && !world.free(px, pz, r)) return false;
+    return true;
+  };
+  if (ok(x, z)) return { x, z };
+  for (const dist of [2, 3.2, 4.5, 6, 8, 11]) {
+    for (let k = 0; k < 14; k++) {
+      const a = (k / 14) * Math.PI * 2 + 0.2;
+      const px = x + Math.cos(a) * dist;
+      const pz = z + Math.sin(a) * dist;
+      if (ok(px, pz)) return { x: px, z: pz };
+    }
+  }
+  return { x, z };
 }
 
 function showBadge() {
@@ -599,7 +665,12 @@ function bindDebugSpawn(game) {
 export function teleportDebug(game, raw) {
   if (debugOnlineBlocked(game)) return null;
   const spot = resolveSpot(raw, game?.world);
-  if (!spot || !game?.player?.pos) return null;
+  if (!spot || !game?.player?.pos) {
+    if (!spot && String(raw || '').trim() && game?.hud?.toast) {
+      game.hud.toast(`DEBUG · unknown tp "${raw}"`, 2800);
+    }
+    return null;
+  }
   if (game.world && game.world.realm && game.world.realm !== 'over') {
     game.world.realm = 'over';
     if (game.world.group) game.world.group.visible = true;
@@ -630,9 +701,23 @@ export function teleportDebug(game, raw) {
       game.cam.lookAhead = OASIS_CAM.lookAhead;
     }
   }
+  if (spot.id === 'lagoon') {
+    const yaw = Math.atan2(-226 - spot.x, 50 - spot.z);
+    game.player.yaw = yaw;
+    if (game.cam) {
+      game.cam.targetYaw = yaw + Math.PI;
+      game.cam.yaw = yaw + Math.PI;
+      game.cam.pitch = LAGOON_CAM.pitch;
+      game.cam.targetDist = LAGOON_CAM.dist;
+      game.cam.dist = LAGOON_CAM.dist;
+      game.cam.lookAhead = LAGOON_CAM.lookAhead;
+    }
+  }
   game.player.syncObj?.();
   game.snapCamera?.();
-  game.world?.revealAround?.(spot.x, spot.z, 64);
+  const far = game.viewDistance?.() || game.world?.streamRadius || 140;
+  if (game.world?.streamAround) game.world.streamAround(spot.x, spot.z, far, 64);
+  else game.world?.revealAround?.(spot.x, spot.z, 64);
   game.hud?.toast?.(`DEBUG · ${spot.id}`, 2200);
   return spot;
 }

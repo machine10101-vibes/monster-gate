@@ -167,13 +167,16 @@ export function buildAtlas() {
   const pick = (arr, seed) => arr[Math.floor(seed * arr.length) % arr.length];
   const wrapNoise = (x, y, s) => hash2(((x % TILE_PX) + TILE_PX) % TILE_PX, ((y % TILE_PX) + TILE_PX) % TILE_PX, s);
 
-  const GRASS = [0x4e8f36, 0x58963c, 0x629e42, 0x6aa848, 0x457e30];
+  const GRASS = [0x4e8f36, 0x58963c, 0x629e42, 0x6aa848, 0x457e30, 0x6b9a32, 0x3f8a48, 0x7ab03c, 0x558b2f, 0x8aad3a];
   const grassFn = (x, y, s) => {
     const n = wrapNoise(x, y, s);
     const clump = wrapNoise(x >> 1, y >> 1, s + 9);
-    let c = pick(GRASS, n * 0.55 + clump * 0.45);
-    if (wrapNoise(x, y, s + 3) > 0.93) c = shade(c, 0.78);
-    if (wrapNoise(x, y, s + 5) > 0.95) c = shade(c, 1.2);
+    const patch = wrapNoise(x >> 3, y >> 3, s + 17);
+    let c = pick(GRASS, n * 0.35 + clump * 0.3 + patch * 0.35);
+    if (patch > 0.62) c = mix(c, 0x8bb83c, 0.28);
+    if (patch < 0.32) c = mix(c, 0x2f7a4a, 0.22);
+    if (wrapNoise(x, y, s + 3) > 0.93) c = shade(c, 0.82);
+    if (wrapNoise(x, y, s + 5) > 0.95) c = shade(c, 1.16);
     return c;
   };
   fill(TILE.GRASS, (x, y) => grassFn(x, y, 11));
@@ -199,14 +202,14 @@ export function buildAtlas() {
   fill(TILE.DIRT, (x, y) => dirtFn(x, y, 21));
 
   fill(TILE.GRASS_SIDE, (x, y) => {
-    const depth = 3 + Math.floor(wrapNoise(x, 0, 31) * 3);
-    const drip = wrapNoise(x, 1, 32) > 0.75 ? 2 : 0;
-    if (y < depth + drip - (y > 4 ? 1 : 0) && y < 7) return grassFn(x, y, 12);
-    return dirtFn(x, y, 22);
+    const depth = 6 + Math.floor(wrapNoise(x, 0, 31) * 2);
+    const drip = wrapNoise(x, 1, 32) > 0.8 ? 1 : 0;
+    if (y < depth + drip && y < 10) return grassFn(x, y, 12);
+    return mix(dirtFn(x, y, 22), grassFn(x, y, 12), 0.35);
   });
   for (let x = 0; x < TILE_PX; x++) {
-    const d = 3 + Math.floor(wrapNoise(x, 0, 31) * 3) + (wrapNoise(x, 1, 32) > 0.75 ? 2 : 0);
-    if (d < 8) px(TILE.GRASS_SIDE, x, Math.min(d, 7), 0x4a8d30);
+    const d = 6 + Math.floor(wrapNoise(x, 0, 31) * 2) + (wrapNoise(x, 1, 32) > 0.8 ? 1 : 0);
+    if (d < 12) px(TILE.GRASS_SIDE, x, Math.min(d, 11), 0x4a8d30);
   }
 
   const STONE = [0x8c9298, 0x969ca2, 0x80868c, 0xa0a6ac, 0x777d84];

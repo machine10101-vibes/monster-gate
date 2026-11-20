@@ -327,23 +327,19 @@ function mixSample(a, b, t) {
 
 /** Sample a tile blended with its neighbours so biome borders are not hard rectangles. */
 export function sampleBlended(tile, u, v) {
-  const warp = (fbm(u * 7.2 + tile.seed * 0.02, v * 7.2, tile.seed + 5, 3) - 0.5) * 0.3;
+  const warp = (fbm(u * 6.4 + tile.seed * 0.02, v * 6.4, tile.seed + 5, 3) - 0.5) * 0.42;
   let s = sampleTile(tile, u, v);
-  const band = 0.3;
-  if (u + warp < band) {
-    const n = tileAt(tile.tx - 1, tile.tz);
-    if (n) s = mixSample(s, sampleTile(n, 1 - (band - u), v), smoothstep(band, 0, u + warp));
-  } else if (u + warp > 1 - band) {
-    const n = tileAt(tile.tx + 1, tile.tz);
-    if (n) s = mixSample(s, sampleTile(n, u - (1 - band), v), smoothstep(band, 0, 1 - (u + warp)));
-  }
-  if (v + warp * 0.8 < band) {
-    const n = tileAt(tile.tx, tile.tz - 1);
-    if (n) s = mixSample(s, sampleTile(n, u, 1 - (band - v)), smoothstep(band, 0, v + warp * 0.8));
-  } else if (v + warp * 0.8 > 1 - band) {
-    const n = tileAt(tile.tx, tile.tz + 1);
-    if (n) s = mixSample(s, sampleTile(n, u, v - (1 - band)), smoothstep(band, 0, 1 - (v + warp * 0.8)));
-  }
+  const band = 0.44;
+  const wu = u + warp;
+  const wv = v + warp * 0.9;
+  const west = tileAt(tile.tx - 1, tile.tz);
+  const east = tileAt(tile.tx + 1, tile.tz);
+  const north = tileAt(tile.tx, tile.tz - 1);
+  const south = tileAt(tile.tx, tile.tz + 1);
+  if (west && wu < band) s = mixSample(s, sampleTile(west, 1 - (band - u), v), smoothstep(band, 0, wu));
+  if (east && wu > 1 - band) s = mixSample(s, sampleTile(east, u - (1 - band), v), smoothstep(band, 0, 1 - wu));
+  if (north && wv < band) s = mixSample(s, sampleTile(north, u, 1 - (band - v)), smoothstep(band, 0, wv));
+  if (south && wv > 1 - band) s = mixSample(s, sampleTile(south, u, v - (1 - band)), smoothstep(band, 0, 1 - wv));
   return s;
 }
 
@@ -356,7 +352,7 @@ export function paintTileMap(canvas, tile) {
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
       const c = sampleBlended(tile, (x + 0.5) / s, (y + 0.5) / s);
-      const snap = (v) => Math.round(Math.max(0, Math.min(1, (v - 0.4) * 1.45 + 0.4)) * 6) / 6;
+      const snap = (v) => Math.round(Math.max(0.06, Math.min(0.9, v)) * 8) / 8;
       const i = (y * s + x) * 4;
       d[i] = snap(c.r) * 255;
       d[i + 1] = snap(c.g) * 255;
