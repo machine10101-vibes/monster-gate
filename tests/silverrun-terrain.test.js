@@ -63,7 +63,7 @@ test('Greystone has a flat, climbable summit and a marked switchback trail', () 
       assert.equal(peak.data.climb[i], 1);
     }
   }
-  const trail = 76 * W + 8;
+  const trail = 88 * W + 34;
   assert.equal(peak.data.climb[trail], 1);
   const world = new World('high');
   world.lands = [peak];
