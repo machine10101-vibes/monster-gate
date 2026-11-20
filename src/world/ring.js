@@ -789,11 +789,23 @@ function stitchSilverrunRiver(lands) {
     const { H, zone, top, tint, pathMask, forest, slope } = land.data;
     for (let z = 0; z < W; z++) {
       const worldZ = land.z0 + z;
-      const centre = silverrunRiverCenterX(worldZ);
-      const width = 4.2 + 3.4 * smoothstep(500, 576, worldZ);
       for (let x = 0; x < W; x++) {
         const worldX = land.x0 + x;
-        if (Math.abs(worldX - centre) >= width) continue;
+        // Border vertices represent the same seam on adjacent tiles. Treat both
+        // neighboring grid coordinates as candidates so the river cannot leave
+        // a one-cell mismatch where its channel crosses a tile edge.
+        const worldXs = [worldX];
+        const worldZs = [worldZ];
+        if (x === 0) worldXs.push(worldX - 1);
+        if (x === W - 1) worldXs.push(worldX + 1);
+        if (z === 0) worldZs.push(worldZ - 1);
+        if (z === W - 1) worldZs.push(worldZ + 1);
+        const inChannel = worldZs.some((sampleZ) => {
+          const centre = silverrunRiverCenterX(sampleZ);
+          const width = 4.2 + 3.4 * smoothstep(500, 576, sampleZ);
+          return worldXs.some((sampleX) => Math.abs(sampleX - centre) < width);
+        });
+        if (!inChannel) continue;
         const i = z * W + x;
         H[i] = -0.55;
         zone[i] = ZONE.WATER;
