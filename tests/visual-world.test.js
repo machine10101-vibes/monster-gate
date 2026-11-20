@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { TILE } from '../src/engine/materials.js';
+import { TILE, cloudShadeAt, CLOUD_DRIFT } from '../src/engine/materials.js';
 import { QUALITIES, survivalBudget } from '../src/engine/quality.js';
 import { originOf, paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
-import { chartedWeight, oceanWeight, rasterPlaymap } from '../src/world/playmap.js';
+import { chartedAnchor, chartedWeight, oceanWeight, rasterPlaymap } from '../src/world/playmap.js';
 import { sideTilesFor } from '../src/world/terrain.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
@@ -180,7 +180,7 @@ test('cloud shadows darken the ground and never cover the play view', () => {
   assert.doesNotMatch(sky, /CircleGeometry/);
   assert.doesNotMatch(sky, /rng\.range\(6, 11\)/);
   assert.match(mats, /cloudShade/);
-  assert.match(mats, /mix\(1\.0, 0\.70/);
+  assert.match(mats, /mix\(1\.0, 0\.56/);
   assert.match(mats, /#include <opaque_fragment>/);
   assert.match(world, /cloudShade\(p, uCloudTime, uCloudAmt\)/);
   assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
@@ -201,8 +201,11 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
   assert.match(world, /shoreBand/);
+  assert.match(world, /smoothstep\(0\.20, 0\.06, vDepth\)/);
+  assert.doesNotMatch(world, /smoothstep\(0\.0, 0\.03, vDepth\)/);
   assert.doesNotMatch(world, /foamNoise/);
   assert.doesNotMatch(world, /max\(vShore, shoreBand\)/);
+  assert.doesNotMatch(world, /fwidth|dFdx|dFdy/);
   assert.match(world, /depthAt\(land, x \+ step, z \+ step\)/);
 });
 
@@ -275,6 +278,8 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
   assert.doesNotMatch(mats, /patch < 0\.32/);
   assert.match(player, /RingGeometry/);
+  assert.match(player, /opacity: 0\.8/);
+  assert.match(terrain, /h - nh <= 1\.001/);
 });
 
 test('hunter map paints uncharted parchment and one ocean, not biome blocks', () => {
@@ -301,4 +306,66 @@ test('hunter map paints uncharted parchment and one ocean, not biome blocks', ()
 test('debug teleport snaps the camera look to the hunter', () => {
   const main = src('src/main.js');
   assert.match(main, /this\.cam\.look\.set\(P\.x, P\.y \+ 1\.3, P\.z\)/);
+});
+
+test('charted tile edges are noise-warped on all four sides, including charted neighbours', () => {
+  const play = src('src/world/playmap.js');
+  assert.match(play, /function warpUv/);
+  assert.match(play, /neighborBleed/);
+  assert.match(play, /sampleBuiltUv/);
+  assert.doesNotMatch(play, /ftz > 7\.45/);
+  const snow = TILES.find((t) => t.kind === 'snowfall');
+  const so = originOf(snow);
+  const rgba = rasterPlaymap({
+    width: 160,
+    height: 160,
+    minX: so.x - 80,
+    minZ: so.z + 32,
+    scale: 1,
+  });
+  const crossings = [];
+  for (let y = 56; y < 104; y++) {
+    let edge = -1;
+    let best = 0;
+    for (let x = 40; x < 120; x++) {
+      const i = (y * 160 + x) * 4;
+      const cold = rgba[i + 2] - rgba[i] > 8 && rgba[i + 1] > 140;
+      const prev = ((y * 160 + x - 1) * 4);
+      const pcold = rgba[prev + 2] - rgba[prev] > 8 && rgba[prev + 1] > 140;
+      if (cold !== pcold) {
+        const jump = Math.abs((rgba[i] + rgba[i + 1] + rgba[i + 2]) - (rgba[prev] + rgba[prev + 1] + rgba[prev + 2]));
+        if (jump > best) {
+          best = jump;
+          edge = x;
+        }
+      }
+    }
+    if (edge >= 0) crossings.push(edge);
+  }
+  const uniq = new Set(crossings);
+  const span = crossings.length ? Math.max(...crossings) - Math.min(...crossings) : 0;
+  assert.ok(uniq.size >= 3 && span > 4, `snowfall west edge should wander, got ${[...uniq].join(',')} span ${span}`);
+  assert.ok(chartedAnchor(so.x + 72, so.z + 72), 'snowfall centre stays charted');
+});
+
+test('cloud shadows drift a few world units per second on ground materials', () => {
+  const mats = src('src/engine/materials.js');
+  assert.match(mats, /t \* 2\.8/);
+  assert.match(mats, /t \* -2\.2/);
+  assert.match(mats, /injectCloudShadows|vCloudWorld/);
+  assert.match(mats, /patchHide[\s\S]*cloudShade/);
+  const speed = Math.hypot(CLOUD_DRIFT.x, CLOUD_DRIFT.z);
+  assert.ok(speed >= 2 && speed <= 4.2, `drift ${speed}`);
+  let changed = 0;
+  let maxDelta = 0;
+  for (const [x, z] of [[72, 72], [40, 40], [20, 110], [90, 30]]) {
+    const a = cloudShadeAt(x, z, 0, 1);
+    const b = cloudShadeAt(x, z, 10, 1);
+    const d = Math.abs(a - b);
+    maxDelta = Math.max(maxDelta, d);
+    if (d > 0.02) changed++;
+  }
+  assert.ok(changed >= 2, `cloud field should move in 10s (max Δ ${maxDelta.toFixed(3)})`);
+  assert.ok(cloudShadeAt(72, 72, 0, 1) <= 1);
+  assert.ok(cloudShadeAt(72, 72, 0, 1) >= CLOUD_DRIFT.dark - 0.02);
 });

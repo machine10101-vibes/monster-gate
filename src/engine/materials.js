@@ -18,23 +18,62 @@ export function hideRadiusPx(bufferW, bufferH, playerPxH = 0) {
 }
 
 /** Tight screen-door of geometry that sits between the camera and the hero. */
+function injectCloudShadows(shader) {
+  if (shader.uniforms.uCloudTime) return;
+  shader.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
+  shader.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
+  if (!shader.vertexShader.includes('vCloudWorld')) {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCloudWorld;')
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+vCloudWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+      );
+  }
+  if (!shader.fragmentShader.includes('cloudShade(')) {
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vCloudWorld;
+uniform float uCloudTime;
+uniform float uCloudAmt;
+${CLOUD_SHADOW_GLSL}`
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `#include <opaque_fragment>
+gl_FragColor.rgb *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);`
+      );
+  }
+}
+
 export function patchHide(material, key = 'hide') {
   if (!material) return material;
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPlayerScreen = hideUniforms.uPlayerScreen;
     shader.uniforms.uPlayerDepth = hideUniforms.uPlayerDepth;
     shader.uniforms.uHideRadius = hideUniforms.uHideRadius;
+    shader.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
+    shader.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vHideDepth;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvHideDepth = -mvPosition.z;');
+      .replace('#include <common>', '#include <common>\nvarying float vHideDepth;\nvarying vec3 vCloudWorld;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+vHideDepth = -mvPosition.z;
+vCloudWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 varying float vHideDepth;
+varying vec3 vCloudWorld;
 uniform vec2 uPlayerScreen;
 uniform float uPlayerDepth;
-uniform float uHideRadius;`
+uniform float uHideRadius;
+uniform float uCloudTime;
+uniform float uCloudAmt;
+${CLOUD_SHADOW_GLSL}`
       )
       .replace(
         '#include <clipping_planes_fragment>',
@@ -48,9 +87,14 @@ uniform float uHideRadius;`
     if (bayer > t * t * 0.92) discard;
   }
 }`
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `#include <opaque_fragment>
+gl_FragColor.rgb *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);`
       );
   };
-  material.customProgramCacheKey = () => key;
+  material.customProgramCacheKey = () => key + 'cloudShadow';
   return material;
 }
 
@@ -85,6 +129,9 @@ export const cloudShadowUniforms = {
   uCloudAmt: { value: 1 },
 };
 
+/** World-space drift of the cloud shadow field, about 3 units per second. */
+export const CLOUD_DRIFT = { x: 2.8, z: -2.2, scale: 0.014, dark: 0.56 };
+
 export const CLOUD_SHADOW_GLSL = `
 float cloudHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float cloudNoise(vec2 p){
@@ -94,16 +141,59 @@ float cloudNoise(vec2 p){
 }
 float cloudFbm(vec2 p){
   float a = 0.0; float w = 0.5;
-  for (int i = 0; i < 4; i++) { a += w * cloudNoise(p); p = p * 2.07 + 13.1; w *= 0.5; }
+  for (int i = 0; i < 3; i++) { a += w * cloudNoise(p); p = p * 2.07 + 13.1; w *= 0.5; }
   return a;
 }
 float cloudShade(vec2 xz, float t, float amt){
-  float n = cloudFbm(xz * 0.018 + vec2(t * 0.012, t * 0.007));
-  n += 0.32 * cloudFbm(xz * 0.007 - vec2(t * 0.005, -t * 0.004) + 4.7);
-  float sh = smoothstep(0.40, 0.62, n);
-  return mix(1.0, 0.70, sh * amt);
+  vec2 drift = vec2(t * 2.8, t * -2.2);
+  float n = cloudFbm((xz + drift) * 0.014);
+  n += 0.28 * cloudFbm((xz + drift * 0.55) * 0.006 + 4.7);
+  float sh = smoothstep(0.32, 0.54, n);
+  return mix(1.0, 0.56, sh * amt);
 }
 `;
+
+export function cloudShadeAt(x, z, t, amt = 1) {
+  const hash = (px, py) => {
+    const s = Math.sin(px * 127.1 + py * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  const noise = (px, py) => {
+    const ix = Math.floor(px);
+    const iy = Math.floor(py);
+    let fx = px - ix;
+    let fy = py - iy;
+    fx = fx * fx * (3 - 2 * fx);
+    fy = fy * fy * (3 - 2 * fy);
+    const a = hash(ix, iy);
+    const b = hash(ix + 1, iy);
+    const c = hash(ix, iy + 1);
+    const d = hash(ix + 1, iy + 1);
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  };
+  const fbm = (px, py) => {
+    let v = 0;
+    let w = 0.5;
+    let x0 = px;
+    let y0 = py;
+    for (let i = 0; i < 3; i++) {
+      v += w * noise(x0, y0);
+      const nx = x0 * 2.07 + 13.1;
+      const ny = y0 * 2.07 + 13.1;
+      x0 = nx;
+      y0 = ny;
+      w *= 0.5;
+    }
+    return v;
+  };
+  const dx = x + t * CLOUD_DRIFT.x;
+  const dz = z + t * CLOUD_DRIFT.z;
+  let n = fbm(dx * CLOUD_DRIFT.scale, dz * CLOUD_DRIFT.scale);
+  n += 0.28 * fbm((x + t * CLOUD_DRIFT.x * 0.55) * 0.006 + 4.7, (z + t * CLOUD_DRIFT.z * 0.55) * 0.006 + 4.7);
+  const tsh = Math.min(1, Math.max(0, (n - 0.32) / (0.54 - 0.32)));
+  const sh = tsh * tsh * (3 - 2 * tsh);
+  return 1 + (CLOUD_DRIFT.dark - 1) * sh * amt;
+}
 
 /**
  * Cheap lava emissive on atlas UVs. LAVA is fill9 around tile 58 (cols 9-11, rows 2-4).
@@ -113,27 +203,10 @@ float cloudShade(vec2 xz, float t, float amt){
 export function patchTerrainGlow(material, key = 'terrainGlow') {
   if (!material) return material;
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
-    shader.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vCloudWorld;')
-      .replace(
-        '#include <project_vertex>',
-        `#include <project_vertex>
-vCloudWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-varying vec3 vCloudWorld;
-uniform float uCloudTime;
-uniform float uCloudAmt;
-${CLOUD_SHADOW_GLSL}`
-      )
-      .replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
+    injectCloudShadows(shader);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
 #ifdef USE_MAP
 {
   vec2 tu = vec2(vMapUv.x * 16.0, (1.0 - vMapUv.y) * 16.0);
@@ -142,12 +215,7 @@ ${CLOUD_SHADOW_GLSL}`
   totalEmissiveRadiance += vec3(1.4, 0.42, 0.07) * lava * pulse;
 }
 #endif`
-      )
-      .replace(
-        '#include <opaque_fragment>',
-        `#include <opaque_fragment>
-gl_FragColor.rgb *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);`
-      );
+    );
   };
   const prev = material.customProgramCacheKey;
   material.customProgramCacheKey = function terrainGlowKey() {
@@ -221,7 +289,10 @@ export function buildAtlas() {
   const grassFn = (x, y, s) => {
     const n = wrapNoise(x, y, s);
     const clump = wrapNoise(x >> 1, y >> 1, s + 9);
-    return mix(0x5a9a3e, 0x72b04a, n * 0.5 + clump * 0.5);
+    const t = n * 0.5 + clump * 0.5;
+    const edge = Math.min(x, y, TILE_PX - 1 - x, TILE_PX - 1 - y);
+    const w = Math.min(1, edge / 2);
+    return mix(0x64a444, mix(0x5a9a3e, 0x72b04a, t), 0.4 + 0.6 * w);
   };
   fill(TILE.GRASS, (x, y) => grassFn(x, y, 11));
 

@@ -474,6 +474,12 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             const nh = hAt(x + dx, z + dz);
             if (nh >= h) continue;
             if (roll && !cliffCell(x + dx, z + dz)) continue;
+            const nx = x + dx;
+            const nz = z + dz;
+            const nt = nx >= 0 && nz >= 0 && nx < width && nz < depth ? top[nz * width + nx] : -1;
+            const nbGrassy = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
+            if (grassy && nbGrassy && h - nh <= 1.001) continue;
+            if ((tl === TILE.PATH || grassy) && (nbGrassy || nt === TILE.PATH) && h - nh <= 1.001) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;

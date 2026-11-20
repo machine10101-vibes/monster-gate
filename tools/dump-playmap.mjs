@@ -83,4 +83,39 @@ const placed = layoutPlaymapLabels(pins, { mapW: w, mapH: h });
 stampLabelsOnRaster(labelsOn, w, h, minX, minZ, 1, placed);
 const outOn = process.argv[3] ? resolve(process.argv[3]) : outOff.replace(/\.png$/, '-labels-on.png');
 writePNG(outOn, w, h, labelsOn);
+
+function containInto(src, sw, sh, vw, vh, bg = [18, 16, 14, 255]) {
+  const scale = Math.min(vw / sw, vh / sh);
+  const dw = Math.max(1, Math.round(sw * scale));
+  const dh = Math.max(1, Math.round(sh * scale));
+  const ox = Math.floor((vw - dw) / 2);
+  const oy = Math.floor((vh - dh) / 2);
+  const out = new Uint8ClampedArray(vw * vh * 4);
+  for (let i = 0; i < out.length; i += 4) {
+    out[i] = bg[0];
+    out[i + 1] = bg[1];
+    out[i + 2] = bg[2];
+    out[i + 3] = bg[3];
+  }
+  for (let y = 0; y < dh; y++) {
+    const sy = Math.min(sh - 1, Math.floor(y / scale));
+    for (let x = 0; x < dw; x++) {
+      const sx = Math.min(sw - 1, Math.floor(x / scale));
+      const si = (sy * sw + sx) * 4;
+      const di = ((oy + y) * vw + (ox + x)) * 4;
+      out[di] = src[si];
+      out[di + 1] = src[si + 1];
+      out[di + 2] = src[si + 2];
+      out[di + 3] = 255;
+    }
+  }
+  return out;
+}
+
+const dir = dirname(outOff);
+const desk = join(dir, 'map-1920x1080.png');
+const phone = join(dir, 'map-844x390.png');
+writePNG(desk, 1920, 1080, containInto(labelsOn, w, h, 1920, 1080));
+writePNG(phone, 844, 390, containInto(labelsOn, w, h, 844, 390));
 console.log(`wrote ${outOff} and ${outOn} ${w}x${h}`);
+console.log(`wrote ${desk} and ${phone}`);

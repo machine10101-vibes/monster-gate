@@ -66,9 +66,12 @@ test('L and maplabels=0 hide world map names', () => {
   assert.match(main, /inp\.take\('maplabels'\)/);
   assert.match(main, /hud\.setMapLabels\(!hud\.mapLabels\)/);
   assert.match(hud, /setMapLabels\(on\)/);
+  assert.match(hud, /this\.mapLabels = !!on/);
+  assert.doesNotMatch(hud, /on !== false/);
   assert.match(hud, /labels-off/);
   assert.match(style, /\.playmap\.labels-off \.playmap-label/);
   assert.match(style, /#panel\.labels-off \.playmap-leads/);
+  assert.match(style, /body\.map-labels-off \.playmap-label/);
   assert.doesNotMatch(src('src/systems/saveio.js'), /mapLabels|parseMapLabelsFlag/);
   assert.doesNotMatch(src('src/net/mmo.js'), /mapLabels|parseMapLabelsFlag/);
 });
