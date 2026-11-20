@@ -43,21 +43,21 @@ export const SAND_MINE = {
 
 export const DESERT_SPECS = {
   sunspill: {
-    banner: ['The Western Dunes', 'Sunspill'], desert: true, shade: 0.12, forest: 0.05, amp: 0.9, base: 3.4, seed: 74,
+    banner: ['The Western Dunes', 'Sunspill'], desert: true, shade: 0.12, forest: 0.05, amp: 1.6, base: 3.4, seed: 74,
     rim: {},
     knolls: [[36, 48, 28, 4.2], [28, 100, 24, 3.4], [90, 40, 26, 3.8], [70, 78, 18, -1.8], [112, 88, 20, 3.0], [52, 70, 16, 2.4]],
     roads: [[[72, 0], [78, 36], [96, 78], [118, 112]], [[0, 100], [36, 96], [78, 100], [110, 112]]],
     dress: { cactus: 36, scrub: 48, rocks: 32, buttes: 8, palms: 0, reeds: 0, flowers: 10 },
   },
   glassroad: {
-    banner: ['The South Road', 'Glassroad'], desert: true, shade: 0.1, forest: 0.04, amp: 0.85, base: 3.4, seed: 75,
+    banner: ['The South Road', 'Glassroad'], desert: true, shade: 0.1, forest: 0.04, amp: 1.45, base: 3.4, seed: 75,
     rim: {},
     knolls: [[100, 46, 20, 3.2], [40, 70, 16, 2.2], [110, 100, 18, 2.8], [80, 30, 12, -1.0], [58, 108, 14, 2.4]],
     roads: [[[60, 0], [62, 36], [52, 86], [28, 118]]],
     dress: { cactus: 28, scrub: 40, rocks: 26, buttes: 6, palms: 0, reeds: 0, flowers: 12 },
   },
   deepwell: {
-    banner: ['The Great Dig', 'Deepwell'], desert: true, shade: 0.08, forest: 0.03, amp: 0.8, base: 3.3, seed: 84,
+    banner: ['The Great Dig', 'Deepwell'], desert: true, shade: 0.08, forest: 0.03, amp: 1.3, base: 3.3, seed: 84,
     rim: {},
     beach: true,
     knolls: [[28, 40, 18, 3.0], [24, 96, 16, 2.2], [110, 70, 14, 2.0], [88, 48, 12, 1.8]],
@@ -65,7 +65,7 @@ export const DESERT_SPECS = {
     dress: { cactus: 16, scrub: 24, rocks: 20, buttes: 4, palms: 0, reeds: 0, flowers: 4, mine: true },
   },
   greenbowl: {
-    banner: ['The Living Water', 'Oasis'], desert: true, shade: 0.06, forest: 0.08, amp: 0.75, base: 3.3, seed: 85,
+    banner: ['The Living Water', 'Oasis'], desert: true, shade: 0.06, forest: 0.08, amp: 1.2, base: 3.3, seed: 85,
     rim: {},
     beach: true,
     knolls: [[90, 50, 18, 2.8], [110, 100, 16, 2.2], [50, 80, 12, 1.8], [70, 30, 14, 2.0]],
@@ -360,11 +360,11 @@ export function paintDesertCell(out, H, x, z, kind, isPath, n, spec, index) {
   }
   zone[i] = ZONE.FIELD;
   const crest = h > 4.2 ? 0.12 : 0;
-  top[i] = h < 1.6 ? TILE.SAND : n < 0.18 ? TILE.DIRT : TILE.SAND;
+  top[i] = TILE.SAND;
   const [r, g, b] = sandTint(n, crest, x, z);
-  tint[i * 3] = lerp(r, 0.7, north * 0.45);
-  tint[i * 3 + 1] = lerp(g, 0.9, north * 0.55);
-  tint[i * 3 + 2] = lerp(b, 0.4, north * 0.2);
+  tint[i * 3] = lerp(r, 0.86, north * 0.22);
+  tint[i * 3 + 1] = lerp(g, 0.74, north * 0.12);
+  tint[i * 3 + 2] = lerp(b, 0.42, north * 0.08);
 }
 
 export function dressDesert(world, land, spec) {

@@ -64,7 +64,7 @@ test('world map samples blend biome borders instead of darkening tile edges', ()
   assert.doesNotMatch(world, /#1a140e/);
   assert.doesNotMatch(world, /\[240, 245, 255\]/);
   assert.match(world, /\[168, 186, 210\]/);
-  assert.match(world, /\[186, 158, 112\]/);
+  assert.match(world, /\[204, 172, 118\]/);
   assert.doesNotMatch(world, /\[120, 108, 96\]/);
   assert.doesNotMatch(world, /\[150, 146, 138\]/);
   const snow = TILES.find((t) => t.kind === 'snowfall');
@@ -138,6 +138,37 @@ test('overhead tile shots raise the camera far plane past the fog clip', () => {
   assert.match(view, /camFar:\s*cam\.far/);
   assert.match(view, /cam\.far = Math\.max\(cam\.far \|\| 0, dist \+ TILE_SIZE\)/);
   assert.match(view, /cam\.far = saved\.camFar/);
+});
+
+test('desert dunes keep a continuous heightfield instead of 0.5-unit terraces', () => {
+  const ring = src('src/world/ring.js');
+  const terrain = src('src/world/terrain.js');
+  const desert = src('src/world/desert.js');
+  const world = src('src/world/world.js');
+  assert.match(ring, /else if \(!spec\.desert\) H\[i\] = Math\.round\(H\[i\] \* 2\) \/ 2/);
+  assert.match(ring, /smooth: !!spec\.desert/);
+  assert.match(ring, /H\[i\] = s \/ 12/);
+  assert.match(terrain, /const roll = smooth && !cliffCell/);
+  assert.match(terrain, /if \(roll && !cliffCell\(x \+ dx, z \+ dz\)\) continue/);
+  assert.match(terrain, /tile === TILE\.SAND/);
+  assert.match(desert, /top\[i\] = TILE\.SAND/);
+  assert.doesNotMatch(desert, /n < 0\.18 \? TILE\.DIRT/);
+  assert.match(world, /land\.data\.smooth/);
+  assert.match(world, /smooth: !!land\.data\.smooth/);
+});
+
+test('clouds stay visible over snow and grass step sides match the top', () => {
+  const sky = src('src/world/sky.js');
+  const mats = src('src/engine/materials.js');
+  const terrain = src('src/world/terrain.js');
+  assert.match(sky, /fog:\s*false/);
+  assert.match(sky, /const snow = chill/);
+  assert.match(sky, /nClouds = quality\.id === 'low' \? 16 : 28/);
+  assert.match(sky, /rng\.range\(13, 22\)/);
+  assert.match(sky, /puffs \* hz/);
+  assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
+  assert.match(mats, /0xd2ae78/);
+  assert.match(terrain, /matchTop \? 0\.96/);
 });
 
 test('water, lava and lamps get cheap glow without a bloom pass', () => {

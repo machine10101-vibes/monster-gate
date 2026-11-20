@@ -58,7 +58,7 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `lira` | `alchemy`, `alchemist` | In front of Lira the Alchemist |
 | `dalla` | `market`, `dalla's market` | In front of Dalla's Market |
 | `brookside` | | West of Oakhollow |
-| `lagoon` | `mirrormere oasis` | East-west road south of the lagoon pool (water in frame, not inside the trees) |
+| `lagoon` | `mirrormere oasis` | South sand of the lagoon pool, looking at the water |
 | `canopy` | `silverrun canopy`, `jungle`, `forest` | Silverrun Canopy road south of the temple |
 | `snowfall` | `snow` | Frozen meadow east of Goldmead |
 | `ashroad` | `ashen road`, `ash`, `waste`, `volcanic` | Ashen Road volcanic approach |
@@ -76,14 +76,18 @@ Keys are case-insensitive. Spaces, `_`, and `-` are ignored. Teleports never wri
 
 ## Photo mode
 
-Hides the HUD, nameplates, attack warnings, and the build tag for clean screenshots. Combat, movement, and MMO are unchanged.
+Hides the HUD, nameplates, attack warnings, and the build tag for clean screenshots. Combat, movement, and MMO are unchanged. **M still opens the world map** — photo mode hides chrome, not the map.
 
 | Query / key | Effect |
 | --- | --- |
 | `?photo=1` | Start with photo mode on (works without `debug=1`) |
 | `H` | Toggle photo mode while in the world |
+| `M` | Open or close the world map (works in photo mode) |
+| `L` | While the map is open, hide or show place names |
+| `?maplabels=0` | Start with map names hidden (works without `debug=1`) |
 
 ```
 https://monstergate.online/?photo=1
 https://monstergate.online/?debug=1&tp=hellspire&photo=1
+https://monstergate.online/?photo=1&maplabels=0
 ```

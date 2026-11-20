@@ -445,3 +445,116 @@ export function writeQuestOpen(open, store) {
     /* private mode */
   }
 }
+
+/** Extra place-names drawn on the hunter Map that sit on top of a tile. */
+export const PLAYMAP_LANDMARKS = new Set([
+  'Monster Gate',
+  'Greyrock Pit',
+  "Tobin's Farm",
+  'Mirrormere',
+  'Darksycle Cave',
+  'Darksycle Den',
+]);
+
+export function playmapLabelKind(label) {
+  if (label?.city) return 'city';
+  if (label?.landmark || PLAYMAP_LANDMARKS.has(label?.name)) return 'landmark';
+  return 'minor';
+}
+
+const PLAYMAP_NUDGES = [
+  [0, 0],
+  [0, -1], [0, 1], [1, 0], [-1, 0],
+  [0.85, -0.85], [-0.85, -0.85], [0.85, 0.85], [-0.85, 0.85],
+  [0, -1.7], [0, 1.7], [1.55, 0], [-1.55, 0],
+  [1.3, -1.15], [-1.3, -1.15], [1.3, 1.15], [-1.3, 1.15],
+  [0, -2.3], [2.1, 0.4], [-2.1, 0.4], [0, 2.3],
+  [0, -3.1], [0, 3.1], [2.8, -0.6], [-2.8, -0.6],
+  [2.4, 1.6], [-2.4, 1.6], [1.8, -2.4], [-1.8, -2.4],
+];
+
+const PLAYMAP_PIN_NUDGES = {
+  'Monster Gate': [0, -2.4],
+  'Greyrock Pit': [2.2, -0.4],
+  Oakhollow: [0, 1.6],
+  Harefield: [-1.6, -0.4],
+  Northleas: [0, -1.2],
+  Goldmead: [1.4, -0.35],
+  Snowfall: [2.6, -0.2],
+  Cinderfall: [-1.8, 0.6],
+  Hellspire: [0.4, -0.2],
+  Runmouth: [-1.4, 0.2],
+  Southmead: [0.2, -1.1],
+  Southford: [0, 0.4],
+};
+
+/**
+ * Nudge overlapping Map labels so names stay readable. Cities keep the
+ * tile centre; landmarks and lesser places slide to a free slot and grow
+ * a leader line back to the pin. Leftover minor names hide.
+ */
+export function layoutPlaymapLabels(labels, opts = {}) {
+  const mapW = Number(opts.mapW) > 0 ? Number(opts.mapW) : 720;
+  const mapH = Number(opts.mapH) > 0 ? Number(opts.mapH) : 560;
+  const list = (labels || []).map((label, i) => {
+    const kind = playmapLabelKind(label);
+    const font = kind === 'city' ? 12 : kind === 'landmark' ? 10.5 : 9;
+    const name = String(label.name || '');
+    const twoLine = /\s/.test(name) || name.length > 10;
+    const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.42 : 0.58) + 12));
+    const bh = font * (twoLine ? 2.6 : 1.55);
+    return {
+      ...label,
+      i,
+      kind,
+      font,
+      bw,
+      bh,
+      ax: Number(label.nx),
+      ay: Number(label.ny),
+      x: Number(label.nx),
+      y: Number(label.ny),
+      visible: true,
+      lead: false,
+      rank: kind === 'city' ? 0 : kind === 'landmark' ? 1 : 2,
+    };
+  });
+  list.sort((a, b) => a.rank - b.rank || a.i - b.i);
+  const used = [];
+  const boxAt = (it, x, y) => ({
+    x: (x / 100) * mapW - it.bw / 2,
+    y: (y / 100) * mapH - it.bh / 2,
+    w: it.bw,
+    h: it.bh,
+  });
+  const blocked = (r) => used.some((u) => overlap(r, u, 6));
+  for (const it of list) {
+    const stepX = ((it.bw + 12) / mapW) * 100;
+    const stepY = ((it.bh + 10) / mapH) * 100;
+    const pin = PLAYMAP_PIN_NUDGES[it.name];
+    const slots = pin ? [pin, ...PLAYMAP_NUDGES] : PLAYMAP_NUDGES;
+    let placed = false;
+    for (const [dx, dy] of slots) {
+      const x = Math.min(96.5, Math.max(3.5, it.ax + dx * stepX));
+      const y = Math.min(96.5, Math.max(3.5, it.ay + dy * stepY));
+      const r = boxAt(it, x, y);
+      if (blocked(r)) continue;
+      it.x = x;
+      it.y = y;
+      it.lead = Math.hypot(x - it.ax, y - it.ay) > 0.7;
+      it.visible = true;
+      used.push(r);
+      placed = true;
+      break;
+    }
+    if (!placed) {
+      it.visible = it.kind !== 'minor';
+      it.lead = false;
+      it.x = it.ax;
+      it.y = it.ay;
+      if (it.visible) used.push(boxAt(it, it.x, it.y));
+    }
+  }
+  list.sort((a, b) => a.i - b.i);
+  return list;
+}

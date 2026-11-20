@@ -19,7 +19,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, parsePhotoFlag, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
+import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, parseMapLabelsFlag, parsePhotoFlag, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { DEBUG_LOOT_ID, isUnsellableGood, markDebugGranted } from './debug/transient.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
@@ -3751,6 +3751,9 @@ class Game {
     const inp = this.input;
     const hud = this.hud;
     if (inp.take('photo') && this.started) this.setPhotoMode(!this.photoMode);
+    if (inp.take('maplabels') && this.started && hud.panelOpen && hud.panelId === 'map') {
+      hud.setMapLabels(!hud.mapLabels);
+    }
     if (inp.take('escape')) {
       if (hud.panelOpen) hud.closePanel();
       else if (this.talkNpc) {
@@ -3788,7 +3791,7 @@ class Game {
     if (inp.take('rotateR')) this.cam.targetYaw += Math.PI / 4;
     if (inp.take('rotateL')) this.cam.targetYaw -= Math.PI / 4;
     if (inp.zoomDelta) {
-      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 10, 26);
+      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 8, 32);
       inp.zoomDelta = 0;
     }
 
@@ -4211,6 +4214,7 @@ async function startGame() {
     installMockWallet();
     attachDebug(game);
     game.setPhotoMode(parsePhotoFlag(location.search));
+    game.hud?.setMapLabels(parseMapLabelsFlag(location.search));
     attachSocial(game);
     const q = new URLSearchParams(location.search);
     const liveSearch = location.search;

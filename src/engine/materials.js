@@ -202,7 +202,7 @@ export function buildAtlas() {
   fill(TILE.DIRT, (x, y) => dirtFn(x, y, 21));
 
   fill(TILE.GRASS_SIDE, (x, y) => {
-    const deep = 0.78 + (1 - y / 16) * 0.22;
+    const deep = 0.98 + (1 - y / 16) * 0.02;
     return shade(grassFn(x, y, 12), deep);
   });
 
@@ -233,7 +233,7 @@ export function buildAtlas() {
     return wrapNoise(x >> 2, y >> 2, s) * 0.55 + wrapNoise(x >> 1, y >> 1, s + 1) * 0.3 + wrapNoise(x, y, s + 2) * 0.15;
   }
 
-  const COBS = [0x8a8f96, 0x9aa0a6, 0x7c8288, 0xa7a29a, 0x8d8a86, 0x73787f, 0x7a7268, 0x969086];
+  const COBS = [0xd2ae78, 0xc49a64, 0xe0c08a, 0xb89058, 0xd8b888, 0xc09060, 0xa87e50, 0xe8d09a];
   fill(TILE.COBBLE, (x, y) => {
     const warp = Math.floor(wrapNoise(x, 0, 59) * 2);
     const row = Math.floor((y + warp) / 4);
@@ -242,12 +242,12 @@ export function buildAtlas() {
     const ly = (y + warp) % 4;
     const lx = (x + off) % 5;
     const moss = wrapNoise(sx, row, 64) > 0.78;
-    if (ly === 3 || lx === 4) return moss ? 0x4a5a3e : 0x4d4d52;
+    if (ly === 3 || lx === 4) return moss ? 0x7a6238 : 0x8c6a40;
     let c = pick(COBS, hash2(sx, row, 61));
     if (ly === 0) c = shade(c, 1.1);
-    if (moss && ly > 1) c = mix(c, 0x5a7a42, 0.35);
-    if (wrapNoise(x, y, 62) > 0.84) c = mix(c, 0x6a5340, 0.4);
-    if (wrapNoise(x, y, 63) > 0.92) c = shade(c, 0.82);
+    if (moss && ly > 1) c = mix(c, 0x6a7a42, 0.22);
+    if (wrapNoise(x, y, 62) > 0.84) c = mix(c, 0x8a6340, 0.35);
+    if (wrapNoise(x, y, 63) > 0.92) c = shade(c, 0.88);
     return c;
   });
 
@@ -351,11 +351,11 @@ export function buildAtlas() {
     if ((x + y * 2) % 9 === 0 && wrapNoise(x, y, 193) > 0.5) c = 0x4a4a68;
     return c;
   });
-  const FLAG = [0xd9d6cf, 0xcfccc4, 0xe4e1da, 0xc4c1ba, 0xd2cfc8];
+  const FLAG = [0xead49e, 0xdcb888, 0xf0d8a8, 0xd0aa78, 0xe4c898];
   fill9(TILE.FLAGSTONE, (x, y) => {
     let c = pick(FLAG, wrapNoise(x, y, 201) * 0.4 + wrapNoise(x >> 2, y >> 2, 202) * 0.6);
-    if (x % 8 === 0 || y % 8 === 0) c = shade(c, 0.82);
-    if (wrapNoise(x, y, 203) > 0.96) c = 0xb8a65e;
+    if (x % 8 === 0 || y % 8 === 0) c = shade(c, 0.86);
+    if (wrapNoise(x, y, 203) > 0.96) c = 0xc4a65e;
     return c;
   });
 

@@ -13,6 +13,8 @@ import {
   dialogClearance,
   fitMenuButtons,
   hudRects,
+  layoutPlaymapLabels,
+  playmapLabelKind,
   touchActionRects,
   overlap,
   overlapsOf,
@@ -180,4 +182,46 @@ test('desktop minimap sits top-left and click hints sit above the hotbar', () =>
   assert.ok(desktop.minimap.y <= 8);
   assert.ok(desktop.minimap.x <= 8);
   assert.ok(desktop.quest.x >= desktop.minimap.x + desktop.minimap.w);
+});
+
+test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
+  const row = [
+    { name: 'Harefield', nx: 42, ny: 48 },
+    { name: 'Northleas', nx: 48, ny: 48 },
+    { name: 'Goldmead', nx: 54, ny: 48 },
+    { name: 'Snowfall', nx: 60, ny: 48 },
+    { name: 'Hellspire', nx: 30, ny: 22, city: true },
+    { name: 'Cinderfall', nx: 34, ny: 22 },
+    { name: 'Monster Gate', nx: 50, ny: 58, landmark: true },
+    { name: 'Greyrock Pit', nx: 52, ny: 58, landmark: true },
+    { name: 'Oakhollow', nx: 50, ny: 62, city: true },
+    { name: 'Runmouth', nx: 40, ny: 72 },
+    { name: 'Southmead', nx: 46, ny: 72 },
+    { name: 'Southford', nx: 52, ny: 72, city: true },
+  ];
+  const placed = layoutPlaymapLabels(row);
+  assert.equal(placed.filter((p) => p.visible).length, placed.length);
+  assert.equal(playmapLabelKind({ name: 'Oakhollow', city: true }), 'city');
+  assert.equal(playmapLabelKind({ name: 'Monster Gate' }), 'landmark');
+  assert.equal(playmapLabelKind({ name: 'Harefield' }), 'minor');
+  const box = (p) => ({
+    x: p.x / 100 * 720 - p.bw / 2,
+    y: p.y / 100 * 560 - p.bh / 2,
+    w: p.bw,
+    h: p.bh,
+  });
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      if (!placed[i].visible || !placed[j].visible) continue;
+      assert.equal(overlap(box(placed[i]), box(placed[j]), 2), false, `${placed[i].name} x ${placed[j].name}`);
+    }
+  }
+  const gate = placed.find((p) => p.name === 'Monster Gate');
+  const pit = placed.find((p) => p.name === 'Greyrock Pit');
+  const oak = placed.find((p) => p.name === 'Oakhollow');
+  assert.ok(Math.hypot(gate.x - pit.x, gate.y - pit.y) > 3);
+  assert.ok(Math.abs(gate.y - oak.y) > 2);
+  const hud = src('../src/ui/hud.js');
+  assert.match(hud, /layoutPlaymapLabels/);
+  assert.match(hud, /playmap-leads/);
 });

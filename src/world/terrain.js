@@ -238,7 +238,7 @@ export function generateWorld() {
         const wear = fbm(x * 0.08 + 2, z * 0.08, 44, 2);
         if (cobble) {
           tl = wear < 0.22 ? TILE.GRAVEL : wear > 0.86 && jr > 0.7 ? TILE.DIRT : TILE.COBBLE;
-          [r, g, b] = [0.9 + wear * 0.1, 0.88 + jr * 0.08, 0.84 + wear * 0.1];
+          [r, g, b] = [1.08 + wear * 0.04, 0.92 + jr * 0.05, 0.64 + wear * 0.06];
         } else {
           tl = wear < 0.28 ? TILE.DIRT : TILE.PATH;
           [r, g, b] = [0.96, 0.9 + wear * 0.08, 0.78];
@@ -256,7 +256,7 @@ export function generateWorld() {
         const roll = hash2(x, z, 61);
         if (rampFlag[i]) {
           tl = TILE.COBBLE;
-          [r, g, b] = [0.95, 0.88, 0.8];
+          [r, g, b] = [1.02, 0.9, 0.7];
           pathMask[i] = 1;
         } else if (mineRel[i] === 1) {
           tl = roll > 0.82 ? TILE.DIRT : TILE.GRAVEL;
@@ -347,10 +347,30 @@ export function buildTerrainMeshes(data, material, opt = {}) {
   const oz = opt.oz || 0;
   const { H, top, tint, zone } = data;
   const group = new THREE.Group();
+  const smooth = !!opt.smooth || !!data.smooth;
   const hAt = (x, z) => {
     if (x >= 0 && z >= 0 && x < width && z < depth) return H[z * width + x];
     const outside = opt.outside?.(x, z);
     return outside == null ? -3 : outside;
+  };
+  const cornerH = (x, z) => {
+    let s = 0;
+    let n = 0;
+    for (const dx of [-1, 0]) {
+      for (const dz of [-1, 0]) {
+        const h = hAt(x + dx, z + dz);
+        if (h == null || h < -2.5) continue;
+        s += h;
+        n += 1;
+      }
+    }
+    return n ? s / n : hAt(Math.max(0, Math.min(width - 1, x)), Math.max(0, Math.min(depth - 1, z)));
+  };
+  const cliffCell = (x, z) => {
+    if (x < 0 || z < 0 || x >= width || z >= depth) return true;
+    const i = z * width + x;
+    const zn = zone[i];
+    return zn === ZONE.WATER || zn === ZONE.MINE || zn === ZONE.LAKE || H[i] < WATER_Y + 0.02;
   };
   const chunks = [];
 
@@ -387,9 +407,10 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           const { u0, u1, vTop, vBot } = uvOf(tl);
 
           const aoAt = (sx, sz) => {
-            const s1 = hAt(x + sx, z) > h + 0.01 ? 1 : 0;
-            const s2 = hAt(x, z + sz) > h + 0.01 ? 1 : 0;
-            const c = hAt(x + sx, z + sz) > h + 0.01 ? 1 : 0;
+            const lift = smooth ? 0.85 : 0.55;
+            const s1 = hAt(x + sx, z) > h + lift ? 1 : 0;
+            const s2 = hAt(x, z + sz) > h + lift ? 1 : 0;
+            const c = hAt(x + sx, z + sz) > h + lift ? 1 : 0;
             const a = s1 && s2 ? 0 : 3 - (s1 + s2 + c);
             return [0.62, 0.78, 0.9, 1.0][a];
           };
@@ -408,18 +429,34 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             [u1, vBot],
           ];
           const uvs = [0, 1, 2, 3].map((k) => baseUV[(k + rot) % 4]);
+          const roll = smooth && !cliffCell(x, z);
+          const y00 = roll ? cornerH(x, z) : h;
+          const y01 = roll ? cornerH(x, z + 1) : h;
+          const y11 = roll ? cornerH(x + 1, z + 1) : h;
+          const y10 = roll ? cornerH(x + 1, z) : h;
           const ps = [
-            [x + ox, h, z + oz],
-            [x + ox, h, z + oz + 1],
-            [x + ox + 1, h, z + oz + 1],
-            [x + ox + 1, h, z + oz],
+            [x + ox, y00, z + oz],
+            [x + ox, y01, z + oz + 1],
+            [x + ox + 1, y11, z + oz + 1],
+            [x + ox + 1, y10, z + oz],
           ];
+          const e1x = ps[1][0] - ps[0][0];
+          const e1y = ps[1][1] - ps[0][1];
+          const e1z = ps[1][2] - ps[0][2];
+          const e2x = ps[3][0] - ps[0][0];
+          const e2y = ps[3][1] - ps[0][1];
+          const e2z = ps[3][2] - ps[0][2];
+          let nx = e1y * e2z - e1z * e2y;
+          let ny = e1z * e2x - e1x * e2z;
+          let nz = e1x * e2y - e1y * e2x;
+          const nl = Math.hypot(nx, ny, nz) || 1;
+          const topN = [nx / nl, ny / nl, nz / nl];
           const cs = aos.map((a) => [tr * a, tg * a, tb * a]);
-          if (aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, [0, 1, 0], uvs, cs);
+          if (aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, topN, uvs, cs);
           else {
             quad(
               [ps[1], ps[2], ps[3], ps[0]],
-              [0, 1, 0],
+              topN,
               [uvs[1], uvs[2], uvs[3], uvs[0]],
               [cs[1], cs[2], cs[3], cs[0]]
             );
@@ -435,6 +472,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           for (const [dx, dz] of dirs) {
             const nh = hAt(x + dx, z + dz);
             if (nh >= h) continue;
+            if (roll && !cliffCell(x + dx, z + dz)) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;
@@ -454,14 +492,16 @@ export function buildTerrainMeshes(data, material, opt = {}) {
               const vh = t.vTop;
               const vl = vh - len * (t.vTop - t.vBot);
               const lastSeg = yb <= nh + 0.001;
-              const bot = lastSeg ? 0.78 : 0.94;
+              const matchTop = tile === TILE.GRASS_SIDE || tile === TILE.SNOW_SIDE || tile === TILE.SAND;
+              const bot = matchTop ? 0.96 : (lastSeg ? 0.78 : 0.94);
               const topShade = seg === 0 ? 1.0 : 0.94;
-              const sr = tile === TILE.GRASS_SIDE || tile === TILE.SNOW_SIDE ? tr : lerp(1, tr, 0.55);
-              const sg = tile === TILE.GRASS_SIDE || tile === TILE.SNOW_SIDE ? tg : lerp(1, tg, 0.55);
-              const sb = tile === TILE.GRASS_SIDE || tile === TILE.SNOW_SIDE ? tb : lerp(1, tb, 0.55);
+              const lip = matchTop ? (dx !== 0 ? 0.97 : 0.99) : shadeSide;
+              const sr = matchTop ? tr : lerp(1, tr, 0.55);
+              const sg = matchTop ? tg : lerp(1, tg, 0.55);
+              const sb = matchTop ? tb : lerp(1, tb, 0.55);
               const jb = 0.94 + hash2(x * 3 + dx, z * 3 + dz, 19 + seg) * 0.12;
-              const cTop = [sr * shadeSide * topShade * jb, sg * shadeSide * topShade * jb, sb * shadeSide * topShade * jb];
-              const cBot = [sr * shadeSide * bot * jb, sg * shadeSide * bot * jb, sb * shadeSide * bot * jb];
+              const cTop = [sr * lip * topShade * jb, sg * lip * topShade * jb, sb * lip * topShade * jb];
+              const cBot = [sr * lip * bot * jb, sg * lip * bot * jb, sb * lip * bot * jb];
               quad(
                 [
                   [ax + ox, yb, az + oz],

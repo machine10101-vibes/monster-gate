@@ -25,3 +25,11 @@ test('touch look is 180deg per full-width swipe and does not eat the empty 3D vi
   assert.doesNotMatch(input, /dx \* 0\.008/);
   assert.match(input, /if \(this\.touch\) return/);
 });
+
+test('mouse wheel zooms from the window so HUD overlays do not swallow it', () => {
+  const input = src('src/engine/input.js');
+  const main = src('src/main.js');
+  assert.match(input, /window\.addEventListener\('wheel'/);
+  assert.match(input, /#panel, #dialog, #title/);
+  assert.match(main, /clamp\(this\.cam\.targetDist \+ inp\.zoomDelta \* 1\.2, 8, 32\)/);
+});
