@@ -48,7 +48,13 @@ test('Pages index.html cache-busts the build tag via version.json', () => {
   assert.match(html, /version\.json\?t=/);
   assert.match(html, /cache: 'no-store'/);
   assert.match(html, /'__MG_' \+ 'BUILD__'/);
-  assert.match(html, /searchParams\.get\('mgb'\) === build\) return/);
+  assert.match(html, /searchParams\.has\('mgb'\)/);
+  assert.match(html, /id="build-stale"/);
+  assert.match(html, /New version available, it'll load in a few minutes/);
+  assert.match(html, /__mgForceBuildReload/);
+  assert.match(main, /showStaleBuildNotice/);
+  assert.match(main, /searchParams\.has\('mgb'\)/);
+  assert.match(main, /__mgForceBuildReload/);
   assert.doesNotMatch(html, /cache: 'reload'/);
   assert.match(html, /__mgHuntStarted/);
   assert.match(html, /__mgOfferBuildReload/);
@@ -59,7 +65,6 @@ test('Pages index.html cache-busts the build tag via version.json', () => {
   assert.match(main, /syncPublishedBuild/);
   assert.match(main, /cache: 'no-store'/);
   assert.match(main, /remote === BUILD_ID/);
-  assert.match(main, /searchParams\.get\('mgb'\) === remote\) return/);
   assert.match(main, /captureHunter\(\)/);
   assert.match(main, /progress\?\.save\?\.\(false\)/);
   assert.match(vite, /fileName: 'version\.json'/);
@@ -110,4 +115,85 @@ test('MG-SYS-10: stamping index.html leaves the version.json guard and fetch int
   assert.ok(hit, `boot script must fetch version.json, got ${JSON.stringify(fetches)}`);
   assert.match(String(hit.url), /[?&]t=/);
   assert.equal(hit.cache, 'no-store');
+});
+
+test('MG-SYS-11: a stale ?mgb= does not replace again; title shows a wait notice', async () => {
+  const stamp = 'oldsha1';
+  const html = stampIndexHtml(src('../index.html'), stamp);
+  const boot = html.match(/<script>\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)/)?.[1];
+  assert.ok(boot, 'inline boot script');
+
+  let replaced = null;
+  let reloaded = 0;
+  const stale = {
+    classList: { hidden: true, remove(name) { if (name === 'hidden') this.hidden = false; } },
+  };
+  const fetches = [];
+  const sandbox = {
+    Date,
+    URL,
+    document: {
+      readyState: 'complete',
+      addEventListener() {},
+      querySelector: (sel) => (String(sel).includes('mg-build') ? { getAttribute: () => stamp } : null),
+      getElementById: (id) => (id === 'build-stale' ? stale : null),
+      body: { classList: { contains: () => false } },
+    },
+    location: {
+      href: 'https://monstergate.online/?mgb=oldsha1',
+      search: '?mgb=oldsha1',
+      replace(url) { replaced = String(url); },
+      reload() { reloaded += 1; },
+    },
+    window: {},
+    fetch(url, opts) {
+      fetches.push({ url: String(url), cache: opts?.cache });
+      return Promise.resolve({ ok: true, json: async () => ({ build: 'newsha2' }) });
+    },
+  };
+  sandbox.window = sandbox;
+  const ctx = createContext(sandbox);
+  runInContext(boot, ctx);
+  await Promise.resolve();
+  await Promise.resolve();
+  const hit = fetches.find((f) => String(f.url).includes('version.json'));
+  assert.ok(hit);
+  assert.equal(hit.cache, 'no-store');
+  ctx.__mgApplyBuildReload('newsha2');
+  assert.equal(replaced, null, 'must not location.replace when ?mgb= is already set');
+  assert.equal(stale.classList.hidden, false, 'title notice must unhide');
+  ctx.__mgForceBuildReload('newsha2');
+  assert.equal(reloaded, 1, 'in-world reload still reloads when mgb is present');
+});
+
+test('MG-SYS-11: first mismatch without ?mgb= still does one cache-bust replace', async () => {
+  const stamp = 'oldsha1';
+  const html = stampIndexHtml(src('../index.html'), stamp);
+  const boot = html.match(/<script>\s*(\(function \(\) \{[\s\S]*?\}\)\(\);)/)?.[1];
+  let replaced = null;
+  const sandbox = {
+    Date,
+    URL,
+    document: {
+      readyState: 'complete',
+      addEventListener() {},
+      querySelector: (sel) => (String(sel).includes('mg-build') ? { getAttribute: () => stamp } : null),
+      getElementById: () => null,
+      body: { classList: { contains: () => false } },
+    },
+    location: {
+      href: 'https://monstergate.online/',
+      search: '',
+      replace(url) { replaced = String(url); },
+    },
+    window: {},
+    fetch() {
+      return Promise.resolve({ ok: true, json: async () => ({ build: 'newsha2' }) });
+    },
+  };
+  sandbox.window = sandbox;
+  const ctx = createContext(sandbox);
+  runInContext(boot, ctx);
+  ctx.__mgApplyBuildReload('newsha2');
+  assert.match(String(replaced), /[?&]mgb=newsha2/);
 });

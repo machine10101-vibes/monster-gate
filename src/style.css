@@ -856,6 +856,23 @@ body.touch #top-right {
 #build-reload.hidden {
   display: none;
 }
+#build-stale {
+  margin: 8px auto 10px;
+  max-width: 28em;
+  padding: 6px 10px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  letter-spacing: 0.3px;
+  line-height: 1.45;
+  color: #fff8e8;
+  background: rgba(18, 22, 32, 0.72);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  pointer-events: none;
+}
+#build-stale.hidden {
+  display: none;
+}
 #banner {
   position: absolute;
   left: 0;

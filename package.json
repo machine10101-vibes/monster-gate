@@ -15,6 +15,7 @@
     "start:server": "node server/index.js",
     "ci:server": "npm ci && npm ci --prefix server/persistence",
     "test": "node --test tests/*.js server/tests/*.test.js",
+    "test:shaders": "node tools/shader-compile-test.mjs",
     "test:server": "node --test server/tests/*.test.js",
     "test:persistence": "node --test server/persistence/tests/*.test.js"
   },
