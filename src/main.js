@@ -229,6 +229,7 @@ class Game {
     this.hud.layoutHud();
     const buildEl = document.getElementById('build-id');
     if (buildEl) buildEl.textContent = BUILD_ID;
+    this.syncPublishedBuild();
     this.time = 0;
     this.hitstopT = 0;
     this.punchAmt = 0;
@@ -1480,6 +1481,28 @@ class Game {
     document.getElementById('wallet-help')?.classList.add('hidden');
     if (status) status.textContent = '';
     document.getElementById('wallet-unlinked-email')?.focus();
+  }
+
+  syncPublishedBuild() {
+    const href = new URL('version.json', location.href);
+    href.searchParams.set('t', String(Date.now()));
+    fetch(href.toString(), { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+      const remote = String(v?.build || '').trim();
+      if (!remote || remote === BUILD_ID) return;
+      const u = new URL(location.href);
+      if (u.searchParams.get('mgb') === remote) return;
+      const hunting = !!(window.__mgHuntStarted || document.body?.classList.contains('hunting') || this.started);
+      if (hunting) {
+        window.__mgPendingBuild = remote;
+        this.offerBuildReload(remote);
+        return;
+      }
+      if (typeof window.__mgApplyBuildReload === 'function') window.__mgApplyBuildReload(remote);
+      else {
+        u.searchParams.set('mgb', remote);
+        location.replace(u.toString());
+      }
+    }).catch(() => {});
   }
 
   offerBuildReload(build) {
@@ -4068,7 +4091,8 @@ class Game {
     this.input.update();
     this.handleInput();
 
-    if (this.started) this.sky.setHour(this.sky.hour + rawDt / 50);
+    // Debug cloudshadow=strong only: freeze lighting for screenshots. Never saved.
+    if (this.started && !(this.debug && this.sky?.cloudShadowStrong)) this.sky.setHour(this.sky.hour + rawDt / 50);
 
     if (!this.campParked) this.player.update(dt);
     updateCaveTravel(this, dt);

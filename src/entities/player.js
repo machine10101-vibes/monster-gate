@@ -50,6 +50,8 @@ export class Player {
     );
     this.groundRing.rotation.x = -Math.PI / 2;
     this.groundRing.renderOrder = 3;
+    this.groundRing.visible = false;
+    this._modelReady = false;
     game.scene.add(this.groundRing);
 
     this.pos = new THREE.Vector3(72, 3, 72.5);
@@ -238,6 +240,8 @@ export class Player {
       const y = Math.max(terrainY, this.pos.y, this.wading ? WATER_Y : -Infinity) + 0.12;
       this.groundRing.material.opacity = 0.8;
       this.groundRing.position.set(this.pos.x, y, this.pos.z);
+      const modelReady = !!(this.game.started && this.obj.visible && this.model?.root?.parent && this._modelReady);
+      this.groundRing.visible = modelReady;
     }
   }
 
@@ -682,6 +686,7 @@ export class Player {
 
     this.tickSheath(dt);
     this.pose(dt);
+    if (this.game.started) this._modelReady = true;
     this.syncObj();
     this.updateTrail(dt);
 

@@ -447,6 +447,9 @@ export function buildTerrainMeshes(data, material, opt = {}) {
               if (cx === x && cz === z) continue;
               const nh = hAt(cx, cz);
               const drop = h - nh;
+              // Cap at 1 wu even on water. Welding a 2–4 wu brook/lagoon drop
+              // into a ramp leaves paper-thin sky spikes at grazing angles
+              // (pass 40, x 60-90 y 690-750). Skirts close those walls.
               if (drop <= 0 || drop > 1.001) continue;
               if (!skirtOk(tileAt(cx, cz))) continue;
               y = Math.min(y, nh);
@@ -505,7 +508,8 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             const nh = hAt(x + dx, z + dz);
             if (nh >= h) continue;
             if (roll && !cliffCell(x + dx, z + dz)) continue;
-            if (edgeY[di][0] <= nh + 0.001 && edgeY[di][1] <= nh + 0.001) continue;
+            const nextWater = cliffCell(x + dx, z + dz) || cliffCell(x, z);
+            if (!nextWater && edgeY[di][0] <= nh + 0.001 && edgeY[di][1] <= nh + 0.001) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;
@@ -514,11 +518,11 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             const az = mz - rz * 0.5;
             const bx = mx + rx * 0.5;
             const bz = mz + rz * 0.5;
-            let yt = h;
+            let yt = h + (nextWater ? 0.04 : 0.02);
             let seg = 0;
             const shadeSide = dx !== 0 ? 0.86 : 0.93;
             while (yt > nh + 0.001) {
-              const yb = Math.max(nh - 0.05, yt - 1);
+              const yb = Math.max(nh - (nextWater ? 0.28 : 0.08), yt - 1);
               const len = yt - yb;
               const tile = seg === 0 ? sideTiles[0] : seg < 3 || sideTiles[1] !== TILE.DIRT ? sideTiles[1] : TILE.STONE;
               const t = uvOf(tile);

@@ -474,52 +474,52 @@ export function playmapLabelKind(label) {
   return 'minor';
 }
 
-const PLAYMAP_NUDGES = [
+const PLAYMAP_FRAME_PAD_PX = 56;
+const PLAYMAP_MAX_PIN_PX = 30;
+const PLAYMAP_HARD_PIN_PX = 52;
+
+/** Cardinal sides first, then diagonals. Distances are scaled to stay near the pin. */
+const PLAYMAP_SIDES = [
   [0, 0],
-  [0, -1], [0, 1], [1, 0], [-1, 0],
-  [0.85, -0.85], [-0.85, -0.85], [0.85, 0.85], [-0.85, 0.85],
-  [0, -1.7], [0, 1.7], [1.55, 0], [-1.55, 0],
-  [1.3, -1.15], [-1.3, -1.15], [1.3, 1.15], [-1.3, 1.15],
-  [0, -2.3], [2.1, 0.4], [-2.1, 0.4], [0, 2.3],
-  [0, -3.1], [0, 3.1], [2.8, -0.6], [-2.8, -0.6],
-  [2.4, 1.6], [-2.4, 1.6], [1.8, -2.4], [-1.8, -2.4],
+  [-1, 0], [1, 0], [0, -1], [0, 1],
+  [-1, -1], [1, -1], [-1, 1], [1, 1],
 ];
 
 const PLAYMAP_PIN_NUDGES = {
-  'Monster Gate': [0, -2.4],
-  'Greyrock Pit': [2.2, -0.4],
-  Oakhollow: [0, -0.2],
-  Harefield: [-1.6, -0.4],
-  Northleas: [0, -1.2],
-  Goldmead: [1.4, -0.35],
-  Snowfall: [2.6, -0.2],
-  Cinderfall: [-1.8, 0.6],
-  Hellspire: [0.4, -0.2],
-  Runmouth: [-1.4, 0.2],
-  Southmead: [0.2, -1.1],
-  Southford: [0, 2.4],
-  Broadshire: [1.6, 0.8],
-  Brookside: [-2.2, 0.3],
-  'The Lagoon': [1.4, 1.8],
-  'Silverrun Canopy': [-1.6, -1.8],
-  Dawnspire: [1.8, -0.4],
-  Bramblewood: [-2.6, 0.6],
+  'Monster Gate': [0, -1],
+  'Greyrock Pit': [1, 0],
+  Oakhollow: [0, -1],
+  Harefield: [-1, 0],
+  Northleas: [0, -1],
+  Goldmead: [1, 0],
+  Snowfall: [1, 0],
+  Cinderfall: [-1, 0],
+  Hellspire: [0, -1],
+  Runmouth: [-1, 0],
+  Southmead: [0, -1],
+  Southford: [0, 1],
+  Broadshire: [1, 0],
+  Brookside: [-1, 0],
+  'The Lagoon': [1, 1],
+  'Silverrun Canopy': [-1, -1],
 };
 
 /**
- * Nudge overlapping Map labels so names stay readable. Cities keep the
- * tile centre; landmarks and lesser places slide to a free slot and grow
- * a leader line back to the pin. Leftover minor names hide.
+ * Place Map labels inside the parchment (off the gold frame), within about
+ * 30px of the pin. Collisions flip to left/right/above/below instead of a
+ * long shove that can park a name on the frame or on the wrong biome.
  */
 export function layoutPlaymapLabels(labels, opts = {}) {
   const mapW = Number(opts.mapW) > 0 ? Number(opts.mapW) : 720;
   const mapH = Number(opts.mapH) > 0 ? Number(opts.mapH) : 560;
+  const padX = (PLAYMAP_FRAME_PAD_PX / mapW) * 100;
+  const padY = (PLAYMAP_FRAME_PAD_PX / mapH) * 100;
   const list = (labels || []).map((label, i) => {
     const kind = playmapLabelKind(label);
     const font = kind === 'city' ? 14 : kind === 'landmark' ? 13 : kind === 'uncharted' ? 12 : 12;
     const name = String(label.name || '');
     const twoLine = /\s/.test(name) || name.length > 10;
-    const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.42 : 0.58) + 12));
+    const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.52 : 0.62) + 14));
     const bh = font * (twoLine ? 2.6 : 1.55);
     return {
       ...label,
@@ -545,7 +545,19 @@ export function layoutPlaymapLabels(labels, opts = {}) {
     w: it.bw,
     h: it.bh,
   });
-  const blocked = (r) => used.some((u) => overlap(r, u, 6));
+  const blocked = (r) => used.some((u) => overlap(r, u, -2));
+  const clampBox = (it, x, y) => {
+    const halfW = (it.bw / 2 / mapW) * 100;
+    const halfH = (it.bh / 2 / mapH) * 100;
+    const loX = padX + halfW;
+    const hiX = 100 - padX - halfW;
+    const loY = padY + halfH;
+    const hiY = 100 - padY - halfH;
+    return {
+      x: Math.min(hiX, Math.max(loX, x)),
+      y: Math.min(hiY, Math.max(loY, y)),
+    };
+  };
   const clusters = list.filter((it) => it.kind === 'city' || CLUSTER.has(it.name));
   const nearCluster = (it) => clusters.some((c) => Math.hypot(it.ax - c.ax, it.ay - c.ay) < 9);
   for (const it of list) {
@@ -556,33 +568,37 @@ export function layoutPlaymapLabels(labels, opts = {}) {
       it.y = it.ay;
       continue;
     }
-    const stepX = ((it.bw + 12) / mapW) * 100;
-    const stepY = ((it.bh + 10) / mapH) * 100;
     const pin = PLAYMAP_PIN_NUDGES[it.name];
-    const slots = pin ? [pin, ...PLAYMAP_NUDGES] : PLAYMAP_NUDGES;
-    let placed = false;
-    for (let s = 0; s < slots.length; s++) {
-      const [dx, dy] = slots[s];
-      const sx = pin && s === 0 ? 5.2 : stepX;
-      const sy = pin && s === 0 ? 5.4 : stepY;
-      const x = Math.min(96.5, Math.max(3.5, it.ax + dx * sx));
-      const y = Math.min(96.5, Math.max(3.5, it.ay + dy * sy));
-      const r = boxAt(it, x, y);
-      if (blocked(r)) continue;
-      it.x = x;
-      it.y = y;
-      const d = Math.hypot(x - it.ax, y - it.ay);
-      it.lead = (it.kind === 'city' || it.kind === 'landmark') && it.uncharted !== true && it.charted !== false && d > 0.7 && d < 4.2;
-      it.visible = true;
-      used.push(r);
-      placed = true;
-      break;
-    }
+    const slots = pin ? [pin, ...PLAYMAP_SIDES] : PLAYMAP_SIDES;
+    const tryReach = (maxPx) => {
+      const maxDx = (maxPx / mapW) * 100;
+      const maxDy = (maxPx / mapH) * 100;
+      const stepX = Math.min(maxDx, ((it.bw * 0.55 + 8) / mapW) * 100);
+      const stepY = Math.min(maxDy, ((it.bh * 0.85 + 8) / mapH) * 100);
+      for (let s = 0; s < slots.length; s++) {
+        const [dx, dy] = slots[s];
+        const c = clampBox(it, it.ax + dx * stepX, it.ay + dy * stepY);
+        if (Math.hypot(c.x - it.ax, c.y - it.ay) > Math.hypot(maxDx, maxDy) + 0.15 && (dx || dy)) continue;
+        const r = boxAt(it, c.x, c.y);
+        if (blocked(r)) continue;
+        it.x = c.x;
+        it.y = c.y;
+        const d = Math.hypot(c.x - it.ax, c.y - it.ay);
+        it.lead = (it.kind === 'city' || it.kind === 'landmark') && it.uncharted !== true && it.charted !== false && d > 0.7 && d < 8;
+        it.visible = true;
+        used.push(r);
+        return true;
+      }
+      return false;
+    };
+    let placed = tryReach(PLAYMAP_MAX_PIN_PX);
+    if (!placed && (it.kind === 'city' || it.kind === 'landmark')) placed = tryReach(PLAYMAP_HARD_PIN_PX);
     if (!placed) {
-      it.visible = it.kind === 'city' || it.kind === 'landmark';
+      const c = clampBox(it, it.ax, it.ay);
+      it.visible = it.kind === 'city';
       it.lead = false;
-      it.x = it.ax;
-      it.y = it.ay;
+      it.x = c.x;
+      it.y = c.y;
       if (it.visible) used.push(boxAt(it, it.x, it.y));
     }
   }

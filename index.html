@@ -11,13 +11,15 @@
       (function () {
         var meta = document.querySelector('meta[name="mg-build"]');
         var mine = meta && meta.getAttribute('content');
-        if (!mine || mine === 'dev' || mine === '__MG_BUILD__') return;
+        // Split so Vite's meta stamp cannot rewrite this into `mine === '<sha>'`
+        // and return before version.json is fetched (MG-SYS-10).
+        if (!mine || mine === 'dev' || mine === '__MG_' + 'BUILD__') return;
         function go(build) {
-          try {
-            if (sessionStorage.getItem('mg-build-reload') === build) return;
-            sessionStorage.setItem('mg-build-reload', build);
-          } catch (e) {}
+          if (mine === build) return;
           var u = new URL(location.href);
+          // Fastly caches index.html for max-age=600. One replace with ?mgb=
+          // is the correction; do not loop if the HTML is still stale (MG-SYS-11).
+          if (u.searchParams.get('mgb') === build) return;
           u.searchParams.set('mgb', build);
           location.replace(u.toString());
         }
