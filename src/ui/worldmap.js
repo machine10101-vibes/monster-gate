@@ -1,22 +1,74 @@
-import { TILES, TILE_COUNT, paintTileMap } from '../world/tiles.js';
+import { GRID, TILES, TILE_COUNT, paintTileMap } from '../world/tiles.js';
 import { captureTileView } from '../world/tileview.js';
 
 const thumbs = new Map();
+const CELL = 36;
 
 function thumb(tile, game) {
   let c = thumbs.get(tile.id);
   if (c) return c;
   c = document.createElement('canvas');
-  c.width = 36;
-  c.height = 36;
+  c.width = CELL;
+  c.height = CELL;
   const ctx = c.getContext('2d');
   const land = tile.built && game.world.tileCanvas?.[tile.id];
   if (land) {
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(land, 0, 0, 36, 36);
+    ctx.drawImage(land, 0, 0, CELL, CELL);
   } else paintTileMap(c, tile);
   thumbs.set(tile.id, c);
   return c;
+}
+
+/** Soften biome seams so the 10×10 map is not a grid of hard rectangles. */
+function blendThumbs() {
+  const w = GRID * CELL;
+  const atlas = document.createElement('canvas');
+  atlas.width = w;
+  atlas.height = w;
+  const actx = atlas.getContext('2d');
+  for (const tile of TILES) {
+    const c = thumbs.get(tile.id);
+    if (c) actx.drawImage(c, tile.tx * CELL, tile.tz * CELL);
+  }
+  const src = actx.getImageData(0, 0, w, w);
+  const out = actx.createImageData(w, w);
+  out.data.set(src.data);
+  const band = 7;
+  const mix = (x, y, nx, ny, t) => {
+    if (nx < 0 || ny < 0 || nx >= w || ny >= w || t <= 0) return;
+    const i = (y * w + x) * 4;
+    const j = (ny * w + nx) * 4;
+    out.data[i] += (src.data[j] - out.data[i]) * t;
+    out.data[i + 1] += (src.data[j + 1] - out.data[i + 1]) * t;
+    out.data[i + 2] += (src.data[j + 2] - out.data[i + 2]) * t;
+  };
+  for (let tz = 0; tz < GRID; tz++) {
+    for (let tx = 0; tx < GRID; tx++) {
+      for (let ly = 0; ly < CELL; ly++) {
+        for (let lx = 0; lx < CELL; lx++) {
+          const x = tx * CELL + lx;
+          const y = tz * CELL + ly;
+          if (lx < band && tx > 0) mix(x, y, x - (band - lx), y, 1 - lx / band);
+          if (lx >= CELL - band && tx < GRID - 1) mix(x, y, x + (lx - (CELL - band) + 1), y, (lx - (CELL - band) + 1) / band);
+          if (ly < band && tz > 0) mix(x, y, x, y - (band - ly), 1 - ly / band);
+          if (ly >= CELL - band && tz < GRID - 1) mix(x, y, x, y + (ly - (CELL - band) + 1), (ly - (CELL - band) + 1) / band);
+        }
+      }
+    }
+  }
+  actx.putImageData(out, 0, 0);
+  for (const tile of TILES) {
+    const c = thumbs.get(tile.id);
+    if (!c) continue;
+    c.getContext('2d').drawImage(atlas, tile.tx * CELL, tile.tz * CELL, CELL, CELL, 0, 0, CELL, CELL);
+  }
+}
+
+function ensureThumbs(game) {
+  if (thumbs.size >= TILES.length) return;
+  for (const tile of TILES) thumb(tile, game);
+  blendThumbs();
 }
 
 /** The 100-tile world map. Selecting a tile shows that plot from above. */
@@ -39,6 +91,7 @@ export function mountWorldMap(body, game) {
     left.appendChild(note);
     const grid = document.createElement('div');
     grid.className = 'wm-grid';
+    ensureThumbs(game);
     for (const tile of TILES) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -47,7 +100,7 @@ export function mountWorldMap(body, game) {
       const cv = document.createElement('canvas');
       cv.width = 36;
       cv.height = 36;
-      cv.getContext('2d').drawImage(thumb(tile, game), 0, 0);
+      cv.getContext('2d').drawImage(thumbs.get(tile.id), 0, 0);
       b.appendChild(cv);
       const num = document.createElement('span');
       num.className = 'wm-num';

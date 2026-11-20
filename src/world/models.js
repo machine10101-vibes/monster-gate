@@ -455,6 +455,30 @@ export function buildCrate(seed) {
   return bundle([[M, 0.0625, 7, 0, 7]]);
 }
 
+/** Timber market wagon. Long axis on x, wheels on z. */
+export function buildWagon(seed = 1) {
+  const M = new VoxelModel(30, 18, 16);
+  const wood = (x, y, z) => J(y % 3 === 0 ? 0x7a4e2c : 0x8c5c34, x, y, z, seed, 0.08);
+  const iron = (x, y, z) => J(0x3b3e46, x, y, z, seed + 1, 0.06);
+  M.box(3, 6, 3, 27, 8, 13, wood);
+  M.box(3, 8, 3, 27, 13, 5, wood);
+  M.box(3, 8, 11, 27, 13, 13, wood);
+  M.box(3, 8, 3, 5, 13, 13, wood);
+  M.box(25, 8, 5, 27, 12, 11, wood);
+  M.box(1, 8, 6, 3, 10, 10, iron);
+  for (const [cx, cz] of [[8, 2], [22, 2], [8, 13], [22, 13]]) {
+    for (let y = 1; y < 8; y++)
+      for (let x = cx - 3; x <= cx + 3; x++) {
+        const dx = x - cx;
+        const dy = y - 4;
+        if (dx * dx + dy * dy > 10) continue;
+        M.set(x, y, cz, dx === 0 && dy === 0 ? 0xb8bcc6 : iron(x, y, cz));
+      }
+  }
+  M.box(8, 8, 5, 16, 11, 11, (x, y, z) => J(0x6a4527, x, y, z, seed, 0.07));
+  return bundle([[M, 0.0625, 15, 0, 8]]);
+}
+
 export function buildBarrel(seed) {
   const M = new VoxelModel(16, 20, 16);
   const rad = [4.4, 5.2, 5.8, 6.1, 6.2, 6.2, 6.2, 6.2, 6.1, 5.8, 5.2, 4.4];

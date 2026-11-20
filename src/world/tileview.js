@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { hideUniforms } from '../engine/materials.js';
-import { TILE_SIZE, originOf, sampleTile } from './tiles.js';
+import { TILE_SIZE, originOf, sampleBlended } from './tiles.js';
 
 const SEG = 48;
 
@@ -13,7 +13,7 @@ export function buildTilePreview(tile) {
   for (let i = 0; i < pos.count; i++) {
     const u = (pos.getX(i) + TILE_SIZE / 2) / TILE_SIZE;
     const v = (pos.getZ(i) + TILE_SIZE / 2) / TILE_SIZE;
-    const s = sampleTile(tile, u, v);
+    const s = sampleBlended(tile, u, v);
     pos.setY(i, s.h);
     col[i * 3] = s.r;
     col[i * 3 + 1] = s.g;
@@ -63,6 +63,7 @@ export function captureTileView(game, tile, outCanvas) {
     upy: cam.up.y,
     upz: cam.up.z,
     fov: cam.fov,
+    camFar: cam.far,
     near: game.scene.fog.near,
     far: game.scene.fog.far,
     fog: game.scene.fog.color.getHex(),
@@ -73,6 +74,7 @@ export function captureTileView(game, tile, outCanvas) {
   try {
     const dist = 230;
     const aspect = cam.aspect || 1;
+    cam.far = Math.max(cam.far || 0, dist + TILE_SIZE);
     cam.fov = aspect >= 1 ? (2 * Math.atan(TILE_SIZE / 2 / dist) * 180) / Math.PI : (2 * Math.atan(TILE_SIZE / 2 / aspect / dist) * 180) / Math.PI;
     cam.up.set(0, 0, -1);
     cam.position.set(cx, dist, cz);
@@ -96,6 +98,7 @@ export function captureTileView(game, tile, outCanvas) {
   } finally {
     cam.up.set(saved.upx, saved.upy, saved.upz);
     cam.fov = saved.fov;
+    cam.far = saved.camFar;
     cam.position.set(saved.px, saved.py, saved.pz);
     cam.quaternion.set(saved.qx, saved.qy, saved.qz, saved.qw);
     cam.updateProjectionMatrix();

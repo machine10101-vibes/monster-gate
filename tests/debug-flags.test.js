@@ -8,6 +8,7 @@ import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload, 
 import { GOODS } from '../src/data/gathering.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
 import { Progress, saveKey } from '../src/systems/progress.js';
+import { TILES } from '../src/world/tiles.js';
 
 const mem = new Map();
 
@@ -76,8 +77,9 @@ test('debug combined with mmo=1 changes nothing', () => {
 
 test('every documented tp key resolves', () => {
   const keys = ['oakhollow', 'goldenmeadow', 'greyrock', 'forge', 'oasis', 'deepwell', 'cinderfall', 'glimmerfrost', 'hellspire', 'dawnspire', 'endlessfield', 'crate', 'plaza', 'lira', 'dalla', 'gilantre'];
-  assert.deepEqual(debugSpotKeys().sort(), [...keys].sort());
+  const have = new Set(debugSpotKeys());
   for (const key of keys) {
+    assert.ok(have.has(key), key);
     const spot = resolveSpot(key);
     assert.ok(spot, key);
     assert.equal(spot.id, canonicalSpot(key));
@@ -94,6 +96,19 @@ test('every documented tp key resolves', () => {
   assert.ok(oasis.z > 432, 'oasis spawn is on the Oasis (greenbowl) tile');
   assert.equal(oasisHudName(oasis.x, oasis.z), 'Oasis');
   assert.equal(oasisHudName(0, 432), 'Oasis');
+});
+
+test('every built tile has a debug tp key', () => {
+  const have = new Set(debugSpotKeys());
+  const missing = TILES.filter((t) => t.built).filter((t) => !have.has(String(t.kind).toLowerCase()));
+  assert.deepEqual(missing.map((t) => t.kind), []);
+  for (const name of ['brookside', 'lagoon', 'canopy', 'snowfall', 'ashroad', 'southford', 'harefield']) {
+    const spot = resolveSpot(name);
+    assert.ok(spot, name);
+    assert.ok(Number.isFinite(spot.x) && Number.isFinite(spot.z), name);
+  }
+  assert.equal(canonicalSpot('ashen road'), 'ashroad');
+  assert.equal(canonicalSpot('silverrun canopy'), 'canopy');
 });
 
 test('debug monster spawn is inert without ?debug=1 and picks a zone mob with the flag', () => {

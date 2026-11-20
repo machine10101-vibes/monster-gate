@@ -69,7 +69,8 @@ export class CharacterSelect {
     this.active = true;
     g.hud?.clearPlates?.();
     if (this.hourWas == null) this.hourWas = g.sky.hour;
-    g.sky.setHour(18.4);
+    g.sky.setHour(16.7);
+    g.sky.camp = true;
     try {
       this.stage.show();
       $('cs-account').textContent = g.wallet?.kind === 'guest'
@@ -141,6 +142,7 @@ export class CharacterSelect {
     this.clearPlates();
     $('cs-confirm')?.classList.add('hidden');
     this.hideWorldMenu();
+    g.sky.camp = false;
     if (this.hourWas != null) {
       g.sky.setHour(this.hourWas);
       this.hourWas = null;

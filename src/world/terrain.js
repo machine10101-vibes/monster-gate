@@ -201,14 +201,15 @@ export function generateWorld() {
       let g = 1;
       let b = 1;
       const zn = zone[i];
-      const fieldTint = [1.08, 1.14, 0.86];
-      const forestTint = [0.62, 0.9, 0.84];
+      const fieldTint = [0.98, 1.04, 0.86];
+      const forestTint = [0.66, 0.9, 0.78];
       const mix3 = (a, c, t) => [lerp(a[0], c[0], t), lerp(a[1], c[1], t), lerp(a[2], c[2], t)];
       const dn = fbm(x * 0.045 + 10, z * 0.045 + 3, 1, 4);
       const forestAmt = smoothstep(64, 54, z + (fbm(x * 0.12, z * 0.12, 2, 3) - 0.5) * 12);
       forest[i] = forestAmt;
       let t3 = mix3(fieldTint, forestTint, forestAmt);
-      const pv = 0.9 + patch * 0.28;
+      const low = fbm(x * 0.02 + 4, z * 0.02, 17, 3);
+      const pv = 0.86 + patch * 0.22 + (low - 0.5) * 0.16;
       t3 = [t3[0] * pv, t3[1] * pv, t3[2] * pv];
 
       if (zn === ZONE.MOUNTAIN || h > 8) {
@@ -219,7 +220,7 @@ export function generateWorld() {
         const gtint = mix3(t3, [0.78, 0.92, 0.78], high * 0.8);
         [r, g, b] = gtint;
         if (tl === TILE.STONE || tl === TILE.MOSS_STONE) [r, g, b] = [0.95, 0.97, 1.0];
-        if (tl === TILE.SNOW) [r, g, b] = [1, 1, 1];
+        if (tl === TILE.SNOW) [r, g, b] = [0.9 + patch * 0.08, 0.92 + patch * 0.06, 0.97];
       } else if (zn === ZONE.WATER || zn === ZONE.LAKE || (h <= 0.5 && !mineRel[i])) {
         tl = h <= 0 ? TILE.GRAVEL : TILE.SAND;
         [r, g, b] = [1, 1, 1];
@@ -229,8 +230,18 @@ export function generateWorld() {
         [r, g, b] = [1, 1, 1];
       } else if (pathMask[i]) {
         const cobble = zn === ZONE.TOWN || zn === ZONE.GATE;
-        tl = cobble ? TILE.COBBLE : TILE.PATH;
-        [r, g, b] = cobble ? [1, 1.0, 1.02] : [1, 1, 1];
+        const wear = fbm(x * 0.08 + 2, z * 0.08, 44, 2);
+        if (cobble) {
+          tl = wear < 0.22 ? TILE.GRAVEL : wear > 0.86 && jr > 0.7 ? TILE.DIRT : TILE.COBBLE;
+          [r, g, b] = [0.9 + wear * 0.1, 0.88 + jr * 0.08, 0.84 + wear * 0.1];
+        } else {
+          tl = wear < 0.28 ? TILE.DIRT : TILE.PATH;
+          [r, g, b] = [0.96, 0.9 + wear * 0.08, 0.78];
+        }
+      } else if (pm > 0.12) {
+        const k = clamp((pm - 0.12) / 0.4, 0, 1);
+        tl = jr > 0.55 ? TILE.DIRT : TILE.PATH;
+        [r, g, b] = mix3(t3, [0.86, 0.74, 0.52], 0.35 + k * 0.45);
       } else {
         tl = jr > 0.935 && forestAmt < 0.6 ? TILE.FLOWER_GRASS : TILE.GRASS;
         [r, g, b] = t3;
@@ -278,7 +289,7 @@ const SIDE_TILES = {
   [TILE.MOSS_STONE]: [TILE.STONE, TILE.STONE],
   [TILE.SNOW]: [TILE.SNOW_SIDE, TILE.STONE],
   [TILE.ICE]: [TILE.ICE, TILE.ICE],
-  [TILE.FROST_GRASS]: [TILE.GRASS_SIDE, TILE.DIRT],
+  [TILE.FROST_GRASS]: [TILE.SNOW_SIDE, TILE.STONE],
   [TILE.BASALT]: [TILE.BASALT, TILE.BASALT],
   [TILE.ASH]: [TILE.ASH, TILE.BASALT],
   [TILE.LAVA]: [TILE.LAVA, TILE.CINDER],
@@ -290,6 +301,37 @@ const SIDE_TILES = {
   [TILE.DIRT]: [TILE.DIRT, TILE.DIRT],
   [TILE.FARMLAND]: [TILE.DIRT, TILE.DIRT],
 };
+
+const PATH_EDGE = { SNOW: 0, SAND: 1, ASH: 2, GRASS: 3 };
+
+/** Path (and frost-grass) sides follow the neighbouring biome, not always a grass strip. */
+export function sideTilesFor(tl, top, width, depth, x, z) {
+  if (tl !== TILE.PATH && tl !== TILE.FROST_GRASS) return SIDE_TILES[tl] || [TILE.STONE, TILE.STONE];
+  let snow = 0;
+  let sand = 0;
+  let ash = 0;
+  let grass = 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) {
+    const nx = x + dx;
+    const nz = z + dz;
+    if (nx < 0 || nz < 0 || nx >= width || nz >= depth) continue;
+    const nt = top[nz * width + nx];
+    if (nt === TILE.PATH || nt === TILE.COBBLE || nt === TILE.GRAVEL) continue;
+    if (nt === TILE.SNOW || nt === TILE.ICE || nt === TILE.FROST_GRASS) snow++;
+    else if (nt === TILE.SAND) sand++;
+    else if (nt === TILE.ASH || nt === TILE.BASALT || nt === TILE.CINDER || nt === TILE.LAVA || nt === TILE.OBSIDIAN) ash++;
+    else grass++;
+  }
+  const kind = snow >= sand && snow >= ash && snow >= grass ? PATH_EDGE.SNOW
+    : sand >= ash && sand >= grass ? PATH_EDGE.SAND
+      : ash >= grass ? PATH_EDGE.ASH
+        : PATH_EDGE.GRASS;
+  if (kind === PATH_EDGE.SNOW) return [TILE.SNOW_SIDE, TILE.STONE];
+  if (kind === PATH_EDGE.SAND) return [TILE.SAND, TILE.SAND];
+  if (kind === PATH_EDGE.ASH) return [TILE.ASH, TILE.BASALT];
+  if (tl === TILE.FROST_GRASS) return [TILE.SNOW_SIDE, TILE.DIRT];
+  return [TILE.GRASS_SIDE, TILE.DIRT];
+}
 
 const CHUNK = 24;
 
@@ -378,7 +420,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             );
           }
 
-          const sideTiles = SIDE_TILES[tl] || [TILE.STONE, TILE.STONE];
+          const sideTiles = sideTilesFor(tl, top, width, depth, x, z);
           const dirs = [
             [1, 0],
             [-1, 0],

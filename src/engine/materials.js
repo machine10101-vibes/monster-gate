@@ -19,6 +19,7 @@ export function hideRadiusPx(bufferW, bufferH, playerPxH = 0) {
 
 /** Tight screen-door of geometry that sits between the camera and the hero. */
 export function patchHide(material, key = 'hide') {
+  if (!material) return material;
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPlayerScreen = hideUniforms.uPlayerScreen;
     shader.uniforms.uPlayerDepth = hideUniforms.uPlayerDepth;
@@ -70,11 +71,39 @@ export function makeGradientMap(steps) {
   return tex;
 }
 
-export const toonRamp = makeGradientMap([0.0, 0.0, 0.28, 0.55, 0.78, 0.92, 1.0, 1.0]);
+/** Lifted blacks so unlit faces stay readable under AgX instead of crushing to ink. */
+export const toonRamp = makeGradientMap([0.22, 0.36, 0.5, 0.64, 0.76, 0.86, 0.94, 1.0]);
 
 export function toonMaterial(opts = {}) {
   const m = new THREE.MeshToonMaterial({ gradientMap: toonRamp, ...opts });
   return m;
+}
+
+/**
+ * Cheap lava emissive on atlas UVs. LAVA is fill9 around tile 58 (cols 9-11, rows 2-4).
+ * Keeps MeshToonMaterial otherwise so roofs and cobbles stay untouched.
+ */
+export function patchTerrainGlow(material, key = 'terrainGlow') {
+  if (!material) return material;
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+#ifdef USE_MAP
+{
+  vec2 tu = vec2(vMapUv.x * 16.0, (1.0 - vMapUv.y) * 16.0);
+  float lava = step(9.0, tu.x) * step(tu.x, 12.0) * step(2.0, tu.y) * step(tu.y, 5.0);
+  float pulse = 0.75 + 0.25 * sin(vMapUv.x * 48.0 + vMapUv.y * 32.0);
+  totalEmissiveRadiance += vec3(1.4, 0.42, 0.07) * lava * pulse;
+}
+#endif`
+    );
+  };
+  const prev = material.customProgramCacheKey;
+  material.customProgramCacheKey = function terrainGlowKey() {
+    return (prev ? prev.call(this) : '') + key;
+  };
+  return material;
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,7 +167,7 @@ export function buildAtlas() {
   const pick = (arr, seed) => arr[Math.floor(seed * arr.length) % arr.length];
   const wrapNoise = (x, y, s) => hash2(((x % TILE_PX) + TILE_PX) % TILE_PX, ((y % TILE_PX) + TILE_PX) % TILE_PX, s);
 
-  const GRASS = [0x58a838, 0x62b23e, 0x6cbb44, 0x77c64d, 0x4f9c33];
+  const GRASS = [0x4e8f36, 0x58963c, 0x629e42, 0x6aa848, 0x457e30];
   const grassFn = (x, y, s) => {
     const n = wrapNoise(x, y, s);
     const clump = wrapNoise(x >> 1, y >> 1, s + 9);
@@ -207,17 +236,21 @@ export function buildAtlas() {
     return wrapNoise(x >> 2, y >> 2, s) * 0.55 + wrapNoise(x >> 1, y >> 1, s + 1) * 0.3 + wrapNoise(x, y, s + 2) * 0.15;
   }
 
-  const COBS = [0x8a8f96, 0x9aa0a6, 0x7c8288, 0xa7a29a, 0x8d8a86, 0x73787f];
+  const COBS = [0x8a8f96, 0x9aa0a6, 0x7c8288, 0xa7a29a, 0x8d8a86, 0x73787f, 0x7a7268, 0x969086];
   fill(TILE.COBBLE, (x, y) => {
-    const row = Math.floor(y / 4);
-    const off = row % 2 === 0 ? 0 : 2;
+    const warp = Math.floor(wrapNoise(x, 0, 59) * 2);
+    const row = Math.floor((y + warp) / 4);
+    const off = row % 2 === 0 ? 0 : 2 + Math.floor(wrapNoise(row, 0, 60) * 2);
     const sx = Math.floor((x + off) / 5);
-    const ly = y % 4;
+    const ly = (y + warp) % 4;
     const lx = (x + off) % 5;
-    if (ly === 3 || lx === 4) return 0x4d4d52;
+    const moss = wrapNoise(sx, row, 64) > 0.78;
+    if (ly === 3 || lx === 4) return moss ? 0x4a5a3e : 0x4d4d52;
     let c = pick(COBS, hash2(sx, row, 61));
-    if (ly === 0) c = shade(c, 1.12);
-    if (wrapNoise(x, y, 62) > 0.88) c = shade(c, 0.88);
+    if (ly === 0) c = shade(c, 1.1);
+    if (moss && ly > 1) c = mix(c, 0x5a7a42, 0.35);
+    if (wrapNoise(x, y, 62) > 0.84) c = mix(c, 0x6a5340, 0.4);
+    if (wrapNoise(x, y, 63) > 0.92) c = shade(c, 0.82);
     return c;
   });
 
@@ -234,7 +267,7 @@ export function buildAtlas() {
     return c;
   });
 
-  const SNOW = [0xf4f8ff, 0xe8f0fa, 0xdce8f6, 0xffffff];
+  const SNOW = [0xdce6f2, 0xd0dcec, 0xc4d4e6, 0xe8eef6];
   fill(TILE.SNOW, (x, y) => pick(SNOW, wrapNoise(x, y, 81) * 0.5 + wrapNoise(x >> 1, y >> 1, 82) * 0.5));
   fill(TILE.SNOW_SIDE, (x, y) => {
     const depth = 3 + Math.floor(wrapNoise(x, 0, 83) * 4);
@@ -259,10 +292,13 @@ export function buildAtlas() {
     return g;
   });
 
-  const SAND = [0xe5d29a, 0xdcc78c, 0xefdca6, 0xd3bd80];
+  const SAND = [0xe5d29a, 0xdcc78c, 0xefdca6, 0xd3bd80, 0xc8ae72, 0xf0e0b0];
   fill(TILE.SAND, (x, y) => {
-    let c = pick(SAND, wrapNoise(x, y, 91) * 0.6 + wrapNoise(x >> 1, y >> 1, 92) * 0.4);
+    const dune = wrapNoise(x >> 2, y >> 2, 90);
+    let c = pick(SAND, wrapNoise(x, y, 91) * 0.45 + wrapNoise(x >> 1, y >> 1, 92) * 0.3 + dune * 0.25);
     if (wrapNoise(x, y, 93) > 0.94) c = shade(c, 0.85);
+    if (dune > 0.72) c = shade(c, 1.08);
+    if (dune < 0.28) c = shade(c, 0.9);
     return c;
   });
 

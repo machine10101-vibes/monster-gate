@@ -158,10 +158,14 @@ export class CampStage {
   }
 
   mesh(parts, x, z, rot = 0, scale = 1, y = 0) {
+    if (!parts) return null;
     const mats = this.game.world.mats;
     const g = new THREE.Group();
-    for (const p of parts) {
-      const mesh = new THREE.Mesh(p.geo, p.kind === 'solid' ? mats.solid : p.kind === 'glow' ? mats.glow : mats.window);
+    for (const p of Array.isArray(parts) ? parts : [parts]) {
+      if (!p?.geo) continue;
+      const mat = p.kind === 'glow' ? mats.glow : p.kind === 'window' ? mats.window : p.kind === 'cover' ? mats.cover : mats.solid;
+      if (!mat) continue;
+      const mesh = new THREE.Mesh(p.geo, mat);
       if (p.kind === 'solid' && this.shadows) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -186,31 +190,51 @@ export class CampStage {
     const treeCount = phone ? 16 : 46;
     const plantCount = phone ? 20 : 70;
 
-    const grass = toonMaterial({ color: 0x4f8f3a });
-    const ground = new THREE.Mesh(new THREE.CylinderGeometry(30, 31.5, 2, phone ? 32 : 56), grass);
-    ground.position.y = -1;
+    const grass = toonMaterial({ color: 0x5a9644, vertexColors: true });
+    const segs = phone ? 48 : 80;
+    const groundGeo = new THREE.CircleGeometry(31, segs);
+    groundGeo.rotateX(-Math.PI / 2);
+    const gcol = new Float32Array(groundGeo.attributes.position.count * 3);
+    for (let i = 0; i < groundGeo.attributes.position.count; i++) {
+      const px = groundGeo.attributes.position.getX(i);
+      const pz = groundGeo.attributes.position.getZ(i);
+      const d = Math.hypot(px, pz) / 31;
+      const n = (Math.sin(px * 0.18) + Math.cos(pz * 0.16)) * 0.04;
+      const shade = 0.88 + (1 - d) * 0.12 + n;
+      gcol[i * 3] = 0.32 * shade;
+      gcol[i * 3 + 1] = 0.55 * shade;
+      gcol[i * 3 + 2] = 0.24 * shade;
+    }
+    groundGeo.setAttribute('color', new THREE.BufferAttribute(gcol, 3));
+    const ground = new THREE.Mesh(groundGeo, grass);
+    ground.position.y = 0;
     ground.receiveShadow = this.shadows;
     this.group.add(ground);
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(31, 31.4, 1.4, segs, 1, true), toonMaterial({ color: 0x4a7a38 }));
+    skirt.position.y = -0.7;
+    this.group.add(skirt);
 
-    const dirt = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 8, 0.08, 40), toonMaterial({ color: 0x8a6a46 }));
+    const dirt = new THREE.Mesh(new THREE.CircleGeometry(7.8, 40), toonMaterial({ color: 0x8a6a46 }));
+    dirt.rotation.x = -Math.PI / 2;
     dirt.position.y = 0.02;
     dirt.receiveShadow = this.shadows;
     this.group.add(dirt);
-    const path = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.1, 32), toonMaterial({ color: 0x735740 }));
+    const path = new THREE.Mesh(new THREE.CircleGeometry(4.4, 36), toonMaterial({ color: 0x735740 }));
+    path.rotation.x = -Math.PI / 2;
     path.position.y = 0.04;
     path.receiveShadow = this.shadows;
     this.group.add(path);
 
-    const patch = new THREE.BoxGeometry(1, 0.12, 1);
+    const tuftGeo = new THREE.ConeGeometry(0.35, 0.55, 5);
     const tones = [0x5aa043, 0x468733, 0x6cb04c, 0x3f7a30, 0x78b858];
-    const patches = new THREE.InstancedMesh(patch, toonMaterial({}), grassCount);
+    const patches = new THREE.InstancedMesh(tuftGeo, toonMaterial({}), grassCount);
     const mtx = new THREE.Matrix4();
     const col = new THREE.Color();
     for (let i = 0; i < grassCount; i++) {
       const a = rand() * Math.PI * 2;
       const r = 8 + Math.sqrt(rand()) * 21;
-      const s = 0.8 + rand() * 1.8;
-      mtx.compose(new THREE.Vector3(Math.cos(a) * r, 0.03, Math.sin(a) * r), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * 3), new THREE.Vector3(s, 1, s * (0.7 + rand() * 0.6)));
+      const s = 0.6 + rand() * 1.1;
+      mtx.compose(new THREE.Vector3(Math.cos(a) * r, 0.22, Math.sin(a) * r), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * 3), new THREE.Vector3(s, 1, s * (0.7 + rand() * 0.6)));
       patches.setMatrixAt(i, mtx);
       patches.setColorAt(i, col.setHex(tones[Math.floor(rand() * tones.length)]));
     }
@@ -249,14 +273,18 @@ export class CampStage {
     this.mesh(M.barrel[0], 10.4, 3.6, 0.4, 1.2);
 
     for (let i = 0; i < treeCount; i++) {
-      const a = Math.PI * (0.02 + rand() * 1.96) + Math.PI * 0;
-      const r = 13 + rand() * 15;
+      const a = Math.PI * (0.05 + rand() * 0.9) * (rand() < 0.5 ? 1 : -1) + Math.PI;
+      const r = 12 + rand() * 16;
       const x = Math.cos(a) * r;
       const z = -Math.abs(Math.sin(a)) * r - 2 + (rand() - 0.5) * 3;
       if (Math.hypot(x + 13.5, z + 8.5) < 6 || Math.hypot(x - 14.5, z + 10) < 6) continue;
       const kind = rand();
-      const pool = kind < 0.6 ? M.pines : kind < 0.85 ? M.oaks : M.teal;
-      this.mesh(pool[Math.floor(rand() * pool.length)], x, z, rand() * 6.28, 1.15 + rand() * 0.7);
+      const pool = kind < 0.55 ? M.oaks : kind < 0.78 ? M.teal : kind < 0.9 ? M.blossoms : M.pines;
+      const scale = (kind < 0.78 ? 1.35 : 1.05) + rand() * 0.55;
+      this.mesh(pool[Math.floor(rand() * pool.length)], x, z, rand() * 6.28, scale);
+      if (kind < 0.7 && rand() < 0.55) {
+        this.mesh(M.oaks[Math.floor(rand() * M.oaks.length)], x + (rand() - 0.5) * 1.4, z + (rand() - 0.5) * 1.4, rand() * 6.28, scale * 0.55);
+      }
     }
     for (let i = 0; i < plantCount; i++) {
       const a = rand() * Math.PI * 2;

@@ -260,7 +260,9 @@ function buildLake(world) {
 }
 
 function addFishSpot(world, def, y) {
-  const mesh = new THREE.Mesh(world.fishGeo, world.fishMats[def.look || def.kind]);
+  const mat = world.fishMats[def.kind] || world.fishMats[def.look] || world.fishMats.rod;
+  if (!mat) return null;
+  const mesh = new THREE.Mesh(world.fishGeo, mat);
   mesh.position.set(def.x, y + 0.05, def.z);
   if (def.site === 'ice') mesh.scale.setScalar(0.78);
   mesh.renderOrder = 3;
