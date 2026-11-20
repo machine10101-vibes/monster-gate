@@ -79,8 +79,15 @@ function landMapLabels(world) {
       gilantre.n += 1;
       continue;
     }
-    const cx = land.x0 + TILE_SIZE / 2;
-    const cz = land.z0 + TILE_SIZE / 2;
+    let cx = land.x0 + TILE_SIZE / 2;
+    let cz = land.z0 + TILE_SIZE / 2;
+    if (name === 'Dawnspire' && world.holyKeep) {
+      cx = world.holyKeep.x;
+      cz = world.holyKeep.z;
+    } else if (name === 'Hellspire' && world.demonKeep) {
+      cx = world.demonKeep.x;
+      cz = world.demonKeep.z;
+    }
     const pin = chartedAnchor(cx, cz);
     if (!pin) continue;
     labels.push({
@@ -697,6 +704,15 @@ export class HUD {
         ny: ((label.z - oz) * mapScale / src.height) * 100,
       }));
       const placed = layoutPlaymapLabels(pins);
+      for (const label of placed) {
+        if (!label.visible) continue;
+        if (!(label.city || label.kind === 'city' || label.kind === 'landmark' || label.landmark)) continue;
+        const pinEl = document.createElement('i');
+        pinEl.className = 'playmap-pin' + (label.city || label.kind === 'city' ? ' city' : '');
+        pinEl.style.left = Number(label.ax).toFixed(2) + '%';
+        pinEl.style.top = Number(label.ay).toFixed(2) + '%';
+        fit.appendChild(pinEl);
+      }
       const leads = document.createElement('canvas');
       leads.className = 'playmap-leads';
       leads.width = 720;
@@ -715,10 +731,11 @@ export class HUD {
       for (const label of placed) {
         if (!label.visible) continue;
         const b = document.createElement('b');
-        b.className = 'playmap-label' + (label.city ? ' city' : label.kind === 'uncharted' ? ' uncharted' : label.kind === 'minor' ? ' minor' : ' landmark');
+        b.className = 'playmap-label' + (label.city ? ' city' : label.kind === 'uncharted' ? ' uncharted' : label.kind === 'minor' ? ' minor' : ' landmark') + (label.side ? ' side-' + label.side : '');
         b.textContent = label.name;
-        b.style.left = label.x.toFixed(2) + '%';
-        b.style.top = label.y.toFixed(2) + '%';
+        const atPin = !!label.side;
+        b.style.left = (atPin ? label.ax : label.x).toFixed(2) + '%';
+        b.style.top = (atPin ? label.ay : label.y).toFixed(2) + '%';
         fit.appendChild(b);
       }
       frame.appendChild(fit);

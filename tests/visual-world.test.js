@@ -194,7 +194,7 @@ test('cloud shadows darken the ground and never cover the play view', () => {
   assert.match(world, /uCloudDark: cloudShadowUniforms\.uCloudDark/);
   assert.match(src('src/world/sky.js'), /cloudShadowStrong/);
   assert.match(src('src/world/sky.js'), /uCloudDark\.value = 0\.25/);
-  assert.match(src('src/world/sky.js'), /_cloudTimeFrozen/);
+  assert.doesNotMatch(src('src/world/sky.js'), /_cloudTimeFrozen/);
   assert.match(src('src/main.js'), /parseCloudShadowFlag/);
   assert.match(src('src/main.js'), /this\.debug && this\.sky\?\.cloudShadowStrong/);
   assert.doesNotMatch(src('src/main.js'), /rememberHunter\([\s\S]{0,400}hour/);
@@ -216,7 +216,8 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
   assert.match(world, /cornerDist/);
-  assert.match(world, /smoothstep\(1\.15, 0\.10, d\)/);
+  assert.match(world, /smoothstep\(0\.48, 0\.04, d\)/);
+  assert.match(world, /WATER_SURFACE/);
   assert.match(world, /0x124a78/);
   assert.match(world, /0x4eb8c4/);
   assert.match(world, /mix\(0\.97, 1\.0, depthK\)/);
@@ -430,6 +431,19 @@ test('grass terrace T-junctions weld so a 1-unit drop has one height per vertex'
   const { cracks, samples } = grassCracks({ H, top }, mesh, 1, 5, 1, 5);
   assert.ok(samples > 4, `expected skirt samples, got ${samples}`);
   assert.equal(cracks, 0, `synthetic terrace should not show sky cracks (${cracks})`);
+});
+
+test('pass 41 waterline sits under shore sand with a thin foam line', () => {
+  const world = src('src/world/world.js');
+  const jungle = src('src/world/jungle.js');
+  const terrain = src('src/world/terrain.js');
+  assert.match(terrain, /WATER_SURFACE = 0\.28/);
+  assert.match(world, /WATER_SURFACE/);
+  assert.match(world, /smoothstep\(0\.48, 0\.04, d\)/);
+  assert.doesNotMatch(world, /smoothstep\(1\.15, 0\.10, d\)/);
+  assert.match(jungle, /lerp\(ih, 0\.32/);
+  assert.match(terrain, /nh < WATER_Y \+ 0\.02/);
+  assert.match(terrain, /wetTop/);
 });
 
 test('Oakhollow guild/tent and Brookside meadow skirts have no 1-unit cracks', () => {

@@ -494,7 +494,9 @@ const PLAYMAP_PIN_NUDGES = {
   Goldmead: [1, 0],
   Snowfall: [1, 0],
   Cinderfall: [-1, 0],
+  Dawnspire: [1, 0],
   Hellspire: [0, -1],
+  Bramblewood: [-1, 0],
   Runmouth: [-1, 0],
   Southmead: [0, -1],
   Southford: [0, 1],
@@ -502,6 +504,18 @@ const PLAYMAP_PIN_NUDGES = {
   Brookside: [-1, 0],
   'The Lagoon': [1, 1],
   'Silverrun Canopy': [-1, -1],
+};
+
+const PLAYMAP_SIDE_NAME = {
+  '0,0': '',
+  '-1,0': 'w',
+  '1,0': 'e',
+  '0,-1': 'n',
+  '0,1': 's',
+  '-1,-1': 'nw',
+  '1,-1': 'ne',
+  '-1,1': 'sw',
+  '1,1': 'se',
 };
 
 /**
@@ -569,7 +583,9 @@ export function layoutPlaymapLabels(labels, opts = {}) {
       continue;
     }
     const pin = PLAYMAP_PIN_NUDGES[it.name];
-    const slots = pin ? [pin, ...PLAYMAP_SIDES] : PLAYMAP_SIDES;
+    const hugPin = it.kind === 'city' || it.kind === 'landmark';
+    const offCenter = PLAYMAP_SIDES.filter(([dx, dy]) => dx || dy);
+    const slots = pin ? [pin, ...offCenter] : hugPin ? offCenter : PLAYMAP_SIDES;
     const tryReach = (maxPx) => {
       const maxDx = (maxPx / mapW) * 100;
       const maxDy = (maxPx / mapH) * 100;
@@ -583,8 +599,9 @@ export function layoutPlaymapLabels(labels, opts = {}) {
         if (blocked(r)) continue;
         it.x = c.x;
         it.y = c.y;
+        it.side = PLAYMAP_SIDE_NAME[`${dx},${dy}`] || '';
         const d = Math.hypot(c.x - it.ax, c.y - it.ay);
-        it.lead = (it.kind === 'city' || it.kind === 'landmark') && it.uncharted !== true && it.charted !== false && d > 0.7 && d < 8;
+        it.lead = !it.side && (it.kind === 'city' || it.kind === 'landmark') && it.uncharted !== true && it.charted !== false && d > 0.7 && d < 8;
         it.visible = true;
         used.push(r);
         return true;

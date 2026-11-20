@@ -130,11 +130,11 @@ export function jungleFeature(h, x, z, spec) {
         let bed = lerp(-1.85, 0.05, d / 0.72);
         for (const [ix, iz, ir, ih] of spec.islands || []) {
           const di = Math.hypot(x - ix, z - iz) / ir;
-          if (di < 1) bed = Math.max(bed, lerp(ih, 0.1, smoothstep(0.55, 1, di)));
+          if (di < 1) bed = Math.max(bed, lerp(ih, 0.32, smoothstep(0.55, 1, di)));
         }
-        return bed > 0.45 ? { h: bed, kind: 0 } : { h: bed, kind: K_WATER };
+        return bed > 0.28 ? { h: bed, kind: 0 } : { h: bed, kind: K_WATER };
       }
-      out = { h: lerp(0.3, Math.min(h, 3.4), (d - 0.72) / 0.68), kind: 0 };
+      out = { h: lerp(0.28, Math.min(h, 3.4), (d - 0.72) / 0.68), kind: 0 };
       h = out.h;
     }
   }

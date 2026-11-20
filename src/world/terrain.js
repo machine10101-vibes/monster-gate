@@ -9,6 +9,8 @@ export const TOWN = { x: 72, z: 76 };
 export const GUILD = { x: 72, z: 67 };
 export const GATE = { x: 72, z: 33 };
 export const WATER_Y = 0.35;
+/** Water mesh Y. Shore sand lerps to ~0.3, so the pool sits just under the beach instead of a raised slab. */
+export const WATER_SURFACE = 0.28;
 export const PLAY_RADIUS = 52;
 export const FARM = { x0: 90, z0: 84, x1: 108, z1: 99 };
 export const MINE = { x: 98, z: 66, pitR: 5.5, rimR: 10.5, blend: 5.5, rimH: 3, floorH: 1, rampX0: 88, rampHW: 1.5 };
@@ -400,6 +402,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
         for (let x = cx; x < Math.min(width, cx + CHUNK); x++) {
           const i = z * width + x;
           const h = H[i];
+          const zn = zone[i];
           const tl = top[i];
           const tr = tint[i * 3];
           const tg = tint[i * 3 + 1];
@@ -451,6 +454,10 @@ export function buildTerrainMeshes(data, material, opt = {}) {
               // into a ramp leaves paper-thin sky spikes at grazing angles
               // (pass 40, x 60-90 y 690-750). Skirts close those walls.
               if (drop <= 0 || drop > 1.001) continue;
+              // Never weld into the pool — a 0.4–1 wu shore/island drop
+              // became a sky-coloured sliver at the waterline. Leave mines
+              // welding; those 1 wu ramps are the oak tent terrace.
+              if (nh < WATER_Y + 0.02) continue;
               if (!skirtOk(tileAt(cx, cz))) continue;
               y = Math.min(y, nh);
             }
@@ -462,11 +469,12 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             y11 = weldCorner(x + 1, z + 1);
             y10 = weldCorner(x + 1, z);
           }
+          const pad = grassy ? 0.015 : 0;
           const ps = [
-            [x + ox, y00, z + oz],
-            [x + ox, y01, z + oz + 1],
-            [x + ox + 1, y11, z + oz + 1],
-            [x + ox + 1, y10, z + oz],
+            [x + ox - pad, y00, z + oz - pad],
+            [x + ox - pad, y01, z + oz + 1 + pad],
+            [x + ox + 1 + pad, y11, z + oz + 1 + pad],
+            [x + ox + 1 + pad, y10, z + oz - pad],
           ];
           const e1x = ps[1][0] - ps[0][0];
           const e1y = ps[1][1] - ps[0][1];
@@ -480,15 +488,29 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           const nl = Math.hypot(nx, ny, nz) || 1;
           const topN = [nx / nl, ny / nl, nz / nl];
           const cs = aos.map((a) => [tr * a, tg * a, tb * a]);
-          if (!grassy && aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, topN, uvs, cs);
-          else if (!grassy) {
-            quad(
-              [ps[1], ps[2], ps[3], ps[0]],
-              topN,
-              [uvs[1], uvs[2], uvs[3], uvs[0]],
-              [cs[1], cs[2], cs[3], cs[0]]
-            );
-          } else quad(ps, topN, uvs, cs);
+          const wetTop = zn === ZONE.WATER || zn === ZONE.LAKE;
+          // Lakebed tops sit under the water plane. Drawing them made a teal
+          // slab at the lagoon shore and sky holes at the palm island.
+          if (!wetTop) {
+            // Grazing grass ramps pick the hemi sky colour (pale blue). Keep
+            // the quad but light it as a ground face.
+            if (grassy && topN[1] < 0.55) {
+              topN[0] = 0;
+              topN[1] = 1;
+              topN[2] = 0;
+            }
+            if (!grassy && aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, topN, uvs, cs);
+            else if (!grassy) {
+              quad(
+                [ps[1], ps[2], ps[3], ps[0]],
+                topN,
+                [uvs[1], uvs[2], uvs[3], uvs[0]],
+                [cs[1], cs[2], cs[3], cs[0]]
+              );
+            } else quad(ps, topN, uvs, cs);
+          }
+
+          if (wetTop) continue;
 
           const sideTiles = sideTilesFor(tl, top, width, depth, x, z);
           const dirs = [
@@ -512,8 +534,8 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             if (!nextWater && edgeY[di][0] <= nh + 0.001 && edgeY[di][1] <= nh + 0.001) continue;
             const rx = dz;
             const rz = -dx;
-            const mx = x + 0.5 + dx * 0.5;
-            const mz = z + 0.5 + dz * 0.5;
+            const mx = x + 0.5 + dx * 0.54;
+            const mz = z + 0.5 + dz * 0.54;
             const ax = mx - rx * 0.5;
             const az = mz - rz * 0.5;
             const bx = mx + rx * 0.5;

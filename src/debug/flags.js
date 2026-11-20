@@ -26,6 +26,15 @@ export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
 const LAGOON_POOL = { x: -226, z: 50 };
 const LAGOON_SHORE = { x: -226, z: 69 };
 export const LAGOON_CAM = { pitch: 0.58, dist: 16, lookAhead: 0 };
+/** Dry sand just north of the brown-ship pier, looking south at the hull and sea. */
+function pirateOrigin() {
+  const tile = TILES.find((t) => t.kind === 'pirateshore');
+  return tile ? originOf(tile) : { x: -288, z: 288 };
+}
+const _pirateO = pirateOrigin();
+export const PIRATE_SHORE = { x: _pirateO.x + 34, z: _pirateO.z + 96 };
+export const PIRATE_SHIP = { x: _pirateO.x + 50.8, z: _pirateO.z + 125 };
+export const PIRATE_CAM = { pitch: 0.34, dist: 24, lookAhead: 0 };
 /** ~18 Hunter Blade hits; ~20s of steady auto-attack at low level. */
 export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;
@@ -84,6 +93,7 @@ export const DEBUG_SPOTS = {
   greenbowl: { x: OASIS_DRY.x, z: OASIS_DRY.z },
   lagoon: { x: LAGOON_SHORE.x, z: LAGOON_SHORE.z },
   canopy: { x: -354, z: 110 },
+  pirateshore: { x: PIRATE_SHORE.x, z: PIRATE_SHORE.z },
 };
 
 const DEBUG_ALIAS_EXPLICIT = {
@@ -740,6 +750,19 @@ export function teleportDebug(game, raw) {
       game.cam.targetDist = LAGOON_CAM.dist;
       game.cam.dist = LAGOON_CAM.dist;
       game.cam.lookAhead = LAGOON_CAM.lookAhead;
+    }
+  }
+  if (spot.id === 'pirateshore') {
+    const yaw = Math.atan2(PIRATE_SHIP.x - spot.x, PIRATE_SHIP.z - spot.z);
+    game.player.yaw = yaw;
+    if (typeof game.forestAmt === 'number') game.forestAmt = 0;
+    if (game.cam) {
+      game.cam.targetYaw = yaw + Math.PI;
+      game.cam.yaw = yaw + Math.PI;
+      game.cam.pitch = PIRATE_CAM.pitch;
+      game.cam.targetDist = PIRATE_CAM.dist;
+      game.cam.dist = PIRATE_CAM.dist;
+      game.cam.lookAhead = PIRATE_CAM.lookAhead;
     }
   }
   game.player.syncObj?.();

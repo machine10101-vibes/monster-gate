@@ -247,12 +247,16 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   const style = src('../src/style.css');
   assert.match(hud, /layoutPlaymapLabels/);
   assert.match(hud, /playmap-leads/);
+  assert.match(hud, /playmap-pin/);
   assert.match(hud, /playmap-fit/);
   assert.match(hud, /chartedAnchor/);
+  assert.match(hud, /holyKeep/);
   assert.match(style, /object-fit:\s*contain/);
   assert.match(style, /--map-w/);
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*font-size: 12px/);
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*#7a4a18/);
+  assert.match(style, /\.playmap-pin/);
+  assert.match(style, /\.playmap-label\.side-e/);
   const layout = src('../src/ui/hudLayout.js');
   assert.match(layout, /d < 8/);
   assert.match(layout, /PLAYMAP_FRAME_PAD_PX/);
@@ -286,6 +290,18 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   assert.ok(pinPx <= 32, `Bramblewood ${pinPx.toFixed(1)}px from its marker`);
   const dawnPin = Math.hypot((dawn.x - dawn.ax) / 100 * 720, (dawn.y - dawn.ay) / 100 * 560);
   assert.ok(dawnPin <= 32, `Dawnspire ${dawnPin.toFixed(1)}px from its marker`);
+  assert.ok(dawnPin >= 6, `Dawnspire sits beside its marker (${dawnPin.toFixed(1)}px)`);
+  assert.equal(dawn.side, 'e');
+  for (const size of [[720, 560], [1280, 800], [1920, 1080], [1920, 1200]]) {
+    const sized = layoutPlaymapLabels([
+      { name: 'Dawnspire', nx: 32, ny: 24, city: true },
+      { name: 'Bramblewood', nx: 22, ny: 24, uncharted: true },
+    ], { mapW: size[0], mapH: size[1] });
+    const d = sized.find((p) => p.name === 'Dawnspire');
+    assert.ok(d.visible && d.side, `Dawnspire marker side at ${size[0]}x${size[1]}`);
+    const dist = Math.hypot((d.x - d.ax) / 100 * size[0], (d.y - d.ay) / 100 * size[1]);
+    assert.ok(dist <= 36, `Dawnspire ${dist.toFixed(1)}px from pin at ${size[0]}x${size[1]}`);
+  }
 });
 
 test('Map panel contain size stays above 300px at desktop, laptop and phone landscape', () => {
