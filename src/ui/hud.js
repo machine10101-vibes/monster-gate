@@ -522,8 +522,19 @@ export class HUD {
     const origin = cave ? cave.origin : (world.minimapOrigin || { x: 0, z: 0 });
     const sx = Math.round(px - origin.x - N / 2);
     const sz = Math.round(pz - origin.z - N / 2);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(cave ? cave.minimap : world.minimapCanvas, sx, sz, N, N, 0, 0, cv.width, cv.height);
+    const mapScale = cave ? 1 : (world.minimapScale || 1);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(
+      cave ? cave.minimap : world.minimapCanvas,
+      sx * mapScale,
+      sz * mapScale,
+      N * mapScale,
+      N * mapScale,
+      0,
+      0,
+      cv.width,
+      cv.height,
+    );
     const toX = (x) => (x - origin.x - sx) * sc;
     const toZ = (z) => (z - origin.z - sz) * sc;
     const inView = (x, z) => {
@@ -631,20 +642,22 @@ export class HUD {
       c.width = instanced ? 240 : src.width;
       c.height = instanced ? 192 : src.height;
       const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(src, 0, 0, c.width, c.height);
       const p = game.player;
       const ox = inCave ? game.world.cave.origin.x : inRift ? game.world.rift.origin.x : (game.world.minimapOrigin?.x || 0);
       const oz = inCave ? game.world.cave.origin.z : inRift ? game.world.rift.origin.z : (game.world.minimapOrigin?.z || 0);
-      const mx = (p.pos.x - ox) * (c.width / src.width);
-      const mz = (p.pos.z - oz) * (c.height / src.height);
+      const mapScale = instanced ? 1 : (game.world.minimapScale || 1);
+      const mx = (p.pos.x - ox) * mapScale * (c.width / src.width);
+      const mz = (p.pos.z - oz) * mapScale * (c.height / src.height);
       if (!instanced) {
         ctx.fillStyle = '#c27bff';
-        ctx.fillRect(GATE.x - ox - 3, GATE.z - oz - 3, 6, 6);
+        ctx.fillRect((GATE.x - ox) * mapScale - 3, (GATE.z - oz) * mapScale - 3, 6, 6);
         ctx.fillStyle = '#ffd23f';
-        ctx.fillRect(GUILD.x - ox - 3, GUILD.z - oz - 3, 6, 6);
+        ctx.fillRect((GUILD.x - ox) * mapScale - 3, (GUILD.z - oz) * mapScale - 3, 6, 6);
         ctx.fillStyle = '#b25cff';
-        ctx.fillRect(CAVE_MOUTH.x - ox - 3, CAVE_MOUTH.z - oz - 3, 6, 6);
+        ctx.fillRect((CAVE_MOUTH.x - ox) * mapScale - 3, (CAVE_MOUTH.z - oz) * mapScale - 3, 6, 6);
       }
       ctx.fillStyle = '#fff';
       ctx.fillRect(mx - 2, mz - 2, 4, 4);
@@ -656,8 +669,8 @@ export class HUD {
       const raw = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
       const pins = raw.map((label) => ({
         ...label,
-        nx: ((label.x - ox) / src.width) * 100,
-        ny: ((label.z - oz) / src.height) * 100,
+        nx: ((label.x - ox) * mapScale / src.width) * 100,
+        ny: ((label.z - oz) * mapScale / src.height) * 100,
       }));
       const placed = layoutPlaymapLabels(pins);
       const leads = document.createElement('canvas');

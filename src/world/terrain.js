@@ -406,8 +406,9 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           const tb = tint[i * 3 + 2];
           const { u0, u1, vTop, vBot } = uvOf(tl);
 
+          const grassy = tl === TILE.GRASS || tl === TILE.FLOWER_GRASS;
           const aoAt = (sx, sz) => {
-            const lift = smooth ? 0.85 : 0.55;
+            const lift = grassy ? 1.4 : (smooth ? 0.85 : 0.55);
             const s1 = hAt(x + sx, z) > h + lift ? 1 : 0;
             const s2 = hAt(x, z + sz) > h + lift ? 1 : 0;
             const c = hAt(x + sx, z + sz) > h + lift ? 1 : 0;
@@ -421,7 +422,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             [1, -1],
           ];
           const aos = corners.map(([sx, sz]) => aoAt(sx, sz));
-          const rot = Math.floor(hash2(x, z, 13) * 4);
+          const rot = grassy ? 0 : Math.floor(hash2(x, z, 13) * 4);
           const baseUV = [
             [u0, vBot],
             [u0, vTop],
@@ -452,15 +453,15 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           const nl = Math.hypot(nx, ny, nz) || 1;
           const topN = [nx / nl, ny / nl, nz / nl];
           const cs = aos.map((a) => [tr * a, tg * a, tb * a]);
-          if (aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, topN, uvs, cs);
-          else {
+          if (!grassy && aos[0] + aos[2] > aos[1] + aos[3]) quad(ps, topN, uvs, cs);
+          else if (!grassy) {
             quad(
               [ps[1], ps[2], ps[3], ps[0]],
               topN,
               [uvs[1], uvs[2], uvs[3], uvs[0]],
               [cs[1], cs[2], cs[3], cs[0]]
             );
-          }
+          } else quad(ps, topN, uvs, cs);
 
           const sideTiles = sideTilesFor(tl, top, width, depth, x, z);
           const dirs = [

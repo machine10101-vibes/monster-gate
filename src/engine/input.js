@@ -188,7 +188,8 @@ export class Input {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.target?.closest?.('#panel, #dialog, #title, #world-chat, #loading')) return;
       e.preventDefault();
-      this.zoomDelta += Math.sign(e.deltaY);
+      const step = Math.sign(e.deltaY) * Math.min(2.4, Math.max(0.35, Math.abs(e.deltaY) / 100));
+      this.zoomDelta += step;
     };
     window.addEventListener('wheel', onWheel, { passive: false });
 

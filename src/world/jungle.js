@@ -206,6 +206,14 @@ export function paintJungleCell(out, H, x, z, kind, isPath, n, spec) {
     set(ZONE.MOUNTAIN, h > 6 && n > 0.45 ? TILE.MOSS_STONE : TILE.STONE, 0.74, 0.92, 0.74);
     return;
   }
+  for (const [cx, cz, rx, rz] of spec.pools || []) {
+    if (rx < 20 || rz < 14) continue;
+    const d = Math.hypot((x - cx) / rx, (z - cz) / rz);
+    if (d >= 0.68 && d < 1.28) {
+      set(ZONE.FIELD, TILE.SAND, 1.02, 0.96, 0.78);
+      return;
+    }
+  }
   if (beach > 0.55) {
     const wet = h < 0.9;
     set(ZONE.FIELD, TILE.SAND, wet ? 0.92 : 1.02 + nB * 0.06, wet ? 0.88 : 0.97, wet ? 0.74 : 0.8 + nB * 0.06);

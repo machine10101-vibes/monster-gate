@@ -31,5 +31,6 @@ test('mouse wheel zooms from the window so HUD overlays do not swallow it', () =
   const main = src('src/main.js');
   assert.match(input, /window\.addEventListener\('wheel'/);
   assert.match(input, /#panel, #dialog, #title/);
-  assert.match(main, /clamp\(this\.cam\.targetDist \+ inp\.zoomDelta \* 1\.2, 8, 32\)/);
+  assert.match(main, /clamp\(this\.cam\.targetDist \+ inp\.zoomDelta \* 1\.6, 8, 52\)/);
+  assert.match(input, /Math\.abs\(e\.deltaY\) \/ 100/);
 });

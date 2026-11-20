@@ -47,10 +47,28 @@ test('MG-UI-12: one right-edge menu column and a collapsed quest dropdown', () =
 test('menu buttons shrink to fit the viewport and stay at least 32px on touch', () => {
   for (const vp of HUD_VIEWPORTS) {
     const fit = fitMenuButtons(vp.h, { touch: vp.touch, count: MENU_COUNT });
-    assert.ok(fit.size * MENU_COUNT + fit.gap * (MENU_COUNT - 1) <= vp.h - 12, vp.name);
-    if (vp.touch) assert.ok(fit.size >= 32, vp.name);
+    const rows = fit.rows || MENU_COUNT;
+    assert.ok(fit.size * rows + fit.gap * Math.max(0, rows - 1) <= vp.h - 12, vp.name);
+    assert.ok(fit.height <= vp.h - 12, `${vp.name} column height`);
+    if (vp.touch && vp.h > 500) assert.ok(fit.size >= 32, vp.name);
+    if (vp.touch) assert.ok(fit.size >= 28, vp.name);
     assert.ok(fit.size <= 44, vp.name);
   }
+});
+
+test('MG-UI-52 phone landscape packs the menu into two columns that fit 390px', () => {
+  const vp = { name: 'phone-landscape', w: 844, h: 390, touch: true };
+  const fit = fitMenuButtons(vp.h, { touch: true, count: MENU_COUNT });
+  assert.equal(fit.cols, 2);
+  assert.ok(fit.height <= 390 - 36, `menu height ${fit.height} must clear safe-area`);
+  assert.ok(fit.size >= 28);
+  const rects = hudRects(vp);
+  assert.ok(rects.menu.y >= 0);
+  assert.ok(rects.menu.y + rects.menu.h <= vp.h);
+  const theme = src('../src/ui/theme.css');
+  assert.match(theme, /flex-wrap:\s*wrap-reverse/);
+  assert.match(theme, /--menu-cols:\s*2/);
+  assert.match(theme, /\.build-id \{[\s\S]*top:\s*calc\(8px \+ var\(--safe-t\) \+ 78px\)/);
 });
 
 test('HUD rects do not collide at 844x390, 390x844, 1280x800, 1920x1080', () => {

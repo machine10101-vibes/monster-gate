@@ -25,12 +25,14 @@ import { placeTeleportPortals } from './teleport.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
+export const MAP_PX = 2;
+const GRASS_MAP = [105, 175, 75];
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const _sphereC = new THREE.Vector3();
 const _sphereE = new THREE.Vector3();
 
-/** Soften hard tile rectangles on the hunter Map so snow, ash and meadow meet. */
-function blendMinimapSeams(map, lands, minX, minZ) {
+/** Soft cosine blend across tile edges so the middle band stays seamless. */
+function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
   const w = map.width;
   const h = map.height;
   if (w < 2 || h < 2 || !lands?.length) return;
@@ -40,7 +42,9 @@ function blendMinimapSeams(map, lands, minX, minZ) {
   out.data.set(src.data);
   const d = src.data;
   const o = out.data;
-  const band = 28;
+  const tile = W * scale;
+  const band = Math.max(10, Math.round(22 * scale));
+  const fall = (b) => 0.5 * (1 + Math.cos(Math.PI * b / band)) * 0.55;
   const mix = (x, y, nx, ny, t) => {
     if (t <= 0 || nx < 0 || ny < 0 || nx >= w || ny >= h) return;
     const i = (y * w + x) * 4;
@@ -51,33 +55,68 @@ function blendMinimapSeams(map, lands, minX, minZ) {
     o[i + 2] += (d[j + 2] - o[i + 2]) * k;
   };
   for (const land of lands) {
-    const x0 = land.x0 - minX;
-    const z0 = land.z0 - minZ;
-    for (let lz = 0; lz < W; lz++) {
+    const x0 = Math.round((land.x0 - minX) * scale);
+    const z0 = Math.round((land.z0 - minZ) * scale);
+    for (let lz = 0; lz < tile; lz++) {
       const y = z0 + lz;
       if (y < 0 || y >= h) continue;
       for (let b = 0; b < band; b++) {
-        const jagged = (hash2(land.x0 + W - b, land.z0 + lz, 91) - 0.5) * 12;
-        const east = x0 + W - 1 - b;
+        const t = fall(b);
+        const east = x0 + tile - 1 - b;
         const west = x0 + b;
-        const te = 1 - (b + jagged) / band;
-        const tw = 1 - (b - jagged) / band;
-        if (east >= 0 && east < w) mix(east, y, east + b + 1, y, te * 0.62);
-        if (west >= 0 && west < w) mix(west, y, west - b - 1, y, tw * 0.62);
+        if (east >= 0 && east < w) mix(east, y, east + b + 1, y, t);
+        if (west >= 0 && west < w) mix(west, y, west - b - 1, y, t);
       }
     }
-    for (let lx = 0; lx < W; lx++) {
+    for (let lx = 0; lx < tile; lx++) {
       const x = x0 + lx;
       if (x < 0 || x >= w) continue;
       for (let b = 0; b < band; b++) {
-        const jagged = (hash2(land.x0 + lx, land.z0 + W - b, 92) - 0.5) * 12;
-        const south = z0 + W - 1 - b;
+        const t = fall(b);
+        const south = z0 + tile - 1 - b;
         const north = z0 + b;
-        const ts = 1 - (b + jagged) / band;
-        const tn = 1 - (b - jagged) / band;
-        if (south >= 0 && south < h) mix(x, south, x, south + b + 1, ts * 0.62);
-        if (north >= 0 && north < h) mix(x, north, x, north - b - 1, tn * 0.62);
+        if (south >= 0 && south < h) mix(x, south, x, south + b + 1, t);
+        if (north >= 0 && north < h) mix(x, north, x, north - b - 1, t);
       }
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
+/** 3×3 box blur so zone colours interpolate instead of dithering. */
+function blurMinimap(map) {
+  const w = map.width;
+  const h = map.height;
+  if (w < 2 || h < 2) return;
+  const ctx = map.getContext('2d');
+  const src = ctx.getImageData(0, 0, w, h);
+  const out = ctx.createImageData(w, h);
+  const d = src.data;
+  const o = out.data;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          const j = (yy * w + xx) * 4;
+          r += d[j];
+          g += d[j + 1];
+          b += d[j + 2];
+          n++;
+        }
+      }
+      const i = (y * w + x) * 4;
+      o[i] = r / n;
+      o[i + 1] = g / n;
+      o[i + 2] = b / n;
+      o[i + 3] = 255;
     }
   }
   ctx.putImageData(out, 0, 0);
@@ -625,10 +664,11 @@ export class World {
           col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float foamWave = 0.55 + 0.45 * sin(uTime * 1.7 + p.x * 0.55 + p.y * 0.4);
-          float foamNoise = vn(p * 1.8 + vec2(uTime * 0.12, -uTime * 0.08));
-          float foam = vShore * foamWave * smoothstep(0.16, 0.88, foamNoise);
-          col = mix(col, uFoam, foam * 0.92);
+          float shoreBand = smoothstep(0.62, 0.08, vDepth);
+          float foamWave = 0.88 + 0.12 * sin(uTime * 1.5 + p.x * 0.32);
+          float foam = max(vShore, shoreBand) * foamWave;
+          foam = smoothstep(0.22, 0.95, foam);
+          col = mix(col, uFoam, foam * 0.78);
           col *= uLight;
           float alpha = mix(0.72, 0.88, depthK);
           gl_FragColor = vec4(col, alpha);
@@ -1497,9 +1537,15 @@ export class World {
       else if (t === TILE.FARMLAND) [r, g, b] = [200, 170, 70];
       else {
         const fo = data.forest[i];
-        [r, g, b] = [105 - fo * 55, 175 - fo * 60, 75 - fo * 15];
+        [r, g, b] = [105 - fo * 28, 175 - fo * 30, 75 - fo * 8];
       }
-      const sh = 0.8 + clamp(h / 18, 0, 1) * 0.18;
+      if (t === TILE.FLAGSTONE || t === TILE.COBBLE || t === TILE.PATH || t === TILE.GRAVEL) {
+        const k = 0.62;
+        r = r * (1 - k) + GRASS_MAP[0] * k;
+        g = g * (1 - k) + GRASS_MAP[1] * k;
+        b = b * (1 - k) + GRASS_MAP[2] * k;
+      }
+      const sh = 0.9 + clamp(h / 18, 0, 1) * 0.08;
       img.data[i * 4] = r * sh;
       img.data[i * 4 + 1] = g * sh;
       img.data[i * 4 + 2] = b * sh;
@@ -1551,23 +1597,21 @@ export class World {
       ctx.fillRect(Math.floor(p.x - land.x0) - 1, Math.floor(p.z - land.z0) - 1, 3, 3);
     }
     octx.fillStyle = '#6a3d86';
-    octx.fillRect(70, 84, 4, 3);
+    octx.fillRect(70, 84, 2, 2);
     if (this.dock) {
       octx.fillStyle = '#7a5230';
       octx.fillRect(Math.floor(this.dock.x0), Math.floor(this.dock.z - this.dock.hw), Math.ceil(this.dock.x1 - this.dock.x0), 2);
     }
     if (this.storage) {
       octx.fillStyle = '#3f7d79';
-      octx.fillRect(Math.floor(this.storage.x) - 2, Math.floor(this.storage.z) - 2, 5, 4);
+      octx.fillRect(Math.floor(this.storage.x) - 1, Math.floor(this.storage.z) - 1, 3, 3);
     }
     if (this.smithy) {
       octx.fillStyle = '#e07030';
-      octx.fillRect(Math.floor(this.smithy.x) - 2, Math.floor(this.smithy.z) - 2, 5, 4);
+      octx.fillRect(Math.floor(this.smithy.x) - 1, Math.floor(this.smithy.z) - 1, 3, 3);
     }
-    octx.fillStyle = '#6b4a2b';
-    for (const b of [[GUILD.x, GUILD.z, 6, 6], [62.5, 72.5, 5, 4], [62.5, 81, 5, 4], [81.5, 73, 5, 4], [81.5, 81.5, 5, 4]]) {
-      octx.fillRect(Math.floor(b[0] - b[2] / 2), Math.floor(b[1] - b[3] / 2), b[2], b[3]);
-    }
+    octx.fillStyle = '#6b8a42';
+    octx.fillRect(Math.floor(GUILD.x) - 1, Math.floor(GUILD.z) - 1, 3, 3);
     const south = this.tileCanvas[TILES.find((t) => t.kind === 'southford').id];
     const sctx = south.getContext('2d');
     sctx.fillStyle = '#b25cff';
@@ -1580,30 +1624,40 @@ export class World {
       maxZ = Math.max(maxZ, o.z + W);
     }
     const map = document.createElement('canvas');
-    map.width = maxX - minX;
-    map.height = maxZ - minZ;
+    const px = MAP_PX;
+    map.width = (maxX - minX) * px;
+    map.height = (maxZ - minZ) * px;
     const mctx = map.getContext('2d');
     mctx.imageSmoothingEnabled = true;
-    mctx.fillStyle = '#cbb894';
+    mctx.imageSmoothingQuality = 'high';
+    mctx.fillStyle = '#1d4e86';
     mctx.fillRect(0, 0, map.width, map.height);
     for (const tile of TILES) {
       const o = originOf(tile);
       const planned = document.createElement('canvas');
-      planned.width = 36;
-      planned.height = 36;
+      planned.width = W * px;
+      planned.height = W * px;
       paintTileMap(planned, tile);
-      mctx.drawImage(planned, o.x - minX, o.z - minZ, W, W);
+      mctx.drawImage(planned, (o.x - minX) * px, (o.z - minZ) * px);
     }
     const atlasLands = TILES.map((tile) => {
       const o = originOf(tile);
       return { x0: o.x, z0: o.z };
     });
     for (const land of this.lands) {
-      mctx.drawImage(this.tileCanvas[land.tileId], land.x0 - minX, land.z0 - minZ);
+      mctx.drawImage(
+        this.tileCanvas[land.tileId],
+        (land.x0 - minX) * px,
+        (land.z0 - minZ) * px,
+        W * px,
+        W * px,
+      );
     }
-    blendMinimapSeams(map, atlasLands, minX, minZ);
+    blendMinimapSeams(map, atlasLands, minX, minZ, px);
+    blurMinimap(map);
     this.minimapCanvas = map;
     this.minimapOrigin = { x: minX, z: minZ };
+    this.minimapScale = px;
   }
 
   update(dt, t) {

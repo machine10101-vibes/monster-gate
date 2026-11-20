@@ -1,7 +1,8 @@
 /**
  * HUD geometry used by CSS variables and the collision tests.
- * Menu buttons live in one right-edge column. The quest tracker is a
- * collapsed chip by default, sitting beside the minimap on touch.
+ * Menu buttons live on the right edge (one column, or two on short
+ * phones). The quest tracker is a collapsed chip by default, sitting
+ * beside the minimap on touch.
  */
 
 export const MENU_COUNT = 11;
@@ -22,25 +23,29 @@ export const HUD_VIEWPORTS = [
 ];
 
 export function fitMenuButtons(h, { touch = false, count = MENU_COUNT, pad = 12 } = {}) {
-  const minSize = touch ? 32 : 28;
+  const short = touch && h <= 500;
+  const cols = short ? 2 : 1;
+  const rows = Math.ceil(count / cols);
+  const minSize = touch ? (short ? 28 : 32) : 28;
   const maxSize = touch ? 40 : 44;
-  const gaps = Math.max(0, count - 1);
-  const inner = Math.max(minSize, h - pad * 2);
+  const gaps = Math.max(0, rows - 1);
+  const inner = Math.max(minSize, h - pad * 2 - (short ? 24 : 0));
   let size = maxSize;
   let gap = touch ? 4 : 8;
-  const fits = (s, g) => s * count + Math.max(0, g) * gaps <= inner + 0.01;
+  const fits = (s, g) => s * rows + Math.max(0, g) * gaps <= inner + 0.01;
   while (!fits(size, gap) && size > minSize) size -= 1;
   if (!fits(size, gap) && gaps) {
-    gap = Math.max(touch ? 2 : 3, Math.floor((inner - size * count) / gaps));
+    gap = Math.max(touch ? 2 : 3, Math.floor((inner - size * rows) / gaps));
   }
   if (!fits(size, gap) && gaps) {
-    gap = Math.max(0, Math.floor((inner - size * count) / gaps));
+    gap = Math.max(0, Math.floor((inner - size * rows) / gaps));
   }
   if (!fits(size, gap)) {
-    size = Math.max(minSize, Math.floor((inner - Math.max(0, gap) * gaps) / count));
+    size = Math.max(minSize, Math.floor((inner - Math.max(0, gap) * gaps) / rows));
   }
-  const height = size * count + Math.max(0, gap) * gaps;
-  return { size, gap: Math.max(0, gap), colW: size, height };
+  const height = size * rows + Math.max(0, gap) * gaps;
+  const colW = size * cols + (cols > 1 ? Math.max(0, gap) : 0);
+  return { size, gap: Math.max(0, gap), colW, height, cols, rows };
 }
 
 export function rect(id, x, y, w, h) {
@@ -312,10 +317,11 @@ export function hudRects(vp, { questOpen = false } = {}) {
   const questH = questOpen ? Math.min(120, Math.max(72, Math.floor(h * 0.26))) : 22;
   const quest = rect('quest', 8 + mm + 8, 6, questW, questH);
 
-  const hotScale = touch ? 0.86 : 1;
-  const clusterW = 520 * hotScale;
+  const hotScale = touch ? (short ? 0.78 : 0.86) : 1;
+  const clusterW = (short && touch ? 460 : 520) * hotScale;
   const clusterH = touch ? 86 * hotScale : 190;
-  const hotbar = rect('hotbar', w / 2 - clusterW / 2, h - 4 - clusterH, clusterW, clusterH);
+  const hotShift = short && touch ? 36 : 0;
+  const hotbar = rect('hotbar', w / 2 - clusterW / 2 - hotShift, h - 4 - clusterH, clusterW, clusterH);
   const hearts = rect('hearts', w / 2 - 90 * hotScale, h - 4 - clusterH, 180 * hotScale, 22);
 
   let menuY = h - 6 - menu.height;
@@ -326,11 +332,12 @@ export function hudRects(vp, { questOpen = false } = {}) {
   }
 
   const ui = Math.max(1, Math.min(1.5, h / 820));
+  const actGap = short ? 14 : ACTION_GAP;
   const bubbleW = short ? 180 : 220;
   const bubbleH = (short ? 160 : 190) * ui;
   const bubbleBottom = touch && w <= 1100 ? 90 : 18;
   const bubbles = touch
-    ? rect('bubbles', w - MENU_INSET - menu.colW - ACTION_GAP - bubbleW, h - bubbleBottom - bubbleH, bubbleW, bubbleH)
+    ? rect('bubbles', w - MENU_INSET - menu.colW - actGap - bubbleW, h - bubbleBottom - bubbleH, bubbleW, bubbleH)
     : null;
 
   const chatW = short && touch ? Math.min(240, w * 0.36) : 80;
@@ -387,9 +394,11 @@ export function applyHudLayout(el, vp) {
   el.style.setProperty('--menu-btn', `${menu.size}px`);
   el.style.setProperty('--menu-gap', `${menu.gap}px`);
   el.style.setProperty('--menu-col-w', `${menu.colW}px`);
+  el.style.setProperty('--menu-cols', String(menu.cols || 1));
   el.style.setProperty('--hud-clear-bottom', `${clear}px`);
   el.style.setProperty('--hud-menu-bottom', `${menuBottom}px`);
-  el.style.setProperty('--hud-action-gap', `${ACTION_GAP}px`);
+  el.style.setProperty('--hud-action-gap', `${vp.h <= 500 ? 14 : ACTION_GAP}px`);
+  if (el.dataset) el.dataset.menuCols = String(menu.cols || 1);
   el.style.setProperty('--hud-menu-inset', `${MENU_INSET}px`);
   el.style.setProperty('--hud-clock-gap', `${CLOCK_GAP}px`);
   return menu;
@@ -409,7 +418,7 @@ export function touchActionRects(vp) {
   const boxW = 220;
   const boxH = short ? 200 : 190;
   const bottom = w <= 1100 ? 90 : 18;
-  const right = MENU_INSET + menu.colW + ACTION_GAP;
+  const right = MENU_INSET + menu.colW + (short ? 14 : ACTION_GAP);
   const visualW = boxW * scale;
   const visualH = boxH * scale;
   const cluster = rect('cluster', w - right - visualW, h - bottom - visualH, visualW, visualH);

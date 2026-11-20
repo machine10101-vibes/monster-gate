@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, LAGOON_CAM, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload, isUnsellableGood, stripDebugGrantedInPlace } from '../src/debug/transient.js';
 import { GOODS } from '../src/data/gathering.js';
@@ -160,6 +160,11 @@ test('every built tile has a debug tp key', () => {
   const pool = Math.hypot(lagoon.x + 226, lagoon.z - 50);
   assert.ok(pool > 16 && pool < 28, 'lagoon spawn looks at the water from a clear beach');
   assert.ok(Math.hypot(lagoon.x + 216, lagoon.z - 72) > 5, 'lagoon spawn is not the tile center');
+  assert.equal(LAGOON_CAM.lookAhead, 0, 'lagoon snap looks at the hunter, not the palm island');
+  assert.ok(LAGOON_CAM.dist >= 22, 'lagoon camera can sit farther back than the default zoom');
+  const jungle = readFileSync(new URL('../src/world/jungle.js', import.meta.url), 'utf8');
+  assert.match(jungle, /d >= 0\.68 && d < 1\.28/);
+  assert.match(jungle, /TILE\.SAND, 1\.02, 0\.96, 0\.78/);
 });
 
 test('debug monster spawn is inert without ?debug=1 and picks a zone mob with the flag', () => {
@@ -516,6 +521,27 @@ test('auto-attack ON, no input, tank dies in about 20s of simulated time', () =>
   assert.match(main, /kind === 'lootbag'/);
   assert.match(main, /performance\.now\(\)/);
   assert.doesNotMatch(main, /else if \(!blocked\) tickDebugAutoAttack/);
+});
+
+test('MG-UI-47 lagoon teleport snaps the camera onto the beach hunter', () => {
+  const cam = { yaw: 0, targetYaw: 0, pitch: 0.8, dist: 12, targetDist: 12, lookAhead: 12 };
+  const game = {
+    world: { realm: 'over', heightAt: () => 1.1, revealAround() {} },
+    player: { pos: { set(x, y, z) { this.x = x; this.y = y; this.z = z; }, x: 0, y: 0, z: 0 }, yaw: 0, syncObj() {} },
+    cam,
+    forestAmt: 0.4,
+    hud: { toast() {} },
+    snapCamera() { this.snapped = true; },
+  };
+  const spot = teleportDebug(game, 'lagoon');
+  assert.ok(spot);
+  assert.equal(cam.lookAhead, 0);
+  assert.equal(cam.pitch, LAGOON_CAM.pitch);
+  assert.equal(cam.dist, LAGOON_CAM.dist);
+  assert.equal(game.forestAmt, 0);
+  assert.ok(game.snapped);
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(main, /this\.cam\.look\.set\(P\.x, P\.y \+ 1\.3, P\.z\)/);
 });
 
 test('MG-UI-22 oasis landing frames the pool above the hotbar clearance', () => {
