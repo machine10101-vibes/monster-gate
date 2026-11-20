@@ -86,7 +86,7 @@ export const DEBUG_SPOTS = {
   canopy: { x: -354, z: 110 },
 };
 
-export const DEBUG_ALIASES = {
+const DEBUG_ALIAS_EXPLICIT = {
   oak: 'oakhollow',
   town: 'oakhollow',
   goldmead: 'goldenmeadow',
@@ -141,6 +141,7 @@ export const DEBUG_ALIASES = {
   forest: 'canopy',
   'pirate shore': 'pirateshore',
   piratedocks: 'pirateshore',
+  piratedunes: 'pirateshore',
   reedford: 'silverrunwest',
   'reedford reach': 'silverrunwest',
   elderwood: 'silverruneast',
@@ -148,7 +149,14 @@ export const DEBUG_ALIASES = {
   'greystone summit': 'silverrunpeak',
 };
 
+export const DEBUG_ALIASES = { ...DEBUG_ALIAS_EXPLICIT };
+
 {
+  const reserved = new Set([
+    ...Object.keys(DEBUG_SPOTS),
+    ...Object.keys(DEBUG_ALIAS_EXPLICIT),
+    'dunes', 'dune', 'desert', 'sand', 'sands', 'oasis', 'beach',
+  ]);
   const uses = new Map();
   for (const t of TILES) {
     if (!t.built) continue;
@@ -160,9 +168,10 @@ export const DEBUG_ALIASES = {
     const n = String(t.name || '').toLowerCase();
     const key = String(t.kind).toLowerCase();
     if (!n || uses.get(n) !== 1) continue;
-    if (DEBUG_SPOTS[n] || DEBUG_ALIASES[n]) continue;
+    if (reserved.has(n) || DEBUG_SPOTS[n] || DEBUG_ALIASES[n]) continue;
     DEBUG_ALIASES[n] = key;
   }
+  Object.assign(DEBUG_ALIASES, DEBUG_ALIAS_EXPLICIT);
 }
 
 export function parseDebugFlags(search = '') {
@@ -173,6 +182,11 @@ export function parseDebugFlags(search = '') {
   const tp = enabled ? String(q.get('tp') || '').trim() : '';
   const unlock = enabled && q.get('unlock') === '1';
   return { enabled, tp, unlock, blocked: wanted && mmo };
+}
+
+/** Photo mode is HUD-only. Independent of debug, and it does not change combat or MMO. */
+export function parsePhotoFlag(search = '') {
+  return paramsOf(search).get('photo') === '1';
 }
 
 export function canonicalSpot(raw) {

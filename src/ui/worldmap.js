@@ -18,15 +18,11 @@ function thumb(tile, game) {
   paintTileMap(c, tile);
   const land = tile.built && game.world.tileCanvas?.[tile.id];
   if (land) {
-    const tmp = document.createElement('canvas');
-    tmp.width = CELL;
-    tmp.height = CELL;
-    const tctx = tmp.getContext('2d');
-    tctx.imageSmoothingEnabled = true;
-    tctx.drawImage(land, 0, 0, CELL, CELL);
     const ctx = c.getContext('2d');
-    const inset = 9;
-    ctx.drawImage(tmp, inset, inset, CELL - inset * 2, CELL - inset * 2, inset, inset, CELL - inset * 2, CELL - inset * 2);
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = 0.84;
+    ctx.drawImage(land, 0, 0, CELL, CELL);
+    ctx.globalAlpha = 1;
   }
   thumbs.set(tile.id, c);
   return c;
@@ -46,7 +42,7 @@ function blendThumbs() {
   const src = actx.getImageData(0, 0, w, w);
   const out = actx.createImageData(w, w);
   out.data.set(src.data);
-  const band = 13;
+  const band = 16;
   const mix = (x, y, nx, ny, t) => {
     if (nx < 0 || ny < 0 || nx >= w || ny >= w || t <= 0) return;
     const i = (y * w + x) * 4;

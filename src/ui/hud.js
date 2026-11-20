@@ -5,7 +5,7 @@ import { mountStats } from './stats.js';
 import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
 import { FARM, GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
-import { TILE_SIZE } from '../world/tiles.js';
+import { TILE_SIZE, TILES } from '../world/tiles.js';
 import { CAVE_MOUTH } from '../world/southford.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
@@ -66,7 +66,10 @@ function landMapLabels(world) {
   let gilantre = null;
   for (const land of world.lands || []) {
     if (land.role === 'oak') continue;
-    const name = land.banner?.[1];
+    const tile = TILES.find((t) => t.id === land.tileId || t.kind === land.kind);
+    const name = tile?.kind === 'pirateshore' || land.kind === 'pirateshore'
+      ? 'Pirate Shore'
+      : (land.banner?.[1] || tile?.name);
     if (!name) continue;
     if (name === 'Gilantre') {
       gilantre = gilantre || { name, x: 0, z: 0, n: 0, city: true };

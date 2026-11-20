@@ -43,34 +43,34 @@ export const SAND_MINE = {
 
 export const DESERT_SPECS = {
   sunspill: {
-    banner: ['The Western Dunes', 'Sunspill'], desert: true, shade: 0.12, forest: 0.05, amp: 1.7, base: 3.3, seed: 74,
+    banner: ['The Western Dunes', 'Sunspill'], desert: true, shade: 0.12, forest: 0.05, amp: 0.9, base: 3.4, seed: 74,
     rim: {},
-    knolls: [[36, 48, 14, 2.4], [28, 100, 10, 1.8], [90, 40, 12, 2.2], [70, 78, 8, -0.8]],
+    knolls: [[36, 48, 28, 4.2], [28, 100, 24, 3.4], [90, 40, 26, 3.8], [70, 78, 18, -1.8], [112, 88, 20, 3.0], [52, 70, 16, 2.4]],
     roads: [[[72, 0], [78, 36], [96, 78], [118, 112]], [[0, 100], [36, 96], [78, 100], [110, 112]]],
-    dress: { cactus: 16, scrub: 28, rocks: 18, buttes: 5, palms: 0, reeds: 0, flowers: 10 },
+    dress: { cactus: 36, scrub: 48, rocks: 32, buttes: 8, palms: 0, reeds: 0, flowers: 10 },
   },
   glassroad: {
-    banner: ['The South Road', 'Glassroad'], desert: true, shade: 0.1, forest: 0.04, amp: 1.6, base: 3.3, seed: 75,
+    banner: ['The South Road', 'Glassroad'], desert: true, shade: 0.1, forest: 0.04, amp: 0.85, base: 3.4, seed: 75,
     rim: {},
-    knolls: [[100, 46, 13, 2.2], [40, 70, 9, 1.4], [110, 100, 11, 1.8], [80, 30, 7, -0.6]],
+    knolls: [[100, 46, 20, 3.2], [40, 70, 16, 2.2], [110, 100, 18, 2.8], [80, 30, 12, -1.0], [58, 108, 14, 2.4]],
     roads: [[[60, 0], [62, 36], [52, 86], [28, 118]]],
-    dress: { cactus: 14, scrub: 26, rocks: 16, buttes: 4, palms: 0, reeds: 0, flowers: 12 },
+    dress: { cactus: 28, scrub: 40, rocks: 26, buttes: 6, palms: 0, reeds: 0, flowers: 12 },
   },
   deepwell: {
-    banner: ['The Great Dig', 'Deepwell'], desert: true, shade: 0.08, forest: 0.03, amp: 1.5, base: 3.2, seed: 84,
+    banner: ['The Great Dig', 'Deepwell'], desert: true, shade: 0.08, forest: 0.03, amp: 0.8, base: 3.3, seed: 84,
     rim: {},
     beach: true,
-    knolls: [[28, 40, 12, 2.2], [24, 96, 10, 1.6], [110, 70, 8, 1.2]],
+    knolls: [[28, 40, 18, 3.0], [24, 96, 16, 2.2], [110, 70, 14, 2.0], [88, 48, 12, 1.8]],
     roads: [[[96, 0], [90, 28], [78, 46]]],
-    dress: { cactus: 8, scrub: 16, rocks: 12, buttes: 3, palms: 0, reeds: 0, flowers: 4, mine: true },
+    dress: { cactus: 16, scrub: 24, rocks: 20, buttes: 4, palms: 0, reeds: 0, flowers: 4, mine: true },
   },
   greenbowl: {
-    banner: ['The Living Water', 'Oasis'], desert: true, shade: 0.06, forest: 0.08, amp: 1.5, base: 3.2, seed: 85,
+    banner: ['The Living Water', 'Oasis'], desert: true, shade: 0.06, forest: 0.08, amp: 0.75, base: 3.3, seed: 85,
     rim: {},
     beach: true,
-    knolls: [[90, 50, 12, 2], [110, 100, 10, 1.6], [50, 80, 8, 1.2]],
+    knolls: [[90, 50, 18, 2.8], [110, 100, 16, 2.2], [50, 80, 12, 1.8], [70, 30, 14, 2.0]],
     roads: [[[24, 20], [48, 48], [80, 70], [110, 90]]],
-    dress: { cactus: 6, scrub: 12, rocks: 8, buttes: 2, palms: 0, reeds: 0, flowers: 8 },
+    dress: { cactus: 12, scrub: 20, rocks: 14, buttes: 3, palms: 0, reeds: 0, flowers: 8 },
   },
 };
 
@@ -277,9 +277,14 @@ export function carveDesert(lands) {
 
 function duneAt(x, z, h, spec) {
   const edge = Math.min(x, z, W - 1 - x, W - 1 - z);
-  const fade = smoothstep(10, 28, edge);
-  const wave = Math.sin((z + spec.seed * 3) * 0.085) * 1.15 + Math.sin((x + z * 0.35) * 0.06) * 0.55;
-  return { h: Math.min(h + wave * fade, Math.max(h, 6)), kind: 0 };
+  const fade = smoothstep(8, 26, edge);
+  const wx = (spec.ox ?? 0) + x;
+  const wz = (spec.oz ?? 0) + z;
+  const ridge = Math.sin(wx * 0.026 + wz * 0.01 + spec.seed * 0.15) * 4.2
+    + Math.sin(wx * 0.011 - wz * 0.022) * 2.8
+    + Math.sin((wx + wz) * 0.016) * 1.6;
+  const bowl = (fbm(wx * 0.007, wz * 0.0065, spec.seed + 40, 3) - 0.42) * 2.4;
+  return { h: h + (ridge + bowl) * fade, kind: 0 };
 }
 
 export function desertFeature(h, x, z, spec) {
@@ -290,10 +295,12 @@ export function desertFeature(h, x, z, spec) {
 
 function sandTint(n, crest, x = 0, z = 0) {
   const low = fbm(x * 0.02 + 3, z * 0.02, 27, 3);
+  const wind = Math.sin((x * 0.55 + z * 0.18) * 0.85) * 0.045 + Math.sin((z * 0.9 - x * 0.2) * 1.4) * 0.03;
+  const streak = fbm(x * 0.09 + 8, z * 0.03, 29, 2);
   return [
-    (0.9 + n * 0.12 + crest) * (0.9 + low * 0.16),
-    (0.74 + n * 0.08) * (0.9 + low * 0.12),
-    (0.4 + n * 0.06) * (0.92 + (1 - low) * 0.08),
+    (0.9 + n * 0.14 + crest + wind) * (0.88 + low * 0.2) * (0.94 + streak * 0.1),
+    (0.72 + n * 0.1 + wind * 0.4) * (0.88 + low * 0.14),
+    (0.38 + n * 0.07 - wind * 0.2) * (0.9 + (1 - low) * 0.1),
   ];
 }
 
@@ -380,7 +387,7 @@ export function dressDesert(world, land, spec) {
     if (data.pathMask[i]) return true;
     const zn = data.zone[i];
     if (zn === ZONE.WATER || zn === ZONE.MINE) return true;
-    if (h < 0.7 || h > 7.4) return true;
+    if (h < 0.7 || h > 9.8) return true;
     const x = X(lx);
     const z = Z(lz);
     if (!world.free(x, z, rad)) return true;

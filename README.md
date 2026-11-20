@@ -22,7 +22,7 @@ Guests play solo from the title (**Play as guest**). After sign-in, account crea
 
 World 1 is live at `wss://monster-gate-world-1.onrender.com`. The production Pages workflow injects `MG_WORLD_URL` and `VITE_WORLD_URL` at build time. Guests and anyone without a session token never open the world socket; `?mmo=1` without a session drops to solo and shows **Sign in to hunt online**. Authenticated hunters can queue in the Gilantre Colosseum for 1v1, 2v2, or 3v3 matches. Every fighter confirms before a private arena starts; combat, results, and persistent Elo ratings are server-authoritative.
 
-`MG_WORLD_URL` and `VITE_WORLD_URL` are production build inputs configured in `.github/workflows/publish-pages.yml`. That workflow runs the test suite, builds from `main` with Vite base `/`, and publishes `dist` to `gh-pages`; it also sets `VITE_BUILD_ID` to the merged `main` SHA. Do not blank the world URL for production. For a local build, use:
+`MG_WORLD_URL` and `VITE_WORLD_URL` are production build inputs configured in `.github/workflows/publish-pages.yml`. That workflow runs the test suite, builds from `main` with Vite base `/`, and publishes `dist` to `gh-pages`; it also sets `VITE_BUILD_ID` to the merged `main` SHA (7 hex chars). Do not blank the world URL for production. For a local build, use:
 
 ```bash
 git checkout main

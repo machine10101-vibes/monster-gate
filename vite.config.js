@@ -43,11 +43,18 @@ export function resolveSupabaseConfig(env = process.env, { readFile, filePath } 
   return { url, key };
 }
 
+/** Keep the on-screen tag at 7 hex chars even if a workflow stamps the full SHA. */
+export function shortenBuildId(id) {
+  const s = String(id ?? '').trim();
+  if (/^[0-9a-f]{8,40}$/i.test(s)) return s.slice(0, 7).toLowerCase();
+  return s;
+}
+
 export function resolveBuildId({ env = process.env, branch = '', headSha = '', mainSha = '' } = {}) {
   const raw = env?.VITE_BUILD_ID;
-  if (raw != null && String(raw).trim() !== '') return String(raw).trim();
-  if (String(branch) === 'gh-pages' && mainSha) return String(mainSha).trim();
-  return (headSha && String(headSha).trim()) || 'dev';
+  if (raw != null && String(raw).trim() !== '') return shortenBuildId(raw);
+  if (String(branch) === 'gh-pages' && mainSha) return shortenBuildId(mainSha) || 'dev';
+  return shortenBuildId(headSha) || 'dev';
 }
 
 function git(cmd) {

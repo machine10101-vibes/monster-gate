@@ -614,6 +614,18 @@ function makeTile(spec, edges) {
       else H[i] = Math.round(H[i] * 2) / 2;
     }
   }
+  if (spec.desert) {
+    const src = Float32Array.from(H);
+    for (let z = 1; z < W - 1; z++) {
+      for (let x = 1; x < W - 1; x++) {
+        if (onBorder(x, z, edges)) continue;
+        const i = z * W + x;
+        if (kind[i] === WATER) continue;
+        const s = src[i] * 2 + src[i - 1] + src[i + 1] + src[i - W] + src[i + W];
+        H[i] = Math.round((s / 6) * 2) / 2;
+      }
+    }
+  }
   for (const road of spec.roads) stampRoad(H, kind, mask, road, edges, spec.silverrunMountain ? climb : null);
   if (spec.silverrunMountain) {
     for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) {

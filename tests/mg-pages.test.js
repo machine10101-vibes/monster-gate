@@ -27,8 +27,13 @@ test('gh-pages World 1 URL comes from MG_WORLD_URL and stays empty by default', 
 
 test('gh-pages build stamps origin/main, not the deploy-branch SHA', () => {
   assert.equal(resolveBuildId({ env: { VITE_BUILD_ID: 'abc1234' }, branch: 'gh-pages', headSha: '64fde99', mainSha: '00eeb62' }), 'abc1234');
+  assert.equal(resolveBuildId({ env: { VITE_BUILD_ID: 'e92c7e1b3a4c5d6e7f8091a2b3c4d5e6f8091a2b' }, branch: 'main', headSha: 'deadbee', mainSha: '00eeb62' }), 'e92c7e1');
   assert.equal(resolveBuildId({ env: {}, branch: 'gh-pages', headSha: '64fde99', mainSha: '00eeb62' }), '00eeb62');
   assert.equal(resolveBuildId({ env: {}, branch: 'main', headSha: '00eeb62', mainSha: '00eeb62' }), '00eeb62');
   assert.equal(resolveBuildId({ env: {}, branch: 'cursor/pass-19-hud-mock-fda8', headSha: '39e2ae1', mainSha: '00eeb62' }), '39e2ae1');
   assert.match(src('../vite.config.js'), /origin\/main/);
+  assert.match(src('../vite.config.js'), /shortenBuildId/);
+  assert.match(src('../.github/workflows/publish-pages.yml'), /GITHUB_SHA:0:7/);
+  assert.match(src('../.github/workflows/publish-pages.yml'), /steps\.buildid\.outputs\.short/);
+  assert.doesNotMatch(src('../.github/workflows/publish-pages.yml'), /VITE_BUILD_ID: \$\{{\s*github\.sha\s*\}\}/);
 });

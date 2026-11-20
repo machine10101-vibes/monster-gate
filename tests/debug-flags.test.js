@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload, isUnsellableGood, stripDebugGrantedInPlace } from '../src/debug/transient.js';
 import { GOODS } from '../src/data/gathering.js';
@@ -123,6 +123,29 @@ test('every built tile has a debug tp key', () => {
   assert.equal(canonicalSpot('dune'), 'sunspill');
   const desert = resolveSpot('desert');
   assert.equal(desert.id, 'sunspill');
+  const pirateTile = TILES.find((t) => t.kind === 'pirateshore');
+  assert.equal(pirateTile.name, 'Pirate Shore');
+  assert.notEqual(String(pirateTile.name).toLowerCase(), 'dunes');
+  const sun = resolveSpot('sunspill');
+  const pirate = resolveSpot('pirateshore');
+  for (const key of ['dunes', 'dune', 'desert', 'sand', 'sands']) {
+    const s = resolveSpot(key);
+    assert.equal(s.id, 'sunspill', key);
+    assert.ok(Math.hypot(s.x - sun.x, s.z - sun.z) < 8, key);
+    assert.ok(Math.hypot(s.x - pirate.x, s.z - pirate.z) > 80, key);
+  }
+  assert.equal(canonicalSpot('pirate shore'), 'pirateshore');
+  for (const [alias, dest] of Object.entries(DEBUG_ALIASES)) {
+    const s = resolveSpot(alias);
+    const target = resolveSpot(dest);
+    assert.ok(s, `alias ${alias} -> ${dest}`);
+    assert.ok(target, dest);
+    assert.ok(Math.hypot(s.x - target.x, s.z - target.z) < 8, `${alias} should land with ${dest}`);
+  }
+  assert.equal(parsePhotoFlag('?photo=1'), true);
+  assert.equal(parsePhotoFlag('?debug=1&photo=1'), true);
+  assert.equal(parsePhotoFlag('?debug=1'), false);
+  assert.equal(parsePhotoFlag('?mmo=1&photo=1'), true);
   const lagoon = resolveSpot('lagoon');
   assert.ok(lagoon.z >= 80, 'lagoon spawn is on the road south of the pool, not in the palm belt');
   assert.ok(lagoon.x > -210, 'lagoon spawn sits east of the pool so the water is in frame');

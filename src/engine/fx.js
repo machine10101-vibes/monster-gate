@@ -80,7 +80,10 @@ export class FX {
       const mat = new THREE.ShaderMaterial({
         transparent: true,
         depthWrite: false,
-        depthTest: false,
+        depthTest: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
         side: THREE.DoubleSide,
         uniforms: { uProg: { value: 0 }, uA: { value: 0 }, uCol: { value: new THREE.Color(0xff4a3a) }, uShape: { value: 0 } },
         vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
@@ -330,8 +333,9 @@ export class FX {
     if (this.slashT > 0) {
       this.slashT -= dt;
       const k = Math.max(0, this.slashT / this.slashMax);
-      this.slash.material.uniforms.uA.value = k;
+      this.slash.material.uniforms.uA.value = this.photoMode ? 0 : k;
       this.slash.scale.x *= 1 + dt * 1.2;
+      this.slash.visible = this.slashT > 0 && !this.photoMode;
       if (this.slashT <= 0) this.slash.visible = false;
     }
 
@@ -347,7 +351,8 @@ export class FX {
       const p = Math.min(1, s.t / s.dur);
       u.uProg.value = p * p * (3 - 2 * p);
       const pulse = 0.75 + Math.sin(s.t * 26) * 0.25 * p;
-      u.uA.value = s.t > s.dur ? Math.max(0, 1 - (s.t - s.dur) / 0.12) : Math.min(1, s.t * 8) * pulse;
+      u.uA.value = this.photoMode ? 0 : (s.t > s.dur ? Math.max(0, 1 - (s.t - s.dur) / 0.12) : Math.min(1, s.t * 8) * pulse);
+      s.mesh.visible = !this.photoMode;
     }
 
     let n = 0;

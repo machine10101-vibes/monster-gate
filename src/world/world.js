@@ -5,7 +5,7 @@ import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
-import { STARTER, TILES } from './tiles.js';
+import { STARTER, TILES, originOf, paintTileMap } from './tiles.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
@@ -40,7 +40,7 @@ function blendMinimapSeams(map, lands, minX, minZ) {
   out.data.set(src.data);
   const d = src.data;
   const o = out.data;
-  const band = 22;
+  const band = 28;
   const mix = (x, y, nx, ny, t) => {
     if (t <= 0 || nx < 0 || ny < 0 || nx >= w || ny >= h) return;
     const i = (y * w + x) * 4;
@@ -1471,12 +1471,12 @@ export class World {
       else if (t === TILE.ASH) [r, g, b] = [96, 94, 100];
       else if (t === TILE.LAVA) [r, g, b] = [255, 110, 30];
       else if (t === TILE.CINDER) [r, g, b] = [86, 52, 40];
-      else if (t === TILE.FLAGSTONE) [r, g, b] = [126, 114, 98];
-      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [108, 110, 116];
-      else if (t === TILE.COBBLE) [r, g, b] = [120, 108, 96];
+      else if (t === TILE.FLAGSTONE) [r, g, b] = [176, 154, 112];
+      else if (t === TILE.STONE || t === TILE.MOSS_STONE || t === TILE.DARK_STONE) [r, g, b] = [138, 124, 98];
+      else if (t === TILE.COBBLE) [r, g, b] = [186, 158, 112];
       else if (t === TILE.PATH) [r, g, b] = [190, 160, 110];
       else if (t === TILE.SAND) [r, g, b] = [225, 205, 150];
-      else if (t === TILE.GRAVEL) [r, g, b] = [128, 116, 100];
+      else if (t === TILE.GRAVEL) [r, g, b] = [168, 146, 108];
       else if (t === TILE.DIRT) [r, g, b] = [150, 112, 78];
       else if (t === TILE.FARMLAND) [r, g, b] = [200, 170, 70];
       else {
@@ -1556,16 +1556,36 @@ export class World {
     const sctx = south.getContext('2d');
     sctx.fillStyle = '#b25cff';
     sctx.fillRect(CAVE_MOUTH.x - 2, CAVE_MOUTH.z - SOUTH_Z - 2, 5, 5);
+    for (const tile of TILES) {
+      const o = originOf(tile);
+      minX = Math.min(minX, o.x);
+      minZ = Math.min(minZ, o.z);
+      maxX = Math.max(maxX, o.x + W);
+      maxZ = Math.max(maxZ, o.z + W);
+    }
     const map = document.createElement('canvas');
     map.width = maxX - minX;
     map.height = maxZ - minZ;
     const mctx = map.getContext('2d');
-    mctx.fillStyle = '#1a140e';
+    mctx.imageSmoothingEnabled = true;
+    mctx.fillStyle = '#cbb894';
     mctx.fillRect(0, 0, map.width, map.height);
+    for (const tile of TILES) {
+      const o = originOf(tile);
+      const planned = document.createElement('canvas');
+      planned.width = 36;
+      planned.height = 36;
+      paintTileMap(planned, tile);
+      mctx.drawImage(planned, o.x - minX, o.z - minZ, W, W);
+    }
+    const atlasLands = TILES.map((tile) => {
+      const o = originOf(tile);
+      return { x0: o.x, z0: o.z };
+    });
     for (const land of this.lands) {
       mctx.drawImage(this.tileCanvas[land.tileId], land.x0 - minX, land.z0 - minZ);
     }
-    blendMinimapSeams(map, this.lands, minX, minZ);
+    blendMinimapSeams(map, atlasLands, minX, minZ);
     this.minimapCanvas = map;
     this.minimapOrigin = { x: minX, z: minZ };
   }

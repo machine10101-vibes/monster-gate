@@ -202,15 +202,9 @@ export function buildAtlas() {
   fill(TILE.DIRT, (x, y) => dirtFn(x, y, 21));
 
   fill(TILE.GRASS_SIDE, (x, y) => {
-    const depth = 6 + Math.floor(wrapNoise(x, 0, 31) * 2);
-    const drip = wrapNoise(x, 1, 32) > 0.8 ? 1 : 0;
-    if (y < depth + drip && y < 10) return grassFn(x, y, 12);
-    return mix(dirtFn(x, y, 22), grassFn(x, y, 12), 0.35);
+    const deep = 0.78 + (1 - y / 16) * 0.22;
+    return shade(grassFn(x, y, 12), deep);
   });
-  for (let x = 0; x < TILE_PX; x++) {
-    const d = 6 + Math.floor(wrapNoise(x, 0, 31) * 2) + (wrapNoise(x, 1, 32) > 0.8 ? 1 : 0);
-    if (d < 12) px(TILE.GRASS_SIDE, x, Math.min(d, 11), 0x4a8d30);
-  }
 
   const STONE = [0x8c9298, 0x969ca2, 0x80868c, 0xa0a6ac, 0x777d84];
   const stoneFn = (x, y, s) => {
