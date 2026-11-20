@@ -929,7 +929,7 @@ function dressSilverrun(world, land, spec) {
   if (land.kind === 'silverrunRiver') {
     const bridgeZ = Z(72);
     const bridgeWorldX = silverrunRiverCenterX(land.z0 + 72) + 0.5;
-    const deckY = 3.2;
+    const deckY = 2.5;
     world.forestBridge = {
       x: bridgeWorldX, z: bridgeZ, deckY, halfX: 10.5, halfZ: 4.5,
       contains(x, z) { return Math.abs(x - this.x) <= this.halfX && Math.abs(z - this.z) <= this.halfZ; },
