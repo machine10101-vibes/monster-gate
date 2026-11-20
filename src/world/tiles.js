@@ -4,6 +4,9 @@ import { fbm } from '../engine/voxel.js';
 export const GRID = 10;
 export const TILE_COUNT = GRID * GRID;
 export const TILE_SIZE = 144;
+/** World-space blend at biome borders. Interiors stay crisp. */
+export const MAP_BORDER_PX = 24;
+export const MAP_WARP_PX = 16;
 
 const BIOMES = {
   P: { id: 'peaks', name: 'Peaks', color: '#c5d4e2', blurb: 'High stone and snow.' },
@@ -154,9 +157,10 @@ const smoothstep = (a, b, x) => {
 
 /** Height and color of a planned tile at u, v in 0..1. North is v = 0. */
 export function sampleTile(tile, u, v) {
-  const s = tile.seed;
-  const n = fbm(u * 3.2 + s * 0.01, v * 3.2, s, 4);
-  const n2 = fbm(u * 8 + 2, v * 8, s + 9, 3);
+  const wx = tile.tx + u;
+  const wz = tile.tz + v;
+  const n = fbm(wx * 1.85, wz * 1.85, 11, 3);
+  const n2 = fbm(wx * 4.2 + 2.1, wz * 4.2, 20, 2);
   const edge = Math.min(u, v, 1 - u, 1 - v);
   let h = 1.4;
   let r = 0.42;
@@ -166,38 +170,32 @@ export function sampleTile(tile, u, v) {
     case 'peaks': {
       h = 3.5 + n * 7;
       const snow = h > 8.2 ? clamp01((h - 8.2) / 2.2) : 0;
-      r = lerp(0.22 + n2 * 0.08, 0.9, snow);
-      g = lerp(0.24 + n2 * 0.05, 0.92, snow);
-      b = lerp(0.3, 0.96, snow);
+      r = lerp(0.24 + n * 0.04, 0.70, snow);
+      g = lerp(0.26 + n * 0.03, 0.74, snow);
+      b = lerp(0.32, 0.80, snow);
       break;
     }
     case 'forest':
     case 'gate': {
       h = 2.2 + n * 2.4;
-      r = tile.biome === 'gate' ? 0.16 : 0.1;
-      g = 0.28 + n * 0.22;
-      b = tile.biome === 'gate' ? 0.2 : 0.12;
-      if (n2 > 0.62) {
-        g *= 0.72;
-        r *= 0.8;
-      }
-      if (tile.biome === 'gate' && Math.hypot(u - 0.5, v - 0.62) < 0.12) {
-        r = 0.35;
-        g = 0.22;
-        b = 0.48;
-        h = 2.4;
+      r = tile.biome === 'gate' ? 0.14 : 0.1;
+      g = 0.28 + n * 0.18;
+      b = tile.biome === 'gate' ? 0.16 : 0.12;
+      if (n2 > 0.78) {
+        g *= 0.86;
+        r *= 0.9;
       }
       break;
     }
     case 'meadow':
       h = 1.3 + n * 0.8;
-      r = 0.62 + n2 * 0.15;
+      r = 0.62 + n2 * 0.1;
       g = 0.68;
       b = 0.28;
-      if (n2 > 0.78) {
-        r = 0.85;
-        g = 0.45;
-        b = 0.55;
+      if (n2 > 0.84) {
+        r = 0.82;
+        g = 0.5;
+        b = 0.52;
       }
       break;
     case 'river': {
@@ -230,7 +228,7 @@ export function sampleTile(tile, u, v) {
     }
     case 'waste':
       h = 2 + n * 4;
-      r = 0.62 + n2 * 0.15;
+      r = 0.62 + n2 * 0.12;
       g = 0.42;
       b = 0.24;
       break;
@@ -241,7 +239,7 @@ export function sampleTile(tile, u, v) {
       b = 0.2;
       break;
     case 'marsh': {
-      const pond = n2 > 0.58;
+      const pond = n2 > 0.62;
       h = pond ? -0.1 : 0.7 + n * 0.3;
       r = pond ? 0.16 : 0.32;
       g = pond ? 0.4 : 0.48;
@@ -249,62 +247,62 @@ export function sampleTile(tile, u, v) {
       break;
     }
     case 'coast': {
-      const shore = v > 0.45 + (n - 0.5) * 0.1;
-      h = shore ? 0.15 : 1 + n * 0.5;
-      r = shore ? 0.15 : 0.78;
-      g = shore ? 0.45 : 0.7;
-      b = shore ? 0.62 : 0.45;
+      const t = smoothstep(0.36, 0.62, v + (n - 0.5) * 0.14);
+      h = lerp(1 + n * 0.45, 0.14, t);
+      r = lerp(0.78, 0.13, t);
+      g = lerp(0.70, 0.42, t);
+      b = lerp(0.45, 0.58, t);
       break;
     }
     case 'sea':
-      h = 0.12 + n2 * 0.08;
-      r = 0.08 + n * 0.06;
-      g = 0.28 + n2 * 0.12;
-      b = 0.52 + n * 0.15;
+      h = 0.12;
+      r = 0.11 + n * 0.018;
+      g = 0.31 + n * 0.025;
+      b = 0.54 + n * 0.03;
       break;
     case 'volcanic': {
       h = 2.4 + n * 3.4;
-      const lava = n2 > 0.8;
-      r = lava ? 0.95 : 0.2 + n2 * 0.12;
-      g = lava ? 0.42 : 0.19 + n2 * 0.06;
-      b = lava ? 0.1 : 0.2 + n2 * 0.06;
+      const lava = n2 > 0.84;
+      r = lava ? 0.95 : 0.2 + n2 * 0.1;
+      g = lava ? 0.42 : 0.19 + n2 * 0.05;
+      b = lava ? 0.1 : 0.2 + n2 * 0.05;
       break;
     }
     case 'ruins': {
-      const pad = u > 0.32 && u < 0.68 && v > 0.3 && v < 0.7;
-      h = pad ? 1.6 : 1.1 + n * 0.4;
-      r = pad ? 0.45 : 0.4;
-      g = pad ? 0.42 : 0.5;
-      b = pad ? 0.4 : 0.28;
+      h = 1.2 + n * 0.5;
+      r = 0.28 + n2 * 0.06;
+      g = 0.42 + n * 0.1;
+      b = 0.24 + n2 * 0.03;
       break;
     }
     case 'arctic': {
       h = 1.6 + n * 1.8;
-      const ice = n2 > 0.72;
-      r = ice ? 0.72 : 0.86 + n2 * 0.08;
-      g = ice ? 0.86 : 0.9 + n * 0.05;
-      b = ice ? 0.94 : 0.96;
+      const drift = n * 0.55 + n2 * 0.45;
+      const ice = drift > 0.62;
+      r = ice ? 0.52 + n * 0.05 : 0.64 + n * 0.06;
+      g = ice ? 0.68 + n * 0.04 : 0.76 + n * 0.04;
+      b = ice ? 0.80 : 0.84;
       break;
     }
     case 'oasis': {
-      const bowl = Math.hypot((u - 0.55) / 0.28, (v - 0.45) / 0.24);
-      h = bowl < 1 ? -0.15 : 1.1 + n * 0.7;
+      const bowl = Math.hypot((wx - 3.55) / 0.92, (wz - 7.48) / 0.78);
+      h = bowl < 1 ? -0.15 : 1.1 + n * 0.55;
       if (h < 0.3) {
         r = 0.18;
         g = 0.58;
         b = 0.72;
       } else {
-        r = 0.86 + n2 * 0.08;
-        g = 0.72 + n * 0.08;
+        r = 0.86 + n * 0.05;
+        g = 0.72 + n * 0.06;
         b = 0.42;
       }
       break;
     }
     case 'town':
       h = 1.3 + n * 0.4;
-      r = 0.72 + n2 * 0.08;
-      g = 0.66 + n * 0.06;
-      b = 0.34;
+      r = 0.38 + n2 * 0.08;
+      g = 0.56 + n * 0.08;
+      b = 0.26;
       break;
     default:
       break;
@@ -327,19 +325,22 @@ function mixSample(a, b, t) {
 
 /** Sample a tile blended with its neighbours so biome borders are not hard rectangles. */
 export function sampleBlended(tile, u, v) {
-  const warp = (fbm(u * 6.4 + tile.seed * 0.02, v * 6.4, tile.seed + 5, 3) - 0.5) * 0.42;
+  const band = MAP_BORDER_PX / TILE_SIZE;
+  const warpAmp = MAP_WARP_PX / TILE_SIZE;
+  const wx = tile.tx + u;
+  const wz = tile.tz + v;
+  const warp = (fbm(wx * 3.4, wz * 3.4, 5, 3) - 0.5) * warpAmp;
   let s = sampleTile(tile, u, v);
-  const band = 0.44;
   const wu = u + warp;
   const wv = v + warp * 0.9;
   const west = tileAt(tile.tx - 1, tile.tz);
   const east = tileAt(tile.tx + 1, tile.tz);
   const north = tileAt(tile.tx, tile.tz - 1);
   const south = tileAt(tile.tx, tile.tz + 1);
-  if (west && wu < band) s = mixSample(s, sampleTile(west, 1 - (band - u), v), smoothstep(band, 0, wu));
-  if (east && wu > 1 - band) s = mixSample(s, sampleTile(east, u - (1 - band), v), smoothstep(band, 0, 1 - wu));
-  if (north && wv < band) s = mixSample(s, sampleTile(north, u, 1 - (band - v)), smoothstep(band, 0, wv));
-  if (south && wv > 1 - band) s = mixSample(s, sampleTile(south, u, v - (1 - band)), smoothstep(band, 0, 1 - wv));
+  if (west && wu < band) s = mixSample(s, sampleTile(west, u + 1, v), smoothstep(band, 0, wu));
+  if (east && wu > 1 - band) s = mixSample(s, sampleTile(east, u - 1, v), smoothstep(band, 0, 1 - wu));
+  if (north && wv < band) s = mixSample(s, sampleTile(north, u, v + 1), smoothstep(band, 0, wv));
+  if (south && wv > 1 - band) s = mixSample(s, sampleTile(south, u, v - 1), smoothstep(band, 0, 1 - wv));
   return s;
 }
 

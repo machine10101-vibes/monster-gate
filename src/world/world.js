@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { GeometryBatch, RNG, hash2, fbm, smoothstep, clamp } from '../engine/voxel.js';
-import { buildAtlas, toonMaterial, patchHide, patchTerrainGlow, TILE } from '../engine/materials.js';
+import { buildAtlas, toonMaterial, patchHide, patchTerrainGlow, TILE, CLOUD_SHADOW_GLSL, cloudShadowUniforms } from '../engine/materials.js';
 import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
-import { STARTER, TILES, originOf, paintTileMap } from './tiles.js';
+import { STARTER, TILES, TILE_SIZE, originOf, paintTileMap, MAP_BORDER_PX } from './tiles.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
@@ -25,13 +25,14 @@ import { placeTeleportPortals } from './teleport.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
-export const MAP_PX = 2;
+export const MAP_PX = 1;
 const GRASS_MAP = [105, 175, 75];
+const TOWN_KINDS = new Set(['oakhollow', 'southford', 'hellspire', 'dawnspire']);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const _sphereC = new THREE.Vector3();
 const _sphereE = new THREE.Vector3();
 
-/** Soft cosine blend across tile edges so the middle band stays seamless. */
+/** 16–24px noise-warped mix at tile edges. Zone interiors stay crisp — no global blur. */
 function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
   const w = map.width;
   const h = map.height;
@@ -43,8 +44,7 @@ function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
   const d = src.data;
   const o = out.data;
   const tile = W * scale;
-  const band = Math.max(10, Math.round(22 * scale));
-  const fall = (b) => 0.5 * (1 + Math.cos(Math.PI * b / band)) * 0.55;
+  const band = Math.max(12, Math.round(MAP_BORDER_PX * scale));
   const mix = (x, y, nx, ny, t) => {
     if (t <= 0 || nx < 0 || ny < 0 || nx >= w || ny >= h) return;
     const i = (y * w + x) * 4;
@@ -54,6 +54,11 @@ function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
     o[i + 1] += (d[j + 1] - o[i + 1]) * k;
     o[i + 2] += (d[j + 2] - o[i + 2]) * k;
   };
+  const fall = (b, warp) => {
+    const t = 1 - (b + warp) / band;
+    if (t <= 0) return 0;
+    return t * t * (3 - 2 * t) * 0.62;
+  };
   for (const land of lands) {
     const x0 = Math.round((land.x0 - minX) * scale);
     const z0 = Math.round((land.z0 - minZ) * scale);
@@ -61,7 +66,8 @@ function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
       const y = z0 + lz;
       if (y < 0 || y >= h) continue;
       for (let b = 0; b < band; b++) {
-        const t = fall(b);
+        const warp = (hash2(land.x0 + b, land.z0 + lz / scale, 91) - 0.5) * 16 * scale;
+        const t = fall(b, warp);
         const east = x0 + tile - 1 - b;
         const west = x0 + b;
         if (east >= 0 && east < w) mix(east, y, east + b + 1, y, t);
@@ -72,7 +78,8 @@ function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
       const x = x0 + lx;
       if (x < 0 || x >= w) continue;
       for (let b = 0; b < band; b++) {
-        const t = fall(b);
+        const warp = (hash2(land.x0 + lx / scale, land.z0 + b, 92) - 0.5) * 16 * scale;
+        const t = fall(b, warp);
         const south = z0 + tile - 1 - b;
         const north = z0 + b;
         if (south >= 0 && south < h) mix(x, south, x, south + b + 1, t);
@@ -83,43 +90,13 @@ function blendMinimapSeams(map, lands, minX, minZ, scale = 1) {
   ctx.putImageData(out, 0, 0);
 }
 
-/** 3×3 box blur so zone colours interpolate instead of dithering. */
-function blurMinimap(map) {
-  const w = map.width;
-  const h = map.height;
-  if (w < 2 || h < 2) return;
-  const ctx = map.getContext('2d');
-  const src = ctx.getImageData(0, 0, w, h);
-  const out = ctx.createImageData(w, h);
-  const d = src.data;
-  const o = out.data;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let n = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        const yy = y + dy;
-        if (yy < 0 || yy >= h) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          const xx = x + dx;
-          if (xx < 0 || xx >= w) continue;
-          const j = (yy * w + xx) * 4;
-          r += d[j];
-          g += d[j + 1];
-          b += d[j + 2];
-          n++;
-        }
-      }
-      const i = (y * w + x) * 4;
-      o[i] = r / n;
-      o[i + 1] = g / n;
-      o[i + 2] = b / n;
-      o[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(out, 0, 0);
+function stampTownIcon(ctx, x, y) {
+  const ix = Math.round(x);
+  const iy = Math.round(y);
+  ctx.fillStyle = '#e6c36a';
+  ctx.fillRect(ix - 3, iy - 3, 7, 7);
+  ctx.fillStyle = '#5a3a18';
+  ctx.fillRect(ix - 1, iy - 1, 3, 3);
 }
 
 /** World-space footprint. Instanced props keep their bounds on the mesh, not the shared geometry. */
@@ -617,6 +594,8 @@ export class World {
           uShallow: { value: new THREE.Color(0x4eb8c4) },
           uFoam: { value: new THREE.Color(0xe8f4fa) },
           uSky: { value: new THREE.Color(0xcfe9ff) },
+          uCloudTime: cloudShadowUniforms.uCloudTime,
+          uCloudAmt: cloudShadowUniforms.uCloudAmt,
         },
       ]),
       vertexShader: `
@@ -644,9 +623,12 @@ export class World {
         uniform vec3 uShallow;
         uniform vec3 uFoam;
         uniform vec3 uSky;
+        uniform float uCloudTime;
+        uniform float uCloudAmt;
         varying vec3 vWorld;
         varying float vDepth;
         varying float vShore;
+        ${CLOUD_SHADOW_GLSL}
         float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float vn(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -664,13 +646,14 @@ export class World {
           col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float shoreBand = smoothstep(0.62, 0.08, vDepth);
-          float foamWave = 0.88 + 0.12 * sin(uTime * 1.5 + p.x * 0.32);
-          float foam = max(vShore, shoreBand) * foamWave;
-          foam = smoothstep(0.22, 0.95, foam);
-          col = mix(col, uFoam, foam * 0.78);
+          float shoreBand = smoothstep(0.34, 0.05, vDepth) * smoothstep(0.0, 0.03, vDepth);
+          float foamWave = 0.96 + 0.04 * sin(uTime * 1.45 + p.x * 0.28);
+          float foam = shoreBand * foamWave;
+          col = mix(col, uFoam, foam);
           col *= uLight;
-          float alpha = mix(0.72, 0.88, depthK);
+          col *= cloudShade(p, uCloudTime, uCloudAmt);
+          float alpha = mix(0.78, 0.92, depthK);
+          alpha = max(alpha, foam * 0.98);
           gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -683,6 +666,7 @@ export class World {
       if (x < 0 || z < 0 || x >= W || z >= W) return 8;
       return land.data.H[z * W + x];
     };
+    const depthAt = (land, x, z) => Math.max(0, WATER_Y - hAt(land, x, z));
     for (const land of this.lands || [{ x0: 0, z0: 0, data: this.data }, { x0: 0, z0: SOUTH_Z, data: this.south }]) {
       const key = land.x0 + ',' + land.z0;
       if (seen.has(key) || !land.data) continue;
@@ -700,17 +684,19 @@ export class World {
           for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step], [step, step], [step, -step], [-step, step], [-step, -step]]) {
             if (hAt(land, x + dx, z + dz) >= WATER_Y - 0.02) edge = 1;
           }
-          const d = Math.max(0.05, WATER_Y - h);
           const x0 = land.x0 + x;
           const z0 = land.z0 + z;
           const x1 = x0 + step;
           const z1 = z0 + step;
           const base = pos.length / 3;
           pos.push(x0, WATER_Y, z0, x0, WATER_Y, z1, x1, WATER_Y, z1, x1, WATER_Y, z0);
-          for (let k = 0; k < 4; k++) {
-            depth.push(d);
-            shore.push(edge);
-          }
+          depth.push(
+            depthAt(land, x, z),
+            depthAt(land, x, z + step),
+            depthAt(land, x + step, z + step),
+            depthAt(land, x + step, z)
+          );
+          for (let k = 0; k < 4; k++) shore.push(edge);
           idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
         }
       }
@@ -1628,8 +1614,7 @@ export class World {
     map.width = (maxX - minX) * px;
     map.height = (maxZ - minZ) * px;
     const mctx = map.getContext('2d');
-    mctx.imageSmoothingEnabled = true;
-    mctx.imageSmoothingQuality = 'high';
+    mctx.imageSmoothingEnabled = false;
     mctx.fillStyle = '#1d4e86';
     mctx.fillRect(0, 0, map.width, map.height);
     for (const tile of TILES) {
@@ -1645,16 +1630,28 @@ export class World {
       return { x0: o.x, z0: o.z };
     });
     for (const land of this.lands) {
-      mctx.drawImage(
-        this.tileCanvas[land.tileId],
-        (land.x0 - minX) * px,
-        (land.z0 - minZ) * px,
-        W * px,
-        W * px,
-      );
+      const src = this.tileCanvas[land.tileId];
+      if (!src) continue;
+      mctx.drawImage(src, (land.x0 - minX) * px, (land.z0 - minZ) * px, W * px, W * px);
     }
     blendMinimapSeams(map, atlasLands, minX, minZ, px);
-    blurMinimap(map);
+    let gx = 0;
+    let gz = 0;
+    let gn = 0;
+    for (const tile of TILES) {
+      const o = originOf(tile);
+      if (String(tile.kind).startsWith('gilantre')) {
+        gx += o.x + TILE_SIZE / 2;
+        gz += o.z + TILE_SIZE / 2;
+        gn += 1;
+        continue;
+      }
+      if (!TOWN_KINDS.has(tile.kind)) continue;
+      const cx = tile.kind === 'oakhollow' ? TOWN.x - 10 : o.x + TILE_SIZE / 2;
+      const cz = tile.kind === 'oakhollow' ? TOWN.z + 18 : o.z + TILE_SIZE / 2;
+      stampTownIcon(mctx, (cx - minX) * px, (cz - minZ) * px);
+    }
+    if (gn) stampTownIcon(mctx, (gx / gn - minX) * px, (gz / gn - minZ) * px);
     this.minimapCanvas = map;
     this.minimapOrigin = { x: minX, z: minZ };
     this.minimapScale = px;

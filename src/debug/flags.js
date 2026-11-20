@@ -25,7 +25,7 @@ export const OASIS_CAM = { pitch: 0.30, dist: 22, lookAhead: 20 };
 /** South sand of the main lagoon pool (local 62, 72). Looks north at the water. */
 const LAGOON_POOL = { x: -226, z: 50 };
 const LAGOON_SHORE = { x: -226, z: 69 };
-export const LAGOON_CAM = { pitch: 0.52, dist: 26, lookAhead: 0 };
+export const LAGOON_CAM = { pitch: 0.58, dist: 16, lookAhead: 0 };
 /** ~18 Hunter Blade hits; ~20s of steady auto-attack at low level. */
 export const DEBUG_TANK_HP_MUL = 8;
 export const DEBUG_TANK_HP_CAP = 160;

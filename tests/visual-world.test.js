@@ -59,13 +59,16 @@ test('world map samples blend biome borders instead of darkening tile edges', ()
   assert.match(map, /paintTileMap\(c, tile\)/);
   assert.match(map, /const band = 16/);
   assert.match(world, /function blendMinimapSeams/);
-  assert.match(world, /Math\.round\(22 \* scale\)/);
+  assert.match(world, /MAP_BORDER_PX \* scale/);
   assert.match(world, /paintTileMap\(planned, tile\)/);
-  assert.match(world, /export const MAP_PX = 2/);
-  assert.match(world, /imageSmoothingQuality/);
+  assert.match(world, /export const MAP_PX = 1/);
+  assert.doesNotMatch(world, /function blurMinimap/);
   assert.match(world, /#1d4e86/);
   assert.doesNotMatch(world, /#cbb894/);
   assert.doesNotMatch(world, /jagged/);
+  assert.match(tiles, /MAP_BORDER_PX = 24/);
+  assert.match(tiles, /MAP_WARP_PX = 16/);
+  assert.match(tiles, /const wx = tile\.tx \+ u/);
   assert.doesNotMatch(world, /#1a140e/);
   assert.doesNotMatch(world, /\[240, 245, 255\]/);
   assert.match(world, /\[168, 186, 210\]/);
@@ -116,7 +119,7 @@ test('view distance tracks fog and parks land beyond it', () => {
   assert.match(main, /PerspectiveCamera\(38, 1, 0\.3, 240\)/);
   assert.doesNotMatch(main, /PerspectiveCamera\(38, 1, 0\.3, 320\)/);
   assert.match(sky, /viewFar/);
-  assert.match(sky, /focus\.x \+ c\.userData\.ox/);
+  assert.match(sky, /cloudShadowUniforms/);
 });
 
 test('character camp uses a late-afternoon sky, smooth ground and oak canopy', () => {
@@ -162,17 +165,21 @@ test('desert dunes keep a continuous heightfield instead of 0.5-unit terraces', 
   assert.match(world, /smooth: !!land\.data\.smooth/);
 });
 
-test('clouds stay visible over snow and grass step sides match the top', () => {
+test('cloud shadows darken the ground and never cover the play view', () => {
   const sky = src('src/world/sky.js');
   const mats = src('src/engine/materials.js');
   const terrain = src('src/world/terrain.js');
+  const world = src('src/world/world.js');
   assert.match(sky, /fog:\s*false/);
-  assert.match(sky, /const snow = chill/);
-  assert.match(sky, /nClouds = quality\.id === 'low' \? 16 : 28/);
-  assert.match(sky, /rng\.range\(6, 11\)/);
-  assert.match(sky, /cloudShadows/);
-  assert.match(sky, /CircleGeometry/);
   assert.match(sky, /puffs \* hz/);
+  assert.match(sky, /cloudShadowUniforms\.uCloudTime/);
+  assert.match(sky, /this\.clouds\.visible = false/);
+  assert.doesNotMatch(sky, /CircleGeometry/);
+  assert.doesNotMatch(sky, /rng\.range\(6, 11\)/);
+  assert.match(mats, /cloudShade/);
+  assert.match(mats, /mix\(1\.0, 0\.78/);
+  assert.match(mats, /#include <opaque_fragment>/);
+  assert.match(world, /cloudShade\(p, uCloudTime, uCloudAmt\)/);
   assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
   assert.match(mats, /0xd2ae78/);
   assert.match(terrain, /matchTop \? 0\.96/);
@@ -192,6 +199,8 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
   assert.match(world, /shoreBand/);
   assert.doesNotMatch(world, /foamNoise/);
+  assert.doesNotMatch(world, /max\(vShore, shoreBand\)/);
+  assert.match(world, /depthAt\(land, x \+ step, z \+ step\)/);
 });
 
 function paintMock(tile, s = 48) {
@@ -210,26 +219,36 @@ function paintMock(tile, s = 48) {
   return pixels;
 }
 
-test('world map raster is high-res and smoothly interpolated, not 8-level dither', () => {
+test('world map raster is one resolution with a 16-24px warped border, not a global blur', () => {
   const tiles = src('src/world/tiles.js');
   const world = src('src/world/world.js');
   const hud = src('src/ui/hud.js');
   const style = src('src/style.css');
   assert.doesNotMatch(tiles, /Math\.round\(Math\.max\(0\.06/);
-  assert.match(world, /blurMinimap/);
-  assert.match(world, /MAP_PX = 2/);
-  assert.match(hud, /imageSmoothingQuality = 'high'/);
+  assert.doesNotMatch(tiles, /\* 0\.42/);
+  assert.doesNotMatch(tiles, /const band = 0\.44/);
+  assert.doesNotMatch(world, /function blurMinimap/);
+  assert.match(world, /MAP_PX = 1/);
+  assert.match(world, /stampTownIcon/);
+  assert.match(hud, /imageSmoothingEnabled = false/);
   assert.match(style, /\.bigmap \{[\s\S]*image-rendering:\s*auto/);
   const snow = TILES.find((t) => t.kind === 'snowfall');
+  const gold = TILES.find((t) => t.kind === 'goldmead');
   const sea = TILES.find((t) => t.biome === 'sea');
   const data = paintMock(snow, 48);
   assert.ok(data && data.length === 48 * 48 * 4);
-  let fine = 0;
-  for (let i = 4; i < data.length; i += 4) {
-    const dr = Math.abs(data[i] - data[i - 4]);
-    if (dr > 0 && dr < 16) fine++;
+  const mid = paintMock(snow, 32);
+  let white = 0;
+  for (let i = 0; i < mid.length; i += 4) {
+    if (mid[i] > 210 && mid[i + 1] > 210 && mid[i + 2] > 210) white++;
   }
-  assert.ok(fine > 40, `expected sub-band colour steps, got ${fine}`);
+  assert.ok(white < 40, `snow interior should not be a white halo (${white} near-white px)`);
+  const edge = sampleBlended(snow, 0.02, 0.5);
+  const center = sampleTile(snow, 0.5, 0.5);
+  const neighbor = sampleTile(gold, 0.98, 0.5);
+  const distEdge = Math.abs(edge.r - neighbor.r) + Math.abs(edge.g - neighbor.g) + Math.abs(edge.b - neighbor.b);
+  const distMid = Math.abs(center.r - neighbor.r) + Math.abs(center.g - neighbor.g) + Math.abs(center.b - neighbor.b);
+  assert.ok(distEdge < distMid, `border ${distEdge} interior ${distMid}`);
   if (sea) {
     const seaPix = paintMock(sea, 24);
     let blue = 0;
@@ -241,9 +260,13 @@ test('world map raster is high-res and smoothly interpolated, not 8-level dither
 test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   const terrain = src('src/world/terrain.js');
   const mats = src('src/engine/materials.js');
+  const player = src('src/entities/player.js');
   assert.match(terrain, /const grassy = tl === TILE\.GRASS/);
   assert.match(terrain, /const rot = grassy \? 0/);
+  assert.match(terrain, /grassy \? \[1, 1, 1, 1\]/);
   assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
+  assert.doesNotMatch(mats, /patch < 0\.32/);
+  assert.match(player, /RingGeometry/);
 });
 
 test('debug teleport snaps the camera look to the hunter', () => {
