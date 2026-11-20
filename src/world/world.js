@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GeometryBatch, RNG, hash2, fbm, smoothstep, clamp } from '../engine/voxel.js';
-import { buildAtlas, toonMaterial, patchHide, TILE } from '../engine/materials.js';
+import { buildAtlas, toonMaterial, patchHide, patchTerrainGlow, TILE } from '../engine/materials.js';
 import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
@@ -366,11 +366,11 @@ export class World {
     const atlas = buildAtlas();
     this.atlas = atlas;
     this.mats = {
-      terrain: toonMaterial({ map: atlas.texture, vertexColors: true }),
+      terrain: patchTerrainGlow(toonMaterial({ map: atlas.texture, vertexColors: true })),
       solid: patchHide(toonMaterial({ vertexColors: true }), 'solid'),
       cover: patchHide(toonMaterial({ vertexColors: true }), 'cover'),
-      glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
-      window: new THREE.MeshBasicMaterial({ vertexColors: true }),
+      glow: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
+      window: new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
     };
     this.mats.solid.side = THREE.FrontSide;
 
@@ -387,6 +387,7 @@ export class World {
       if (land.role === 'south') this.southTerrain = mesh;
     }
     this.buildWater();
+    this.buildLavaGlow();
 
     progress(0.3, 'Growing the fairy forest');
     await nextFrame();
@@ -405,6 +406,7 @@ export class World {
     this.scatterTrees();
     await nextFrame();
     this.scatterCover();
+    this.scatterBiomeDetail();
     this.placeWaygate();
     placeTeleportPortals(this);
     dressSouthford(this);
@@ -502,29 +504,40 @@ export class World {
         {
           uTime: { value: 0 },
           uLight: { value: 1 },
-          uDeep: { value: new THREE.Color(0x1d6f9a) },
-          uShallow: { value: new THREE.Color(0x46c0c8) },
+          uDeep: { value: new THREE.Color(0x124a78) },
+          uShallow: { value: new THREE.Color(0x4eb8c4) },
+          uFoam: { value: new THREE.Color(0xe8f4fa) },
           uSky: { value: new THREE.Color(0xcfe9ff) },
         },
       ]),
       vertexShader: `
         #include <fog_pars_vertex>
+        attribute float aDepth;
+        attribute float aShore;
         varying vec3 vWorld;
+        varying float vDepth;
+        varying float vShore;
         void main() {
           vec4 wp = modelMatrix * vec4(position, 1.0);
           vWorld = wp.xyz;
+          vDepth = aDepth;
+          vShore = aShore;
           vec4 mvPosition = viewMatrix * wp;
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }`,
       fragmentShader: `
+        #include <common>
         #include <fog_pars_fragment>
         uniform float uTime;
         uniform float uLight;
         uniform vec3 uDeep;
         uniform vec3 uShallow;
+        uniform vec3 uFoam;
         uniform vec3 uSky;
         varying vec3 vWorld;
+        varying float vDepth;
+        varying float vShore;
         float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float vn(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -536,16 +549,19 @@ export class World {
           float macro = vn(p * 0.055);
           float mid = vn(p * 0.16 + vec2(uTime * 0.018, -uTime * 0.012));
           float fine = vn(p * 0.4 + vec2(-uTime * 0.02, uTime * 0.016));
-          float cell = 1.15 + macro * 2.4 + mid * 0.35;
-          vec2 q = mix(p, floor(p * cell) / cell, 0.22);
-          float n = vn(q * 0.45) * 0.5 + mid * 0.35 + fine * 0.15;
-          vec3 col = mix(uDeep, uShallow, smoothstep(0.18, 0.88, n));
-          col = mix(col, uDeep * 0.72, smoothstep(0.55, 1.0, macro) * 0.4);
-          float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.05;
-          float ripple = smoothstep(0.9, 1.0, n) * 0.04;
-          col += uSky * (sparkle + ripple);
+          float n = macro * 0.45 + mid * 0.35 + fine * 0.2;
+          float depthK = smoothstep(0.12, 2.6, vDepth);
+          vec3 col = mix(uShallow, uDeep, depthK);
+          col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
+          float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
+          col += uSky * sparkle;
+          float foamWave = 0.55 + 0.45 * sin(uTime * 1.7 + p.x * 0.55 + p.y * 0.4);
+          float foamNoise = vn(p * 1.8 + vec2(uTime * 0.12, -uTime * 0.08));
+          float foam = vShore * foamWave * smoothstep(0.28, 0.92, foamNoise);
+          col = mix(col, uFoam, foam * 0.78);
           col *= uLight;
-          gl_FragColor = vec4(col, 0.78);
+          float alpha = mix(0.72, 0.88, depthK);
+          gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
           #include <fog_fragment>
@@ -553,20 +569,108 @@ export class World {
     });
     this.waterMat = mat;
     const seen = new Set();
-    for (const land of this.lands || [{ x0: 0, z0: 0 }, { x0: 0, z0: SOUTH_Z }]) {
+    const hAt = (land, x, z) => {
+      if (x < 0 || z < 0 || x >= W || z >= W) return 8;
+      return land.data.H[z * W + x];
+    };
+    for (const land of this.lands || [{ x0: 0, z0: 0, data: this.data }, { x0: 0, z0: SOUTH_Z, data: this.south }]) {
       const key = land.x0 + ',' + land.z0;
-      if (seen.has(key)) continue;
+      if (seen.has(key) || !land.data) continue;
       seen.add(key);
-      const oz = land.z0;
-      const ox = land.x0;
-      const geo = new THREE.PlaneGeometry(W, W, 1, 1);
-      geo.rotateX(-Math.PI / 2);
-      geo.translate(ox + W / 2, WATER_Y, oz + W / 2);
+      const pos = [];
+      const depth = [];
+      const shore = [];
+      const idx = [];
+      const step = this.quality?.id === 'low' ? 2 : 1;
+      for (let z = 0; z < W; z += step) {
+        for (let x = 0; x < W; x += step) {
+          const h = hAt(land, x, z);
+          if (h >= WATER_Y + 0.02) continue;
+          let edge = 0;
+          for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+            if (hAt(land, x + dx, z + dz) >= WATER_Y - 0.02) edge = 1;
+          }
+          const d = Math.max(0.05, WATER_Y - h);
+          const x0 = land.x0 + x;
+          const z0 = land.z0 + z;
+          const x1 = x0 + step;
+          const z1 = z0 + step;
+          const base = pos.length / 3;
+          pos.push(x0, WATER_Y, z0, x0, WATER_Y, z1, x1, WATER_Y, z1, x1, WATER_Y, z0);
+          for (let k = 0; k < 4; k++) {
+            depth.push(d);
+            shore.push(edge);
+          }
+          idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        }
+      }
+      if (!pos.length) continue;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('aDepth', new THREE.Float32BufferAttribute(depth, 1));
+      geo.setAttribute('aShore', new THREE.Float32BufferAttribute(shore, 1));
+      geo.setIndex(pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+      geo.computeBoundingSphere();
       const mesh = new THREE.Mesh(geo, mat);
       mesh.renderOrder = 2;
-      mesh.frustumCulled = false;
+      mesh.frustumCulled = true;
       this.group.add(mesh);
     }
+  }
+
+  buildLavaGlow() {
+    const glow = this.quality?.glow ?? 1;
+    if (glow < 0.15) return;
+    const pos = [];
+    const col = [];
+    const phase = [];
+    const skip = glow < 0.7 ? 2 : 1;
+    for (const land of this.lands || []) {
+      const { top, H } = land.data || {};
+      if (!top || !H) continue;
+      for (let z = 0; z < W; z += skip) {
+        for (let x = 0; x < W; x += skip) {
+          const i = z * W + x;
+          if (top[i] !== TILE.LAVA) continue;
+          pos.push(land.x0 + x + 0.5, H[i] + 0.12, land.z0 + z + 0.5);
+          col.push(1.0, 0.42, 0.08);
+          phase.push(hash2(x, z, 19) * 10);
+        }
+      }
+    }
+    if (!pos.length) return;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute('phase', new THREE.Float32BufferAttribute(phase, 1));
+    this.lavaHaloMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+      uniforms: { uTime: { value: 0 }, uScale: { value: 600 } },
+      vertexShader: `
+        attribute vec3 color; attribute float phase; uniform float uTime; uniform float uScale;
+        varying vec3 vCol; varying float vA;
+        void main(){
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          float fl = 0.82 + 0.18 * sin(uTime * 6.0 + phase);
+          gl_PointSize = 7.5 * fl * uScale / -mv.z;
+          vCol = color; vA = 0.72 * fl;
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying vec3 vCol; varying float vA;
+        void main(){
+          vec2 c = gl_PointCoord - 0.5; float d = length(c) * 2.0;
+          float a = pow(max(0.0, 1.0 - d), 1.6) * vA;
+          gl_FragColor = vec4(vCol * a, a);
+        }`,
+    });
+    const pts = new THREE.Points(g, this.lavaHaloMat);
+    pts.frustumCulled = true;
+    pts.renderOrder = 5;
+    this.group.add(pts);
   }
 
   /* -------------------------------- town --------------------------------- */
@@ -672,6 +776,25 @@ export class World {
     this.fenceLine(58.8, 75.5, 58.8, 79);
     this.fenceLine(58.8, 83.5, 58.8, 88);
     this.fenceLine(86.8, 69, 86.8, 72);
+    this.fenceLine(64.0, 83.2, 66.6, 83.2);
+
+    this.putAt(M.buildWagon(2), 63.8, 84.5, Math.PI * 0.08, 1.15);
+    this.box(63.8, 84.5, 1.15, 0.7);
+    this.putAt(m.crate[0], 62.4, 85.2, 0.4, 1.15);
+    this.putAt(m.crate[1], 62.5, 85.2, 0.2, 1.05, { y: this.heightAt(62.5, 85.2) + 0.82 });
+    this.circle(62.4, 85.2, 0.4);
+    this.putAt(m.barrel[1], 65.2, 85.4, 0.6, 1.15);
+    this.circle(65.2, 85.4, 0.4);
+    this.putAt(m.crate[0], 82.8, 84.3, -0.3, 1.2);
+    this.putAt(m.barrel[0], 83.6, 84.8, 0.5, 1.1);
+    this.circle(82.8, 84.3, 0.4);
+    this.circle(83.6, 84.8, 0.38);
+    this.putAt(m.hay, 84.4, 78.6, 0.2, 0.95);
+    this.circle(84.4, 78.6, 0.55);
+    this.putAt(m.pots[2], 80.6, 70.6, 0.8, 1.15);
+    this.circle(80.6, 70.6, 0.28);
+    this.putAt(m.crate[1], 78.4, 87.3, 0.25, 1.1);
+    this.circle(78.4, 87.3, 0.35);
 
     const FX = 86.3;
     const FZ = 72.8;
@@ -877,7 +1000,7 @@ export class World {
     const m = this.models;
     const rng = this.rng;
     const D = this.data;
-    const dens = this.quality.density;
+    const dens = this.quality.scatter ?? this.quality.density;
     const step = 2.3;
     let giants = 0;
     const okSpot = (x, z) => {
@@ -958,7 +1081,7 @@ export class World {
     const m = this.models;
     const rng = new RNG(999);
     const D = this.data;
-    const dens = this.quality.density;
+    const dens = this.quality.scatter ?? this.quality.density;
     const pickOf = (list) => list[Math.floor(rng.next() * list.length)];
     const cover = { cover: true };
     for (let gz = 6; gz < W - 6; gz += 1.15) {
@@ -1043,6 +1166,62 @@ export class World {
       else this.putAt(this.models.logs[i % 2], x, z, rng.next() * 6, 1.3);
       this.occupy(x, z, 1.1);
       this.circle(x, z, 0.6);
+    }
+  }
+
+  scatterBiomeDetail() {
+    const dens = this.quality.scatter ?? this.quality.density;
+    if (dens < 0.12) return;
+    const m = this.models;
+    const rng = new RNG(404);
+    const cover = { cover: true };
+    const pickOf = (list) => list[Math.floor(rng.next() * list.length)];
+    const budget = Math.round((this.quality.id === 'low' ? 90 : this.quality.id === 'medium' ? 180 : 280) * dens);
+    let put = 0;
+    for (const land of this.lands || []) {
+      const D = land.data;
+      if (!D?.top) continue;
+      const step = this.quality.id === 'low' ? 4.2 : 2.8;
+      for (let gz = 8; gz < W - 8 && put < budget; gz += step) {
+        for (let gx = 8; gx < W - 8 && put < budget; gx += step) {
+          const x = land.x0 + gx + rng.range(-1.1, 1.1);
+          const z = land.z0 + gz + rng.range(-1.1, 1.1);
+          const lx = Math.floor(x) - land.x0;
+          const lz = Math.floor(z) - land.z0;
+          if (lx < 2 || lz < 2 || lx >= W - 2 || lz >= W - 2) continue;
+          const i = lz * W + lx;
+          if (D.pathMask[i] || D.zone[i] === ZONE.WATER || D.zone[i] === ZONE.FARM || D.zone[i] === ZONE.MINE) continue;
+          const h = D.H[i];
+          if (h < 0.9 || h > 8.5) continue;
+          if (!this.free(x, z, 0.35)) continue;
+          const t = D.top[i];
+          const rot = rng.next() * Math.PI * 2;
+          if (t === TILE.GRASS || t === TILE.FLOWER_GRASS) {
+            const roll = rng.next();
+            if (roll < 0.55) this.putAt(pickOf(m.tufts), x, z, rot, 1, cover);
+            else if (roll < 0.82) this.putAt(pickOf(m.flowers), x, z, rot, 1, cover);
+            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.55, 0.9), cover);
+            put++;
+          } else if (t === TILE.SAND) {
+            const Ds = m.desert;
+            if (rng.next() < 0.35 && Ds?.cactus) this.putAt(pickOf(Ds.cactus), x, z, rot, rng.range(0.7, 1.05));
+            else if (Ds?.scrub && rng.next() < 0.7) this.putAt(pickOf(Ds.scrub), x, z, rot, rng.range(0.7, 1), cover);
+            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.5, 0.85), cover);
+            put++;
+          } else if (t === TILE.SNOW || t === TILE.FROST_GRASS || t === TILE.ICE) {
+            const A = m.arctic;
+            if (A?.snowMounds && rng.next() < 0.45) this.putAt(pickOf(A.snowMounds), x, z, rot, rng.range(0.55, 0.9), cover);
+            else if (A?.snowRocks) this.putAt(pickOf(A.snowRocks), x, z, rot, rng.range(0.5, 0.85), cover);
+            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.45, 0.75), cover);
+            put++;
+          } else if (t === TILE.ASH || t === TILE.BASALT || t === TILE.CINDER) {
+            const V = m.volcanic;
+            if (V?.rocks && rng.next() < 0.6) this.putAt(pickOf(V.rocks), x, z, rot, rng.range(0.55, 0.9), cover);
+            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.5, 0.8), cover);
+            put++;
+          }
+        }
+      }
     }
   }
 
@@ -1156,6 +1335,7 @@ export class World {
         b[kind].c = null;
         b[kind].i = null;
         const mat = kind === 'solid' ? this.mats.solid : kind === 'cover' ? this.mats.cover : this.mats[kind];
+        if (!mat) continue;
         const mesh = new THREE.Mesh(geo, mat);
         mesh.castShadow = kind === 'solid';
         mesh.receiveShadow = kind === 'solid' || kind === 'cover';
@@ -1185,15 +1365,16 @@ export class World {
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      uniforms: { uTime: { value: 0 }, uScale: { value: 600 }, uNight: { value: 0 } },
+      toneMapped: false,
+      uniforms: { uTime: { value: 0 }, uScale: { value: 600 }, uNight: { value: 0 }, uGlow: { value: this.quality?.glow ?? 1 } },
       vertexShader: `
-        attribute vec3 color; attribute float phase; uniform float uTime; uniform float uScale; uniform float uNight;
+        attribute vec3 color; attribute float phase; uniform float uTime; uniform float uScale; uniform float uNight; uniform float uGlow;
         varying vec3 vCol; varying float vA;
         void main(){
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           float fl = 0.85 + 0.15 * sin(uTime * 9.0 + phase * 3.0) * sin(uTime * 5.3 + phase);
-          gl_PointSize = (2.6 + 1.6 * uNight) * fl * uScale / -mv.z;
-          vCol = color; vA = (0.35 + 0.65 * uNight) * fl;
+          gl_PointSize = (4.2 + 2.4 * uNight) * fl * uGlow * uScale / -mv.z;
+          vCol = color; vA = (0.5 + 0.5 * uNight) * fl * uGlow;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
@@ -1339,6 +1520,7 @@ export class World {
     this.waterMat.uniforms.uTime.value = t;
     this.portalMat.uniforms.uTime.value = t;
     this.haloMat.uniforms.uTime.value = t;
+    if (this.lavaHaloMat) this.lavaHaloMat.uniforms.uTime.value = t;
     this.waygate?.tick(t);
     const gate = this.teleportFx;
     if (gate) {

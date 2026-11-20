@@ -57,5 +57,12 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `plaza` | `square` | Between Lira's stall and Dalla's Market |
 | `lira` | `alchemy`, `alchemist` | In front of Lira the Alchemist |
 | `dalla` | `market`, `dalla's market` | In front of Dalla's Market |
+| `brookside` | | West of Oakhollow |
+| `lagoon` | `mirrormere oasis` | Mirrormere Oasis |
+| `canopy` | `silverrun canopy` | Silverrun Canopy jungle |
+| `snowfall` | | Frozen meadow east of Goldmead |
+| `ashroad` | `ashen road` | Ashen Road volcanic approach |
+
+Every **built** tile also has a `tp` key equal to its `kind` (lowercase): `southford`, `harefield`, `eastleas`, `icewind`, `rimefang`, `sunspill`, `longacre`, `hayfield`, and the Silverrun / Gilantre quarters. Tile names with a unique label (`Harefield`, `Snowfall`, `Deepwell`, …) work too.
 
 Keys are case-insensitive. Spaces, `_`, and `-` are ignored. Teleports never write the hunter save. They are inert without `debug=1`, and with `mmo=1` or world-view.

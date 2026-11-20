@@ -27,7 +27,7 @@ test('MG-UI-40: terrain stays solid; hide only punches solid and cover', () => {
   const world = src('src/world/world.js');
   const main = src('src/main.js');
   const mats = src('src/engine/materials.js');
-  assert.match(world, /terrain:\s*toonMaterial\(/);
+  assert.match(world, /terrain:\s*(?:patchTerrainGlow\()?toonMaterial\(/);
   assert.doesNotMatch(world, /terrain:\s*patchHide\(/);
   assert.match(world, /solid:\s*patchHide\(/);
   assert.match(world, /cover:\s*patchHide\(/);

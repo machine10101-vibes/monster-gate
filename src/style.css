@@ -3170,9 +3170,9 @@ body.touch .stash-slot.holding {
 .wm-head span, .wm-meta { color: #c5cedb; font-size: 13px; }
 .wm-meta { margin: 0 0 6px; }
 .wm-left { min-width: 0; }
-.wm-grid { display: grid; gap: 2px; grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.wm-grid { display: grid; gap: 0; grid-template-columns: repeat(10, minmax(0, 1fr)); }
 .wm-detail { min-width: 0; }
-.wm-cell { position: relative; container-type: inline-size; padding: 0; border: 2px solid #10140c; border-radius: 2px; overflow: hidden; aspect-ratio: 1; touch-action: auto; background: #111; }
+.wm-cell { position: relative; container-type: inline-size; padding: 0; border: 0; border-radius: 0; overflow: hidden; aspect-ratio: 1; touch-action: auto; background: #111; }
 .wm-cell canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .wm-num {
   position: absolute;
@@ -3215,7 +3215,7 @@ body.touch .stash-slot.holding {
 @container (max-width: 68px) {
   .wm-name { font-size: 8px; padding-top: 8px; }
 }
-.wm-cell.built { box-shadow: inset 0 0 0 2px #ffe27a; }
+.wm-cell.built { box-shadow: none; }
 .wm-cell.sel { outline: 2px solid #fff6d0; outline-offset: 1px; z-index: 1; }
 .wm-shot { width: 100%; height: auto; background: #0c1014; border: 2px solid #3a3f4a; border-radius: 6px; }
 .wm-cap { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #8a94a6; }

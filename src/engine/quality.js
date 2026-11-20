@@ -3,9 +3,9 @@
 export const QUALITY_KEY = 'mg-quality';
 
 export const QUALITIES = [
-  { id: 'low', label: 'Low', density: 0.55, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true },
-  { id: 'medium', label: 'Medium', density: 0.8, motes: 220, gateMotes: 160, shadowSize: 2048, shadowExtent: 30, dpr: 1.25, shadows: true },
-  { id: 'high', label: 'High', density: 1, motes: 380, gateMotes: 260, shadowSize: 3072, shadowExtent: 34, dpr: 2, shadows: true },
+  { id: 'low', label: 'Low', density: 0.55, scatter: 0.4, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true, viewFar: 118, glow: 0.5 },
+  { id: 'medium', label: 'Medium', density: 0.8, scatter: 0.75, motes: 220, gateMotes: 160, shadowSize: 2048, shadowExtent: 30, dpr: 1.25, shadows: true, viewFar: 140, glow: 0.85 },
+  { id: 'high', label: 'High', density: 1, scatter: 1, motes: 380, gateMotes: 260, shadowSize: 3072, shadowExtent: 34, dpr: 2, shadows: true, viewFar: 150, glow: 1 },
 ];
 
 export function qualityById(id) {
@@ -34,6 +34,9 @@ export function survivalBudget(q, heavy, size = {}) {
     id: heavy ? 'low' : q.id,
     label: heavy ? 'Low' : q.label,
     density: heavy ? Math.min(q.density, 0.45) : q.density,
+    scatter: heavy ? Math.min(q.scatter ?? q.density, 0.32) : (q.scatter ?? q.density),
+    viewFar: heavy ? Math.min(q.viewFar || 150, 100) : (q.viewFar || 150),
+    glow: heavy ? Math.min(q.glow ?? 1, 0.4) : (q.glow ?? 1),
     motes: heavy ? Math.min(q.motes, 80) : q.motes,
     gateMotes: heavy ? Math.min(q.gateMotes, 60) : q.gateMotes,
     dpr: Math.min(q.dpr, Math.round(dprCap * 100) / 100),

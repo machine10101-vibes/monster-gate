@@ -55,7 +55,12 @@ const PLAZA_STAND = { x: 74.1, z: 84.0 };
 const LIRA_STAND = { x: 72.2, z: 85.0, dx: 1.0, dz: 1.2 };
 const DALLA_STAND = { x: 77.0, z: 85.6, dx: 0, dz: 1.4 };
 
+const BUILT_SPOTS = Object.fromEntries(
+  TILES.filter((t) => t.built).map((t) => [String(t.kind).toLowerCase(), { kind: t.kind }]),
+);
+
 export const DEBUG_SPOTS = {
+  ...BUILT_SPOTS,
   oakhollow: { x: 72, z: 72.5 },
   goldenmeadow: { kind: 'goldmead' },
   greyrock: { x: MINE.rampX0 + 4, z: MINE.z },
@@ -72,6 +77,7 @@ export const DEBUG_SPOTS = {
   lira: { live: 'alchemy', x: LIRA_STAND.x, z: LIRA_STAND.z, dx: LIRA_STAND.dx, dz: LIRA_STAND.dz },
   dalla: { live: 'market', x: DALLA_STAND.x, z: DALLA_STAND.z, dx: DALLA_STAND.dx, dz: DALLA_STAND.dz },
   gilantre: { x: 446, z: 148 },
+  greenbowl: { x: OASIS_DRY.x, z: OASIS_DRY.z },
 };
 
 export const DEBUG_ALIASES = {
@@ -104,7 +110,37 @@ export const DEBUG_ALIASES = {
   market: 'dalla',
   dallamarket: 'dalla',
   "dalla's market": 'dalla',
+  'ashen road': 'ashroad',
+  'silverrun canopy': 'canopy',
+  'mirrormere oasis': 'lagoon',
+  'icewind reach': 'icewind',
+  'rimefang mesa': 'rimefang',
+  southmead: 'sunken',
+  runmouth: 'tigerwood',
+  dunes: 'pirateshore',
+  reedford: 'silverrunwest',
+  'reedford reach': 'silverrunwest',
+  elderwood: 'silverruneast',
+  'silverrun crossing': 'silverrunriver',
+  'greystone summit': 'silverrunpeak',
 };
+
+{
+  const uses = new Map();
+  for (const t of TILES) {
+    if (!t.built) continue;
+    const n = String(t.name || '').toLowerCase();
+    if (n) uses.set(n, (uses.get(n) || 0) + 1);
+  }
+  for (const t of TILES) {
+    if (!t.built) continue;
+    const n = String(t.name || '').toLowerCase();
+    const key = String(t.kind).toLowerCase();
+    if (!n || uses.get(n) !== 1) continue;
+    if (DEBUG_SPOTS[n] || DEBUG_ALIASES[n]) continue;
+    DEBUG_ALIASES[n] = key;
+  }
+}
 
 export function parseDebugFlags(search = '') {
   const q = paramsOf(search);

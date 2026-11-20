@@ -181,7 +181,7 @@ test('MG-UI-11 oasis landing is labeled Oasis and the water bed tint varies', ()
   assert.match(desert, /hash2\(wx, wz/);
   assert.match(src('src/world/tiles.js'), /'Oasis'/);
   assert.doesNotMatch(src('src/world/tiles.js'), /'Greenbowl'/);
-  assert.match(src('src/world/world.js'), /macro \* 2\.4/);
+  assert.match(src('src/world/world.js'), /mix\(uShallow, uDeep/);
 });
 
 test('menu buttons sit in one right-edge column', () => {

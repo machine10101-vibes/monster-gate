@@ -147,6 +147,10 @@ export function originOf(tile) {
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const smoothstep = (a, b, x) => {
+  const t = clamp01((x - a) / (b - a || 1));
+  return t * t * (3 - 2 * t);
+};
 
 /** Height and color of a planned tile at u, v in 0..1. North is v = 0. */
 export function sampleTile(tile, u, v) {
@@ -274,17 +278,73 @@ export function sampleTile(tile, u, v) {
       b = pad ? 0.4 : 0.28;
       break;
     }
+    case 'arctic': {
+      h = 1.6 + n * 1.8;
+      const ice = n2 > 0.72;
+      r = ice ? 0.72 : 0.86 + n2 * 0.08;
+      g = ice ? 0.86 : 0.9 + n * 0.05;
+      b = ice ? 0.94 : 0.96;
+      break;
+    }
+    case 'oasis': {
+      const bowl = Math.hypot((u - 0.55) / 0.28, (v - 0.45) / 0.24);
+      h = bowl < 1 ? -0.15 : 1.1 + n * 0.7;
+      if (h < 0.3) {
+        r = 0.18;
+        g = 0.58;
+        b = 0.72;
+      } else {
+        r = 0.86 + n2 * 0.08;
+        g = 0.72 + n * 0.08;
+        b = 0.42;
+      }
+      break;
+    }
+    case 'town':
+      h = 1.3 + n * 0.4;
+      r = 0.55 + n2 * 0.1;
+      g = 0.58;
+      b = 0.32;
+      break;
     default:
       break;
   }
-  if (edge < 0.02) {
-    h = Math.min(h, 0.2);
-    r *= 0.35;
-    g *= 0.35;
-    b *= 0.35;
-  }
+  void edge;
   const shade = 0.86 + clamp01(h / 18) * 0.14;
   return { h: Math.max(0.05, h), r: r * shade, g: g * shade, b: b * shade };
+}
+
+function mixSample(a, b, t) {
+  if (!b || t <= 0) return a;
+  if (t >= 1) return b;
+  return {
+    h: lerp(a.h, b.h, t),
+    r: lerp(a.r, b.r, t),
+    g: lerp(a.g, b.g, t),
+    b: lerp(a.b, b.b, t),
+  };
+}
+
+/** Sample a tile blended with its neighbours so biome borders are not hard rectangles. */
+export function sampleBlended(tile, u, v) {
+  const warp = (fbm(u * 7.2 + tile.seed * 0.02, v * 7.2, tile.seed + 5, 3) - 0.5) * 0.3;
+  let s = sampleTile(tile, u, v);
+  const band = 0.3;
+  if (u + warp < band) {
+    const n = tileAt(tile.tx - 1, tile.tz);
+    if (n) s = mixSample(s, sampleTile(n, 1 - (band - u), v), smoothstep(band, 0, u + warp));
+  } else if (u + warp > 1 - band) {
+    const n = tileAt(tile.tx + 1, tile.tz);
+    if (n) s = mixSample(s, sampleTile(n, u - (1 - band), v), smoothstep(band, 0, 1 - (u + warp)));
+  }
+  if (v + warp * 0.8 < band) {
+    const n = tileAt(tile.tx, tile.tz - 1);
+    if (n) s = mixSample(s, sampleTile(n, u, 1 - (band - v)), smoothstep(band, 0, v + warp * 0.8));
+  } else if (v + warp * 0.8 > 1 - band) {
+    const n = tileAt(tile.tx, tile.tz + 1);
+    if (n) s = mixSample(s, sampleTile(n, u, v - (1 - band)), smoothstep(band, 0, 1 - (v + warp * 0.8)));
+  }
+  return s;
 }
 
 /** Flat overhead painting of a planned tile. North is up. */
@@ -295,7 +355,7 @@ export function paintTileMap(canvas, tile) {
   const d = img.data;
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
-      const c = sampleTile(tile, (x + 0.5) / s, (y + 0.5) / s);
+      const c = sampleBlended(tile, (x + 0.5) / s, (y + 0.5) / s);
       const snap = (v) => Math.round(Math.max(0, Math.min(1, (v - 0.4) * 1.45 + 0.4)) * 6) / 6;
       const i = (y * s + x) * 4;
       d[i] = snap(c.r) * 255;

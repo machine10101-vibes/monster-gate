@@ -288,8 +288,13 @@ export function desertFeature(h, x, z, spec) {
   return oasisAt(wx, wz, h) || mineAt(wx, wz, h) || beachAt(spec, z, h) || duneAt(x, z, h, spec);
 }
 
-function sandTint(n, crest) {
-  return [0.95 + n * 0.12 + crest, 0.78 + n * 0.08, 0.42 + n * 0.06];
+function sandTint(n, crest, x = 0, z = 0) {
+  const low = fbm(x * 0.02 + 3, z * 0.02, 27, 3);
+  return [
+    (0.9 + n * 0.12 + crest) * (0.9 + low * 0.16),
+    (0.74 + n * 0.08) * (0.9 + low * 0.12),
+    (0.4 + n * 0.06) * (0.92 + (1 - low) * 0.08),
+  ];
 }
 
 export function paintDesertCell(out, H, x, z, kind, isPath, n, spec, index) {
@@ -349,7 +354,7 @@ export function paintDesertCell(out, H, x, z, kind, isPath, n, spec, index) {
   zone[i] = ZONE.FIELD;
   const crest = h > 4.2 ? 0.12 : 0;
   top[i] = h < 1.6 ? TILE.SAND : n < 0.18 ? TILE.DIRT : TILE.SAND;
-  const [r, g, b] = sandTint(n, crest);
+  const [r, g, b] = sandTint(n, crest, x, z);
   tint[i * 3] = lerp(r, 0.7, north * 0.45);
   tint[i * 3 + 1] = lerp(g, 0.9, north * 0.55);
   tint[i * 3 + 2] = lerp(b, 0.4, north * 0.2);

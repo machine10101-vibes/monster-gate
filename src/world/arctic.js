@@ -142,8 +142,9 @@ export function paintArcticCell(out, H, x, z, kind, isPath, n, spec) {
   } else if (n > 0.9 && slope > 0.4) {
     set(ZONE.FIELD, TILE.STONE, 0.86, 0.92, 1);
   } else {
-    const sh = 0.93 + n2 * 0.07;
-    set(ZONE.FIELD, TILE.SNOW, sh * (0.97 + n * 0.03), sh, 1);
+    const low = fbm(x * 0.02, z * 0.02, spec.seed + 11, 3);
+    const sh = 0.86 + n2 * 0.08 + (low - 0.5) * 0.1;
+    set(ZONE.FIELD, TILE.SNOW, sh * (0.9 + n * 0.06), sh * 0.96, 0.98);
   }
 }
 

@@ -289,7 +289,7 @@ class Game {
     this.staffRole = '';
     this.saveAcc = 0;
     this.accountWatch = false;
-    this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.8, dist: 24, targetDist: 24, pos: new THREE.Vector3(), look: new THREE.Vector3() };
+    this.cam = { yaw: Math.PI * 0.08, targetYaw: Math.PI * 0.08, pitch: 0.92, dist: 20, targetDist: 20, pos: new THREE.Vector3(), look: new THREE.Vector3() };
     this.uiBlocking = false;
 
     if (!this.initRenderer()) {
@@ -297,7 +297,7 @@ class Game {
       return;
     }
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.3, 320);
+    this.camera = new THREE.PerspectiveCamera(38, 1, 0.3, 160);
     this.tmpV = new THREE.Vector3();
     this.ray = new THREE.Raycaster();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -316,18 +316,39 @@ class Game {
     }
     try {
       const lite = this.lightBoot;
+      const debugShot = typeof location !== 'undefined' && /(?:^|[?&])debug=1(?:&|$)/.test(location.search);
       const r = new THREE.WebGLRenderer({
         canvas: this.canvas,
         antialias: !lite,
         alpha: false,
         powerPreference: lite ? 'default' : 'high-performance',
-        preserveDrawingBuffer: false,
+        preserveDrawingBuffer: debugShot,
       });
       r.outputColorSpace = THREE.SRGBColorSpace;
-      r.toneMapping = THREE.NoToneMapping;
+      r.toneMapping = THREE.AgXToneMapping;
+      r.toneMappingExposure = 1.05;
       r.setClearColor(0x0b0d10, 1);
       r.shadowMap.enabled = true;
       r.shadowMap.type = THREE.PCFShadowMap;
+      const draw = r.renderBufferDirect.bind(r);
+      r.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
+        if (!material || typeof material.onBeforeCompile !== 'function') {
+          if (!this._loggedMissingMat) {
+            this._loggedMissingMat = true;
+            console.warn('MG missing material error', object?.type, object?.name || '', object?.parent?.name || '');
+          }
+          return;
+        }
+        try {
+          return draw(camera, scene, geometry, material, object, group);
+        } catch (err) {
+          if (!this._loggedMissingMat) {
+            this._loggedMissingMat = true;
+            console.warn('MG rbd throw error', object?.type, object?.name || '', object?.parent?.name || '', material?.type || '', err?.message || err);
+          }
+          return;
+        }
+      };
       this.renderer = r;
       this.glWatch = armContextLost(this.canvas, {
         onFail: () => showBootGlFail(),
@@ -337,6 +358,41 @@ class Game {
       showBootGlFail();
       return false;
     }
+  }
+
+  /** Meshes built with a missing material crash WebGLProgram on onBeforeCompile. */
+  hideBrokenMeshes() {
+    const fallback = this._missingMat || (this._missingMat = new THREE.MeshBasicMaterial({ visible: false, fog: true }));
+    const ok = (m) => !!(m && typeof m.onBeforeCompile === 'function');
+    let fixed = 0;
+    const visit = (o) => {
+      if (o.customDepthMaterial === null) o.customDepthMaterial = undefined;
+      if (o.customDistanceMaterial === null) o.customDistanceMaterial = undefined;
+      if (!(o.isMesh || o.isInstancedMesh || o.isPoints || o.isLine || o.isSprite)) return;
+      const m = o.material;
+      if (Array.isArray(m)) {
+        for (let i = 0; i < m.length; i++) {
+          if (!ok(m[i])) {
+            m[i] = fallback;
+            fixed++;
+            o.visible = false;
+          }
+        }
+      } else if (!ok(m)) {
+        o.material = fallback;
+        o.visible = false;
+        fixed++;
+        console.warn('MG missing material error', o.type, o.name || '', o.parent?.name || '');
+      }
+    };
+    this.scene?.traverse(visit);
+    this.world?.group?.traverse(visit);
+    this.world?.cave?.group?.traverse(visit);
+    this.world?.rift?.group?.traverse(visit);
+    this.world?.colosseum?.group?.traverse(visit);
+    for (const row of this.world?.parked || []) row.obj?.traverse?.(visit);
+    if (fixed) console.warn('MG missing material error fixed', fixed);
+    return fixed;
   }
 
   /** Say what broke, once, on the loading screen or the character camp. */
@@ -435,11 +491,9 @@ class Game {
     this.player = new Player(this);
     this.spawner = new Spawner(this);
     if (this.safeBoot) {
-      this.camera.far = 240;
-      this.camera.updateProjectionMatrix();
-      // The first picture is only the town. The rest streams in a few pieces a frame, out to the fog.
-      this.world.parkBeyond(this.player.pos.x, this.player.pos.z, 96);
-      this.world.streamRadius = 220;
+      this.syncViewDistance();
+      this.world.parkBeyond(this.player.pos.x, this.player.pos.z, Math.min(96, this.viewDistance()));
+      this.world.streamRadius = this.viewDistance();
       this.ambient = { npcs: [], fowl: [], cows: [], butterflies: [] };
       this.wakeWorld = true;
     }
@@ -454,6 +508,11 @@ class Game {
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
     this.selectSlot(0, true);
     this.refreshHud(true);
+    this.syncViewDistance();
+    const startX = this.player?.pos?.x ?? 72;
+    const startZ = this.player?.pos?.z ?? 73;
+    this.world.parkBeyond(startX, startZ, this.viewDistance());
+    this.world.streamRadius = this.viewDistance();
 
     this.snapCamera();
     this.hud.drawMinimap(this.world, this.player.pos.x, this.player.pos.z, this.player.yaw, [], [], 0);
@@ -470,7 +529,7 @@ class Game {
       if (status) status.textContent = taken;
     }
     this.applyQuality();
-    if (!this.lightBoot) this.renderer.compile(this.scene, this.camera);
+    this.hideBrokenMeshes();
     progress(1, 'Ready');
 
     if (loadingScreen) await loadingScreen.dismiss();
@@ -519,7 +578,7 @@ class Game {
       this.spawner.populate(true);
     }
     this.audio.unlock();
-    this.cam.targetDist = 16;
+    this.cam.targetDist = 18;
     document.getElementById('title').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
     const returning = this.restoreHunter();
@@ -1680,9 +1739,37 @@ class Game {
     this.setQuality(next.id);
   }
 
+  viewDistance() {
+    const fogFar = this.sky?.fog?.far;
+    const qFar = this.quality?.viewFar || 150;
+    return Math.max(72, Number.isFinite(fogFar) ? fogFar : qFar);
+  }
+
+  syncViewDistance() {
+    const far = this.viewDistance() + 8;
+    if (this.camera && Math.abs(this.camera.far - far) > 0.5) {
+      this.camera.far = far;
+      this.camera.updateProjectionMatrix();
+    }
+    if (this.world) this.world.streamRadius = this.viewDistance();
+  }
+
+  drawStats() {
+    const info = this.renderer?.info?.render || {};
+    return {
+      triangles: info.triangles | 0,
+      calls: info.calls | 0,
+      fogFar: this.sky?.fog?.far ?? 0,
+      camFar: this.camera?.far ?? 0,
+      streamRadius: this.world?.streamRadius ?? 0,
+      parked: this.world?.parked?.length | 0,
+    };
+  }
+
   applyQuality() {
     const q = this.quality;
     if (this.vfx) this.vfx.density = q.density;
+    this.syncViewDistance();
     this.renderer.shadowMap.enabled = !!q.shadows;
     if (this.sky?.sun) this.sky.sun.castShadow = !!q.shadows;
     const sh = this.sky.sun.shadow;
@@ -1691,6 +1778,7 @@ class Game {
       sh.map?.dispose();
       sh.map = null;
     }
+    if (this.world?.haloMat?.uniforms?.uGlow) this.world.haloMat.uniforms.uGlow.value = q.glow ?? 1;
     this.sky.shadowExtent = q.shadowExtent;
     const cam = sh.camera;
     cam.left = -q.shadowExtent;
@@ -3687,7 +3775,7 @@ class Game {
     if (inp.take('rotateR')) this.cam.targetYaw += Math.PI / 4;
     if (inp.take('rotateL')) this.cam.targetYaw -= Math.PI / 4;
     if (inp.zoomDelta) {
-      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 8, 22);
+      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 10, 26);
       inp.zoomDelta = 0;
     }
 
@@ -3749,10 +3837,11 @@ class Game {
     c.look.y += (ty - c.look.y) * Math.min(1, dt === 0 ? 1 : dt * 5);
     c.look.z += (tz - c.look.z) * k;
 
-    const pitch = c.pitch + this.forestAmt * 0.36;
+    const inTown = this.world?.zoneAt?.(P.x, P.z) === ZONE.TOWN;
+    const pitch = c.pitch + this.forestAmt * 0.36 + (inTown ? 0.14 : 0);
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
-    const dist = c.dist * (1 + this.forestAmt * 0.12);
+    const dist = c.dist * (1 + this.forestAmt * 0.12 + (inTown ? 0.08 : 0));
     const cx = c.look.x + Math.sin(c.yaw) * cp * dist;
     const cz = c.look.z + Math.cos(c.yaw) * cp * dist;
     let cy = c.look.y + sp * dist;
@@ -3795,7 +3884,9 @@ class Game {
     const feetY = this.tmpV.project(cam).y;
     this.tmpV.set(P.x, P.y + 2.2, P.z);
     const headY = this.tmpV.project(cam).y;
-    hideUniforms.uHideRadius.value = hideRadiusPx(rw, rh, Math.abs(headY - feetY) * 0.5 * rh);
+    const inTown = this.world?.zoneAt?.(this.player.pos.x, this.player.pos.z) === ZONE.TOWN;
+    const heroPx = Math.abs(headY - feetY) * (inTown ? 0.85 : 0.62) * rh;
+    hideUniforms.uHideRadius.value = hideRadiusPx(rw, rh, heroPx);
     this.tmpV.set(P.x, P.y + 1, P.z);
     const depth = this.tmpV.clone().applyMatrix4(cam.matrixWorldInverse).z * -1;
     const proj = this.tmpV.project(cam);
@@ -3915,7 +4006,10 @@ class Game {
           this.bootFrames = -1;
         }
       }
-      if (this.safeBoot && this.player) this.world?.revealAround?.(this.player.pos.x, this.player.pos.z, 20);
+      if (this.world?.parked?.length && this.player) {
+        const budget = this.quality?.id === 'low' ? 10 : this.safeBoot ? 20 : 18;
+        this.world.revealAround(this.player.pos.x, this.player.pos.z, budget);
+      }
     } catch (err) {
       this.reportFault(err);
     }
@@ -3995,6 +4089,7 @@ class Game {
     this.sky.chill = this.chill;
     this.sky.ember = this.ember;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
+    this.syncViewDistance();
     if (!this.campParked) {
       this.snowfall.update(dt, t, this.camera.position, this.world.realm === 'cave' || this.world.realm === 'rift' ? 0 : this.chill);
       this.ashfall.update(dt, t, this.camera.position, this.world.realm === 'cave' || this.world.realm === 'rift' ? 0 : this.ember);
@@ -4009,6 +4104,7 @@ class Game {
     this.vfx.update(dt, this.camera);
     this.world.haloMat.uniforms.uScale.value = scale;
     this.world.haloMat.uniforms.uNight.value = night;
+    if (this.world.lavaHaloMat) this.world.lavaHaloMat.uniforms.uScale.value = scale;
     if (!this.campParked) this.world.update(dt, t);
 
     this.hud.setClock(this.sky.hour);

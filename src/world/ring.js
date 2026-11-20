@@ -717,9 +717,17 @@ function makeTile(spec, edges) {
         const flower = n > 0.66 && h < 5.2 && h > 1.4;
         top[i] = flower ? TILE.FLOWER_GRASS : n < 0.22 && h > 3.4 ? TILE.DIRT : TILE.GRASS;
         const gold = spec.kind === 'goldmead' || spec.kind === 'hayfield' ? 0.16 : 0;
-        tint[i * 3] = 0.72 + n * 0.26 + gold;
-        tint[i * 3 + 1] = 0.88 + (1 - n) * 0.16;
-        tint[i * 3 + 2] = 0.5 + n * 0.2;
+        const low = fbm(x * 0.018 + 5, z * 0.018, spec.seed + 11, 3);
+        const wear = mask[i] ? 0 : fbm(x * 0.09, z * 0.09, spec.seed + 19, 2);
+        tint[i * 3] = (0.7 + n * 0.22 + gold) * (0.88 + low * 0.2);
+        tint[i * 3 + 1] = (0.86 + (1 - n) * 0.14) * (0.9 + low * 0.16);
+        tint[i * 3 + 2] = (0.48 + n * 0.18) * (0.9 + (1 - low) * 0.1);
+        if (wear < 0.22 && h < 5) {
+          top[i] = TILE.DIRT;
+          tint[i * 3] = 0.82;
+          tint[i * 3 + 1] = 0.7;
+          tint[i * 3 + 2] = 0.48;
+        }
       }
     }
   }
