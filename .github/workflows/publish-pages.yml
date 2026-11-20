@@ -37,12 +37,16 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Short main SHA
+        id: buildid
+        run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
       - name: Build production site
         run: env -u VITE_BASE npm run build
         env:
           MG_WORLD_URL: wss://monster-gate-world-1.onrender.com
           VITE_WORLD_URL: wss://monster-gate-world-1.onrender.com
-          VITE_BUILD_ID: ${{ github.sha }}
+          VITE_BUILD_ID: ${{ steps.buildid.outputs.short }}
 
       - name: Publish dist to gh-pages
         shell: bash

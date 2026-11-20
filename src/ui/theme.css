@@ -964,6 +964,30 @@ body.touch #top-left:has(#quest.open) {
   padding: 3px 7px;
   border-radius: 8px;
 }
+body.photo-mode #hud,
+body.photo-mode #build-id,
+body.photo-mode .build-id,
+body.photo-mode #debug-badge,
+body.photo-mode #nameplates,
+body.photo-mode #damage-layer,
+body.photo-mode #toast,
+body.photo-mode #banner,
+body.photo-mode #panel,
+body.photo-mode #dialog,
+body.photo-mode #quest,
+body.photo-mode #touch-controls,
+body.photo-mode #rotate-overlay,
+body.photo-mode #party-frame,
+body.photo-mode #social-invite,
+body.photo-mode #social-menu,
+body.photo-mode #world-chat,
+body.photo-mode #faint,
+body.photo-mode #clock,
+body.photo-mode .world-mode-pill {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
 #faint {
   background: rgba(7, 13, 22, 0.84);
 }

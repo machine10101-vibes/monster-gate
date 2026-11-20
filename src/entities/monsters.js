@@ -1635,7 +1635,7 @@ export class Monster {
       const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' || this.type === 'volcanum' ? 7.2 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
       const hpNum = this.debugTank ? `<small>${debugTankHpLabel(this)}</small>` : '';
       g.hud.plate(this.id, `${this.name}${hpNum}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
-      g.hud.placePlate(this.id, sx2, sy2, vis);
+      g.hud.placePlate(this.id, sx2, sy2, vis, { dist });
     } else g.hud.removePlate(this.id);
   }
 

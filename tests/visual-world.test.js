@@ -29,21 +29,25 @@ test('meadow grass stays grass instead of wearing into dirt stripes', () => {
   const ring = src('src/world/ring.js');
   const jungle = src('src/world/jungle.js');
   const mats = src('src/engine/materials.js');
+  const terrain = src('src/world/terrain.js');
   assert.doesNotMatch(ring, /wear < 0\.22 && h < 5/);
   assert.match(ring, /const hue = fbm/);
   assert.doesNotMatch(jungle, /nB > 0\.82\) set\(ZONE\.FOREST, TILE\.DIRT/);
   assert.match(mats, /0x6b9a32/);
+  assert.match(mats, /fill\(TILE\.GRASS_SIDE/);
+  assert.doesNotMatch(mats, /mix\(dirtFn\(x, y, 22\), grassFn/);
+  assert.match(terrain, /\[TILE\.GRASS\]: \[TILE\.GRASS_SIDE, TILE\.GRASS_SIDE\]/);
 });
 
 test('path sides follow snow, sand and ash instead of always grass', () => {
   const snow = neighborGrid(TILE.PATH, TILE.SNOW);
-  assert.deepEqual(sideTilesFor(TILE.PATH, snow.top, snow.w, snow.w, 4, 4), [TILE.SNOW_SIDE, TILE.STONE]);
+  assert.deepEqual(sideTilesFor(TILE.PATH, snow.top, snow.w, snow.w, 4, 4), [TILE.SNOW_SIDE, TILE.SNOW_SIDE]);
   const sand = neighborGrid(TILE.PATH, TILE.SAND);
   assert.deepEqual(sideTilesFor(TILE.PATH, sand.top, sand.w, sand.w, 4, 4), [TILE.SAND, TILE.SAND]);
   const ash = neighborGrid(TILE.PATH, TILE.ASH);
   assert.deepEqual(sideTilesFor(TILE.PATH, ash.top, ash.w, ash.w, 4, 4), [TILE.ASH, TILE.BASALT]);
   const grass = neighborGrid(TILE.PATH, TILE.GRASS);
-  assert.deepEqual(sideTilesFor(TILE.PATH, grass.top, grass.w, grass.w, 4, 4), [TILE.GRASS_SIDE, TILE.DIRT]);
+  assert.deepEqual(sideTilesFor(TILE.PATH, grass.top, grass.w, grass.w, 4, 4), [TILE.GRASS_SIDE, TILE.GRASS_SIDE]);
 });
 
 test('world map samples blend biome borders instead of darkening tile edges', () => {
@@ -53,12 +57,15 @@ test('world map samples blend biome borders instead of darkening tile edges', ()
   assert.match(tiles, /export function sampleBlended/);
   assert.doesNotMatch(tiles, /if \(edge < 0\.02\)/);
   assert.match(map, /paintTileMap\(c, tile\)/);
-  assert.match(map, /const band = 13/);
+  assert.match(map, /const band = 16/);
   assert.match(world, /function blendMinimapSeams/);
-  assert.match(world, /const band = 22/);
+  assert.match(world, /const band = 28/);
+  assert.match(world, /paintTileMap\(planned, tile\)/);
+  assert.doesNotMatch(world, /#1a140e/);
   assert.doesNotMatch(world, /\[240, 245, 255\]/);
   assert.match(world, /\[168, 186, 210\]/);
-  assert.match(world, /\[120, 108, 96\]/);
+  assert.match(world, /\[186, 158, 112\]/);
+  assert.doesNotMatch(world, /\[120, 108, 96\]/);
   assert.doesNotMatch(world, /\[150, 146, 138\]/);
   const snow = TILES.find((t) => t.kind === 'snowfall');
   const gold = TILES.find((t) => t.kind === 'goldmead');

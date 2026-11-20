@@ -19,7 +19,7 @@ import { buildHeld } from './entities/humanoid.js';
 import { Spawner } from './entities/monsters.js';
 import { RemoteHunter } from './entities/remote.js';
 import { Session } from './net/session.js';
-import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
+import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, parsePhotoFlag, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { DEBUG_LOOT_ID, isUnsellableGood, markDebugGranted } from './debug/transient.js';
 import { oasisAreaName } from './world/desert.js';
 import { attachSocial } from './social/index.js';
@@ -255,6 +255,7 @@ class Game {
     this.discoverT = 0;
     this.sel = 0;
     this.started = false;
+    this.photoMode = false;
     this.zone = -1;
     this.forestAmt = 0;
     this.resScale = 1;
@@ -3739,9 +3740,17 @@ class Game {
     } else this.hud.removePlate('forge');
   }
 
+  setPhotoMode(on) {
+    this.photoMode = !!on;
+    document.body.classList.toggle('photo-mode', this.photoMode);
+    document.documentElement.classList.toggle('photo-mode', this.photoMode);
+    if (this.fx) this.fx.photoMode = this.photoMode;
+  }
+
   handleInput() {
     const inp = this.input;
     const hud = this.hud;
+    if (inp.take('photo') && this.started) this.setPhotoMode(!this.photoMode);
     if (inp.take('escape')) {
       if (hud.panelOpen) hud.closePanel();
       else if (this.talkNpc) {
@@ -4114,6 +4123,7 @@ class Game {
     else this.sky.assignTorchLights(lights, P.pos.x, P.pos.z);
     const night = this.sky.night;
     const scale = this.pxScale * 0.03;
+    if (this.fx) this.fx.photoMode = !!this.photoMode;
     this.fx.update(dt, t, P.pos, scale, night, this.forestAmt);
     this.vfx.update(dt, this.camera);
     this.world.haloMat.uniforms.uScale.value = scale;
@@ -4200,6 +4210,7 @@ async function startGame() {
   try {
     installMockWallet();
     attachDebug(game);
+    game.setPhotoMode(parsePhotoFlag(location.search));
     attachSocial(game);
     const q = new URLSearchParams(location.search);
     const liveSearch = location.search;

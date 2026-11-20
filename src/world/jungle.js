@@ -4,7 +4,7 @@ import { W, ZONE, WATER_Y } from './terrain.js';
 
 /**
  * The jungle block west of Brookside and Longacre: Mirrormere Oasis (53), Silverrun Canopy (52),
- * Southmead (63), Runmouth (62), and the beach tiles Dunes (73) and Shellbeach (72) with the pirate docks.
+ * Southmead (63), Runmouth (62), and the beach tiles Pirate Shore (73) and Shellbeach (72) with the pirate docks.
  * ring.js builds the height fields and stitches edges; terrain features, painting and dressing live here.
  */
 

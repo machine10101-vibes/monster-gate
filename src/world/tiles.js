@@ -57,8 +57,8 @@ const RING = {
   '1,5': ['canopy', 'West of the oasis. Silverrun Canopy is thick jungle under giant trees, with an overgrown stone temple, carved idols and roaming Bengal Tigers.'],
   '2,6': ['sunken', 'South of the oasis, west of Longacre. Southmead is dense jungle with bamboo groves, pools and tall grass, where Battle Raptors hunt in packs.'],
   '1,6': ['tigerwood', 'Southwest of the oasis. Runmouth is a steaming jungle hollow with a wrecked pirate ship half swallowed by roots, haunted by Cursed Pirates.'],
-  '2,7': ['pirateshore', 'South of Southmead. The jungle thins to a palm beach at Dunes, where two pirate ships are moored and a long fishing pier runs out over deep water.'],
-  '1,7': ['shellbeach', 'West of Dunes. Shellbeach is a sweep of white sand, shells and driftwood between the jungle and the sea, with a pirate ship dock on the shore.'],
+  '2,7': ['pirateshore', 'South of Southmead. The jungle thins to a palm beach at Pirate Shore, where two pirate ships are moored and a long fishing pier runs out over deep water.'],
+  '1,7': ['shellbeach', 'West of Pirate Shore. Shellbeach is a sweep of white sand, shells and driftwood between the jungle and the sea, with a pirate ship dock on the shore.'],
   '3,7': ['sunspill', 'South of Longacre, where the fields dry out. Sunspill is open dune, sandstone and scrub, with the west shore of the oasis pool in its southeast corner.'],
   '4,7': ['glassroad', 'South of Southford. The vale road comes down through the rim into Glassroad, a dry dune land whose southwest corner holds the oasis pool.'],
   '3,8': ['deepwell', 'South of Sunspill. Deepwell is desert dune and a south beach, with a mining pit three times the span of Greyrock cut into the sand.'],
@@ -84,7 +84,7 @@ const NAMES = [
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Gilantre', 'Gilantre', 'Reedbank', 'Frogmarsh'],
   ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Gilantre', 'Gilantre', 'Broken Arch', 'Old Stones'],
-  ['Seagate', 'Shellbeach', 'Dunes', 'Sunspill', 'Glassroad', 'Reedford', 'Silverrun Reach', 'Elderwood', 'Sunken Yard', 'Grey Sea'],
+  ['Seagate', 'Shellbeach', 'Pirate Shore', 'Sunspill', 'Glassroad', 'Reedford', 'Silverrun Reach', 'Elderwood', 'Sunken Yard', 'Grey Sea'],
   ['Open Water', 'West Deep', 'Pale Shore', 'Deepwell', 'Oasis', 'Sedge', 'Silverrun Crossing', 'Greystone Summit', 'South Deep', 'East Deep'],
   ['Far West', 'Whale Road', 'Glass Sea', 'South Strand', 'Midsea', 'East Strand', 'Kelp', 'Quiet Deep', 'Last Water', 'Far East'],
 ];
@@ -302,9 +302,9 @@ export function sampleTile(tile, u, v) {
     }
     case 'town':
       h = 1.3 + n * 0.4;
-      r = 0.55 + n2 * 0.1;
-      g = 0.58;
-      b = 0.32;
+      r = 0.72 + n2 * 0.08;
+      g = 0.66 + n * 0.06;
+      b = 0.34;
       break;
     default:
       break;

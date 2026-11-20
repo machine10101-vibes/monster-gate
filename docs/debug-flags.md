@@ -62,10 +62,10 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 | `canopy` | `silverrun canopy`, `jungle`, `forest` | Silverrun Canopy road south of the temple |
 | `snowfall` | `snow` | Frozen meadow east of Goldmead |
 | `ashroad` | `ashen road`, `ash`, `waste`, `volcanic` | Ashen Road volcanic approach |
-| `sunspill` | `desert`, `sand`, `dunes`, `dune` | Open western dunes (not the pirate beach) |
+| `sunspill` | `desert`, `sand`, `dunes`, `dune` | Open western dunes (not Pirate Shore) |
 | `greenbowl` | `oasis` | Desert oasis pool |
 | `shellbeach` | `beach` | White-sand beach |
-| `pirateshore` | `pirate shore`, `piratedocks` | Dunes beach and pirate docks |
+| `pirateshore` | `pirate shore`, `piratedocks` | Pirate Shore beach and docks |
 | `cinderfall` | `lava` | Cinderfall volcano |
 | `icewind` | `ice` | Icewind Reach |
 | `glimmerfrost` | `arctic` | Glimmerfrost glacier |
@@ -73,3 +73,17 @@ Wake overlay (no `debug=1` needed): `?mmo=1&mockwake=1` is a 30s queue. `?mmo=1&
 Every **built** tile also has a `tp` key equal to its `kind` (lowercase): `southford`, `harefield`, `eastleas`, `icewind`, `rimefang`, `sunspill`, `longacre`, `hayfield`, and the Silverrun / Gilantre quarters. Tile names with a unique label (`Harefield`, `Snowfall`, `Deepwell`, …) work too.
 
 Keys are case-insensitive. Spaces, `_`, and `-` are ignored. Teleports never write the hunter save. They are inert without `debug=1`, and with `mmo=1` or world-view.
+
+## Photo mode
+
+Hides the HUD, nameplates, attack warnings, and the build tag for clean screenshots. Combat, movement, and MMO are unchanged.
+
+| Query / key | Effect |
+| --- | --- |
+| `?photo=1` | Start with photo mode on (works without `debug=1`) |
+| `H` | Toggle photo mode while in the world |
+
+```
+https://monstergate.online/?photo=1
+https://monstergate.online/?debug=1&tp=hellspire&photo=1
+```
