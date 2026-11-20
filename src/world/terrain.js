@@ -348,7 +348,6 @@ export function buildTerrainMeshes(data, material, opt = {}) {
   const { H, top, tint, zone } = data;
   const group = new THREE.Group();
   const smooth = !!opt.smooth || !!data.smooth;
-  const skipThinLips = !!opt.skipThinGrassLips;
   const hAt = (x, z) => {
     if (x >= 0 && z >= 0 && x < width && z < depth) return H[z * width + x];
     const outside = opt.outside?.(x, z);
@@ -432,10 +431,32 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           ];
           const uvs = [0, 1, 2, 3].map((k) => baseUV[(k + rot) % 4]);
           const roll = smooth && !cliffCell(x, z);
-          const y00 = roll ? cornerH(x, z) : h;
-          const y01 = roll ? cornerH(x, z + 1) : h;
-          const y11 = roll ? cornerH(x + 1, z + 1) : h;
-          const y10 = roll ? cornerH(x + 1, z) : h;
+          let y00 = roll ? cornerH(x, z) : h;
+          let y01 = roll ? cornerH(x, z + 1) : h;
+          let y11 = roll ? cornerH(x + 1, z + 1) : h;
+          let y10 = roll ? cornerH(x + 1, z) : h;
+          const skirt = [false, false, false, false];
+          const skirtOk = (nt) => {
+            const g = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
+            return (grassy && g) || ((tl === TILE.PATH || grassy) && (g || nt === TILE.PATH));
+          };
+          if (!roll) {
+            const pull = (dx, dz, setY, dirI) => {
+              const nh = hAt(x + dx, z + dz);
+              const drop = h - nh;
+              if (drop <= 0 || drop > 1.001) return;
+              const nx = x + dx;
+              const nz = z + dz;
+              const nt = nx >= 0 && nz >= 0 && nx < width && nz < depth ? top[nz * width + nx] : -1;
+              if (!skirtOk(nt)) return;
+              setY(nh);
+              skirt[dirI] = true;
+            };
+            pull(1, 0, (nh) => { y10 = Math.min(y10, nh); y11 = Math.min(y11, nh); }, 0);
+            pull(-1, 0, (nh) => { y00 = Math.min(y00, nh); y01 = Math.min(y01, nh); }, 1);
+            pull(0, 1, (nh) => { y01 = Math.min(y01, nh); y11 = Math.min(y11, nh); }, 2);
+            pull(0, -1, (nh) => { y00 = Math.min(y00, nh); y10 = Math.min(y10, nh); }, 3);
+          }
           const ps = [
             [x + ox, y00, z + oz],
             [x + ox, y01, z + oz + 1],
@@ -471,16 +492,12 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             [0, 1],
             [0, -1],
           ];
-          for (const [dx, dz] of dirs) {
+          for (let di = 0; di < dirs.length; di++) {
+            const [dx, dz] = dirs[di];
             const nh = hAt(x + dx, z + dz);
             if (nh >= h) continue;
             if (roll && !cliffCell(x + dx, z + dz)) continue;
-            const nx = x + dx;
-            const nz = z + dz;
-            const nt = nx >= 0 && nz >= 0 && nx < width && nz < depth ? top[nz * width + nx] : -1;
-            const nbGrassy = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
-            if (skipThinLips && grassy && nbGrassy && h - nh <= 1.001) continue;
-            if (skipThinLips && (tl === TILE.PATH || grassy) && (nbGrassy || nt === TILE.PATH) && h - nh <= 1.001) continue;
+            if (skirt[di]) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;

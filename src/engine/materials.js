@@ -22,6 +22,8 @@ function injectCloudShadows(shader) {
   if (shader.uniforms.uCloudTime) return;
   shader.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
   shader.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
+  shader.uniforms.uCloudDark = cloudShadowUniforms.uCloudDark;
+  shader.uniforms.uCloudForce = cloudShadowUniforms.uCloudForce;
   if (!shader.vertexShader.includes('vCloudWorld')) {
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCloudWorld;')
@@ -39,12 +41,14 @@ vCloudWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`
 varying vec3 vCloudWorld;
 uniform float uCloudTime;
 uniform float uCloudAmt;
+uniform float uCloudDark;
+uniform float uCloudForce;
 ${CLOUD_SHADOW_GLSL}`
       )
       .replace(
         '#include <opaque_fragment>',
-        `#include <opaque_fragment>
-gl_FragColor.rgb *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);`
+        `outgoingLight *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);
+#include <opaque_fragment>`
       );
   }
 }
@@ -57,6 +61,8 @@ export function patchHide(material, key = 'hide') {
     shader.uniforms.uHideRadius = hideUniforms.uHideRadius;
     shader.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
     shader.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
+    shader.uniforms.uCloudDark = cloudShadowUniforms.uCloudDark;
+    shader.uniforms.uCloudForce = cloudShadowUniforms.uCloudForce;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying float vHideDepth;\nvarying vec3 vCloudWorld;')
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -73,6 +79,8 @@ uniform float uPlayerDepth;
 uniform float uHideRadius;
 uniform float uCloudTime;
 uniform float uCloudAmt;
+uniform float uCloudDark;
+uniform float uCloudForce;
 ${CLOUD_SHADOW_GLSL}`
       )
       .replace(
@@ -90,8 +98,8 @@ ${CLOUD_SHADOW_GLSL}`
       )
       .replace(
         '#include <opaque_fragment>',
-        `#include <opaque_fragment>
-gl_FragColor.rgb *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);`
+        `outgoingLight *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);
+#include <opaque_fragment>`
       );
   };
   material.customProgramCacheKey = () => key + 'cloudShadow';
@@ -127,6 +135,8 @@ export function toonMaterial(opts = {}) {
 export const cloudShadowUniforms = {
   uCloudTime: { value: 0 },
   uCloudAmt: { value: 1 },
+  uCloudDark: { value: 0.56 },
+  uCloudForce: { value: 0 },
 };
 
 /** World-space drift of the cloud shadow field, about 3 units per second. */
@@ -148,8 +158,8 @@ float cloudShade(vec2 xz, float t, float amt){
   vec2 drift = vec2(t * 2.8, t * -2.2);
   float n = cloudFbm((xz + drift) * 0.014);
   n += 0.28 * cloudFbm((xz + drift * 0.55) * 0.006 + 4.7);
-  float sh = smoothstep(0.32, 0.54, n);
-  return mix(1.0, 0.56, sh * amt);
+  float sh = max(smoothstep(0.32, 0.54, n), uCloudForce);
+  return mix(1.0, uCloudDark, sh * amt);
 }
 `;
 

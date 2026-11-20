@@ -409,7 +409,6 @@ export class World {
         ox: land.x0,
         oz: land.z0,
         smooth: !!land.data.smooth || !!land.desert,
-        skipThinGrassLips: land.kind === 'brookside',
         outside: (x, z) => sampleLands(this.lands, land.x0 + x, land.z0 + z),
       });
       this.group.add(mesh);
@@ -540,6 +539,8 @@ export class World {
           uSky: { value: new THREE.Color(0xcfe9ff) },
           uCloudTime: cloudShadowUniforms.uCloudTime,
           uCloudAmt: cloudShadowUniforms.uCloudAmt,
+          uCloudDark: cloudShadowUniforms.uCloudDark,
+          uCloudForce: cloudShadowUniforms.uCloudForce,
         },
       ]),
       vertexShader: `
@@ -569,6 +570,8 @@ export class World {
         uniform vec3 uSky;
         uniform float uCloudTime;
         uniform float uCloudAmt;
+        uniform float uCloudDark;
+        uniform float uCloudForce;
         varying vec3 vWorld;
         varying float vDepth;
         varying float vShore;
@@ -590,7 +593,7 @@ export class World {
           col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float shoreBand = smoothstep(0.20, 0.06, vDepth);
+          float shoreBand = max(vShore, smoothstep(0.12, 0.04, vDepth));
           float foamWave = 0.97 + 0.03 * sin(uTime * 1.45 + p.x * 0.28);
           float foam = shoreBand * foamWave;
           col = mix(col, uFoam, foam);
@@ -605,6 +608,10 @@ export class World {
         }`,
     });
     this.waterMat = mat;
+    mat.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
+    mat.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
+    mat.uniforms.uCloudDark = cloudShadowUniforms.uCloudDark;
+    mat.uniforms.uCloudForce = cloudShadowUniforms.uCloudForce;
     const seen = new Set();
     const hAt = (land, x, z) => {
       if (x < 0 || z < 0 || x >= W || z >= W) return 8;
@@ -626,7 +633,10 @@ export class World {
           if (h >= WATER_Y + 0.02) continue;
           let edge = 0;
           for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step], [step, step], [step, -step], [-step, step], [-step, -step]]) {
-            if (hAt(land, x + dx, z + dz) >= WATER_Y - 0.02) edge = 1;
+            if (hAt(land, x + dx, z + dz) >= WATER_Y - 0.08) edge = 1;
+          }
+          for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+            if (hAt(land, x + 2 * dx, z + 2 * dz) >= WATER_Y - 0.02) edge = 1;
           }
           const x0 = land.x0 + x;
           const z0 = land.z0 + z;
@@ -1601,6 +1611,10 @@ export class World {
       crate.flag.rotation.y = Math.PI / 2 + Math.sin(t * 1.7) * 0.45;
     }
     this.waterMat.uniforms.uTime.value = t;
+    this.waterMat.uniforms.uCloudTime.value = cloudShadowUniforms.uCloudTime.value;
+    this.waterMat.uniforms.uCloudAmt.value = cloudShadowUniforms.uCloudAmt.value;
+    this.waterMat.uniforms.uCloudDark.value = cloudShadowUniforms.uCloudDark.value;
+    this.waterMat.uniforms.uCloudForce.value = cloudShadowUniforms.uCloudForce.value;
     this.portalMat.uniforms.uTime.value = t;
     this.haloMat.uniforms.uTime.value = t;
     if (this.lavaHaloMat) this.lavaHaloMat.uniforms.uTime.value = t;

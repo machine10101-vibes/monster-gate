@@ -79,9 +79,24 @@ function shortSha() {
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const supabase = resolveSupabaseConfig();
+const BUILD_STAMP = shortSha();
+
+function versionJsonPlugin(id) {
+  const stamp = String(id || 'dev');
+  return {
+    name: 'mg-version-json',
+    transformIndexHtml(html) {
+      return String(html).replaceAll('__MG_BUILD__', stamp);
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ build: stamp })}\n` });
+    },
+  };
+}
 
 export default defineConfig({
   base: publicBase(),
+  plugins: [versionJsonPlugin(BUILD_STAMP)],
   define: {
     'import.meta.env.VITE_BUILD_ID': JSON.stringify(shortSha()),
     'import.meta.env.VITE_MMO_URL': JSON.stringify(resolveMmoUrl()),

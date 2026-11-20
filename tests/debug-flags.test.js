@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, LAGOON_CAM, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, LAGOON_CAM, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseCloudShadowFlag, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload, isUnsellableGood, stripDebugGrantedInPlace } from '../src/debug/transient.js';
 import { GOODS } from '../src/data/gathering.js';
@@ -154,6 +154,11 @@ test('every built tile has a debug tp key', () => {
   assert.equal(parsePhotoFlag('?debug=1&photo=1'), true);
   assert.equal(parsePhotoFlag('?debug=1'), false);
   assert.equal(parsePhotoFlag('?mmo=1&photo=1'), true);
+  assert.equal(parseCloudShadowFlag(''), false);
+  assert.equal(parseCloudShadowFlag('?cloudshadow=strong'), false);
+  assert.equal(parseCloudShadowFlag('?debug=1'), false);
+  assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=1'), false);
+  assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong'), true);
   const lagoon = resolveSpot('lagoon');
   assert.ok(lagoon.z >= 66 && lagoon.z <= 78, 'lagoon spawn is on the south beach of the pool');
   assert.ok(lagoon.x < -218, 'lagoon spawn sits on the south sand, not the east grass road');
