@@ -161,7 +161,7 @@ test('every built tile has a debug tp key', () => {
   assert.ok(pool > 16 && pool < 28, 'lagoon spawn looks at the water from a clear beach');
   assert.ok(Math.hypot(lagoon.x + 216, lagoon.z - 72) > 5, 'lagoon spawn is not the tile center');
   assert.equal(LAGOON_CAM.lookAhead, 0, 'lagoon snap looks at the hunter, not the palm island');
-  assert.ok(LAGOON_CAM.dist >= 22, 'lagoon camera can sit farther back than the default zoom');
+  assert.ok(LAGOON_CAM.dist <= 18 && LAGOON_CAM.dist < 20, 'lagoon teleport uses a closer default zoom so the hunter reads');
   const jungle = readFileSync(new URL('../src/world/jungle.js', import.meta.url), 'utf8');
   assert.match(jungle, /d >= 0\.68 && d < 1\.28/);
   assert.match(jungle, /TILE\.SAND, 1\.02, 0\.96, 0\.78/);

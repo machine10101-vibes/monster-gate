@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { GeometryBatch, RNG, clamp, smoothstep, lerp } from '../engine/voxel.js';
+import { GeometryBatch, clamp, smoothstep, lerp } from '../engine/voxel.js';
+import { cloudShadowUniforms } from '../engine/materials.js';
 
 const KEYS = [
   { h: 0, top: 0x070b24, hor: 0x16204a, fog: 0x121a3a, sun: 0x7f95ff, si: 0.48, hs: 0x2c3c86, hg: 0x161a38, hi: 0.82, exp: 1.0 },
@@ -129,54 +130,11 @@ export class Sky {
     this.skyMesh.renderOrder = -10;
     scene.add(this.skyMesh);
 
-    this.cloudMat = new THREE.MeshBasicMaterial({
-      color: 0xd8e4f0,
-      transparent: true,
-      opacity: 0.52,
-      fog: false,
-      toneMapped: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    this.shadowMat = new THREE.MeshBasicMaterial({
-      color: 0x243040,
-      transparent: true,
-      opacity: 0.2,
-      fog: false,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    const puffGeo = new THREE.CircleGeometry(14, 20);
-    puffGeo.rotateX(-Math.PI / 2);
-    const shadeGeo = new THREE.CircleGeometry(16, 20);
-    shadeGeo.rotateX(-Math.PI / 2);
     this.clouds = new THREE.Group();
-    this.clouds.renderOrder = 2;
-    this.cloudShadows = new THREE.Group();
-    this.cloudShadows.renderOrder = 1;
+    this.clouds.visible = false;
+    this.cloudShadows = null;
     this.cloudSpan = 260;
-    const rng = new RNG(77);
-    const nClouds = quality.id === 'low' ? 16 : 28;
-    for (let i = 0; i < nClouds; i++) {
-      const mesh = new THREE.Mesh(puffGeo, this.cloudMat);
-      mesh.frustumCulled = false;
-      mesh.scale.set(rng.range(0.9, 1.9), 1, rng.range(0.55, 1.15));
-      mesh.userData.ox = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
-      mesh.userData.oz = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
-      mesh.userData.oy = rng.range(6, 11);
-      mesh.userData.speed = rng.range(0.35, 0.85);
-      this.clouds.add(mesh);
-      const shade = new THREE.Mesh(shadeGeo, this.shadowMat);
-      shade.frustumCulled = false;
-      shade.scale.copy(mesh.scale);
-      shade.userData.ox = mesh.userData.ox;
-      shade.userData.oz = mesh.userData.oz;
-      shade.userData.speed = mesh.userData.speed;
-      shade.userData.lift = 0.22;
-      this.cloudShadows.add(shade);
-    }
-    scene.add(this.cloudShadows);
-    scene.add(this.clouds);
+    void quality;
 
     this.tmpA = new THREE.Color();
     this.tmpB = new THREE.Color();
@@ -255,7 +213,7 @@ export class Sky {
       this.hemi.intensity *= 0.5;
       this.skyMesh.visible = false;
       this.clouds.visible = false;
-      if (this.cloudShadows) this.cloudShadows.visible = false;
+      cloudShadowUniforms.uCloudAmt.value = 0;
     } else {
       const viewFar = (this.quality && this.quality.viewFar) || 150;
       this.fog.near = 34 - chill * 8 - ember * 8;
@@ -267,8 +225,7 @@ export class Sky {
         this.sun.intensity *= 1.08;
       }
       this.skyMesh.visible = true;
-      this.clouds.visible = true;
-      if (this.cloudShadows) this.cloudShadows.visible = true;
+      this.clouds.visible = false;
     }
 
     const u = this.skyMat.uniforms;
@@ -285,30 +242,9 @@ export class Sky {
     u.uTime.value = time;
     this.skyMesh.position.copy(camera.position);
 
-    const cloudBright = clamp(0.42 + s.hi * 0.38, 0.48, 0.92);
-    const snow = chill * 0.55;
-    this.cloudMat.color.setRGB(
-      cloudBright * (0.78 - snow * 0.02) * (0.92 + (1 - night) * 0.08),
-      cloudBright * (0.8 + snow * 0.04),
-      cloudBright * (0.88 + snow * 0.06) * (1 + night * 0.08),
-    );
-    this.cloudMat.opacity = 0.42 + (1 - night) * 0.16;
-    if (this.shadowMat) this.shadowMat.opacity = 0.14 + (1 - night) * 0.08;
-    const span = this.cloudSpan;
-    const wrap = (v) => {
-      let n = v + span * 0.5;
-      n = ((n % span) + span) % span;
-      return n - span * 0.5;
-    };
-    for (const c of this.clouds.children) {
-      c.userData.ox = wrap(c.userData.ox + c.userData.speed * dt);
-      c.position.set(focus.x + c.userData.ox, c.userData.oy, focus.z + c.userData.oz);
-    }
-    if (this.cloudShadows) {
-      for (const s of this.cloudShadows.children) {
-        s.userData.ox = wrap(s.userData.ox + s.userData.speed * dt);
-        s.position.set(focus.x + s.userData.ox, s.userData.lift || 0.22, focus.z + s.userData.oz);
-      }
+    cloudShadowUniforms.uCloudTime.value = time;
+    if (!this.indoors) {
+      cloudShadowUniforms.uCloudAmt.value = (1 - night) * 0.92 + night * 0.18;
     }
     this.state = { night, sunDir, lightDir, ...s };
   }

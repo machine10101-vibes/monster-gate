@@ -14,8 +14,7 @@ function thumb(tile, game) {
   const land = tile.built && game.world.tileCanvas?.[tile.id];
   if (land) {
     const ctx = c.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = 0.84;
     ctx.drawImage(land, 0, 0, CELL, CELL);
     ctx.globalAlpha = 1;
@@ -54,7 +53,12 @@ function blendThumbs() {
         for (let lx = 0; lx < CELL; lx++) {
           const x = tx * CELL + lx;
           const y = tz * CELL + ly;
-          const fall = (v) => 0.5 * (1 + Math.cos(Math.PI * v / band));
+          const warp = (Math.sin(x * 12.9898 + y * 78.233) * 43758.5453 % 1 + 1) % 1;
+          const n = (warp - 0.5) * 8;
+          const fall = (v) => {
+            const t = 1 - (v + n) / band;
+            return t <= 0 ? 0 : t * t * (3 - 2 * t) * 0.62;
+          };
           if (lx < band && tx > 0) mix(x, y, x - (band - lx), y, fall(lx));
           if (lx >= CELL - band && tx < GRID - 1) mix(x, y, x + (lx - (CELL - band) + 1), y, fall(CELL - 1 - lx));
           if (ly < band && tz > 0) mix(x, y, x, y - (band - ly), fall(ly));

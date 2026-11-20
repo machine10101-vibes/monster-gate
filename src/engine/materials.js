@@ -79,16 +79,61 @@ export function toonMaterial(opts = {}) {
   return m;
 }
 
+/** Scrolling tiled cloud-shadow multiply. Shared so Sky can tick one clock. */
+export const cloudShadowUniforms = {
+  uCloudTime: { value: 0 },
+  uCloudAmt: { value: 1 },
+};
+
+export const CLOUD_SHADOW_GLSL = `
+float cloudHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float cloudNoise(vec2 p){
+  vec2 i = floor(p); vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(cloudHash(i), cloudHash(i + vec2(1.0, 0.0)), f.x), mix(cloudHash(i + vec2(0.0, 1.0)), cloudHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float cloudFbm(vec2 p){
+  float a = 0.0; float w = 0.5;
+  for (int i = 0; i < 4; i++) { a += w * cloudNoise(p); p = p * 2.07 + 13.1; w *= 0.5; }
+  return a;
+}
+float cloudShade(vec2 xz, float t, float amt){
+  float n = cloudFbm(xz * 0.018 + vec2(t * 0.012, t * 0.007));
+  n += 0.32 * cloudFbm(xz * 0.007 - vec2(t * 0.005, -t * 0.004) + 4.7);
+  float sh = smoothstep(0.40, 0.62, n);
+  return mix(1.0, 0.78, sh * amt);
+}
+`;
+
 /**
  * Cheap lava emissive on atlas UVs. LAVA is fill9 around tile 58 (cols 9-11, rows 2-4).
- * Keeps MeshToonMaterial otherwise so roofs and cobbles stay untouched.
+ * Cloud shadows darken the ground with a soft scrolling noise multiply (never a mesh
+ * between the camera and the hunter).
  */
 export function patchTerrainGlow(material, key = 'terrainGlow') {
   if (!material) return material;
   material.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>
+    shader.uniforms.uCloudTime = cloudShadowUniforms.uCloudTime;
+    shader.uniforms.uCloudAmt = cloudShadowUniforms.uCloudAmt;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCloudWorld;')
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+vCloudWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vCloudWorld;
+uniform float uCloudTime;
+uniform float uCloudAmt;
+${CLOUD_SHADOW_GLSL}`
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
 #ifdef USE_MAP
 {
   vec2 tu = vec2(vMapUv.x * 16.0, (1.0 - vMapUv.y) * 16.0);
@@ -97,11 +142,16 @@ export function patchTerrainGlow(material, key = 'terrainGlow') {
   totalEmissiveRadiance += vec3(1.4, 0.42, 0.07) * lava * pulse;
 }
 #endif`
-    );
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `#include <opaque_fragment>
+gl_FragColor.rgb *= cloudShade(vCloudWorld.xz, uCloudTime, uCloudAmt);`
+      );
   };
   const prev = material.customProgramCacheKey;
   material.customProgramCacheKey = function terrainGlowKey() {
-    return (prev ? prev.call(this) : '') + key;
+    return (prev ? prev.call(this) : '') + key + 'cloudShadow';
   };
   return material;
 }
@@ -167,16 +217,11 @@ export function buildAtlas() {
   const pick = (arr, seed) => arr[Math.floor(seed * arr.length) % arr.length];
   const wrapNoise = (x, y, s) => hash2(((x % TILE_PX) + TILE_PX) % TILE_PX, ((y % TILE_PX) + TILE_PX) % TILE_PX, s);
 
-  const GRASS = [0x4e8f36, 0x58963c, 0x629e42, 0x6aa848, 0x457e30, 0x6b9a32, 0x3f8a48, 0x7ab03c, 0x558b2f, 0x8aad3a];
+  const GRASS = [0x5a9640, 0x629e42, 0x6aa848, 0x6b9a32, 0x64a444, 0x7ab03c];
   const grassFn = (x, y, s) => {
     const n = wrapNoise(x, y, s);
     const clump = wrapNoise(x >> 1, y >> 1, s + 9);
-    const patch = wrapNoise(x >> 3, y >> 3, s + 17);
-    let c = pick(GRASS, n * 0.35 + clump * 0.3 + patch * 0.35);
-    if (patch > 0.62) c = mix(c, 0x8bb83c, 0.28);
-    if (patch < 0.32) c = mix(c, 0x2f7a4a, 0.22);
-    if (wrapNoise(x, y, s + 5) > 0.95) c = shade(c, 1.08);
-    return c;
+    return mix(0x5a9a3e, 0x72b04a, n * 0.5 + clump * 0.5);
   };
   fill(TILE.GRASS, (x, y) => grassFn(x, y, 11));
 

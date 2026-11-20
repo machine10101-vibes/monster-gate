@@ -421,7 +421,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             [1, 1],
             [1, -1],
           ];
-          const aos = corners.map(([sx, sz]) => aoAt(sx, sz));
+          const aos = grassy ? [1, 1, 1, 1] : corners.map(([sx, sz]) => aoAt(sx, sz));
           const rot = grassy ? 0 : Math.floor(hash2(x, z, 13) * 4);
           const baseUV = [
             [u0, vBot],

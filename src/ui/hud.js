@@ -642,8 +642,7 @@ export class HUD {
       c.width = instanced ? 240 : src.width;
       c.height = instanced ? 192 : src.height;
       const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+      ctx.imageSmoothingEnabled = false;
       ctx.drawImage(src, 0, 0, c.width, c.height);
       const p = game.player;
       const ox = inCave ? game.world.cave.origin.x : inRift ? game.world.rift.origin.x : (game.world.minimapOrigin?.x || 0);
