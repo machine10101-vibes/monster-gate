@@ -23,7 +23,7 @@ function assertEastWest(a, b) {
 }
 
 test('tiles 77, 78, 87 and 88 are built as the Silverrun forest region', () => {
-  const expected = new Map([[77, 'silverrunNorth'], [78, 'silverrunEast'], [87, 'silverrunRiver'], [88, 'silverrunPeak']]);
+  const expected = new Map([[76, 'silverrunWest'], [77, 'silverrunNorth'], [78, 'silverrunEast'], [87, 'silverrunRiver'], [88, 'silverrunPeak']]);
   for (const [number, kind] of expected) {
     const tile = TILES.find((entry) => entry.n === number);
     assert.ok(tile, `tile ${number} exists`);
@@ -34,6 +34,8 @@ test('tiles 77, 78, 87 and 88 are built as the Silverrun forest region', () => {
 });
 
 test('all four Silverrun tile seams meet exactly, including the Gilantre boundary', () => {
+  assertEastWest(byKind.glassroad, byKind.silverrunWest);
+  assertEastWest(byKind.silverrunWest, byKind.silverrunNorth);
   assertNorthSouth(byKind.silverrunNorth, byKind.silverrunRiver);
   assertNorthSouth(byKind.silverrunEast, byKind.silverrunPeak);
   assertEastWest(byKind.silverrunNorth, byKind.silverrunEast);
@@ -45,6 +47,15 @@ test('all four Silverrun tile seams meet exactly, including the Gilantre boundar
 test('Silverrun river runs from the southern ocean through tiles 87 and 77', () => {
   const lower = byKind.silverrunRiver;
   const upper = byKind.silverrunNorth;
+  const west = byKind.silverrunWest;
+  const crossingZ = Array.from({ length: W }, (_, z) => z + west.z0).find((z) => Math.abs(silverrunRiverCenterX(z) - (west.x0 + W - 1)) < 0.6);
+  assert.ok(crossingZ, 'river centerline crosses the Reedford/Silverrun seam');
+  const westEdgeIndex = (crossingZ - west.z0) * W + (W - 1);
+  const northEdgeIndex = (crossingZ - upper.z0) * W;
+  assert.ok(west.data.H[westEdgeIndex] < 0.35, 'river water reaches Reedford seam');
+  assert.ok(upper.data.H[northEdgeIndex] < 0.35, 'river water continues across Silverrun seam');
+  assert.equal(west.data.zone[westEdgeIndex], ZONE.WATER);
+  assert.equal(upper.data.zone[northEdgeIndex], ZONE.WATER);
   const lowerX = Math.floor(silverrunRiverCenterX(504) - lower.x0);
   const upperX = Math.floor(silverrunRiverCenterX(360) - upper.x0);
   assert.ok(lower.data.H[72 * W + lowerX] < 0.35, 'river water is present in tile 87');
@@ -65,6 +76,7 @@ test('Greystone has a flat, climbable summit and a marked switchback trail', () 
   }
   const trail = 88 * W + 34;
   assert.equal(peak.data.climb[trail], 1);
+  assert.notEqual(peak.data.H[40 * W + 8], peak.data.H[78 * W + 38], 'rock profile varies around the mountain rather than forming a smooth radial mound');
   const world = new World('high');
   world.lands = [peak];
   const wx = peak.x0 + 8.5;
@@ -91,4 +103,9 @@ test('the timber bridge is modelled and treated as walkable ground above the riv
   assert.equal(world.zoneAt(x, z), ZONE.FIELD);
   assert.equal(world.playable(x, z), true);
   assert.equal(world.canStep(x, z, 2.0), true);
+  for (const [lx, lz] of [[30, 72], [23, 72], [17, 68], [13, 60]]) {
+    const i = lz * W + lx;
+    assert.equal(river.data.pathMask[i], 1, `western bridge approach path at ${lx},${lz}`);
+    assert.equal(world.playable(river.x0 + lx + 0.5, river.z0 + lz + 0.5), true);
+  }
 });
