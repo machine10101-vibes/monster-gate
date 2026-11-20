@@ -598,7 +598,7 @@ function makeTile(spec, edges) {
       else H[i] = Math.round(H[i] * 2) / 2;
     }
   }
-  for (const road of spec.roads) stampRoad(H, kind, mask, road, edges, spec.climbRoads?.includes(road) ? climb : null);
+  for (const road of spec.roads) stampRoad(H, kind, mask, road, edges, spec.silverrunMountain ? climb : null);
   if (spec.silverrunMountain) {
     for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) {
       if (!silverrunSummit(spec.ox + x, spec.oz + z)) continue;
