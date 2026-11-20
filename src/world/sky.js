@@ -242,21 +242,18 @@ export class Sky {
     u.uTime.value = time;
     this.skyMesh.position.copy(camera.position);
 
+    // Strong mode freezes the lighting hour (debug-only, never saved) but
+    // cloud drift still uses the render clock so blobs keep moving.
+    cloudShadowUniforms.uCloudTime.value = time;
     if (this.cloudShadowStrong) {
-      if (this._cloudTimeFrozen == null) this._cloudTimeFrozen = time;
-      cloudShadowUniforms.uCloudTime.value = this._cloudTimeFrozen;
       cloudShadowUniforms.uCloudAmt.value = 1;
       cloudShadowUniforms.uCloudDark.value = 0.25;
       cloudShadowUniforms.uCloudForce.value = 1; // remaining ~0.25 inside blobs; never a flat multiply
     } else if (!this.indoors) {
-      this._cloudTimeFrozen = null;
-      cloudShadowUniforms.uCloudTime.value = time;
       cloudShadowUniforms.uCloudAmt.value = (1 - night) * 1.0 + night * 0.22;
       cloudShadowUniforms.uCloudDark.value = 0.58;
       cloudShadowUniforms.uCloudForce.value = 0;
     } else {
-      this._cloudTimeFrozen = null;
-      cloudShadowUniforms.uCloudTime.value = time;
       cloudShadowUniforms.uCloudDark.value = 0.58;
       cloudShadowUniforms.uCloudForce.value = 0;
     }

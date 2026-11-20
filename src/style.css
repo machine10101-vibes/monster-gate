@@ -1352,6 +1352,23 @@ body.touch #top-right {
   height: 100%;
   pointer-events: none;
 }
+.playmap-pin {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: #f0a030;
+  border: 2px solid #5a3a18;
+  box-shadow: 0 0 0 1px #f6e0a8, 0 0 6px rgba(0, 0, 0, 0.55);
+  z-index: 3;
+  pointer-events: none;
+}
+.playmap-pin.city {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: #f4b44a;
+}
 .bigmap {
   width: 100%;
   height: 100%;
@@ -1380,7 +1397,16 @@ body.touch #top-right {
     0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000,
     1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
   pointer-events: none;
+  z-index: 4;
 }
+.playmap-label.side-e { transform: translate(10px, -50%); text-align: left; }
+.playmap-label.side-w { transform: translate(calc(-100% - 10px), -50%); text-align: right; }
+.playmap-label.side-n { transform: translate(-50%, calc(-100% - 8px)); }
+.playmap-label.side-s { transform: translate(-50%, 10px); }
+.playmap-label.side-ne { transform: translate(8px, calc(-100% - 4px)); text-align: left; }
+.playmap-label.side-nw { transform: translate(calc(-100% - 8px), calc(-100% - 4px)); text-align: right; }
+.playmap-label.side-se { transform: translate(8px, 8px); text-align: left; }
+.playmap-label.side-sw { transform: translate(calc(-100% - 8px), 8px); text-align: right; }
 .playmap-label.city { color: #ffe7a0; font-size: 14px; }
 .playmap-label.landmark { font-size: 13px; }
 .playmap-label.minor { font-size: 12px; font-weight: 500; }

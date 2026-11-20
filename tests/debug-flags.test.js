@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import {
-  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, LAGOON_CAM, OASIS_CAM, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseCloudShadowFlag, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
+  DEBUG_ALIASES, DEBUG_AUTO_CADENCE, DEBUG_LOOT_ID, DEBUG_LOOT_SIT, DEBUG_SPOTS, DEBUG_ONLINE_CODE, DEBUG_STARTER_DMG, DEBUG_TANK_CADENCE, DEBUG_TANK_HP_CAP, DEBUG_TANK_HP_MUL, LAGOON_CAM, OASIS_CAM, PIRATE_CAM, PIRATE_SHORE, acquireAutoAttackTarget, applyDebugTank, attachDebug, canonicalSpot, debugOnlineBlocked, debugOnlineReject, debugSpawnSpot, debugSpotKeys, debugTankHp, debugTankHpLabel, debugTankKillBudget, ensureDebugStarterWeapon, grantDebugTankLoot, grantDebugUnlock, monsterIsHostile, oasisHudName, parseCloudShadowFlag, parseDebugFlags, parsePhotoFlag, pickDebugMonsterType, resolveSpot, setDebugAutoAttack, spawnDebugMonster, teleportDebug, tickDebugAutoAttack, tickDebugTank,
 } from '../src/debug/flags.js';
 import { DEBUG_LOOT_ID as TRANSIENT_LOOT_ID, DEBUG_STARTER_ID, huntSavePayload, isUnsellableGood, stripDebugGrantedInPlace } from '../src/debug/transient.js';
 import { GOODS } from '../src/data/gathering.js';
 import { freezeSaves, savesFrozen, writeJson, readJson } from '../src/systems/saveio.js';
 import { Progress, saveKey } from '../src/systems/progress.js';
-import { TILES } from '../src/world/tiles.js';
+import { originOf, TILES } from '../src/world/tiles.js';
 import { JUNGLE_SPECS } from '../src/world/jungle.js';
 import { PORTALS } from '../src/data/portals.js';
 
@@ -136,6 +136,10 @@ test('every built tile has a debug tp key', () => {
   assert.doesNotMatch(piratePortal.banner.join(' '), /Dunes/);
   const sun = resolveSpot('sunspill');
   const pirate = resolveSpot('pirateshore');
+  const pirateO = originOf(pirateTile);
+  assert.ok(Math.hypot(pirate.x - (pirateO.x + 72), pirate.z - (pirateO.z + 72)) > 20, 'pirateshore is not the inland tile center');
+  assert.ok(pirate.z >= pirateO.z + 90, `pirateshore beach z ${pirate.z} vs origin ${pirateO.z}`);
+  assert.ok(Math.hypot(pirate.x - PIRATE_SHORE.x, pirate.z - PIRATE_SHORE.z) < 8);
   for (const key of ['dunes', 'dune', 'desert', 'sand', 'sands']) {
     const s = resolveSpot(key);
     assert.equal(s.id, 'sunspill', key);
@@ -552,6 +556,25 @@ test('MG-UI-47 lagoon teleport snaps the camera onto the beach hunter', () => {
   assert.ok(game.snapped);
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(main, /this\.cam\.look\.set\(P\.x, P\.y \+ 1\.3, P\.z\)/);
+});
+
+test('pirateshore teleport faces the brown ship and the sea', () => {
+  const cam = { yaw: 0, targetYaw: 0, pitch: 0.8, dist: 12, targetDist: 12, lookAhead: 12 };
+  const game = {
+    world: { realm: 'over', heightAt: () => 1.4, revealAround() {} },
+    player: { pos: { set(x, y, z) { this.x = x; this.y = y; this.z = z; }, x: 0, y: 0, z: 0 }, yaw: 0, syncObj() {} },
+    cam,
+    forestAmt: 0.4,
+    hud: { toast() {} },
+    snapCamera() { this.snapped = true; },
+  };
+  const spot = teleportDebug(game, 'pirateshore');
+  assert.ok(spot);
+  assert.equal(cam.pitch, PIRATE_CAM.pitch);
+  assert.equal(cam.dist, PIRATE_CAM.dist);
+  assert.equal(cam.lookAhead, 0);
+  assert.ok(game.player.yaw !== 0, 'yaw faces the ship');
+  assert.ok(game.snapped);
 });
 
 test('MG-UI-22 oasis landing frames the pool above the hotbar clearance', () => {

@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import { GeometryBatch, RNG, hash2, fbm, smoothstep, clamp } from '../engine/voxel.js';
 import { buildAtlas, toonMaterial, patchHide, patchTerrainGlow, TILE, CLOUD_SHADOW_GLSL, cloudShadowUniforms } from '../engine/materials.js';
 import {
-  W, CENTER, TOWN, GUILD, GATE, WATER_Y, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
+  W, CENTER, TOWN, GUILD, GATE, WATER_Y, WATER_SURFACE, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
 import { STARTER, TILES, TILE_SIZE, originOf } from './tiles.js';
-import { rasterPlaymap } from './playmap.js';
+import { chartedAnchor, rasterPlaymap } from './playmap.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
@@ -36,10 +36,12 @@ const _sphereE = new THREE.Vector3();
 function stampTownIcon(ctx, x, y) {
   const ix = Math.round(x);
   const iy = Math.round(y);
-  ctx.fillStyle = '#e6c36a';
-  ctx.fillRect(ix - 3, iy - 3, 7, 7);
   ctx.fillStyle = '#5a3a18';
-  ctx.fillRect(ix - 1, iy - 1, 3, 3);
+  ctx.fillRect(ix - 9, iy - 9, 18, 18);
+  ctx.fillStyle = '#f0a030';
+  ctx.fillRect(ix - 7, iy - 7, 14, 14);
+  ctx.fillStyle = '#5a3a18';
+  ctx.fillRect(ix - 3, iy - 3, 6, 6);
 }
 
 /** World-space footprint. Instanced props keep their bounds on the mesh, not the shared geometry. */
@@ -595,8 +597,8 @@ export class World {
           col += uSky * sparkle;
           float wobble = 0.10 * sin(uTime * 1.65 + p.x * 2.1 + p.y * 1.7);
           float grain = vn(p * 0.72 + vec2(uTime * 0.08, -uTime * 0.06));
-          float d = vShore + wobble * 0.10 + (grain - 0.5) * 0.12;
-          float foam = smoothstep(1.15, 0.10, d) * (0.88 + 0.12 * sin(uTime * 1.9 + p.y * 2.6 + grain * 4.0));
+          float d = vShore + wobble * 0.04 + (grain - 0.5) * 0.04;
+          float foam = smoothstep(0.48, 0.04, d) * (0.92 + 0.08 * sin(uTime * 1.9 + p.y * 2.6 + grain * 4.0));
           col = mix(col, uFoam, foam);
           col *= uLight;
           float alpha = mix(0.97, 1.0, depthK);
@@ -616,8 +618,8 @@ export class World {
       if (x < 0 || z < 0 || x >= W || z >= W) return 8;
       return land.data.H[z * W + x];
     };
-    const depthAt = (land, x, z) => Math.max(0, WATER_Y - hAt(land, x, z));
-    const cellLand = (land, xx, zz) => hAt(land, xx, zz) >= WATER_Y;
+    const depthAt = (land, x, z) => Math.max(0, WATER_SURFACE - hAt(land, x, z));
+    const cellLand = (land, xx, zz) => hAt(land, xx, zz) >= WATER_SURFACE;
     const cornerDist = (land, gx, gz) => {
       let best = 8;
       for (let z = gz - 8; z < gz + 8; z++) {
@@ -643,13 +645,13 @@ export class World {
       for (let z = 0; z < W; z += step) {
         for (let x = 0; x < W; x += step) {
           const h = hAt(land, x, z);
-          if (h >= WATER_Y + 0.02) continue;
+          if (h >= WATER_SURFACE - 0.02) continue;
           const x0 = land.x0 + x;
           const z0 = land.z0 + z;
           const x1 = x0 + step;
           const z1 = z0 + step;
           const base = pos.length / 3;
-          pos.push(x0, WATER_Y, z0, x0, WATER_Y, z1, x1, WATER_Y, z1, x1, WATER_Y, z0);
+          pos.push(x0, WATER_SURFACE, z0, x0, WATER_SURFACE, z1, x1, WATER_SURFACE, z1, x1, WATER_SURFACE, z0);
           depth.push(
             depthAt(land, x, z),
             depthAt(land, x, z + step),
@@ -1604,11 +1606,22 @@ export class World {
         continue;
       }
       if (!TOWN_KINDS.has(tile.kind)) continue;
-      const cx = tile.kind === 'oakhollow' ? TOWN.x - 10 : o.x + TILE_SIZE / 2;
-      const cz = tile.kind === 'oakhollow' ? TOWN.z + 18 : o.z + TILE_SIZE / 2;
-      stampTownIcon(mctx, (cx - minX) * px, (cz - minZ) * px);
+      let cx = tile.kind === 'oakhollow' ? TOWN.x - 10 : o.x + TILE_SIZE / 2;
+      let cz = tile.kind === 'oakhollow' ? TOWN.z + 18 : o.z + TILE_SIZE / 2;
+      if (tile.kind === 'dawnspire' && this.holyKeep) {
+        cx = this.holyKeep.x;
+        cz = this.holyKeep.z;
+      } else if (tile.kind === 'hellspire' && this.demonKeep) {
+        cx = this.demonKeep.x;
+        cz = this.demonKeep.z;
+      }
+      const pin = chartedAnchor(cx, cz) || { x: cx, z: cz };
+      stampTownIcon(mctx, (pin.x - minX) * px, (pin.z - minZ) * px);
     }
-    if (gn) stampTownIcon(mctx, (gx / gn - minX) * px, (gz / gn - minZ) * px);
+    if (gn) {
+      const pin = chartedAnchor(gx / gn, gz / gn) || { x: gx / gn, z: gz / gn };
+      stampTownIcon(mctx, (pin.x - minX) * px, (pin.z - minZ) * px);
+    }
     this.minimapCanvas = map;
     this.minimapOrigin = { x: minX, z: minZ };
     this.minimapScale = px;
