@@ -269,6 +269,16 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
     h: p.bh,
   });
   assert.equal(overlap(jbox(canopy), jbox(lagoon), 2), false, 'Silverrun Canopy x The Lagoon');
+  assert.match(layout, /Bramblewood:/);
+  assert.match(layout, /Dawnspire:/);
+  const keeps = layoutPlaymapLabels([
+    { name: 'Dawnspire', nx: 32, ny: 24, city: true },
+    { name: 'Bramblewood', nx: 22, ny: 24, uncharted: true },
+  ]);
+  const dawn = keeps.find((p) => p.name === 'Dawnspire');
+  const bramble = keeps.find((p) => p.name === 'Bramblewood');
+  assert.ok(dawn.visible && bramble.visible);
+  assert.equal(overlap(jbox(dawn), jbox(bramble), 2), false, 'Bramblewood x Dawnspire');
 });
 
 test('Map panel contain size stays above 300px at desktop, laptop and phone landscape', () => {

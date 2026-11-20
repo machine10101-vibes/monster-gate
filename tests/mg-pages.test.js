@@ -41,11 +41,19 @@ test('gh-pages build stamps origin/main, not the deploy-branch SHA', () => {
 test('Pages index.html cache-busts the build tag via version.json', () => {
   const html = src('../index.html');
   const vite = src('../vite.config.js');
+  const main = src('../src/main.js');
   assert.match(html, /Cache-Control" content="no-cache, no-store, must-revalidate"/);
   assert.match(html, /name="mg-build"/);
   assert.match(html, /version\.json\?t=/);
   assert.match(html, /cache: 'no-store'/);
   assert.match(html, /mg-build-reload/);
+  assert.match(html, /__mgHuntStarted/);
+  assert.match(html, /__mgOfferBuildReload/);
+  assert.match(html, /id="build-reload"/);
+  assert.match(html, /New version available, reload\?/);
+  assert.match(main, /offerBuildReload/);
+  assert.match(main, /captureHunter\(\)/);
+  assert.match(main, /progress\?\.save\?\.\(false\)/);
   assert.match(vite, /fileName: 'version\.json'/);
   assert.match(vite, /transformIndexHtml/);
   assert.match(vite, /__MG_BUILD__/);

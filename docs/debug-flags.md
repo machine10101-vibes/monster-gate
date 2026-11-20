@@ -14,7 +14,7 @@ Session-only tools for layout and combat checks. **Inert unless the URL has `?de
 | Auto-attack (debug) | Offline only, with `?debug=1`: Settings toggle. Keeps attacking the nearest hostile (or the debug tank) until it is dead, on the normal swing cooldown. Inert with `?mmo=1`. |
 | Debug starter weapon | If the weapon slot is empty, debug equips the Hunter Blade for this session only. It is stripped from guest localStorage and cloud save payloads. |
 | `?mockwallet=<address>` | Session-only Klever stand-in. A green **MOCK WALLET** badge shows. Does not create an account. |
-| `&cloudshadow=strong` | With `debug=1`, force a 0.35 ground multiply so cloud shadows are obvious on SwiftShader. |
+| `&cloudshadow=strong` | With `debug=1`, deepen cloud-shadow blob contrast so the drifting pattern stays visible on SwiftShader. Inert with `mmo=1` or an online session, like the other debug flags. |
 
 Examples:
 

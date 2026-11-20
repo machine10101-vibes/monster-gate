@@ -32,7 +32,7 @@ function seaAt(tx, tz) {
 }
 
 const MAP_WARP_SEED = 17;
-const MAP_WARP_AMP = 0.5;
+const MAP_WARP_AMP = 0.58;
 
 /** Warp tile UV so every charted, parchment, water and shallow edge is a coastline, not a square. */
 function warpUv(wx, wz, seed = MAP_WARP_SEED, amp = MAP_WARP_AMP) {
@@ -100,7 +100,19 @@ function neighborBleed(tx, tz, u, v, band, test) {
 
 /** 1 inside charted land, 0 in uncharted. All four sides of every tile are noise-warped. */
 export function chartedWeight(wx, wz) {
-  return fieldWeight(wx, wz, builtAt, 0.26);
+  return outerRimFade(wx, wz, fieldWeight(wx, wz, builtAt, 0.34));
+}
+
+/** Fade sea/parchment into the map frame so the 10×10 grid is not a hard rectangle. */
+function outerRimFade(wx, wz, amt) {
+  const { ftx, ftz } = worldToTileUv(wx, wz);
+  const n = fbm(ftx * 2.35, ftz * 2.2, MAP_WARP_SEED + 31, 3) - 0.5;
+  const n2 = fbm(ftx * 6.1 + 2.4, ftz * 5.7, MAP_WARP_SEED + 37, 2) - 0.5;
+  const edge = Math.min(ftx, 10 - ftx, ftz, 10 - ftz);
+  if (edge < 0) return amt;
+  const rim = 0.48 + n * 0.32 + n2 * 0.18;
+  if (edge >= rim) return amt;
+  return amt * smoothstep(0.015 + n2 * 0.03, rim, edge);
 }
 
 /** Continuous ocean. Shoreline, shallows and coast patches use the same warp as land. */
@@ -108,12 +120,15 @@ export function oceanWeight(wx, wz) {
   const w = mapWarp(wx, wz);
   const tx = Math.floor(w.wtx);
   const tz = Math.floor(w.wtz);
+  let amt;
   if (tx < 0 || tz < 0 || tx >= 10 || tz >= 10) {
     const n = fbm(w.ftx * 1.4, w.ftz * 1.4, MAP_WARP_SEED + 24, 3);
     const shore = 8.05 + (n - 0.5) * 0.72 + 0.2 * Math.sin(w.ftx * 1.7) + 0.12 * Math.sin(w.ftx * 4.2 + n);
-    return smoothstep(shore - 0.28, shore + 0.22, w.wtz);
+    amt = smoothstep(shore - 0.28, shore + 0.22, w.wtz);
+  } else {
+    amt = fieldWeight(wx, wz, oceanCell, 0.36);
   }
-  return fieldWeight(wx, wz, oceanCell, 0.32);
+  return outerRimFade(wx, wz, amt);
 }
 
 /** Move a pin onto charted land inside its tile, or null if none is nearby. */
@@ -287,15 +302,17 @@ function compass(data, w, h, cx, cy, r) {
 function applyFrame(data, w, h) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const d = Math.min(x, y, w - 1 - x, h - 1 - y);
-      if (d > FRAME + 18) continue;
+      const raw = Math.min(x, y, w - 1 - x, h - 1 - y);
+      const warp = (Math.sin(x * 0.09 + y * 0.061) + Math.sin(x * 0.033 - y * 0.047)) * 7.5;
+      const d = raw < 14 ? raw : raw + warp;
+      if (d > FRAME + 22) continue;
       const i = (y * w + x) * 4;
-      if (d < 7) put(data, w, i, [58, 38, 18]);
-      else if (d < 11) put(data, w, i, [196, 158, 74]);
-      else if (d < 14) put(data, w, i, [92, 62, 28]);
+      if (raw < 7) put(data, w, i, [58, 38, 18]);
+      else if (raw < 11) put(data, w, i, [196, 158, 74]);
+      else if (raw < 14) put(data, w, i, [92, 62, 28]);
       else {
-        const t = (d - 14) / 18;
-        const k = (1 - t) * (1 - t) * 0.38;
+        const t = (d - 14) / 22;
+        const k = (1 - t) * (1 - t) * 0.22;
         data[i] *= 1 - k;
         data[i + 1] *= 1 - k;
         data[i + 2] *= 1 - k * 1.05;

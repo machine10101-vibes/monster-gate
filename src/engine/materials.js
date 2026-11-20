@@ -135,12 +135,16 @@ export function toonMaterial(opts = {}) {
 export const cloudShadowUniforms = {
   uCloudTime: { value: 0 },
   uCloudAmt: { value: 1 },
-  uCloudDark: { value: 0.42 },
+  uCloudDark: { value: 0.58 },
   uCloudForce: { value: 0 },
 };
 
-/** World-space drift of the cloud shadow field, about 3 units per second. */
-export const CLOUD_DRIFT = { x: 2.8, z: -2.2, scale: 0.014, dark: 0.42 };
+/**
+ * World-space drift of the cloud shadow field, about 3 units per second.
+ * `scale` ~0.04 makes blobs 15–40 wu across. `lo`/`hi` keep ~half the ground
+ * fully lit; `dark` is remaining light inside a blob (~42% darkening).
+ */
+export const CLOUD_DRIFT = { x: 2.8, z: -2.2, scale: 0.04, dark: 0.58, lo: 0.52, hi: 0.66 };
 
 export const CLOUD_SHADOW_GLSL = `
 float cloudHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -149,16 +153,13 @@ float cloudNoise(vec2 p){
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(cloudHash(i), cloudHash(i + vec2(1.0, 0.0)), f.x), mix(cloudHash(i + vec2(0.0, 1.0)), cloudHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-float cloudFbm(vec2 p){
-  float a = 0.0; float w = 0.5;
-  for (int i = 0; i < 3; i++) { a += w * cloudNoise(p); p = p * 2.07 + 13.1; w *= 0.5; }
-  return a;
-}
 float cloudShade(vec2 xz, float t, float amt){
   vec2 drift = vec2(t * 2.8, t * -2.2);
-  float n = cloudFbm((xz + drift) * 0.014);
-  n += 0.28 * cloudFbm((xz + drift * 0.55) * 0.006 + 4.7);
-  float sh = max(smoothstep(0.24, 0.48, n), uCloudForce);
+  float n = cloudNoise((xz + drift) * 0.04);
+  n = n * 0.74 + 0.26 * cloudNoise((xz + drift * 0.7) * 0.09 + 5.3);
+  float lo = mix(0.52, 0.42, uCloudForce);
+  float hi = mix(0.66, 0.58, uCloudForce);
+  float sh = smoothstep(lo, hi, n);
   return mix(1.0, uCloudDark, sh * amt);
 }
 `;
@@ -181,26 +182,11 @@ export function cloudShadeAt(x, z, t, amt = 1) {
     const d = hash(ix + 1, iy + 1);
     return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
   };
-  const fbm = (px, py) => {
-    let v = 0;
-    let w = 0.5;
-    let x0 = px;
-    let y0 = py;
-    for (let i = 0; i < 3; i++) {
-      v += w * noise(x0, y0);
-      const nx = x0 * 2.07 + 13.1;
-      const ny = y0 * 2.07 + 13.1;
-      x0 = nx;
-      y0 = ny;
-      w *= 0.5;
-    }
-    return v;
-  };
   const dx = x + t * CLOUD_DRIFT.x;
   const dz = z + t * CLOUD_DRIFT.z;
-  let n = fbm(dx * CLOUD_DRIFT.scale, dz * CLOUD_DRIFT.scale);
-  n += 0.28 * fbm((x + t * CLOUD_DRIFT.x * 0.55) * 0.006 + 4.7, (z + t * CLOUD_DRIFT.z * 0.55) * 0.006 + 4.7);
-  const tsh = Math.min(1, Math.max(0, (n - 0.24) / (0.48 - 0.24)));
+  let n = noise(dx * CLOUD_DRIFT.scale, dz * CLOUD_DRIFT.scale);
+  n = n * 0.74 + 0.26 * noise((x + t * CLOUD_DRIFT.x * 0.7) * 0.09 + 5.3, (z + t * CLOUD_DRIFT.z * 0.7) * 0.09 + 5.3);
+  const tsh = Math.min(1, Math.max(0, (n - CLOUD_DRIFT.lo) / (CLOUD_DRIFT.hi - CLOUD_DRIFT.lo)));
   const sh = tsh * tsh * (3 - 2 * tsh);
   return 1 + (CLOUD_DRIFT.dark - 1) * sh * amt;
 }
