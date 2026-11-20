@@ -85,13 +85,13 @@ test('wall and arcade pieces lie along the tangent, not the radius', () => {
   assert.ok(Math.abs(dot) < 0.05, 'the old yaw is sideways at the diagonal');
 });
 
-test('the Colosseum sign-up board stands beside the Gilantre sand', () => {
+test('the Colosseum sign-up board stands in front of the Gilantre door', () => {
   const arena = GILANTRE_SPOTS.arena;
   const dx = COLOSSEUM_BOARD.x - arena.x;
   const dz = COLOSSEUM_BOARD.z - arena.z;
-  assert.ok(dz > 6 && dz < 14, `south of the sand, dz ${dz}`);
-  assert.ok(Math.abs(dx) > 3.2 && Math.abs(dx) < 8, `off the aisle, dx ${dx}`);
-  assert.ok(Math.abs(COLOSSEUM_BOARD.z - 144) > 2.5, 'clear of the east-west road');
+  assert.ok(Math.abs(dx) < 0.6, `on the south aisle, dx ${dx}`);
+  assert.ok(dz > 12.4 && dz < 13.8, `between the door and the road, dz ${dz}`);
+  assert.ok(COLOSSEUM_BOARD.z < 143.7, 'north of the east-west road');
   assert.ok(Math.hypot(COLOSSEUM_BOARD.x - 432, COLOSSEUM_BOARD.z - 144) < 26, 'inside the city wall');
 });
 

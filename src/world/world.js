@@ -1079,6 +1079,7 @@ export class World {
         for (const child of [...obj.children]) pull(child);
         return;
       }
+      if (obj.name === 'gilantre-colosseum-signup-board') return;
       const sphere = meshSphere(obj);
       if (!sphere) {
         if (obj.children?.length) for (const child of [...obj.children]) pull(child);

@@ -71,6 +71,7 @@ export const DEBUG_SPOTS = {
   plaza: { x: PLAZA_STAND.x, z: PLAZA_STAND.z },
   lira: { live: 'alchemy', x: LIRA_STAND.x, z: LIRA_STAND.z, dx: LIRA_STAND.dx, dz: LIRA_STAND.dz },
   dalla: { live: 'market', x: DALLA_STAND.x, z: DALLA_STAND.z, dx: DALLA_STAND.dx, dz: DALLA_STAND.dz },
+  gilantre: { x: 446, z: 148 },
 };
 
 export const DEBUG_ALIASES = {
@@ -573,6 +574,14 @@ export function teleportDebug(game, raw) {
   const y = game.world?.heightAt?.(spot.x, spot.z) ?? 3.2;
   game.player.pos.set(spot.x, y, spot.z);
   if (game.cam) game.cam.lookAhead = 0;
+  if (spot.id === 'gilantre' && game.cam) {
+    game.player.yaw = 0;
+    game.cam.targetYaw = 0;
+    game.cam.yaw = 0;
+    game.cam.pitch = 0.72;
+    game.cam.targetDist = 14;
+    game.cam.dist = 14;
+  }
   if (spot.id === 'oasis') {
     const yaw = Math.atan2(OASIS.x - spot.x, OASIS.z - spot.z);
     game.player.yaw = yaw;

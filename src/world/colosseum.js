@@ -10,48 +10,58 @@ const WALL = 7.5;
 
 function paintBoard() {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
+  canvas.width = 1024;
+  canvas.height = 512;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#211a27';
-  ctx.fillRect(0, 0, 512, 256);
-  ctx.strokeStyle = '#d8b56b';
-  ctx.lineWidth = 12;
-  ctx.strokeRect(10, 10, 492, 236);
+  ctx.fillStyle = '#1a1422';
+  ctx.fillRect(0, 0, 1024, 512);
+  ctx.strokeStyle = '#f4d58a';
+  ctx.lineWidth = 28;
+  ctx.strokeRect(18, 18, 988, 476);
   ctx.fillStyle = '#f4d58a';
   ctx.textAlign = 'center';
-  ctx.font = 'bold 34px Georgia';
-  ctx.fillText('GILANTRE COLOSSEUM', 256, 92);
-  ctx.font = 'bold 24px Georgia';
-  ctx.fillText('CHALLENGERS • SIGN UP', 256, 148);
-  ctx.font = '18px Georgia';
-  ctx.fillText('1v1  •  2v2  •  3v3', 256, 190);
+  ctx.font = 'bold 92px Georgia';
+  ctx.fillText('PVP SIGN UP', 512, 200);
+  ctx.font = 'bold 54px Georgia';
+  ctx.fillText('GILANTRE COLOSSEUM', 512, 300);
+  ctx.font = 'bold 42px Georgia';
+  ctx.fillText('1v1   ·   2v2   ·   3v3', 512, 390);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
   return texture;
 }
 
-/** Beside the south door of the Gilantre sand, off the aisle. */
-export const COLOSSEUM_BOARD = { x: 441.4, z: 140.4 };
+/**
+ * Centered on the south approach, between the door and the east-west road.
+ * The face tilts up toward the game camera, which sits south of the hunter.
+ */
+export const COLOSSEUM_BOARD = { x: 446, z: 143.35 };
+const BOARD_POST = 2.35;
 
-function buildBoard(group, x, z, floor, yaw = 0) {
+function buildBoard(group, x, z, floor, yaw = 0, tilt = 0) {
   const root = new THREE.Group();
   root.position.set(x, floor, z);
+  root.rotation.order = 'YXZ';
   root.rotation.y = yaw;
+  root.rotation.x = tilt;
   const wood = new THREE.MeshStandardMaterial({ color: 0x53331d, roughness: 0.85 });
-  const gold = new THREE.MeshStandardMaterial({ color: 0xb88a3d, metalness: 0.45, roughness: 0.42 });
-  const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.9, 0.22), wood);
+  const gold = new THREE.MeshBasicMaterial({ color: 0xf4d58a });
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.6, 0.28), wood);
   const left = post.clone();
   const right = post.clone();
-  left.position.set(-2.6, 1.45, 0);
-  right.position.set(2.6, 1.45, 0);
-  const board = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.1, 0.22), new THREE.MeshStandardMaterial({ map: paintBoard(), roughness: 0.72 }));
-  board.position.set(0, 2.45, 0);
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.2, 0.5), gold);
-  cap.position.set(0, 3.6, 0);
-  const lamp = new THREE.PointLight(0xffc870, 1.4, 10, 2);
-  lamp.position.set(0, 3.8, 0.4);
-  root.add(left, right, board, cap, lamp);
+  left.position.set(-BOARD_POST, 2.3, 0);
+  right.position.set(BOARD_POST, 2.3, 0);
+  const face = new THREE.MeshBasicMaterial({ map: paintBoard(), side: THREE.DoubleSide });
+  const board = new THREE.Mesh(new THREE.BoxGeometry(5.0, 3.15, 0.16), face);
+  board.position.set(0, 2.85, 0);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.22, 0.46), gold);
+  cap.position.set(0, 4.55, 0);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.16, 0.4), gold);
+  sill.position.set(0, 1.2, 0);
+  const lamp = new THREE.PointLight(0xffc870, 8, 22, 2);
+  lamp.position.set(0, 3.4, 1.2);
+  root.add(left, right, board, cap, sill, lamp);
   group.add(root);
   return root;
 }
@@ -128,8 +138,9 @@ export function buildColosseumSignUpBoard(world) {
   group.name = 'gilantre-colosseum-signup-board';
   const { x, z } = COLOSSEUM_BOARD;
   const y = world.heightAt(x, z);
-  const mesh = buildBoard(group, x, z, y, 0);
+  const mesh = buildBoard(group, x, z, y, 0, 0.72);
   world.group.add(group);
-  world.circle(x, z, 0.7);
+  world.circle(x - BOARD_POST, z, 0.28);
+  world.circle(x + BOARD_POST, z, 0.28);
   return { group, mesh, x, y, z };
 }

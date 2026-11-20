@@ -1286,7 +1286,7 @@ const PEOPLE = [
     name: 'Marcellus Valerius',
     title: 'Arena master',
     spot: 'marcellus',
-    x: 446, z: 142.4, yaw: -0.2,
+    x: 442.4, z: 142.2, yaw: 0.4,
     look: { skin: 0xe0b090, hair: 0x2a2218, hairStyle: 'short', tunic: 0xf2efe6, sleeve: 0xe6e0d4, vest: true, strap: 0x8a1e1e, pants: 0x4a3030, boots: 0x2a1c18, belt: true, seed: 61, eye: 0x4a3828 },
     lines: [
       'The bowl is older than the wall. Walk onto the sand if you want to know whether the gate turns you around.',

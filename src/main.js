@@ -3390,7 +3390,7 @@ class Game {
     if (!b) return;
     const P = this.player.pos;
     const d = Math.hypot(P.x - b.x, P.z - b.z);
-    this.colosseumNear = d < 3.4 && this.started && this.world.realm === 'over';
+    this.colosseumNear = d < 4.8 && this.started && this.world.realm === 'over';
     if (this.colosseumNear && !this.colosseumHinted) {
       this.colosseumHinted = true;
       this.hud.toast('Colosseum board — press F to sign up for PvP', 2600);

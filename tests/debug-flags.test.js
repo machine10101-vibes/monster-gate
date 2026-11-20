@@ -75,7 +75,7 @@ test('debug combined with mmo=1 changes nothing', () => {
 });
 
 test('every documented tp key resolves', () => {
-  const keys = ['oakhollow', 'goldenmeadow', 'greyrock', 'forge', 'oasis', 'deepwell', 'cinderfall', 'glimmerfrost', 'hellspire', 'dawnspire', 'endlessfield', 'crate', 'plaza', 'lira', 'dalla'];
+  const keys = ['oakhollow', 'goldenmeadow', 'greyrock', 'forge', 'oasis', 'deepwell', 'cinderfall', 'glimmerfrost', 'hellspire', 'dawnspire', 'endlessfield', 'crate', 'plaza', 'lira', 'dalla', 'gilantre'];
   assert.deepEqual(debugSpotKeys().sort(), [...keys].sort());
   for (const key of keys) {
     const spot = resolveSpot(key);
