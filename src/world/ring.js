@@ -255,7 +255,7 @@ function pullEdge(h, edgeH, dist) {
   return lerp(h, edgeH, w);
 }
 
-function stampRoad(H, kind, mask, pts, edges) {
+function stampRoad(H, kind, mask, pts, edges, climb = null) {
   const samples = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const [ax, az] = pts[i];
@@ -283,6 +283,7 @@ function stampRoad(H, kind, mask, pts, edges) {
         if (xx < 0 || zz < 0 || xx >= W || zz >= W) continue;
         const i = zz * W + xx;
         mask[i] = 1;
+        if (climb) climb[i] = 1;
         if (onBorder(xx, zz, edges)) continue;
         H[i] = h;
         kind[i] = PATH;
@@ -340,6 +341,31 @@ const SPECS = {
     hay: true,
     knolls: [[80, 50, 8, 3], [40, 90, 6, 2], [100, 80, 5, -1]],
     roads: [[[0, 92], [36, 86], [70, 60]]],
+  },
+  silverrunNorth: {
+    banner: ['Silverrun Forest', 'The Upper Canopy'], silverrun: true, silverrunRiver: true,
+    shade: 0.03, forest: 0.96, amp: 2.5, base: 3.4, seed: 77,
+    rim: {}, knolls: [[38, 42, 12, 2.2], [98, 76, 14, 2.6], [70, 116, 10, 1.8]], roads: [],
+  },
+  silverrunEast: {
+    banner: ['The Elderwood', 'Elderwood Glade'], silverrun: true,
+    shade: 0.02, forest: 0.94, amp: 2.8, base: 3.5, seed: 78,
+    rim: {}, knolls: [[34, 34, 11, 2.4], [108, 46, 13, 2.8], [82, 112, 12, 2.1]],
+    clearing: [88, 74, 17], roads: [[[0, 104], [28, 94], [58, 82], [88, 74], [118, 62], [143, 48]]],
+  },
+  silverrunRiver: {
+    banner: ['Silverrun Crossing', 'The River Bridge'], silverrun: true, silverrunRiver: true, silverrunMountain: true,
+    shade: 0.02, forest: 0.95, amp: 2.4, base: 3.3, seed: 87,
+    rim: {}, knolls: [[28, 34, 10, 1.8], [88, 38, 12, 2.2], [92, 126, 10, 1.7]],
+    roads: [[[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]]],
+    climbRoads: [[[53, 72], [72, 82], [92, 96], [112, 108], [132, 118], [143, 122]]],
+  },
+  silverrunPeak: {
+    banner: ['Greystone Mountain', 'The Flat Summit'], silverrun: true, silverrunMountain: true,
+    shade: 0.02, forest: 0.92, amp: 2.7, base: 3.4, seed: 88,
+    rim: {}, knolls: [[96, 28, 10, 2.2], [106, 116, 12, 2.1]],
+    roads: [[[0, 122], [10, 116], [22, 108], [32, 98], [34, 88], [30, 80], [22, 72], [14, 68], [8, 76]]],
+    climbRoads: [[[0, 122], [10, 116], [22, 108], [32, 98], [34, 88], [30, 80], [22, 72], [14, 68], [8, 76]]],
   },
   ...ARCTIC_SPECS,
   ...VOLCANIC_SPECS,
@@ -448,7 +474,55 @@ function stampLane(H, kind, mask, lane) {
   }
 }
 
+function silverrunSummit(gx, gz) {
+  return Math.abs(gx - 440) <= 10 && Math.abs(gz - 510) <= 12;
+}
+
+export function silverrunRiverCenterX(worldZ) {
+  const t = clamp((576 - worldZ) / 288, 0, 1);
+  return 350 - 80 * t + Math.sin(worldZ * 0.025) * 4.8 + Math.sin(worldZ * 0.061) * 1.8;
+}
+
+function silverrunMountainHeight(gx, gz) {
+  if (silverrunSummit(gx, gz)) return 29;
+  const d = Math.hypot((gx - 440) / 52, (gz - 510) / 56);
+  return 3.3 + 25.7 * (1 - smoothstep(0.18, 1.0, d));
+}
+
+function silverrunRidgeEdge() {
+  const edge = new Float32Array(W);
+  for (let z = 0; z < W; z++) edge[z] = silverrunMountainHeight(432, 432 + z);
+  return edge;
+}
+
+function silverrunOceanEdge() {
+  return new Float32Array(W).fill(0.1);
+}
+
+function silverrunFeature(h, x, z, spec) {
+  const gx = spec.ox + x;
+  const gz = spec.oz + z;
+  let out = null;
+  if (spec.silverrunMountain) {
+    const summit = silverrunSummit(gx, gz);
+    const peak = silverrunMountainHeight(gx, gz);
+    if (peak > h || summit) {
+      h = summit ? 29 : peak;
+      out = { h, kind: h >= 8 ? STONE : AUTO, climb: summit };
+    }
+  }
+  if (spec.silverrunRiver) {
+    const centre = silverrunRiverCenterX(gz);
+    const width = 4.2 + 3.4 * smoothstep(500, 576, gz);
+    const d = Math.abs(gx - centre);
+    if (d < width) return { h: -0.55, kind: WATER };
+    if (d < width + 10) return { h: lerp(0.15, Math.min(h, 2.8), (d - width) / 10), kind: AUTO };
+  }
+  return out;
+}
+
 function applyFeature(h, x, z, spec) {
+  if (spec.silverrunRiver || spec.silverrunMountain) return silverrunFeature(h, x, z, spec);
   if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.volcanic) return volcanicFeature(h, x, z, spec);
   if (spec.jungle) return jungleFeature(h, x, z, spec);
@@ -524,7 +598,16 @@ function makeTile(spec, edges) {
       else H[i] = Math.round(H[i] * 2) / 2;
     }
   }
-  for (const road of spec.roads) stampRoad(H, kind, mask, road, edges);
+  for (const road of spec.roads) stampRoad(H, kind, mask, road, edges, spec.climbRoads?.includes(road) ? climb : null);
+  if (spec.silverrunMountain) {
+    for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) {
+      if (!silverrunSummit(spec.ox + x, spec.oz + z)) continue;
+      const i = z * W + x;
+      H[i] = 29;
+      if (kind[i] !== PATH) kind[i] = STONE;
+      climb[i] = 1;
+    }
+  }
   if (spec.cone) gradeCinderCone(H, climb);
   for (let z = 0; z < W; z++) {
     for (let x = 0; x < W; x++) {
@@ -662,12 +745,16 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'gilantreNe') return { n: rowOf(made.icewind, W - 1), w: colOf(made.gilantreNw, W - 1) };
   if (kind === 'gilantreSw') return { n: rowOf(made.gilantreNw, W - 1), w: colOf(made.hayfield, W - 1) };
   if (kind === 'gilantreSe') return { n: rowOf(made.gilantreNe, W - 1), w: colOf(made.gilantreSw, W - 1) };
+  if (kind === 'silverrunNorth') return { n: rowOf(made.gilantreSw, W - 1) };
+  if (kind === 'silverrunEast') return { n: rowOf(made.gilantreSe, W - 1), w: colOf(made.silverrunNorth, W - 1) };
+  if (kind === 'silverrunRiver') return { n: rowOf(made.silverrunNorth, W - 1), e: silverrunRidgeEdge(), s: silverrunOceanEdge() };
+  if (kind === 'silverrunPeak') return { n: rowOf(made.silverrunEast, W - 1), w: colOf(made.silverrunRiver, W - 1), s: silverrunOceanEdge() };
   return {};
 }
 
 /** Height data for the ring. Oakhollow and Southford must already include their passes. */
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -701,6 +788,7 @@ export function generateRing(oak, south) {
       arctic: !!spec.arctic,
       volcanic: !!spec.volcanic,
       jungle: !!spec.jungle,
+      silverrun: !!spec.silverrun,
       emberAt: spec.volcanic ? emberAmount(spec) : () => 0,
       chillAt: spec.arctic
         ? spec.blend
