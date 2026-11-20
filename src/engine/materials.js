@@ -175,8 +175,7 @@ export function buildAtlas() {
     let c = pick(GRASS, n * 0.35 + clump * 0.3 + patch * 0.35);
     if (patch > 0.62) c = mix(c, 0x8bb83c, 0.28);
     if (patch < 0.32) c = mix(c, 0x2f7a4a, 0.22);
-    if (wrapNoise(x, y, s + 3) > 0.93) c = shade(c, 0.82);
-    if (wrapNoise(x, y, s + 5) > 0.95) c = shade(c, 1.16);
+    if (wrapNoise(x, y, s + 5) > 0.95) c = shade(c, 1.08);
     return c;
   };
   fill(TILE.GRASS, (x, y) => grassFn(x, y, 11));

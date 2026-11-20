@@ -964,6 +964,13 @@ body.touch #top-left:has(#quest.open) {
   padding: 3px 7px;
   border-radius: 8px;
 }
+@media (max-height: 500px) {
+  .build-id {
+    right: calc(var(--menu-col-w, 66px) + 12px + var(--safe-r));
+    bottom: auto;
+    top: calc(8px + var(--safe-t) + 78px);
+  }
+}
 body.photo-mode #hud,
 body.photo-mode #build-id,
 body.photo-mode .build-id,
@@ -1284,7 +1291,17 @@ body.mmo-view #top-left {
   :root {
     --menu-btn: 32px;
     --menu-gap: 2px;
-    --menu-col-w: 32px;
+    --menu-col-w: 66px;
+    --menu-cols: 2;
+  }
+  #menu-col {
+    display: flex;
+    flex-direction: row-reverse;
+    flex-wrap: wrap-reverse;
+    align-content: flex-end;
+    justify-content: flex-end;
+    width: var(--menu-col-w);
+    max-height: calc(100dvh - 12px - var(--safe-b) - var(--safe-t));
   }
   #menu-col .mbtn kbd { display: none; }
   #hints {

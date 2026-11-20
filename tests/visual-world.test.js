@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { TILE } from '../src/engine/materials.js';
 import { QUALITIES, survivalBudget } from '../src/engine/quality.js';
-import { sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
+import { paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
 import { sideTilesFor } from '../src/world/terrain.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
@@ -59,8 +59,13 @@ test('world map samples blend biome borders instead of darkening tile edges', ()
   assert.match(map, /paintTileMap\(c, tile\)/);
   assert.match(map, /const band = 16/);
   assert.match(world, /function blendMinimapSeams/);
-  assert.match(world, /const band = 28/);
+  assert.match(world, /Math\.round\(22 \* scale\)/);
   assert.match(world, /paintTileMap\(planned, tile\)/);
+  assert.match(world, /export const MAP_PX = 2/);
+  assert.match(world, /imageSmoothingQuality/);
+  assert.match(world, /#1d4e86/);
+  assert.doesNotMatch(world, /#cbb894/);
+  assert.doesNotMatch(world, /jagged/);
   assert.doesNotMatch(world, /#1a140e/);
   assert.doesNotMatch(world, /\[240, 245, 255\]/);
   assert.match(world, /\[168, 186, 210\]/);
@@ -108,7 +113,7 @@ test('view distance tracks fog and parks land beyond it', () => {
   assert.match(main, /parkBeyond\(px, pz, this\.viewDistance\(\)\)/);
   assert.match(world, /streamAround\(/);
   assert.match(flags, /streamAround/);
-  assert.match(main, /PerspectiveCamera\(38, 1, 0\.3, 160\)/);
+  assert.match(main, /PerspectiveCamera\(38, 1, 0\.3, 240\)/);
   assert.doesNotMatch(main, /PerspectiveCamera\(38, 1, 0\.3, 320\)/);
   assert.match(sky, /viewFar/);
   assert.match(sky, /focus\.x \+ c\.userData\.ox/);
@@ -164,7 +169,9 @@ test('clouds stay visible over snow and grass step sides match the top', () => {
   assert.match(sky, /fog:\s*false/);
   assert.match(sky, /const snow = chill/);
   assert.match(sky, /nClouds = quality\.id === 'low' \? 16 : 28/);
-  assert.match(sky, /rng\.range\(13, 22\)/);
+  assert.match(sky, /rng\.range\(6, 11\)/);
+  assert.match(sky, /cloudShadows/);
+  assert.match(sky, /CircleGeometry/);
   assert.match(sky, /puffs \* hz/);
   assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
   assert.match(mats, /0xd2ae78/);
@@ -183,4 +190,63 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /UnrealBloomPass|EffectComposer/);
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
+  assert.match(world, /shoreBand/);
+  assert.doesNotMatch(world, /foamNoise/);
+});
+
+function paintMock(tile, s = 48) {
+  let pixels = null;
+  const canvas = {
+    width: s,
+    height: s,
+    getContext() {
+      return {
+        createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h }),
+        putImageData(img) { pixels = img.data; },
+      };
+    },
+  };
+  paintTileMap(canvas, tile);
+  return pixels;
+}
+
+test('world map raster is high-res and smoothly interpolated, not 8-level dither', () => {
+  const tiles = src('src/world/tiles.js');
+  const world = src('src/world/world.js');
+  const hud = src('src/ui/hud.js');
+  const style = src('src/style.css');
+  assert.doesNotMatch(tiles, /Math\.round\(Math\.max\(0\.06/);
+  assert.match(world, /blurMinimap/);
+  assert.match(world, /MAP_PX = 2/);
+  assert.match(hud, /imageSmoothingQuality = 'high'/);
+  assert.match(style, /\.bigmap \{[\s\S]*image-rendering:\s*auto/);
+  const snow = TILES.find((t) => t.kind === 'snowfall');
+  const sea = TILES.find((t) => t.biome === 'sea');
+  const data = paintMock(snow, 48);
+  assert.ok(data && data.length === 48 * 48 * 4);
+  let fine = 0;
+  for (let i = 4; i < data.length; i += 4) {
+    const dr = Math.abs(data[i] - data[i - 4]);
+    if (dr > 0 && dr < 16) fine++;
+  }
+  assert.ok(fine > 40, `expected sub-band colour steps, got ${fine}`);
+  if (sea) {
+    const seaPix = paintMock(sea, 24);
+    let blue = 0;
+    for (let i = 0; i < seaPix.length; i += 4) if (seaPix[i + 2] > seaPix[i] && seaPix[i + 2] > 80) blue++;
+    assert.ok(blue > 200, 'east-edge sea tiles paint as water, not grey fill');
+  }
+});
+
+test('Brookside grass skips per-cell UV spin and dark speckle', () => {
+  const terrain = src('src/world/terrain.js');
+  const mats = src('src/engine/materials.js');
+  assert.match(terrain, /const grassy = tl === TILE\.GRASS/);
+  assert.match(terrain, /const rot = grassy \? 0/);
+  assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
+});
+
+test('debug teleport snaps the camera look to the hunter', () => {
+  const main = src('src/main.js');
+  assert.match(main, /this\.cam\.look\.set\(P\.x, P\.y \+ 1\.3, P\.z\)/);
 });

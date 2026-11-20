@@ -298,7 +298,7 @@ class Game {
       return;
     }
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.3, 160);
+    this.camera = new THREE.PerspectiveCamera(38, 1, 0.3, 240);
     this.tmpV = new THREE.Vector3();
     this.ray = new THREE.Raycaster();
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -3791,7 +3791,7 @@ class Game {
     if (inp.take('rotateR')) this.cam.targetYaw += Math.PI / 4;
     if (inp.take('rotateL')) this.cam.targetYaw -= Math.PI / 4;
     if (inp.zoomDelta) {
-      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.2, 8, 32);
+      this.cam.targetDist = clamp(this.cam.targetDist + inp.zoomDelta * 1.6, 8, 52);
       inp.zoomDelta = 0;
     }
 
@@ -3827,10 +3827,9 @@ class Game {
   /* ------------------------------ camera ------------------------------ */
   snapCamera() {
     const P = this.player.pos;
-    const ahead = Number(this.cam.lookAhead) || 0;
-    const yaw = Number(this.player.yaw) || 0;
-    this.cam.look.set(P.x + Math.sin(yaw) * ahead, P.y + 1.3, P.z + Math.cos(yaw) * ahead);
+    this.cam.look.set(P.x, P.y + 1.3, P.z);
     this.cam.yaw = this.cam.targetYaw;
+    this.cam.dist = this.cam.targetDist;
     this.positionCamera(0);
   }
 

@@ -352,11 +352,10 @@ export function paintTileMap(canvas, tile) {
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
       const c = sampleBlended(tile, (x + 0.5) / s, (y + 0.5) / s);
-      const snap = (v) => Math.round(Math.max(0.06, Math.min(0.9, v)) * 8) / 8;
       const i = (y * s + x) * 4;
-      d[i] = snap(c.r) * 255;
-      d[i + 1] = snap(c.g) * 255;
-      d[i + 2] = snap(c.b) * 255;
+      d[i] = Math.max(0, Math.min(255, c.r * 255));
+      d[i + 1] = Math.max(0, Math.min(255, c.g * 255));
+      d[i + 2] = Math.max(0, Math.min(255, c.b * 255));
       d[i + 3] = 255;
     }
   }

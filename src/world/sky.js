@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { buildCloud } from './models.js';
 import { GeometryBatch, RNG, clamp, smoothstep, lerp } from '../engine/voxel.js';
 
 const KEYS = [
@@ -131,27 +130,52 @@ export class Sky {
     scene.add(this.skyMesh);
 
     this.cloudMat = new THREE.MeshBasicMaterial({
-      vertexColors: true,
+      color: 0xd8e4f0,
+      transparent: true,
+      opacity: 0.52,
       fog: false,
       toneMapped: true,
       depthWrite: false,
+      side: THREE.DoubleSide,
     });
+    this.shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x243040,
+      transparent: true,
+      opacity: 0.2,
+      fog: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const puffGeo = new THREE.CircleGeometry(14, 20);
+    puffGeo.rotateX(-Math.PI / 2);
+    const shadeGeo = new THREE.CircleGeometry(16, 20);
+    shadeGeo.rotateX(-Math.PI / 2);
     this.clouds = new THREE.Group();
-    this.clouds.renderOrder = -5;
+    this.clouds.renderOrder = 2;
+    this.cloudShadows = new THREE.Group();
+    this.cloudShadows.renderOrder = 1;
     this.cloudSpan = 260;
     const rng = new RNG(77);
     const nClouds = quality.id === 'low' ? 16 : 28;
     for (let i = 0; i < nClouds; i++) {
-      const parts = buildCloud(i + 1);
-      const mesh = new THREE.Mesh(parts[0].geo, this.cloudMat);
+      const mesh = new THREE.Mesh(puffGeo, this.cloudMat);
       mesh.frustumCulled = false;
-      mesh.scale.setScalar(rng.range(2.4, 4.2));
+      mesh.scale.set(rng.range(0.9, 1.9), 1, rng.range(0.55, 1.15));
       mesh.userData.ox = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
       mesh.userData.oz = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
-      mesh.userData.oy = rng.range(13, 22);
+      mesh.userData.oy = rng.range(6, 11);
       mesh.userData.speed = rng.range(0.35, 0.85);
       this.clouds.add(mesh);
+      const shade = new THREE.Mesh(shadeGeo, this.shadowMat);
+      shade.frustumCulled = false;
+      shade.scale.copy(mesh.scale);
+      shade.userData.ox = mesh.userData.ox;
+      shade.userData.oz = mesh.userData.oz;
+      shade.userData.speed = mesh.userData.speed;
+      shade.userData.lift = 0.22;
+      this.cloudShadows.add(shade);
     }
+    scene.add(this.cloudShadows);
     scene.add(this.clouds);
 
     this.tmpA = new THREE.Color();
@@ -231,6 +255,7 @@ export class Sky {
       this.hemi.intensity *= 0.5;
       this.skyMesh.visible = false;
       this.clouds.visible = false;
+      if (this.cloudShadows) this.cloudShadows.visible = false;
     } else {
       const viewFar = (this.quality && this.quality.viewFar) || 150;
       this.fog.near = 34 - chill * 8 - ember * 8;
@@ -243,6 +268,7 @@ export class Sky {
       }
       this.skyMesh.visible = true;
       this.clouds.visible = true;
+      if (this.cloudShadows) this.cloudShadows.visible = true;
     }
 
     const u = this.skyMat.uniforms;
@@ -262,10 +288,12 @@ export class Sky {
     const cloudBright = clamp(0.42 + s.hi * 0.38, 0.48, 0.92);
     const snow = chill * 0.55;
     this.cloudMat.color.setRGB(
-      cloudBright * (0.72 - snow * 0.04) * (0.9 + (1 - night) * 0.08),
-      cloudBright * (0.74 + snow * 0.02),
-      cloudBright * (0.82 + snow * 0.04) * (1 + night * 0.12),
+      cloudBright * (0.78 - snow * 0.02) * (0.92 + (1 - night) * 0.08),
+      cloudBright * (0.8 + snow * 0.04),
+      cloudBright * (0.88 + snow * 0.06) * (1 + night * 0.08),
     );
+    this.cloudMat.opacity = 0.42 + (1 - night) * 0.16;
+    if (this.shadowMat) this.shadowMat.opacity = 0.14 + (1 - night) * 0.08;
     const span = this.cloudSpan;
     const wrap = (v) => {
       let n = v + span * 0.5;
@@ -275,6 +303,12 @@ export class Sky {
     for (const c of this.clouds.children) {
       c.userData.ox = wrap(c.userData.ox + c.userData.speed * dt);
       c.position.set(focus.x + c.userData.ox, c.userData.oy, focus.z + c.userData.oz);
+    }
+    if (this.cloudShadows) {
+      for (const s of this.cloudShadows.children) {
+        s.userData.ox = wrap(s.userData.ox + s.userData.speed * dt);
+        s.position.set(focus.x + s.userData.ox, s.userData.lift || 0.22, focus.z + s.userData.oz);
+      }
     }
     this.state = { night, sunDir, lightDir, ...s };
   }
