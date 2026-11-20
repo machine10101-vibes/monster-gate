@@ -972,7 +972,7 @@ body.photo-mode #nameplates,
 body.photo-mode #damage-layer,
 body.photo-mode #toast,
 body.photo-mode #banner,
-body.photo-mode #panel,
+body.photo-mode #panel:not(.map-open),
 body.photo-mode #dialog,
 body.photo-mode #quest,
 body.photo-mode #touch-controls,
@@ -987,6 +987,11 @@ body.photo-mode .world-mode-pill {
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+body.photo-mode #panel.map-open {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 #faint {
   background: rgba(7, 13, 22, 0.84);

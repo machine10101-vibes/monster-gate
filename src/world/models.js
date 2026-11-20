@@ -1152,7 +1152,7 @@ export function buildCloud(seed) {
     const ry = rng.range(1.8, 3.4);
     blob(
       M, cx, 3 + ry * 0.4, cz, rx, ry, rz,
-      (x, y, z) => mix(0x9aa8bc, 0xf4f7fb, clamp((y - 1) / 5, 0, 1)),
+      (x, y, z) => mix(0x5a6578, 0xb8c4d4, clamp((y - 1) / 5, 0, 1)),
       seed + i, 0.15
     );
   }

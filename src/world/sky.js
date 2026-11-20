@@ -104,6 +104,14 @@ export class Sky {
           col += uSunCol * glow * 0.32 * (1.0 - uNight);
           float below = smoothstep(0.0, -0.25, d.y);
           col = mix(col, uHor * 0.9, below);
+          float hz = smoothstep(0.34, 0.02, abs(d.y - 0.12)) * step(d.y, 0.42);
+          float cx = d.x * 2.4 + d.z * 1.1 + uTime * 0.008;
+          float cz = d.z * 2.1 - d.x * 0.7 + uTime * 0.005;
+          float puffs = 0.0;
+          puffs += smoothstep(0.62, 0.18, length(vec2(fract(cx) - 0.5, fract(cz * 0.7) - 0.45)));
+          puffs += 0.7 * smoothstep(0.55, 0.16, length(vec2(fract(cx * 0.6 + 0.2) - 0.5, fract(cz * 0.85 + 0.35) - 0.5)));
+          puffs += 0.55 * smoothstep(0.48, 0.14, length(vec2(fract(cx * 1.3 + 0.55) - 0.48, fract(cz * 0.5 + 0.1) - 0.5)));
+          col = mix(col, vec3(0.56, 0.60, 0.68), clamp(puffs * hz * 0.82, 0.0, 0.78) * (1.0 - uNight * 0.6));
           vec3 sd = floor(d * 120.0);
           float star = step(0.9965, h31(sd)) * smoothstep(0.1, 0.5, d.y) * uNight;
           star *= 0.6 + 0.4 * sin(uTime * 2.0 + h31(sd + 3.0) * 20.0);
@@ -122,18 +130,25 @@ export class Sky {
     this.skyMesh.renderOrder = -10;
     scene.add(this.skyMesh);
 
-    this.cloudMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: true });
+    this.cloudMat = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      fog: false,
+      toneMapped: true,
+      depthWrite: false,
+    });
     this.clouds = new THREE.Group();
-    this.cloudSpan = 240;
+    this.clouds.renderOrder = -5;
+    this.cloudSpan = 260;
     const rng = new RNG(77);
-    const nClouds = quality.id === 'low' ? 12 : 20;
+    const nClouds = quality.id === 'low' ? 16 : 28;
     for (let i = 0; i < nClouds; i++) {
       const parts = buildCloud(i + 1);
       const mesh = new THREE.Mesh(parts[0].geo, this.cloudMat);
-      mesh.scale.setScalar(rng.range(0.7, 1.35));
+      mesh.frustumCulled = false;
+      mesh.scale.setScalar(rng.range(2.4, 4.2));
       mesh.userData.ox = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
       mesh.userData.oz = rng.range(-this.cloudSpan * 0.5, this.cloudSpan * 0.5);
-      mesh.userData.oy = rng.range(36, 70);
+      mesh.userData.oy = rng.range(13, 22);
       mesh.userData.speed = rng.range(0.35, 0.85);
       this.clouds.add(mesh);
     }
@@ -244,12 +259,12 @@ export class Sky {
     u.uTime.value = time;
     this.skyMesh.position.copy(camera.position);
 
-    const cloudBright = clamp(0.25 + s.hi * 0.55, 0.3, 1);
+    const cloudBright = clamp(0.42 + s.hi * 0.38, 0.48, 0.92);
     const snow = chill * 0.55;
     this.cloudMat.color.setRGB(
-      cloudBright * (0.82 - snow * 0.12) * (0.9 + (1 - night) * 0.1),
-      cloudBright * (0.84 - snow * 0.04),
-      cloudBright * (0.92 + snow * 0.08) * (1 + night * 0.18),
+      cloudBright * (0.72 - snow * 0.04) * (0.9 + (1 - night) * 0.08),
+      cloudBright * (0.74 + snow * 0.02),
+      cloudBright * (0.82 + snow * 0.04) * (1 + night * 0.12),
     );
     const span = this.cloudSpan;
     const wrap = (v) => {

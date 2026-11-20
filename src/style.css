@@ -1299,6 +1299,13 @@ body.touch #top-right {
 .playmap-label.city { color: #ffe7a0; font-size: clamp(11px, 1.25vw, 13px); }
 .playmap-label.landmark { font-size: clamp(9px, 1.05vw, 11px); }
 .playmap-label.minor { font-size: clamp(8px, 0.95vw, 10px); font-weight: 500; }
+.playmap.labels-off .playmap-label,
+.playmap.labels-off .playmap-leads,
+#panel.labels-off .playmap-label,
+#panel.labels-off .playmap-leads,
+#panel.labels-off .playmap-hint {
+  display: none !important;
+}
 
 #faint {
   position: absolute;

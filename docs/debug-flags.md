@@ -76,14 +76,18 @@ Keys are case-insensitive. Spaces, `_`, and `-` are ignored. Teleports never wri
 
 ## Photo mode
 
-Hides the HUD, nameplates, attack warnings, and the build tag for clean screenshots. Combat, movement, and MMO are unchanged.
+Hides the HUD, nameplates, attack warnings, and the build tag for clean screenshots. Combat, movement, and MMO are unchanged. **M still opens the world map** — photo mode hides chrome, not the map.
 
 | Query / key | Effect |
 | --- | --- |
 | `?photo=1` | Start with photo mode on (works without `debug=1`) |
 | `H` | Toggle photo mode while in the world |
+| `M` | Open or close the world map (works in photo mode) |
+| `L` | While the map is open, hide or show place names |
+| `?maplabels=0` | Start with map names hidden (works without `debug=1`) |
 
 ```
 https://monstergate.online/?photo=1
 https://monstergate.online/?debug=1&tp=hellspire&photo=1
+https://monstergate.online/?photo=1&maplabels=0
 ```

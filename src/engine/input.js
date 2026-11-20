@@ -107,6 +107,9 @@ export class Input {
         case 'KeyM':
           this.press('panel:map');
           break;
+        case 'KeyL':
+          this.press('maplabels');
+          break;
         case 'KeyQ':
           this.press('panel:quest');
           break;

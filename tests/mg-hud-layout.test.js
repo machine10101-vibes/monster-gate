@@ -216,6 +216,11 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
       assert.equal(overlap(box(placed[i]), box(placed[j]), 2), false, `${placed[i].name} x ${placed[j].name}`);
     }
   }
+  const gate = placed.find((p) => p.name === 'Monster Gate');
+  const pit = placed.find((p) => p.name === 'Greyrock Pit');
+  const oak = placed.find((p) => p.name === 'Oakhollow');
+  assert.ok(Math.hypot(gate.x - pit.x, gate.y - pit.y) > 3);
+  assert.ok(Math.abs(gate.y - oak.y) > 2);
   const hud = src('../src/ui/hud.js');
   assert.match(hud, /layoutPlaymapLabels/);
   assert.match(hud, /playmap-leads/);

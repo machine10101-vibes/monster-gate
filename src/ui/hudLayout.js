@@ -469,7 +469,24 @@ const PLAYMAP_NUDGES = [
   [0, -1.7], [0, 1.7], [1.55, 0], [-1.55, 0],
   [1.3, -1.15], [-1.3, -1.15], [1.3, 1.15], [-1.3, 1.15],
   [0, -2.3], [2.1, 0.4], [-2.1, 0.4], [0, 2.3],
+  [0, -3.1], [0, 3.1], [2.8, -0.6], [-2.8, -0.6],
+  [2.4, 1.6], [-2.4, 1.6], [1.8, -2.4], [-1.8, -2.4],
 ];
+
+const PLAYMAP_PIN_NUDGES = {
+  'Monster Gate': [0, -2.4],
+  'Greyrock Pit': [2.2, -0.4],
+  Oakhollow: [0, 1.6],
+  Harefield: [-1.6, -0.4],
+  Northleas: [0, -1.2],
+  Goldmead: [1.4, -0.35],
+  Snowfall: [2.6, -0.2],
+  Cinderfall: [-1.8, 0.6],
+  Hellspire: [0.4, -0.2],
+  Runmouth: [-1.4, 0.2],
+  Southmead: [0.2, -1.1],
+  Southford: [0, 0.4],
+};
 
 /**
  * Nudge overlapping Map labels so names stay readable. Cities keep the
@@ -482,8 +499,10 @@ export function layoutPlaymapLabels(labels, opts = {}) {
   const list = (labels || []).map((label, i) => {
     const kind = playmapLabelKind(label);
     const font = kind === 'city' ? 12 : kind === 'landmark' ? 10.5 : 9;
-    const bw = Math.min(mapW * 0.16, Math.max(32, String(label.name || '').length * font * 0.58 + 10));
-    const bh = font * (String(label.name || '').length > 12 && String(label.name || '').includes(' ') ? 2.4 : 1.45);
+    const name = String(label.name || '');
+    const twoLine = /\s/.test(name) || name.length > 10;
+    const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.42 : 0.58) + 12));
+    const bh = font * (twoLine ? 2.6 : 1.55);
     return {
       ...label,
       i,
@@ -508,12 +527,14 @@ export function layoutPlaymapLabels(labels, opts = {}) {
     w: it.bw,
     h: it.bh,
   });
-  const blocked = (r) => used.some((u) => overlap(r, u, 3));
+  const blocked = (r) => used.some((u) => overlap(r, u, 6));
   for (const it of list) {
     const stepX = ((it.bw + 12) / mapW) * 100;
     const stepY = ((it.bh + 10) / mapH) * 100;
+    const pin = PLAYMAP_PIN_NUDGES[it.name];
+    const slots = pin ? [pin, ...PLAYMAP_NUDGES] : PLAYMAP_NUDGES;
     let placed = false;
-    for (const [dx, dy] of PLAYMAP_NUDGES) {
+    for (const [dx, dy] of slots) {
       const x = Math.min(96.5, Math.max(3.5, it.ax + dx * stepX));
       const y = Math.min(96.5, Math.max(3.5, it.ay + dy * stepY));
       const r = boxAt(it, x, y);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parsePhotoFlag } from '../src/debug/flags.js';
+import { parseMapLabelsFlag, parsePhotoFlag } from '../src/debug/flags.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
 
@@ -34,4 +34,41 @@ test('H toggles photo mode and the HUD chrome hides', () => {
   assert.match(src('src/engine/fx.js'), /this\.photoMode \? 0/);
   assert.match(html, /data-panel="stats"/);
   assert.doesNotMatch(html, /data-panel="stats"[^>]*>[\s\S]*<kbd>H<\/kbd>/);
+});
+
+test('photo mode still opens the world map with M', () => {
+  const input = src('src/engine/input.js');
+  const theme = src('src/ui/theme.css');
+  const main = src('src/main.js');
+  const hud = src('src/ui/hud.js');
+  assert.match(input, /case 'KeyM':\s*this\.press\('panel:map'\)/);
+  assert.match(theme, /body\.photo-mode #panel:not\(\.map-open\)/);
+  assert.match(theme, /body\.photo-mode #panel\.map-open/);
+  assert.doesNotMatch(theme, /body\.photo-mode #panel,/);
+  assert.match(hud, /classList\.toggle\('map-open', name === 'map'\)/);
+  assert.match(main, /name\.startsWith\('panel:'\)/);
+  assert.doesNotMatch(main, /photoMode[\s\S]{0,180}panel:map/);
+  assert.doesNotMatch(src('src/net/mmo.js'), /map-open|setMapLabels/);
+});
+
+test('L and maplabels=0 hide world map names', () => {
+  assert.equal(parseMapLabelsFlag(''), true);
+  assert.equal(parseMapLabelsFlag('?photo=1'), true);
+  assert.equal(parseMapLabelsFlag('?maplabels=0'), false);
+  assert.equal(parseMapLabelsFlag('?debug=1&maplabels=0'), false);
+  assert.equal(parseMapLabelsFlag('?maplabels=1'), true);
+  const input = src('src/engine/input.js');
+  const main = src('src/main.js');
+  const hud = src('src/ui/hud.js');
+  const style = src('src/style.css');
+  assert.match(input, /case 'KeyL':\s*this\.press\('maplabels'\)/);
+  assert.match(main, /parseMapLabelsFlag/);
+  assert.match(main, /inp\.take\('maplabels'\)/);
+  assert.match(main, /hud\.setMapLabels\(!hud\.mapLabels\)/);
+  assert.match(hud, /setMapLabels\(on\)/);
+  assert.match(hud, /labels-off/);
+  assert.match(style, /\.playmap\.labels-off \.playmap-label/);
+  assert.match(style, /#panel\.labels-off \.playmap-leads/);
+  assert.doesNotMatch(src('src/systems/saveio.js'), /mapLabels|parseMapLabelsFlag/);
+  assert.doesNotMatch(src('src/net/mmo.js'), /mapLabels|parseMapLabelsFlag/);
 });

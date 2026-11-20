@@ -164,6 +164,7 @@ export class HUD {
     this.toastT = 0;
     this.plates = new Map();
     this.sunKind = '';
+    this.mapLabels = true;
 
     document.querySelectorAll('.mbtn .ico').forEach((n) => {
       const cls = [...n.classList].find((c) => c !== 'ico');
@@ -602,6 +603,8 @@ export class HUD {
     }
     this.runCleanup();
     this.panelId = name;
+    this.el.panel.classList.toggle('map-open', name === 'map');
+    this.el.panel.classList.toggle('labels-off', name === 'map' && this.mapLabels === false);
     const card = this.el.panel.querySelector('.panel-card');
     const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
     card?.classList.toggle('wide', wide);
@@ -648,7 +651,7 @@ export class HUD {
       ctx.fillStyle = '#000';
       ctx.fillRect(mx - 1, mz - 1, 2, 2);
       const frame = document.createElement('div');
-      frame.className = 'playmap';
+      frame.className = 'playmap' + (this.mapLabels === false ? ' labels-off' : '');
       frame.appendChild(c);
       const raw = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
       const pins = raw.map((label) => ({
@@ -707,7 +710,7 @@ export class HUD {
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
         : inRift
           ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
-          : '<p style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you.</p>');
+          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you. L hides names.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);
@@ -972,11 +975,19 @@ export class HUD {
     this.panelId = null;
     this.journalRefresh = null;
     this.el.panel.querySelector('.panel-card')?.classList.remove('adventures', 'wide');
+    this.el.panel.classList.remove('map-open', 'labels-off');
     this.el.panel.classList.add('hidden');
     this.syncWindows();
   }
   get panelOpen() {
     return !this.el.panel.classList.contains('hidden');
+  }
+
+  setMapLabels(on) {
+    this.mapLabels = on !== false;
+    this.el.panel?.classList.toggle('labels-off', this.panelId === 'map' && !this.mapLabels);
+    this.el.panel?.querySelector('.playmap')?.classList.toggle('labels-off', !this.mapLabels);
+    document.body.classList.toggle('map-labels-off', !this.mapLabels);
   }
 
   updateSkillbar(game) {

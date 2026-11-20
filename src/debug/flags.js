@@ -189,6 +189,11 @@ export function parsePhotoFlag(search = '') {
   return paramsOf(search).get('photo') === '1';
 }
 
+/** World-map place names. `?maplabels=0` starts with names hidden for clean shots. */
+export function parseMapLabelsFlag(search = '') {
+  return paramsOf(search).get('maplabels') !== '0';
+}
+
 export function canonicalSpot(raw) {
   const k = String(raw || '').trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
   if (!k) return '';

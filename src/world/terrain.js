@@ -238,7 +238,7 @@ export function generateWorld() {
         const wear = fbm(x * 0.08 + 2, z * 0.08, 44, 2);
         if (cobble) {
           tl = wear < 0.22 ? TILE.GRAVEL : wear > 0.86 && jr > 0.7 ? TILE.DIRT : TILE.COBBLE;
-          [r, g, b] = [1.04 + wear * 0.04, 0.9 + jr * 0.06, 0.68 + wear * 0.08];
+          [r, g, b] = [1.08 + wear * 0.04, 0.92 + jr * 0.05, 0.64 + wear * 0.06];
         } else {
           tl = wear < 0.28 ? TILE.DIRT : TILE.PATH;
           [r, g, b] = [0.96, 0.9 + wear * 0.08, 0.78];
@@ -407,7 +407,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           const { u0, u1, vTop, vBot } = uvOf(tl);
 
           const aoAt = (sx, sz) => {
-            const lift = smooth ? 0.85 : 0.01;
+            const lift = smooth ? 0.85 : 0.55;
             const s1 = hAt(x + sx, z) > h + lift ? 1 : 0;
             const s2 = hAt(x, z + sz) > h + lift ? 1 : 0;
             const c = hAt(x + sx, z + sz) > h + lift ? 1 : 0;
@@ -472,7 +472,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           for (const [dx, dz] of dirs) {
             const nh = hAt(x + dx, z + dz);
             if (nh >= h) continue;
-            if (roll && h - nh < 1.15 && !cliffCell(x + dx, z + dz)) continue;
+            if (roll && !cliffCell(x + dx, z + dz)) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;

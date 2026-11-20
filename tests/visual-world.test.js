@@ -149,7 +149,7 @@ test('desert dunes keep a continuous heightfield instead of 0.5-unit terraces', 
   assert.match(ring, /smooth: !!spec\.desert/);
   assert.match(ring, /H\[i\] = s \/ 12/);
   assert.match(terrain, /const roll = smooth && !cliffCell/);
-  assert.match(terrain, /if \(roll && h - nh < 1\.15/);
+  assert.match(terrain, /if \(roll && !cliffCell\(x \+ dx, z \+ dz\)\) continue/);
   assert.match(terrain, /tile === TILE\.SAND/);
   assert.match(desert, /top\[i\] = TILE\.SAND/);
   assert.doesNotMatch(desert, /n < 0\.18 \? TILE\.DIRT/);
@@ -163,9 +163,11 @@ test('clouds stay visible over snow and grass step sides match the top', () => {
   const terrain = src('src/world/terrain.js');
   assert.match(sky, /fog:\s*false/);
   assert.match(sky, /const snow = chill/);
-  assert.match(sky, /nClouds = quality\.id === 'low' \? 12 : 20/);
-  assert.match(mats, /0\.94 \+ \(1 - y \/ 16\) \* 0\.06/);
-  assert.match(mats, /0xc4a070/);
+  assert.match(sky, /nClouds = quality\.id === 'low' \? 16 : 28/);
+  assert.match(sky, /rng\.range\(13, 22\)/);
+  assert.match(sky, /puffs \* hz/);
+  assert.match(mats, /0\.98 \+ \(1 - y \/ 16\) \* 0\.02/);
+  assert.match(mats, /0xd2ae78/);
   assert.match(terrain, /matchTop \? 0\.96/);
 });
 
