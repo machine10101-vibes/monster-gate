@@ -33,7 +33,7 @@ float cloudShade(vec2 xz, float t, float amt){
   float n = cloudFbm(xz * 0.018 + vec2(t * 0.012, t * 0.007));
   n += 0.32 * cloudFbm(xz * 0.007 - vec2(t * 0.005, -t * 0.004) + 4.7);
   float sh = smoothstep(0.40, 0.62, n);
-  return mix(1.0, 0.78, sh * amt);
+  return mix(1.0, 0.70, sh * amt);
 }
 `;function pc(e,t=`terrainGlow`){if(!e)return e;e.onBeforeCompile=e=>{e.uniforms.uCloudTime=dc.uCloudTime,e.uniforms.uCloudAmt=dc.uCloudAmt,e.vertexShader=e.vertexShader.replace(`#include <common>`,`#include <common>
 varying vec3 vCloudWorld;`).replace(`#include <project_vertex>`,`#include <project_vertex>
