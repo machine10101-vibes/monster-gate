@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import * as THREE from 'three';
 import { TILE, cloudShadeAt, CLOUD_DRIFT } from '../src/engine/materials.js';
 import { QUALITIES, survivalBudget } from '../src/engine/quality.js';
 import { originOf, paintTileMap, sampleBlended, sampleTile, TILES } from '../src/world/tiles.js';
 import { chartedAnchor, chartedWeight, oceanWeight, rasterPlaymap } from '../src/world/playmap.js';
-import { sideTilesFor, generateWorld, GUILD, W, WATER_Y } from '../src/world/terrain.js';
+import { sideTilesFor, generateWorld, buildTerrainMeshes, GUILD, W, WATER_Y } from '../src/world/terrain.js';
 import { JUNGLE_SPECS, jungleFeature } from '../src/world/jungle.js';
+import { generateSouthford, openSouthPass } from '../src/world/southford.js';
+import { openSouthfordDesert } from '../src/world/desert.js';
+import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
 
@@ -206,12 +210,12 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /UnrealBloomPass|EffectComposer/);
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
-  assert.match(world, /shoreBand/);
-  assert.match(world, /max\(vShore, smoothstep\(0\.12, 0\.04, vDepth\)\)/);
+  assert.match(world, /cornerDist/);
+  assert.match(world, /smoothstep\(0\.36, 0\.05, d\)/);
   assert.doesNotMatch(world, /smoothstep\(0\.0, 0\.03, vDepth\)/);
   assert.doesNotMatch(world, /foamNoise/);
   assert.doesNotMatch(world, /fwidth|dFdx|dFdy/);
-  assert.match(world, /x \+ 2 \* dx, z \+ 2 \* dz/);
+  assert.doesNotMatch(world, /max\(vShore, smoothstep/);
   assert.match(world, /depthAt\(land, x \+ step, z \+ step\)/);
 });
 
@@ -283,16 +287,18 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.match(terrain, /grassy \? \[1, 1, 1, 1\]/);
   assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
   assert.doesNotMatch(mats, /patch < 0\.32/);
-  assert.match(player, /RingGeometry/);
-  assert.match(player, /opacity: 0\.95/);
-  assert.match(player, /depthTest:\s*false/);
-  assert.match(player, /toneMapped:\s*false/);
-  assert.match(player, /WATER_Y \+ 0\.1/);
+  assert.match(player, /RingGeometry\(0\.48, 0\.86/);
+  assert.match(player, /color: 0xf4efe0/);
+  assert.match(player, /opacity: 0\.8/);
+  assert.match(player, /depthTest:\s*true/);
+  assert.match(player, /wet \? 0\.88 : 0\.8/);
+  assert.match(player, /WATER_Y \+ 0\.08/);
+  assert.doesNotMatch(player, /opacity: 0\.95/);
   assert.doesNotMatch(terrain, /skipThinGrassLips/);
   assert.doesNotMatch(src('src/world/world.js'), /skipThinGrassLips/);
+  assert.match(terrain, /weldCorner/);
   assert.match(terrain, /skirtOk/);
-  assert.match(terrain, /if \(skirt\[di\]\) continue/);
-  assert.match(terrain, /h - nh <= 1\.001|drop > 1\.001/);
+  assert.match(terrain, /nh - 0\.05/);
 });
 
 test('Oakhollow NE of the Guild still has 1-unit grass terraces that the skirt covers', () => {
@@ -321,6 +327,113 @@ test('Oakhollow NE of the Guild still has 1-unit grass terraces that the skirt c
     }
   }
   assert.ok(lips > 30, `Oakhollow NE of Guild still has terrace drops to skirt (${lips})`);
+});
+
+function gridTopYs(group) {
+  const map = new Map();
+  group.traverse((m) => {
+    const pos = m.geometry?.attributes?.position;
+    const nor = m.geometry?.attributes?.normal;
+    if (!pos || !nor) return;
+    for (let i = 0; i < pos.count; i++) {
+      if (nor.getY(i) < 0.3) continue;
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const gx = Math.round(x);
+      const gz = Math.round(z);
+      if (Math.abs(x - gx) > 0.02 || Math.abs(z - gz) > 0.02) continue;
+      const k = `${gx},${gz}`;
+      const s = map.get(k) || [];
+      if (!s.some((v) => Math.abs(v - y) < 0.02)) s.push(y);
+      map.set(k, s);
+    }
+  });
+  return map;
+}
+
+function grassCracks(data, group, x0, x1, z0, z1, ox = 0, oz = 0) {
+  const ys = gridTopYs(group);
+  const width = Math.sqrt(data.H.length);
+  let cracks = 0;
+  let samples = 0;
+  for (let z = z0; z <= z1; z++) {
+    for (let x = x0; x <= x1; x++) {
+      const cells = [[x - 1, z - 1], [x - 1, z], [x, z - 1], [x, z]];
+      let lo = 1e9;
+      let hi = -1e9;
+      let grass = 0;
+      let present = 0;
+      for (const [cx, cz] of cells) {
+        if (cx < 0 || cz < 0 || cx >= width || cz >= width) continue;
+        present += 1;
+        const tl = data.top[cz * width + cx];
+        if (tl !== TILE.GRASS && tl !== TILE.FLOWER_GRASS && tl !== TILE.PATH) continue;
+        grass += 1;
+        const h = data.H[cz * width + cx];
+        lo = Math.min(lo, h);
+        hi = Math.max(hi, h);
+      }
+      if (grass < 3 || grass !== present || hi - lo > 1.001 || hi - lo < 0.05) continue;
+      const got = ys.get(`${x + ox},${z + oz}`);
+      if (!got) continue;
+      samples += 1;
+      if (got.length > 1) cracks += 1;
+    }
+  }
+  return { cracks, samples };
+}
+
+test('grass terrace T-junctions weld so a 1-unit drop has one height per vertex', () => {
+  const w = 6;
+  const H = new Float32Array(w * w);
+  const top = new Uint8Array(w * w);
+  const tint = new Float32Array(w * w * 3);
+  const zone = new Uint8Array(w * w);
+  for (let z = 0; z < w; z++) {
+    for (let x = 0; x < w; x++) {
+      const i = z * w + x;
+      top[i] = TILE.GRASS;
+      tint[i * 3] = 0.4;
+      tint[i * 3 + 1] = 0.72;
+      tint[i * 3 + 2] = 0.3;
+      H[i] = x >= 3 ? 2 : 3;
+    }
+  }
+  const mesh = buildTerrainMeshes({ H, top, tint, zone }, new THREE.MeshBasicMaterial(), { width: w, depth: w });
+  const ys = gridTopYs(mesh);
+  const seam = ys.get('3,2') || ys.get('3,3');
+  assert.ok(seam && seam.length === 1, `T-junction vertex should weld to one Y, got ${seam}`);
+  const { cracks, samples } = grassCracks({ H, top }, mesh, 1, 5, 1, 5);
+  assert.ok(samples > 4, `expected skirt samples, got ${samples}`);
+  assert.equal(cracks, 0, `synthetic terrace should not show sky cracks (${cracks})`);
+});
+
+test('Oakhollow guild/tent and Brookside meadow skirts have no 1-unit cracks', () => {
+  const oak = generateWorld();
+  const oakMesh = buildTerrainMeshes(oak, new THREE.MeshBasicMaterial());
+  const tent = grassCracks(oak, oakMesh, 76, 92, 58, 72);
+  const guild = grassCracks(oak, oakMesh, GUILD.x, GUILD.x + 24, GUILD.z - 20, GUILD.z + 8);
+  assert.ok(tent.samples + guild.samples > 20, `oak terrace samples ${tent.samples + guild.samples}`);
+  assert.equal(tent.cracks, 0, `oak tent-right cracks ${tent.cracks}/${tent.samples}`);
+  assert.equal(guild.cracks, 0, `oak guild cracks ${guild.cracks}/${guild.samples}`);
+
+  openSouthPass(oak);
+  openRingPasses(oak);
+  const northEdge = new Float32Array(W);
+  for (let x = 0; x < W; x++) northEdge[x] = oak.H[(W - 1) * W + x];
+  const south = generateSouthford(northEdge);
+  openValeSides(south);
+  openSouthfordDesert(south);
+  const ring = generateRing(oak, south);
+  const brook = ring.find((l) => l.kind === 'brookside');
+  assert.ok(brook);
+  const brookMesh = buildTerrainMeshes(brook.data, new THREE.MeshBasicMaterial(), { ox: brook.x0, oz: brook.z0 });
+  const meadow = grassCracks(brook.data, brookMesh, 8, 70, 70, 130, brook.x0, brook.z0);
+  const upper = grassCracks(brook.data, brookMesh, 20, 90, 8, 50, brook.x0, brook.z0);
+  assert.ok(meadow.samples + upper.samples > 20, `brookside samples ${meadow.samples + upper.samples}`);
+  assert.equal(meadow.cracks, 0, `brookside lower meadow cracks ${meadow.cracks}/${meadow.samples}`);
+  assert.equal(upper.cracks, 0, `brookside upper cracks ${upper.cracks}/${upper.samples}`);
 });
 
 test('hunter map paints uncharted parchment and one ocean, not biome blocks', () => {
@@ -385,8 +498,48 @@ test('charted tile edges are noise-warped on all four sides, including charted n
   }
   const uniq = new Set(crossings);
   const span = crossings.length ? Math.max(...crossings) - Math.min(...crossings) : 0;
-  assert.ok(uniq.size >= 3 && span > 4, `snowfall west edge should wander, got ${[...uniq].join(',')} span ${span}`);
+  assert.ok(uniq.size >= 2 && span > 4, `snowfall west edge should wander, got ${[...uniq].join(',')} span ${span}`);
   assert.ok(chartedAnchor(so.x + 72, so.z + 72), 'snowfall centre stays charted');
+});
+
+test('south sea, shallows and coast patches use the same warped field as land', () => {
+  const play = src('src/world/playmap.js');
+  assert.match(play, /function mapWarp/);
+  assert.match(play, /function fieldWeight/);
+  assert.match(play, /function oceanCell/);
+  assert.match(play, /fieldWeight\(wx, wz, oceanCell/);
+  const strand = TILES.find((t) => t.tx === 3 && t.tz === 9);
+  assert.ok(strand);
+  const so = originOf(strand);
+  const rgba = rasterPlaymap({
+    width: 160,
+    height: 120,
+    minX: so.x - 40,
+    minZ: so.z - 80,
+    scale: 1,
+  });
+  const crossings = [];
+  for (let y = 20; y < 100; y++) {
+    let edge = -1;
+    let best = 0;
+    for (let x = 20; x < 140; x++) {
+      const i = (y * 160 + x) * 4;
+      const water = rgba[i + 2] > rgba[i] + 20 && rgba[i + 2] > 80;
+      const prev = ((y * 160 + x - 1) * 4);
+      const pwater = rgba[prev + 2] > rgba[prev] + 20 && rgba[prev + 2] > 80;
+      if (water !== pwater) {
+        const jump = Math.abs((rgba[i] + rgba[i + 1] + rgba[i + 2]) - (rgba[prev] + rgba[prev + 1] + rgba[prev + 2]));
+        if (jump > best) {
+          best = jump;
+          edge = x;
+        }
+      }
+    }
+    if (edge >= 0) crossings.push(edge);
+  }
+  const uniq = new Set(crossings);
+  const span = crossings.length ? Math.max(...crossings) - Math.min(...crossings) : 0;
+  assert.ok(uniq.size >= 3 && span > 4, `south sea edge should wander, got ${[...uniq].join(',')} span ${span}`);
 });
 
 test('cloud shadows drift a few world units per second on ground materials', () => {

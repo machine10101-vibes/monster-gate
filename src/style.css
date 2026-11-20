@@ -1365,12 +1365,12 @@ body.touch #top-right {
 .playmap-label.uncharted {
   font-size: 12px;
   font-style: italic;
-  font-weight: 600;
-  color: #c49658;
-  opacity: 0.94;
+  font-weight: 700;
+  color: #7a4a18;
+  opacity: 1;
   text-shadow:
-    0 0 3px #2a1c0c, 0 0 6px #2a1c0c,
-    0 1px 0 #2a1c0c, 1px 0 0 #2a1c0c, -1px 0 0 #2a1c0c, 0 -1px 0 #2a1c0c;
+    0 0 4px #f6ead0, 0 0 7px #efe0c4,
+    0 0 2px #2a1c0c, 0 1px 0 #2a1c0c, 1px 0 0 #2a1c0c, -1px 0 0 #2a1c0c, 0 -1px 0 #2a1c0c;
 }
 .playmap.labels-off .playmap-label,
 .playmap.labels-off .playmap-leads,

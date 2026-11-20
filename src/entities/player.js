@@ -35,17 +35,16 @@ export class Player {
 
     this.shadowBlob = null;
     this.groundRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.42, 0.98, 48),
+      new THREE.RingGeometry(0.48, 0.86, 48),
       new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: 0xf4efe0,
         transparent: true,
-        opacity: 0.95,
+        opacity: 0.8,
         depthWrite: false,
-        depthTest: false,
-        toneMapped: false,
+        depthTest: true,
         polygonOffset: true,
-        polygonOffsetFactor: -4,
-        polygonOffsetUnits: -4,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
         side: THREE.DoubleSide,
       })
     );
@@ -234,7 +233,14 @@ export class Player {
     this.obj.position.copy(this.pos);
     this.obj.rotation.y = this.yaw;
     if (this.groundRing) {
-      const y = this.pos.y < WATER_Y + 0.45 ? WATER_Y + 0.1 : this.pos.y + 0.08;
+      const wet = this.pos.y < WATER_Y + 0.4;
+      const mat = this.groundRing.material;
+      if (mat.depthTest === wet) {
+        mat.depthTest = !wet;
+        mat.needsUpdate = true;
+      }
+      mat.opacity = wet ? 0.88 : 0.8;
+      const y = wet ? WATER_Y + 0.08 : this.pos.y + 0.08;
       this.groundRing.position.set(this.pos.x, y, this.pos.z);
     }
   }

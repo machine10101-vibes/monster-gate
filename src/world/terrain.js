@@ -435,27 +435,32 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           let y01 = roll ? cornerH(x, z + 1) : h;
           let y11 = roll ? cornerH(x + 1, z + 1) : h;
           let y10 = roll ? cornerH(x + 1, z) : h;
-          const skirt = [false, false, false, false];
           const skirtOk = (nt) => {
             const g = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
             return (grassy && g) || ((tl === TILE.PATH || grassy) && (g || nt === TILE.PATH));
           };
-          if (!roll) {
-            const pull = (dx, dz, setY, dirI) => {
-              const nh = hAt(x + dx, z + dz);
+          const tileAt = (tx, tz) => {
+            if (tx < 0 || tz < 0 || tx >= width || tz >= depth) return -1;
+            return top[tz * width + tx];
+          };
+          const weldCorner = (vx, vz) => {
+            let y = h;
+            if (!skirtOk(tl)) return y;
+            for (const [cx, cz] of [[vx - 1, vz - 1], [vx - 1, vz], [vx, vz - 1], [vx, vz]]) {
+              if (cx === x && cz === z) continue;
+              const nh = hAt(cx, cz);
               const drop = h - nh;
-              if (drop <= 0 || drop > 1.001) return;
-              const nx = x + dx;
-              const nz = z + dz;
-              const nt = nx >= 0 && nz >= 0 && nx < width && nz < depth ? top[nz * width + nx] : -1;
-              if (!skirtOk(nt)) return;
-              setY(nh);
-              skirt[dirI] = true;
-            };
-            pull(1, 0, (nh) => { y10 = Math.min(y10, nh); y11 = Math.min(y11, nh); }, 0);
-            pull(-1, 0, (nh) => { y00 = Math.min(y00, nh); y01 = Math.min(y01, nh); }, 1);
-            pull(0, 1, (nh) => { y01 = Math.min(y01, nh); y11 = Math.min(y11, nh); }, 2);
-            pull(0, -1, (nh) => { y00 = Math.min(y00, nh); y10 = Math.min(y10, nh); }, 3);
+              if (drop <= 0 || drop > 1.001) continue;
+              if (!skirtOk(tileAt(cx, cz))) continue;
+              y = Math.min(y, nh);
+            }
+            return y;
+          };
+          if (!roll) {
+            y00 = weldCorner(x, z);
+            y01 = weldCorner(x, z + 1);
+            y11 = weldCorner(x + 1, z + 1);
+            y10 = weldCorner(x + 1, z);
           }
           const ps = [
             [x + ox, y00, z + oz],
@@ -492,12 +497,18 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             [0, 1],
             [0, -1],
           ];
+          const edgeY = [
+            [y10, y11],
+            [y00, y01],
+            [y01, y11],
+            [y00, y10],
+          ];
           for (let di = 0; di < dirs.length; di++) {
             const [dx, dz] = dirs[di];
             const nh = hAt(x + dx, z + dz);
             if (nh >= h) continue;
             if (roll && !cliffCell(x + dx, z + dz)) continue;
-            if (skirt[di]) continue;
+            if (edgeY[di][0] <= nh + 0.001 && edgeY[di][1] <= nh + 0.001) continue;
             const rx = dz;
             const rz = -dx;
             const mx = x + 0.5 + dx * 0.5;
@@ -510,7 +521,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             let seg = 0;
             const shadeSide = dx !== 0 ? 0.86 : 0.93;
             while (yt > nh + 0.001) {
-              const yb = Math.max(nh, yt - 1);
+              const yb = Math.max(nh - 0.05, yt - 1);
               const len = yt - yb;
               const tile = seg === 0 ? sideTiles[0] : seg < 3 || sideTiles[1] !== TILE.DIRT ? sideTiles[1] : TILE.STONE;
               const t = uvOf(tile);
