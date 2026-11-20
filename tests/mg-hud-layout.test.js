@@ -252,7 +252,7 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   assert.match(style, /object-fit:\s*contain/);
   assert.match(style, /--map-w/);
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*font-size: 12px/);
-  assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*#c49658/);
+  assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*#7a4a18/);
   const layout = src('../src/ui/hudLayout.js');
   assert.match(layout, /d < 4\.2/);
   const jungle = layoutPlaymapLabels([

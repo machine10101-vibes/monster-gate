@@ -249,10 +249,10 @@ export class Sky {
       cloudShadowUniforms.uCloudForce.value = 1;
     } else if (!this.indoors) {
       cloudShadowUniforms.uCloudAmt.value = (1 - night) * 1.0 + night * 0.22;
-      cloudShadowUniforms.uCloudDark.value = 0.56;
+      cloudShadowUniforms.uCloudDark.value = 0.42;
       cloudShadowUniforms.uCloudForce.value = 0;
     } else {
-      cloudShadowUniforms.uCloudDark.value = 0.56;
+      cloudShadowUniforms.uCloudDark.value = 0.42;
       cloudShadowUniforms.uCloudForce.value = 0;
     }
     this.state = { night, sunDir, lightDir, ...s };

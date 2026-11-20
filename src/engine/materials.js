@@ -135,12 +135,12 @@ export function toonMaterial(opts = {}) {
 export const cloudShadowUniforms = {
   uCloudTime: { value: 0 },
   uCloudAmt: { value: 1 },
-  uCloudDark: { value: 0.56 },
+  uCloudDark: { value: 0.42 },
   uCloudForce: { value: 0 },
 };
 
 /** World-space drift of the cloud shadow field, about 3 units per second. */
-export const CLOUD_DRIFT = { x: 2.8, z: -2.2, scale: 0.014, dark: 0.56 };
+export const CLOUD_DRIFT = { x: 2.8, z: -2.2, scale: 0.014, dark: 0.42 };
 
 export const CLOUD_SHADOW_GLSL = `
 float cloudHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -158,7 +158,7 @@ float cloudShade(vec2 xz, float t, float amt){
   vec2 drift = vec2(t * 2.8, t * -2.2);
   float n = cloudFbm((xz + drift) * 0.014);
   n += 0.28 * cloudFbm((xz + drift * 0.55) * 0.006 + 4.7);
-  float sh = max(smoothstep(0.32, 0.54, n), uCloudForce);
+  float sh = max(smoothstep(0.24, 0.48, n), uCloudForce);
   return mix(1.0, uCloudDark, sh * amt);
 }
 `;
@@ -200,7 +200,7 @@ export function cloudShadeAt(x, z, t, amt = 1) {
   const dz = z + t * CLOUD_DRIFT.z;
   let n = fbm(dx * CLOUD_DRIFT.scale, dz * CLOUD_DRIFT.scale);
   n += 0.28 * fbm((x + t * CLOUD_DRIFT.x * 0.55) * 0.006 + 4.7, (z + t * CLOUD_DRIFT.z * 0.55) * 0.006 + 4.7);
-  const tsh = Math.min(1, Math.max(0, (n - 0.32) / (0.54 - 0.32)));
+  const tsh = Math.min(1, Math.max(0, (n - 0.24) / (0.48 - 0.24)));
   const sh = tsh * tsh * (3 - 2 * tsh);
   return 1 + (CLOUD_DRIFT.dark - 1) * sh * amt;
 }

@@ -31,8 +31,11 @@ function seaAt(tx, tz) {
   return tileAt(tx, tz)?.biome === 'sea';
 }
 
-/** Warp tile UV so every charted, parchment and sea edge is a coastline, not a square. */
-function warpUv(wx, wz, seed, amp) {
+const MAP_WARP_SEED = 17;
+const MAP_WARP_AMP = 0.5;
+
+/** Warp tile UV so every charted, parchment, water and shallow edge is a coastline, not a square. */
+function warpUv(wx, wz, seed = MAP_WARP_SEED, amp = MAP_WARP_AMP) {
   const { ftx, ftz } = worldToTileUv(wx, wz);
   const n = fbm(ftx * 2.15, ftz * 2.15, seed, 3) - 0.5;
   const n2 = fbm(ftx * 4.4 + 2.7, ftz * 4.1, seed + 3, 2) - 0.5;
@@ -43,6 +46,43 @@ function warpUv(wx, wz, seed, amp) {
     wtx: ftx + n * amp + n3 * amp * 0.38,
     wtz: ftz + n2 * amp + n3 * amp * 0.32,
   };
+}
+
+function mapWarp(wx, wz) {
+  return warpUv(wx, wz, MAP_WARP_SEED, MAP_WARP_AMP);
+}
+
+function oceanCell(tx, tz) {
+  if (seaAt(tx, tz)) return true;
+  const tile = tileAt(tx, tz);
+  if (tile?.biome !== 'coast' || tile.built) return false;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    if (seaAt(tx + dx, tz + dz)) return true;
+  }
+  return false;
+}
+
+/** 0–1 membership, warped and feathered on every side including corners. */
+function fieldWeight(wx, wz, test, band = 0.3) {
+  const w = mapWarp(wx, wz);
+  const n = fbm(w.ftx * 3.2, w.ftz * 3.15, MAP_WARP_SEED + 11, 2) - 0.5;
+  const tx = Math.floor(w.wtx);
+  const tz = Math.floor(w.wtz);
+  const u = w.wtx - tx;
+  const v = w.wtz - tz;
+  if (test(tx, tz)) {
+    let toOther = 1;
+    if (!test(tx - 1, tz)) toOther = Math.min(toOther, u);
+    if (!test(tx + 1, tz)) toOther = Math.min(toOther, 1 - u);
+    if (!test(tx, tz - 1)) toOther = Math.min(toOther, v);
+    if (!test(tx, tz + 1)) toOther = Math.min(toOther, 1 - v);
+    if (!test(tx - 1, tz - 1)) toOther = Math.min(toOther, Math.hypot(u, v));
+    if (!test(tx + 1, tz - 1)) toOther = Math.min(toOther, Math.hypot(1 - u, v));
+    if (!test(tx - 1, tz + 1)) toOther = Math.min(toOther, Math.hypot(u, 1 - v));
+    if (!test(tx + 1, tz + 1)) toOther = Math.min(toOther, Math.hypot(1 - u, 1 - v));
+    return smoothstep(0, band, toOther + n * 0.2);
+  }
+  return neighborBleed(tx, tz, u, v, band + 0.04, test);
 }
 
 function neighborBleed(tx, tz, u, v, band, test) {
@@ -60,33 +100,20 @@ function neighborBleed(tx, tz, u, v, band, test) {
 
 /** 1 inside charted land, 0 in uncharted. All four sides of every tile are noise-warped. */
 export function chartedWeight(wx, wz) {
-  const w = warpUv(wx, wz, 17, 0.42);
-  const tx = Math.floor(w.wtx);
-  const tz = Math.floor(w.wtz);
-  if (builtAt(tx, tz)) return 1;
-  return neighborBleed(tx, tz, w.wtx - tx, w.wtz - tz, 0.24, builtAt);
+  return fieldWeight(wx, wz, builtAt, 0.26);
 }
 
-/** Continuous ocean. Shoreline bleeds from sea tiles with the same warped UV as land. */
+/** Continuous ocean. Shoreline, shallows and coast patches use the same warp as land. */
 export function oceanWeight(wx, wz) {
-  const w = warpUv(wx, wz, 41, 0.46);
+  const w = mapWarp(wx, wz);
   const tx = Math.floor(w.wtx);
   const tz = Math.floor(w.wtz);
-  if (seaAt(tx, tz)) return 1;
   if (tx < 0 || tz < 0 || tx >= 10 || tz >= 10) {
-    const n = fbm(w.ftx * 1.4, w.ftz * 1.4, 41, 3);
+    const n = fbm(w.ftx * 1.4, w.ftz * 1.4, MAP_WARP_SEED + 24, 3);
     const shore = 8.05 + (n - 0.5) * 0.72 + 0.2 * Math.sin(w.ftx * 1.7) + 0.12 * Math.sin(w.ftx * 4.2 + n);
-    return smoothstep(shore - 0.24, shore + 0.2, w.wtz);
+    return smoothstep(shore - 0.28, shore + 0.22, w.wtz);
   }
-  const u = w.wtx - tx;
-  const v = w.wtz - tz;
-  let sea = neighborBleed(tx, tz, u, v, 0.32, seaAt);
-  const tile = tileAt(tx, tz);
-  if (tile?.biome === 'coast' && !tile.built) {
-    const n = fbm(w.ftx * 1.32, w.ftz * 1.32, 41, 3);
-    sea = Math.max(sea, smoothstep(0.18, 0.78, v + (n - 0.5) * 0.34));
-  }
-  return sea;
+  return fieldWeight(wx, wz, oceanCell, 0.32);
 }
 
 /** Move a pin onto charted land inside its tile, or null if none is nearby. */
@@ -181,7 +208,7 @@ function sampleBuiltUv(tile, u, v, cache) {
 }
 
 function chartedColor(wx, wz, cache) {
-  const w = warpUv(wx, wz, 29, 0.42);
+  const w = mapWarp(wx, wz);
   const tx = Math.floor(w.wtx);
   const tz = Math.floor(w.wtz);
   let tile = tileAt(tx, tz);
@@ -454,8 +481,8 @@ export function stampLabelsOnRaster(data, w, h, minX, minZ, scale, placed) {
     const uncharted = label.kind === 'uncharted' || label.uncharted;
     drawPlaymapText(data, w, h, cx, cy, label.name, {
       scale: city ? 3 : uncharted ? 3 : 2,
-      fill: city ? [255, 231, 160] : uncharted ? [196, 154, 86] : [255, 248, 232],
-      outline: uncharted ? [42, 28, 12] : [10, 7, 3],
+      fill: city ? [255, 231, 160] : uncharted ? [122, 74, 24] : [255, 248, 232],
+      outline: uncharted ? [246, 234, 208] : [10, 7, 3],
       italic: uncharted,
     });
   }

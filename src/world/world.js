@@ -593,9 +593,10 @@ export class World {
           col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float shoreBand = max(vShore, smoothstep(0.12, 0.04, vDepth));
-          float foamWave = 0.97 + 0.03 * sin(uTime * 1.45 + p.x * 0.28);
-          float foam = shoreBand * foamWave;
+          float wobble = 0.12 * sin(uTime * 1.55 + p.x * 2.7 + p.z * 1.9);
+          float grain = vn(p * 0.58 + vec2(uTime * 0.07, -uTime * 0.05));
+          float d = vShore + wobble * 0.14 + (grain - 0.5) * 0.18;
+          float foam = smoothstep(0.36, 0.05, d) * (0.7 + 0.3 * sin(uTime * 2.05 + p.z * 3.2 + grain * 5.0));
           col = mix(col, uFoam, foam);
           col *= uLight;
           col *= cloudShade(p, uCloudTime, uCloudAmt);
@@ -618,6 +619,22 @@ export class World {
       return land.data.H[z * W + x];
     };
     const depthAt = (land, x, z) => Math.max(0, WATER_Y - hAt(land, x, z));
+    const cellLand = (land, xx, zz) => hAt(land, xx, zz) >= WATER_Y - 0.02;
+    const cornerLand = (land, gx, gz) => cellLand(land, gx, gz) || cellLand(land, gx - 1, gz) || cellLand(land, gx, gz - 1) || cellLand(land, gx - 1, gz - 1);
+    const cornerDist = (land, gx, gz) => {
+      if (cornerLand(land, gx, gz)) return 0;
+      let best = 5;
+      for (let r = 1; r <= 4; r++) {
+        for (let dz = -r; dz <= r; dz++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+            if (cornerLand(land, gx + dx, gz + dz)) best = Math.min(best, Math.hypot(dx, dz));
+          }
+        }
+        if (best < 5) break;
+      }
+      return best;
+    };
     for (const land of this.lands || [{ x0: 0, z0: 0, data: this.data }, { x0: 0, z0: SOUTH_Z, data: this.south }]) {
       const key = land.x0 + ',' + land.z0;
       if (seen.has(key) || !land.data) continue;
@@ -631,13 +648,6 @@ export class World {
         for (let x = 0; x < W; x += step) {
           const h = hAt(land, x, z);
           if (h >= WATER_Y + 0.02) continue;
-          let edge = 0;
-          for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step], [step, step], [step, -step], [-step, step], [-step, -step]]) {
-            if (hAt(land, x + dx, z + dz) >= WATER_Y - 0.08) edge = 1;
-          }
-          for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
-            if (hAt(land, x + 2 * dx, z + 2 * dz) >= WATER_Y - 0.02) edge = 1;
-          }
           const x0 = land.x0 + x;
           const z0 = land.z0 + z;
           const x1 = x0 + step;
@@ -650,7 +660,12 @@ export class World {
             depthAt(land, x + step, z + step),
             depthAt(land, x + step, z)
           );
-          for (let k = 0; k < 4; k++) shore.push(edge);
+          shore.push(
+            cornerDist(land, x, z),
+            cornerDist(land, x, z + step),
+            cornerDist(land, x + step, z + step),
+            cornerDist(land, x + step, z)
+          );
           idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
         }
       }
