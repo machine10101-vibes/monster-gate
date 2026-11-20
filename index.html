@@ -12,17 +12,27 @@
         var meta = document.querySelector('meta[name="mg-build"]');
         var mine = meta && meta.getAttribute('content');
         if (!mine || mine === 'dev' || mine === '__MG_BUILD__') return;
+        function go(build) {
+          try {
+            if (sessionStorage.getItem('mg-build-reload') === build) return;
+            sessionStorage.setItem('mg-build-reload', build);
+          } catch (e) {}
+          var u = new URL(location.href);
+          u.searchParams.set('mgb', build);
+          location.replace(u.toString());
+        }
+        window.__mgApplyBuildReload = go;
         fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
           return r.ok ? r.json() : null;
         }).then(function (v) {
           if (!v || !v.build || v.build === mine) return;
-          try {
-            if (sessionStorage.getItem('mg-build-reload') === v.build) return;
-            sessionStorage.setItem('mg-build-reload', v.build);
-          } catch (e) {}
-          var u = new URL(location.href);
-          u.searchParams.set('mgb', v.build);
-          location.replace(u.toString());
+          var hunting = !!(window.__mgHuntStarted || (document.body && document.body.classList.contains('hunting')));
+          if (hunting) {
+            window.__mgPendingBuild = v.build;
+            if (typeof window.__mgOfferBuildReload === 'function') window.__mgOfferBuildReload(v.build);
+            return;
+          }
+          go(v.build);
         }).catch(function () {});
       })();
     </script>
@@ -158,6 +168,7 @@
       <div id="vignette"></div>
       <div id="hurt-flash"></div>
       <div id="toast"></div>
+      <button id="build-reload" class="hidden" type="button">New version available, reload?</button>
       <div id="banner"><span id="banner-sub">Village</span><b id="banner-main">Oakhollow</b></div>
       <div id="dialog" class="mg-frame hidden"><b id="dlg-name"></b><p id="dlg-text"></p><div id="dlg-choices" class="hidden"></div><small>Tap or press F to continue</small></div>
 

@@ -435,10 +435,7 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           let y01 = roll ? cornerH(x, z + 1) : h;
           let y11 = roll ? cornerH(x + 1, z + 1) : h;
           let y10 = roll ? cornerH(x + 1, z) : h;
-          const skirtOk = (nt) => {
-            const g = nt === TILE.GRASS || nt === TILE.FLOWER_GRASS;
-            return (grassy && g) || ((tl === TILE.PATH || grassy) && (g || nt === TILE.PATH));
-          };
+          const skirtOk = (nt) => nt >= 0 && nt !== TILE.LAVA;
           const tileAt = (tx, tz) => {
             if (tx < 0 || tz < 0 || tx >= width || tz >= depth) return -1;
             return top[tz * width + tx];

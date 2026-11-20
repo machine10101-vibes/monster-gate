@@ -187,6 +187,8 @@ test('cloud shadows darken the ground and never cover the play view', () => {
   assert.match(mats, /cloudShade/);
   assert.match(mats, /mix\(1\.0, uCloudDark/);
   assert.match(mats, /uCloudForce/);
+  assert.match(mats, /mix\(0\.52, 0\.42, uCloudForce\)/);
+  assert.doesNotMatch(mats, /max\(smoothstep/);
   assert.match(mats, /outgoingLight \*= cloudShade/);
   assert.match(mats, /#include <opaque_fragment>/);
   assert.match(world, /cloudShade\(p, uCloudTime, uCloudAmt\)/);
@@ -211,7 +213,10 @@ test('water, lava and lamps get cheap glow without a bloom pass', () => {
   assert.doesNotMatch(world, /#include <tonemapping_pars_fragment>/);
   assert.doesNotMatch(src('src/world/sky.js'), /#include <tonemapping_pars_fragment>/);
   assert.match(world, /cornerDist/);
-  assert.match(world, /smoothstep\(0\.36, 0\.05, d\)/);
+  assert.match(world, /smoothstep\(0\.95, 0\.18, d\)/);
+  assert.match(world, /0x124a78/);
+  assert.match(world, /0x4eb8c4/);
+  assert.match(world, /mix\(0\.93, 0\.99, depthK\)/);
   assert.doesNotMatch(world, /smoothstep\(0\.0, 0\.03, vDepth\)/);
   assert.doesNotMatch(world, /foamNoise/);
   assert.doesNotMatch(world, /fwidth|dFdx|dFdy/);
@@ -290,14 +295,16 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.match(player, /RingGeometry\(0\.48, 0\.86/);
   assert.match(player, /color: 0xf4efe0/);
   assert.match(player, /opacity: 0\.8/);
-  assert.match(player, /depthTest:\s*true/);
-  assert.match(player, /wet \? 0\.88 : 0\.8/);
-  assert.match(player, /WATER_Y \+ 0\.08/);
+  assert.match(player, /depthTest:\s*false/);
+  assert.match(player, /heightAt\?\.\(this\.pos\.x, this\.pos\.z\)/);
+  assert.match(player, /\+ 0\.12/);
   assert.doesNotMatch(player, /opacity: 0\.95/);
+  assert.doesNotMatch(player, /wet \? 0\.88 : 0\.8/);
   assert.doesNotMatch(terrain, /skipThinGrassLips/);
   assert.doesNotMatch(src('src/world/world.js'), /skipThinGrassLips/);
   assert.match(terrain, /weldCorner/);
   assert.match(terrain, /skirtOk/);
+  assert.match(terrain, /nt !== TILE\.LAVA/);
   assert.match(terrain, /nh - 0\.05/);
 });
 
@@ -362,19 +369,24 @@ function grassCracks(data, group, x0, x1, z0, z1, ox = 0, oz = 0) {
       const cells = [[x - 1, z - 1], [x - 1, z], [x, z - 1], [x, z]];
       let lo = 1e9;
       let hi = -1e9;
-      let grass = 0;
       let present = 0;
+      let skip = false;
       for (const [cx, cz] of cells) {
-        if (cx < 0 || cz < 0 || cx >= width || cz >= width) continue;
+        if (cx < 0 || cz < 0 || cx >= width || cz >= width) {
+          skip = true;
+          break;
+        }
         present += 1;
         const tl = data.top[cz * width + cx];
-        if (tl !== TILE.GRASS && tl !== TILE.FLOWER_GRASS && tl !== TILE.PATH) continue;
-        grass += 1;
+        if (tl === TILE.LAVA) {
+          skip = true;
+          break;
+        }
         const h = data.H[cz * width + cx];
         lo = Math.min(lo, h);
         hi = Math.max(hi, h);
       }
-      if (grass < 3 || grass !== present || hi - lo > 1.001 || hi - lo < 0.05) continue;
+      if (skip || present !== 4 || hi - lo > 1.001 || hi - lo < 0.05) continue;
       const got = ys.get(`${x + ox},${z + oz}`);
       if (!got) continue;
       samples += 1;
@@ -431,9 +443,12 @@ test('Oakhollow guild/tent and Brookside meadow skirts have no 1-unit cracks', (
   const brookMesh = buildTerrainMeshes(brook.data, new THREE.MeshBasicMaterial(), { ox: brook.x0, oz: brook.z0 });
   const meadow = grassCracks(brook.data, brookMesh, 8, 70, 70, 130, brook.x0, brook.z0);
   const upper = grassCracks(brook.data, brookMesh, 20, 90, 8, 50, brook.x0, brook.z0);
+  const whole = grassCracks(brook.data, brookMesh, 1, W - 1, 1, W - 1, brook.x0, brook.z0);
   assert.ok(meadow.samples + upper.samples > 20, `brookside samples ${meadow.samples + upper.samples}`);
   assert.equal(meadow.cracks, 0, `brookside lower meadow cracks ${meadow.cracks}/${meadow.samples}`);
   assert.equal(upper.cracks, 0, `brookside upper cracks ${upper.cracks}/${upper.samples}`);
+  assert.ok(whole.samples > 40, `brookside whole-tile samples ${whole.samples}`);
+  assert.equal(whole.cracks, 0, `brookside whole-tile cracks ${whole.cracks}/${whole.samples}`);
 });
 
 test('hunter map paints uncharted parchment and one ocean, not biome blocks', () => {
@@ -568,6 +583,17 @@ test('cloud shadows drift a few world units per second on ground materials', () 
   assert.ok(changed >= 2, `cloud field should move in 10s (max Δ ${maxDelta.toFixed(3)})`);
   assert.ok(cloudShadeAt(72, 72, 0, 1) <= 1);
   assert.ok(cloudShadeAt(72, 72, 0, 1) >= CLOUD_DRIFT.dark - 0.02);
+  assert.ok(CLOUD_DRIFT.dark >= 0.55 && CLOUD_DRIFT.dark <= 0.65, `blob remaining light ${CLOUD_DRIFT.dark}`);
+  let lit = 0;
+  let n = 0;
+  for (let z = 0; z < 144; z += 2) {
+    for (let x = 0; x < 144; x += 2) {
+      n += 1;
+      if (cloudShadeAt(x, z, 0, 1) > 0.97) lit += 1;
+    }
+  }
+  const frac = lit / n;
+  assert.ok(frac >= 0.38 && frac <= 0.65, `lit fraction ${frac.toFixed(3)} should be ~40-60%`);
 });
 
 test('lagoon south and east shores have water cells next to land for foam', () => {
@@ -596,4 +622,76 @@ test('lagoon south and east shores have water cells next to land for foam', () =
   assert.ok(south.edge > 6, `south shore foam cells ${south.edge}`);
   assert.ok(east.water > 8, `east water cells ${east.water}`);
   assert.ok(east.edge > 6, `east shore foam cells ${east.edge}`);
+});
+
+test('lagoon foam distance is a shoreline band, not all-zero or inverted', () => {
+  const spec = { ...JUNGLE_SPECS.lagoon, ox: 0, oz: 0 };
+  const hOf = (x, z) => jungleFeature(3.1, x, z, spec)?.h ?? 3.1;
+  const isLand = (x, z) => hOf(x, z) >= WATER_Y;
+  const cornerDist = (gx, gz) => {
+    let best = 8;
+    for (let z = gz - 8; z < gz + 8; z++) {
+      for (let x = gx - 8; x < gx + 8; x++) {
+        if (!isLand(x, z)) continue;
+        const dx = gx < x ? x - gx : gx > x + 1 ? gx - (x + 1) : 0;
+        const dz = gz < z ? z - gz : gz > z + 1 ? gz - (z + 1) : 0;
+        best = Math.min(best, Math.hypot(dx, dz));
+        if (best === 0) return 0;
+      }
+    }
+    return best;
+  };
+  let water = 0;
+  let zero = 0;
+  let band = 0;
+  let far = 0;
+  for (let z = 30; z < 80; z++) {
+    for (let x = 30; x < 95; x++) {
+      if (hOf(x, z) >= WATER_Y + 0.02) continue;
+      water += 1;
+      const ds = [cornerDist(x, z), cornerDist(x, z + 1), cornerDist(x + 1, z + 1), cornerDist(x + 1, z)];
+      const mn = Math.min(...ds);
+      const mx = Math.max(...ds);
+      if (mn < 0.05) zero += 1;
+      if (ds.some((d) => d > 0.15 && d < 1.05)) band += 1;
+      if (mx > 1.4) far += 1;
+    }
+  }
+  assert.ok(water > 80, `lagoon water cells ${water}`);
+  assert.ok(zero > 8, `shore verts at dist 0: ${zero}`);
+  assert.ok(band > 10, `foam-band verts ${band}`);
+  assert.ok(far > 20, `interior water must not be dist 0 (got ${far} far cells)`);
+});
+
+test('map south sea and Hellspire charted edges wander instead of boxing', () => {
+  const hell = TILES.find((t) => t.kind === 'hellspire');
+  assert.ok(hell);
+  const o = originOf(hell);
+  const east = [];
+  for (let i = 0; i < 22; i++) {
+    const z = o.z + 8 + i * 6;
+    for (let x = o.x + 40; x < o.x + 220; x += 3) {
+      if (chartedWeight(x, z) > 0.55 && chartedWeight(x + 3, z) < 0.45) {
+        east.push(x);
+        break;
+      }
+    }
+  }
+  const north = [];
+  for (let i = 0; i < 22; i++) {
+    const x = o.x + 8 + i * 6;
+    for (let z = o.z + 40; z > o.z - 80; z -= 3) {
+      if (chartedWeight(x, z) > 0.55 && chartedWeight(x, z - 3) < 0.45) {
+        north.push(z);
+        break;
+      }
+    }
+  }
+  const eastSpan = east.length ? Math.max(...east) - Math.min(...east) : 0;
+  const northSpan = north.length ? Math.max(...north) - Math.min(...north) : 0;
+  assert.ok(east.length >= 6 && eastSpan > 4, `Hellspire east edge wander ${eastSpan} n=${east.length}`);
+  assert.ok(north.length >= 6 && northSpan > 4, `Hellspire north edge wander ${northSpan} n=${north.length}`);
+  const play = src('src/world/playmap.js');
+  assert.match(play, /outerRimFade/);
+  assert.match(play, /FRAME \+ 22/);
 });

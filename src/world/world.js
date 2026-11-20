@@ -588,19 +588,19 @@ export class World {
           float mid = vn(p * 0.16 + vec2(uTime * 0.018, -uTime * 0.012));
           float fine = vn(p * 0.4 + vec2(-uTime * 0.02, uTime * 0.016));
           float n = macro * 0.45 + mid * 0.35 + fine * 0.2;
-          float depthK = smoothstep(0.06, 1.35, vDepth);
+          float depthK = smoothstep(0.08, 0.72, vDepth);
           vec3 col = mix(uShallow, uDeep, depthK);
-          col = mix(col, uDeep * 0.62, smoothstep(0.55, 1.0, macro) * 0.35 * depthK);
+          col = mix(col, uDeep * 0.72, smoothstep(0.28, 1.0, macro) * 0.45 * depthK);
           float sparkle = smoothstep(0.97, 1.0, vn(p * 1.1 + uTime * 0.06)) * 0.06 * (1.0 - depthK);
           col += uSky * sparkle;
-          float wobble = 0.12 * sin(uTime * 1.55 + p.x * 2.7 + p.z * 1.9);
-          float grain = vn(p * 0.58 + vec2(uTime * 0.07, -uTime * 0.05));
-          float d = vShore + wobble * 0.14 + (grain - 0.5) * 0.18;
-          float foam = smoothstep(0.36, 0.05, d) * (0.7 + 0.3 * sin(uTime * 2.05 + p.z * 3.2 + grain * 5.0));
+          float wobble = 0.10 * sin(uTime * 1.65 + p.x * 2.1 + p.z * 1.7);
+          float grain = vn(p * 0.72 + vec2(uTime * 0.08, -uTime * 0.06));
+          float d = vShore + wobble * 0.10 + (grain - 0.5) * 0.12;
+          float foam = smoothstep(0.95, 0.18, d) * (0.85 + 0.15 * sin(uTime * 1.9 + p.z * 2.6 + grain * 4.0));
           col = mix(col, uFoam, foam);
           col *= uLight;
-          col *= cloudShade(p, uCloudTime, uCloudAmt);
-          float alpha = mix(0.84, 0.94, depthK);
+          col *= mix(1.0, cloudShade(p, uCloudTime, uCloudAmt), 0.12);
+          float alpha = mix(0.93, 0.99, depthK);
           alpha = mix(alpha, 1.0, foam);
           gl_FragColor = vec4(col, alpha);
           #include <tonemapping_fragment>
@@ -619,19 +619,17 @@ export class World {
       return land.data.H[z * W + x];
     };
     const depthAt = (land, x, z) => Math.max(0, WATER_Y - hAt(land, x, z));
-    const cellLand = (land, xx, zz) => hAt(land, xx, zz) >= WATER_Y - 0.02;
-    const cornerLand = (land, gx, gz) => cellLand(land, gx, gz) || cellLand(land, gx - 1, gz) || cellLand(land, gx, gz - 1) || cellLand(land, gx - 1, gz - 1);
+    const cellLand = (land, xx, zz) => hAt(land, xx, zz) >= WATER_Y;
     const cornerDist = (land, gx, gz) => {
-      if (cornerLand(land, gx, gz)) return 0;
-      let best = 5;
-      for (let r = 1; r <= 4; r++) {
-        for (let dz = -r; dz <= r; dz++) {
-          for (let dx = -r; dx <= r; dx++) {
-            if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
-            if (cornerLand(land, gx + dx, gz + dz)) best = Math.min(best, Math.hypot(dx, dz));
-          }
+      let best = 8;
+      for (let z = gz - 8; z < gz + 8; z++) {
+        for (let x = gx - 8; x < gx + 8; x++) {
+          if (!cellLand(land, x, z)) continue;
+          const dx = gx < x ? x - gx : gx > x + 1 ? gx - (x + 1) : 0;
+          const dz = gz < z ? z - gz : gz > z + 1 ? gz - (z + 1) : 0;
+          best = Math.min(best, Math.hypot(dx, dz));
+          if (best === 0) return 0;
         }
-        if (best < 5) break;
       }
       return best;
     };

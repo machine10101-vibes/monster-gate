@@ -159,6 +159,9 @@ test('every built tile has a debug tp key', () => {
   assert.equal(parseCloudShadowFlag('?debug=1'), false);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=1'), false);
   assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong'), true);
+  assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong&mmo=1'), false);
+  assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong', { mmo: true }), false);
+  assert.equal(parseCloudShadowFlag('?debug=1&cloudshadow=strong', { worldView: true }), false);
   const lagoon = resolveSpot('lagoon');
   assert.ok(lagoon.z >= 66 && lagoon.z <= 78, 'lagoon spawn is on the south beach of the pool');
   assert.ok(lagoon.x < -218, 'lagoon spawn sits on the south sand, not the east grass road');

@@ -194,9 +194,11 @@ export function parseMapLabelsFlag(search = '') {
   return paramsOf(search).get('maplabels') !== '0';
 }
 
-/** `?debug=1&cloudshadow=strong` forces a 0.35 ground multiply so testers can see the shader. */
-export function parseCloudShadowFlag(search = '') {
+/** `?debug=1&cloudshadow=strong` deepens blob contrast. Inert with `mmo=1` or an online session. */
+export function parseCloudShadowFlag(search = '', game) {
   const q = paramsOf(search);
+  if (q.get('mmo') === '1') return false;
+  if (game?.mmo || game?.worldView) return false;
   return q.get('debug') === '1' && q.get('cloudshadow') === 'strong';
 }
 

@@ -502,6 +502,8 @@ const PLAYMAP_PIN_NUDGES = {
   Brookside: [-2.2, 0.3],
   'The Lagoon': [1.4, 1.8],
   'Silverrun Canopy': [-1.6, -1.8],
+  Dawnspire: [1.8, -0.4],
+  Bramblewood: [-2.6, 0.6],
 };
 
 /**

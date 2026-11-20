@@ -481,7 +481,7 @@ class Game {
     if (this.world.rift) this.scene.add(this.world.rift.group);
     if (this.world.colosseum) this.scene.add(this.world.colosseum.group);
     this.sky = new Sky(this.scene, this.quality);
-    this.sky.cloudShadowStrong = parseCloudShadowFlag(location.search);
+    this.sky.cloudShadowStrong = parseCloudShadowFlag(location.search, this);
     this.snowfall = new Snowfall(this.scene);
     this.ashfall = new Ashfall(this.scene);
     this.chill = 0;
@@ -572,6 +572,10 @@ class Game {
       this.enterImmersive({ gesture: false, lock: false });
     }
     this.started = true;
+    if (typeof window !== 'undefined') {
+      window.__mgHuntStarted = true;
+      if (window.__mgPendingBuild) this.offerBuildReload(window.__mgPendingBuild);
+    }
     this.ensureWorldConnection?.();
     // Keep the one-shot splash marker for this tab so auth/session reloads do not replay it.
     if (this.wakeWorld) {
@@ -1478,6 +1482,20 @@ class Game {
     document.getElementById('wallet-unlinked-email')?.focus();
   }
 
+  offerBuildReload(build) {
+    const tag = String(build || '').trim();
+    if (!tag) return;
+    const btn = document.getElementById('build-reload');
+    if (!btn) return;
+    btn.classList.remove('hidden');
+    btn.onclick = () => {
+      this.captureHunter();
+      this.progress?.save?.(false);
+      if (typeof window.__mgApplyBuildReload === 'function') window.__mgApplyBuildReload(tag);
+      else location.reload();
+    };
+  }
+
   captureHunter() {
     if (!this.started || !this.wallet || !this.player) return;
     const p = this.player;
@@ -1549,6 +1567,8 @@ class Game {
     });
     if (typeof window !== 'undefined') {
       window.__mgShowWorldPicker = () => this.showWorldPicker({ force: true });
+      window.__mgOfferBuildReload = (build) => this.offerBuildReload(build);
+      if (window.__mgPendingBuild) this.offerBuildReload(window.__mgPendingBuild);
     }
     document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
     document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
@@ -4114,6 +4134,7 @@ class Game {
     const P = this.player;
     this.sky.chill = this.chill;
     this.sky.ember = this.ember;
+    if (this.mmo || this.worldView) this.sky.cloudShadowStrong = false;
     this.sky.update(dt, t, this.camera.position.clone().lerp(this.cam.look, 0.5), this.camera);
     this.syncViewDistance();
     if (!this.campParked) {

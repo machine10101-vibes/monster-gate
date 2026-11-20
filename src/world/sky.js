@@ -246,13 +246,13 @@ export class Sky {
     if (this.cloudShadowStrong) {
       cloudShadowUniforms.uCloudAmt.value = 1;
       cloudShadowUniforms.uCloudDark.value = 0.35;
-      cloudShadowUniforms.uCloudForce.value = 1;
+      cloudShadowUniforms.uCloudForce.value = 1; // deeper, tighter blobs; never a flat multiply
     } else if (!this.indoors) {
       cloudShadowUniforms.uCloudAmt.value = (1 - night) * 1.0 + night * 0.22;
-      cloudShadowUniforms.uCloudDark.value = 0.42;
+      cloudShadowUniforms.uCloudDark.value = 0.58;
       cloudShadowUniforms.uCloudForce.value = 0;
     } else {
-      cloudShadowUniforms.uCloudDark.value = 0.42;
+      cloudShadowUniforms.uCloudDark.value = 0.58;
       cloudShadowUniforms.uCloudForce.value = 0;
     }
     this.state = { night, sunDir, lightDir, ...s };

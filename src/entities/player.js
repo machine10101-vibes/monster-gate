@@ -41,7 +41,7 @@ export class Player {
         transparent: true,
         opacity: 0.8,
         depthWrite: false,
-        depthTest: true,
+        depthTest: false,
         polygonOffset: true,
         polygonOffsetFactor: -2,
         polygonOffsetUnits: -2,
@@ -233,14 +233,10 @@ export class Player {
     this.obj.position.copy(this.pos);
     this.obj.rotation.y = this.yaw;
     if (this.groundRing) {
-      const wet = this.pos.y < WATER_Y + 0.4;
-      const mat = this.groundRing.material;
-      if (mat.depthTest === wet) {
-        mat.depthTest = !wet;
-        mat.needsUpdate = true;
-      }
-      mat.opacity = wet ? 0.88 : 0.8;
-      const y = wet ? WATER_Y + 0.08 : this.pos.y + 0.08;
+      const ground = this.game.world?.heightAt?.(this.pos.x, this.pos.z);
+      const terrainY = Number.isFinite(ground) ? ground : this.pos.y;
+      const y = Math.max(terrainY, this.pos.y, this.wading ? WATER_Y : -Infinity) + 0.12;
+      this.groundRing.material.opacity = 0.8;
       this.groundRing.position.set(this.pos.x, y, this.pos.z);
     }
   }
