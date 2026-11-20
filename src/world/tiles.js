@@ -65,6 +65,7 @@ const RING = {
   '4,8': ['greenbowl', 'South of Glassroad. The Oasis is the living heart of this desert bowl: palms, reeds and still water, drying to dune and then to the southern sea.'],
   '3,6': ['longacre', 'Southwest of Oakhollow, west of Southford. Mara\'s Acre and Wend Farm sit on the long fields, with a lane from the vale.'],
   '5,6': ['hayfield', 'Southeast of Oakhollow, east of Southford. Hay meadows and a lane from the vale.'],
+  '5,7': ['silverrunWest', 'Reedford Reach. A wooded river bend with mossy banks, old-growth trees and a narrow trail beside the water.'],
   '6,7': ['silverrunNorth', 'The upper Silverrun forest. Ancient trees, thick fern beds and a river that bends west through the woodland.'],
   '7,7': ['silverrunEast', 'The Elderwood. A deep, lush forest with towering old-growth trees, mossy clearings and winding woodland paths.'],
   '6,8': ['silverrunRiver', 'Silverrun Crossing. The river pours in from the southern sea beneath a timber bridge, while a forest trail climbs toward the mountain ridge.'],
@@ -100,6 +101,7 @@ function buildTiles() {
       const southford = tz === 6 && tx === 4;
       const ring = RING[tx + ',' + tz];
       const gilantre = ring && String(ring[0]).startsWith('gilantre');
+      const silverrunWest = ring && ring[0] === 'silverrunWest';
       const built = code === 'O' || southford || !!ring;
       tiles.push({
         id: `t${tx}-${tz}`,
@@ -107,9 +109,9 @@ function buildTiles() {
         tz,
         n: tz * GRID + tx + 1,
         code,
-        biome: gilantre ? 'town' : biome.id,
-        biomeName: gilantre ? 'Town' : biome.name,
-        color: gilantre ? '#e6c36a' : biome.color,
+        biome: gilantre ? 'town' : silverrunWest ? 'forest' : biome.id,
+        biomeName: gilantre ? 'Town' : silverrunWest ? 'Forest' : biome.name,
+        color: gilantre ? '#e6c36a' : silverrunWest ? BIOMES.F.color : biome.color,
         name: NAMES[tz][tx],
         blurb: code === 'O'
           ? 'The starter tile. Oakhollow, the fairy forest, Greyrock Pit, Mirrormere and the farm all sit on this one tile. Passes leave north, west, east and south into the neighboring tiles.'
