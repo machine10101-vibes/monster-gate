@@ -165,7 +165,7 @@
   flex: 0 0 auto; min-height: 44px; padding: 10px 14px;
   border: 1px solid #f1c57c; border-radius: 10px;
   color: #281a13; background: linear-gradient(145deg,#ffe2a7,#d18b43);
-  font: 800 11px inherit; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 800; cursor: pointer;
 }
 .mg-gatepass-redeem:disabled { opacity: .55; cursor: wait; }
 .mg-gatepass-code-feedback { margin: 8px 0 0; color: #b8c8c1; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
