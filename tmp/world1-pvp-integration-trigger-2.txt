@@ -1,0 +1,1 @@
+Trigger guarded integration after narrowing to the server-side PvP feature.
