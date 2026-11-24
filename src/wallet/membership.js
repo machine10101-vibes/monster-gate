@@ -185,6 +185,8 @@ export async function ensureMembership(session, game) {
     watch.append(watchIcon, watchCopy);
 
     const actions = node('div', 'mg-gatepass-actions');
+    const payNow = node('button', 'mg-gatepass-pay', 'Pay with Klever Wallet');
+    payNow.type = 'button';
     const checkNow = node('button', 'mg-gatepass-check', 'Check for payment now');
     checkNow.type = 'button';
     const refresh = node('button', 'mg-gatepass-refresh', 'Refresh quote');
