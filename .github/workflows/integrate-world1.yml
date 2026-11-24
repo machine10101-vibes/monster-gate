@@ -34,23 +34,65 @@ jobs:
           git fetch origin mg-servers/world-1-live
           git merge --no-edit -X ours -m "Integrate World 1 server branch into main" FETCH_HEAD
           git checkout "$MAIN_HEAD" -- src/ tests/ server/auth.js server/index.js server/social.js server/social-store.js server/social-world.js server/store.js
-      - name: Ensure the PvP runtime is initialized after social
+      - name: Wire the Colosseum server into the current World 1 server
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path("server/world.js")
-          s = p.read_text()
+
+          def replace_once(path, needle, replacement):
+              p = Path(path)
+              s = p.read_text()
+              if replacement in s:
+                  return
+              if needle not in s:
+                  raise SystemExit(f"Could not find expected insertion point in {path}: {needle[:90]!r}")
+              p.write_text(s.replace(needle, replacement, 1))
+
+          world = Path("server/world.js")
+          s = world.read_text()
           marker = "import { createCombatLoot } from './combat-loot.js';"
           if "import { createPvpRuntime } from './pvp.js';" not in s:
-              s = s.replace(marker, marker + "\nimport { createPvpRuntime } from './pvp.js';")
+              if marker not in s:
+                  raise SystemExit("Could not find combat-loot import")
+              s = s.replace(marker, marker + "\nimport { createPvpRuntime } from './pvp.js';", 1)
           anchor = "    });\n  }\n\n  async idle()"
           if "this.pvp = opts.pvp || createPvpRuntime(this);" not in s:
               if anchor not in s:
-                  raise SystemExit("Could not locate the end of the World constructor")
+                  raise SystemExit("Could not find World constructor end")
               s = s.replace(anchor, "    });\n    this.pvp = opts.pvp || createPvpRuntime(this);\n  }\n\n  async idle()", 1)
-          p.write_text(s)
+          world.write_text(s)
+
+          dispatch = "      else if (msg.type === 'rift_enter') this.enterRift(session).catch((err) => this.actionError(session, err));"
+          pvp_dispatch = """      else if (msg.type === 'pvp_queue') this.pvp.enqueue(session, String(msg.mode || '1v1'));
+                else if (msg.type === 'pvp_confirm') this.pvp.confirm(session, msg.proposal_id, msg.accept === true);
+                else if (msg.type === 'pvp_cancel') this.pvp.cancel(session);
+                else if (msg.type === 'pvp_attack') this.pvp.attack(session, msg.target_id);
+                else if (msg.type === 'pvp_roll') this.pvp.roll(session);
+                else if (msg.type === 'pvp_leave') this.pvp.leave(session);
+          """ + dispatch
+          replace_once("server/world.js", dispatch, pvp_dispatch)
+          replace_once("server/world.js", "      this.social.onLeave(session);", "      this.social.onLeave(session);\n      this.pvp?.disconnect?.(session);")
+
+          protocol = Path("server/protocol.js")
+          s = protocol.read_text()
+          s = s.replace("    hp: p.hp,\n    ...extra,", "    hp: p.hp,\n    pvp_team: p.pvpTeam ?? null,\n    pvp_dead: !!p.pvpDead,\n    ...extra,")
+          s = s.replace("    hp: p.hp,\n  };\n}\n\nconst POSE_KEYS", "    hp: p.hp,\n    pvp_team: p.pvpTeam ?? null,\n    pvp_dead: !!p.pvpDead,\n  };\n}\n\nconst POSE_KEYS")
+          s = s.replace("'zone', 'hp'];", "'zone', 'hp', 'pvp_team', 'pvp_dead'];")
+          needle = "export function inAoi(observer, other, radius = AOI_RADIUS) {\n  if (!observer || !other) return false;"
+          arena = """export function inAoi(observer, other, radius = AOI_RADIUS) {
+            if (!observer || !other) return false;
+            const arenaA = String(observer.zone || '').startsWith('colosseum:');
+            const arenaB = String(other.zone || '').startsWith('colosseum:');
+            if (arenaA || arenaB) {
+              if (!arenaA || !arenaB || observer.zone !== other.zone) return false;
+            }"""
+          if "const arenaA = String(observer.zone" not in s:
+              if needle not in s:
+                  raise SystemExit("Could not find inAoi insertion point")
+              s = s.replace(needle, arena, 1)
+          protocol.write_text(s)
           PY
-          git add server/world.js
+          git add server/world.js server/protocol.js
           git commit -m "Verified World 1 PvP integration"
       - name: Install game dependencies
         run: npm ci
