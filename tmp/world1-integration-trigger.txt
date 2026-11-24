@@ -1,1 +1,0 @@
-Temporary trigger for the guarded World 1 merge workflow. This file will be removed after integration.
