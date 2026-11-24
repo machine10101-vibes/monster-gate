@@ -601,9 +601,25 @@ class Game {
     requestAnimationFrame(this.loop);
   }
 
-  start() {
+  async start() {
     if (this.started) return;
     if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
+    if (!this.membershipGatePassed) {
+      if (this.membershipChecking) return;
+      this.membershipChecking = true;
+      try {
+        const account = readAccount();
+        if (this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken) {
+          this.openSocialSignIn();
+          return;
+        }
+        const allowed = await ensureMembership(account, this);
+        if (!allowed || this.started) return;
+        this.membershipGatePassed = true;
+      } finally {
+        this.membershipChecking = false;
+      }
+    }
     if (this.wallet.kind === 'guest') this.cloudState = 'off';
     document.body.classList.add('hunting');
     if (this.input.touch && (this.isLandscape() || isTablet())) {
@@ -1191,6 +1207,7 @@ class Game {
       }
       const allowed = await ensureMembership(account, this);
       if (!allowed || this.started || !this.roster?.get(char.id)) return;
+      this.membershipGatePassed = true;
     } finally {
       this.membershipChecking = false;
     }
