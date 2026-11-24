@@ -2,7 +2,9 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { bech32 } from "bech32";
 const RECEIVER="klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv";
-const PRICE_URLS=["https://api.exchange.bitcoin.me/v1/market/ticker?symbol=KLV-USDT","https://api.exchange.bitcoin.me/v1/market/tickers"];
+const SWOPUS_API="https://api4.swopus.com";
+const KLV_ASSET="KLV";
+const USDT_ASSET="USDT-23V8";
 const CHAIN_API="https://api.mainnet.klever.org";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH=/^[0-9a-f]{64}$/i, ADDR=/^klv1[02-9ac-hj-np-z]{58}$/;
@@ -28,37 +30,87 @@ function epochMillis(value:any):number|null{
  if(/^\d+(?:\.\d+)?$/.test(text)){const n=Number(text);return Number.isFinite(n)?(n<1e12?n*1000:n):null}
  const parsed=Date.parse(text);return Number.isFinite(parsed)?parsed:null;
 }
-async function ticker(){
- if(priceCache&&Date.now()-priceCache.at<30000&&Date.now()-Date.parse(priceCache.sourceTime)<600000)return priceCache;
- for(const url of PRICE_URLS){
-  const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
-  try{
-   const r=await fetch(url,{signal:c.signal,headers:{accept:"application/json","cache-control":"no-cache"}});
-   if(!r.ok)continue;
-   const j=await r.json(),rows=Array.isArray(j?.data)?j.data:[j?.data];
-   const row=rows.find((item:any)=>item?.symbol==="KLV-USDT");
-   const p=Number(row?.price);
-   if(j?.success!==true||!row||!Number.isFinite(p)||p<=0)continue;
-   const sourceMillis=epochMillis(row.time??row.timestamp??row.updatedAt??row.updated_at)??epochMillis(r.headers.get("date"));
-   if(!sourceMillis||sourceMillis>Date.now()+120000||Date.now()-sourceMillis>600000)continue;
-   return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),source:"Bitcoin.me",at:Date.now()};
-  }catch{
-   /* Try the alternate documented ticker endpoint. */
-  }finally{clearTimeout(t)}
+function collection(value:any):any[]{
+ const root=value?.data??value;
+ if(Array.isArray(root))return root;
+ for(const key of ["pools","items","results","reserves"])if(Array.isArray(root?.[key]))return root[key];
+ return [];
+}
+function assetId(value:any):string{
+ if(typeof value==="string")return value;
+ return String(value?.asset_id??value?.assetId??value?.id??value?.ticker??value?.symbol??"");
+}
+function numericField(value:any,...keys:string[]):number|null{
+ for(const key of keys){
+  const n=Number(value?.[key]);
+  if(Number.isFinite(n)&&n>0)return n;
  }
- // Bitcoin.me can have a stale last-trade timestamp when its KLV market is quiet.
- // MEXC's public recent-trades endpoint supplies both the KLV/USDT price and trade time.
- const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);
+ return null;
+}
+function poolPrice(pool:any,reserve:any):number|null{
+ const base=assetId(pool?.base_asset_id??pool?.baseAssetId??pool?.token0??pool?.base_token);
+ const quote=assetId(pool?.quote_asset_id??pool?.quoteAssetId??pool?.token1??pool?.quote_token);
+ const baseIsKlv=base===KLV_ASSET&&quote===USDT_ASSET;
+ const reverse=base===USDT_ASSET&&quote===KLV_ASSET;
+ if(!baseIsKlv&&!reverse)return null;
+ if(pool?.deprecated===true||pool?.stale===true||reserve?.stale===true)return null;
+ const lag=Number(reserve?.indexer_lag_blocks??pool?.indexer_lag_blocks??0);
+ if(Number.isFinite(lag)&&lag>20)return null;
+ const r0=numericField(reserve,"reserve0","reserve_0","reserve0_scaled")??numericField(pool,"reserve0","reserve_0","reserve0_scaled");
+ const r1=numericField(reserve,"reserve1","reserve_1","reserve1_scaled")??numericField(pool,"reserve1","reserve_1","reserve1_scaled");
+ let ratio:number|null=null;
+ if(r0&&r1)ratio=r1/r0;
+ else{
+  const raw0=numericField(reserve,"reserve0_raw","reserve_0_raw")??numericField(pool,"reserve0_raw","reserve_0_raw");
+  const raw1=numericField(reserve,"reserve1_raw","reserve_1_raw")??numericField(pool,"reserve1_raw","reserve_1_raw");
+  const d0=Number(pool?.base_decimals??pool?.token0_decimals??pool?.token0?.decimals??6);
+  const d1=Number(pool?.quote_decimals??pool?.token1_decimals??pool?.token1?.decimals??6);
+  if(raw0&&raw1&&Number.isInteger(d0)&&Number.isInteger(d1)){
+   const scaled0=raw0/10**d0,scaled1=raw1/10**d1;
+   ratio=scaled1/scaled0;
+  }
+ }
+ if(!Number.isFinite(ratio)||!ratio||ratio<=0)return null;
+ const price=baseIsKlv?ratio:1/ratio;
+ return Number.isFinite(price)&&price>0?price:null;
+}
+async function ticker(){
+ if(priceCache&&Date.now()-priceCache.at<10000)return priceCache;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
  try{
-  const r=await fetch("https://api.mexc.com/api/v3/trades?symbol=KLVUSDT&limit=1",{
-   signal:c.signal,headers:{accept:"application/json","cache-control":"no-cache"},
+  const response=await fetch(SWOPUS_API+"/api/public/pools",{
+   signal:controller.signal,headers:{accept:"application/json","cache-control":"no-cache"},
   });
-  if(!r.ok)return null;
-  const rows=await r.json(),trade=Array.isArray(rows)?rows[0]:null;
-  const p=Number(trade?.price),sourceMillis=epochMillis(trade?.time);
-  if(!Number.isFinite(p)||p<=0||!sourceMillis||sourceMillis>Date.now()+120000||Date.now()-sourceMillis>600000)return null;
-  return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),source:"MEXC",at:Date.now()};
- }catch{return null}finally{clearTimeout(timer)}
+  if(!response.ok)throw new Error("Swopus pool market data is unavailable.");
+  const payload=await response.json();
+  const pools=collection(payload);
+  const pool=pools.find((item:any)=>{
+   const a=assetId(item?.base_asset_id??item?.baseAssetId??item?.token0??item?.base_token);
+   const b=assetId(item?.quote_asset_id??item?.quoteAssetId??item?.token1??item?.quote_token);
+   return(a===KLV_ASSET&&b===USDT_ASSET)||(a===USDT_ASSET&&b===KLV_ASSET);
+  });
+  if(!pool)throw new Error("Swopus does not currently list a KLV/USDT pool.");
+  const pairId=pool?.pair_id??pool?.pairId??pool?.id;
+  if(pairId===undefined||pairId===null)throw new Error("Swopus KLV/USDT pool identifier is missing.");
+  const reservesController=new AbortController(),reservesTimer=setTimeout(()=>reservesController.abort(),10000);
+  try{
+   const reservesResponse=await fetch(SWOPUS_API+"/api/pools/reserves?pair_ids="+encodeURIComponent(String(pairId)),{
+    signal:reservesController.signal,headers:{accept:"application/json","cache-control":"no-cache"},
+   });
+   if(!reservesResponse.ok)throw new Error("Swopus live KLV/USDT reserves are unavailable.");
+   const reservesPayload=await reservesResponse.json();
+   const reserveRows=collection(reservesPayload);
+   const reserve=reserveRows.find((item:any)=>String(item?.pair_id??item?.pairId??item?.id)===String(pairId))??reserveRows[0];
+   if(!reserve)throw new Error("Swopus has not returned live KLV/USDT reserves.");
+   const price=poolPrice(pool,reserve);
+   if(!price)throw new Error("Swopus KLV/USDT pool data is stale or incomplete.");
+   const sourceTime=new Date().toISOString();
+   return priceCache={price,sourceTime,source:"Swopus",pairId:String(pairId),at:Date.now()};
+  }finally{clearTimeout(reservesTimer)}
+ }catch(error){
+  console.error("Swopus KLV/USDT quote failed:",error);
+  return null;
+ }finally{clearTimeout(timer)}
 }
 
 function b64(s:string){try{const b=atob(s);return Uint8Array.from(b,c=>c.charCodeAt(0))}catch{return new Uint8Array()}}
