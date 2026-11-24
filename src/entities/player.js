@@ -7,6 +7,7 @@ import { WeaponTrail } from '../engine/trail.js';
 import { SpringSet } from '../engine/motion.js';
 import { skillMods } from '../systems/skillcast.js';
 import { SKILLFX, meleeSwing } from '../systems/skillfx.js';
+import { weaponFamily, isTwoHandedFamily } from './weaponCombat.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -472,7 +473,7 @@ export class Player {
       this.stamDelay = 0.7;
       const swing = skillMods(this.game).speed ?? 1;
       this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
-      this.game.audio.swing();
+      this.game.audio.swing(weaponFamily(item, item.held || this.heldKind));
       return true;
     }
     if (this.stamina < 3) return false;
@@ -484,7 +485,7 @@ export class Player {
     this.stamDelay = 0.7;
     const swing = skillMods(this.game).speed ?? 1;
     this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
-    this.game.audio.swing();
+    this.game.audio.swing(weaponFamily(item, item.held || this.heldKind));
     return true;
   }
 
@@ -793,7 +794,7 @@ export class Player {
         g.shake(this.combo === 2 ? 0.3 : 0.18);
         g.punch(this.combo === 2 ? 0.34 : 0.16);
         this.fury = Math.min(100, this.fury + Math.round(7 * mods.furyGain) * hits);
-        g.audio.hit();
+        g.audio.hit(weaponFamily(it, it.held || this.heldKind));
       }
     } else if (it.kind === 'ranged') {
       const focus = it.style === 'staff' || it.style === 'wand' || it.style === 'tome';
@@ -810,11 +811,11 @@ export class Player {
         const sp = it.proj === 'gloom' ? 12 : it.proj === 'bolt' ? 16 : 18;
         const lava = it.proj === 'lavabolt';
         g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * (lava ? sp * 0.72 : sp), vz: f.z * (lava ? sp * 0.72 : sp), vy: lava ? 4.2 : 0, gravity: lava ? 14 : 0, dmg, life: it.proj === 'gloom' ? 2.6 : lava ? 1.8 : 1.5, r: lava ? 0.58 : 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
-        g.audio.tone(it.proj === 'gloom' ? 260 : focus ? 720 : 620, 0.14, 'sawtooth', 0.08, -200);
+        g.audio.release(weaponFamily(it, it.held || this.heldKind));
       } else {
         if (!g.progress.drawArrow()) return;
         g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * (it.style === 'crossbow' ? 26 : 20), vz: f.z * (it.style === 'crossbow' ? 26 : 20), dmg, life: 1.3, r: 0.35, crit: aimed, pierce });
-        g.audio.tone(it.style === 'crossbow' ? 420 : 900, 0.08, 'triangle', 0.1, -500);
+        g.audio.release(weaponFamily(it, it.held || this.heldKind));
       }
     } else if (it.kind === 'throw') {
       if (it.count <= 0) return;
@@ -954,7 +955,58 @@ export class Player {
         const hitT = it.hit / it.dur;
         const dir = this.combo === 1 ? -1 : 1;
         rate = 30;
+        const family = weaponFamily(it, it.held || this.heldKind);
         if (it.kind === 'melee') {
+          if (family === 'heavy' || family === 'spear' || family === 'scythe') {
+            const q = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : ease((tt - hitT) / Math.max(0.05, 1 - hitT));
+            const pre = tt < hitT;
+            const comboSide = this.combo === 1 ? -1 : 1;
+            armR = family === 'spear' ? lerp(-1.1, pre ? -1.75 : -0.35, q) : lerp(-1.2, pre ? -2.95 : -0.45, q);
+            armRz = family === 'spear' ? 0.12 : 0.28 * comboSide;
+            armL = family === 'spear' ? lerp(-0.8, pre ? -1.45 : -0.75, q) : lerp(-0.9, pre ? -2.05 : -1.0, q);
+            armLz = family === 'spear' ? -0.12 : -0.2 * comboSide;
+            const wind = pre ? q : 1 - q;
+            if (family === 'spear') {
+              // A polearm is driven from the rear hand with the lead hand guiding the shaft.
+              armR = lerp(-1.05, pre ? -2.0 : -0.25, q);
+              armL = lerp(-0.85, pre ? -1.35 : -0.65, q);
+              torsoYaw = lerp(-0.18, pre ? -0.42 : 0.22, q);
+              lean = pre ? -0.08 * wind : 0.13 * wind;
+              legL = lerp(0.12, pre ? 0.35 : -0.05, q);
+              legR = lerp(-0.08, pre ? -0.18 : -0.3, q);
+            } else if (family === 'scythe') {
+              // Long haft, two hands, and a broad hip-and-shoulder sweep.
+              torsoYaw = lerp(0, pre ? 0.9 * comboSide : -1.05 * comboSide, q);
+              lean = pre ? -0.16 * wind : 0.22 * wind;
+              armR = lerp(-1.25, pre ? -2.7 : -0.45, q);
+              armL = lerp(-0.95, pre ? -2.15 : -0.55, q);
+              legL = lerp(0.2, pre ? 0.5 : 0.72, q);
+              legR = lerp(-0.1, pre ? -0.25 : -0.55, q);
+            } else {
+              // Heavy heads travel overhead; hips and knees load before the downswing.
+              torsoYaw = lerp(0, pre ? 0.25 * comboSide : -0.12 * comboSide, q);
+              lean = pre ? -0.24 * wind : 0.32 * wind;
+              crouch = pre ? 0.08 * q : 0.12 * wind;
+              armR = lerp(-1.15, pre ? -3.05 : -0.25, q);
+              armL = lerp(-0.9, pre ? -2.45 : -0.65, q);
+              armRz = lerp(0, pre ? 0.2 : -0.08, q);
+              legL = lerp(0.1, pre ? 0.48 : 0.85, q);
+              legR = lerp(-0.08, pre ? -0.3 : -0.72, q);
+            }
+            tilt = lerp(0, (pre ? -0.06 : 0.1) * comboSide, q);
+          } else if (family === 'dual') {
+            // Alternating hand cuts; the off-hand follows the combo rather than hanging idle.
+            const side = this.combo === 1 ? -1 : 1;
+            const p = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : 1 - ease((tt - hitT) / Math.max(0.05, 1 - hitT));
+            armR = lerp(-0.8, -2.25, p);
+            armL = lerp(-0.65, -2.1, p);
+            armRz = 0.48 * side * p;
+            armLz = -0.48 * side * p;
+            torsoYaw = 0.28 * side * p;
+            lean = -0.08 * p;
+            legL = lerp(legL, 0.28 * p, p);
+            legR = lerp(legR, -0.18 * p, p);
+          } else {
           const over = this.combo === 2;
           if (tt < hitT) {
             const q = tt / hitT;
@@ -999,17 +1051,42 @@ export class Player {
           legExtraR = 0;
           liftL = 0;
           liftR = 0;
+          }
         } else if (it.kind === 'ranged') {
-          const p = tt < 0.6 ? ease(tt / 0.6) : 1 - ease((tt - 0.6) / 0.4);
-          const rel = tt > 0.6 ? Math.max(0, 1 - (tt - 0.6) / 0.12) : 0;
-          armR = lerp(-0.4, -1.5, p);
-          armL = lerp(0, -1.5, p);
-          torsoYaw = -0.4 * p;
-          lean = lerp(0, -0.06, p) - rel * 0.1;
-          crouch = 0.03 * p;
-          legL = lerp(legL, 0.35, p);
-          legR = lerp(legR, -0.35, p);
-          headPitch = -0.05 * p;
+          const p = tt < 0.68 ? ease(tt / 0.68) : 1 - ease((tt - 0.68) / 0.32);
+          const rel = tt > 0.68 ? Math.max(0, 1 - (tt - 0.68) / 0.14) : 0;
+          if (family === 'bow') {
+            // Bow arm points at the target; draw hand travels back to the cheek.
+            armR = lerp(-0.35, -1.72, p);
+            armL = lerp(-0.1, -1.55, p);
+            armRz = -0.16 * p;
+            armLz = 0.12 * p;
+            torsoYaw = -0.34 * p;
+            lean = -0.04 * p - rel * 0.06;
+            eR = 0.18 + 0.95 * p;
+          } else if (family === 'crossbow') {
+            // Stock braced at the shoulder; lead hand supports the fore-end.
+            armR = lerp(-0.5, -1.42, p);
+            armL = lerp(-0.15, -1.2, p);
+            armRz = -0.06 * p;
+            armLz = 0.08 * p;
+            torsoYaw = -0.18 * p;
+            lean = -0.08 * p - rel * 0.04;
+            eR = 0.2 + 0.32 * p;
+            eL = 0.22 + 0.28 * p;
+          } else {
+            // Focus weapons rise into a controlled casting line rather than mimicking a bow draw.
+            armR = lerp(-0.35, -1.85, p);
+            armL = lerp(0, -1.05, p);
+            armRz = -0.12 * p;
+            torsoYaw = -0.12 * p;
+            lean = -0.08 * p;
+            headPitch = -0.12 * p;
+          }
+          crouch = 0.025 * p;
+          legL = lerp(legL, 0.2, p);
+          legR = lerp(legR, -0.18, p);
+          headPitch += -0.04 * p;
         } else {
           const p = tt < hitT / it.dur ? ease(tt / (hitT / it.dur)) : 1;
           armR = tt < 0.5 ? lerp(-0.6, -2.4, p) : lerp(-2.4, -0.4, ease((tt - 0.5) / 0.5));
