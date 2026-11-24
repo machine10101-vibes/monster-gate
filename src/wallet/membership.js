@@ -89,7 +89,7 @@ export async function ensureMembership(session, game) {
     const eyebrow = node('p', 'mg-membership-eyebrow', 'MONSTER GATE MEMBERSHIP');
     const title = node('h2', '', 'The Gate Pass');
     title.id = 'mg-membership-title';
-    const intro = node('p', 'mg-membership-intro', 'A membership gives this account 30 days of access to the world.');
+    const intro = node('p', 'mg-membership-intro', 'A membership gives this account 30 days of access to the world. Renewals are manual; the wallet is never charged automatically.');
     const price = node('div', 'mg-membership-price', 'Loading live KLV price…');
     const details = node('p', 'mg-membership-details', 'The KLV amount is calculated from the live KLV/USDT ticker on Bitcoin.me. USDT is used as the USD reference.');
     const addressLabel = node('label', 'mg-membership-label', 'Send KLV to this address');
@@ -112,7 +112,7 @@ export async function ensureMembership(session, game) {
       try { await copyText(quote.klvAmount); copyAmount.textContent = 'Amount copied'; }
       catch { copyAmount.textContent = quote.klvAmount; }
     });
-    const instructions = node('p', 'mg-membership-instructions', 'Send the exact amount from your linked Klever wallet, then paste the transaction hash below. Only a confirmed mainnet KLV transfer to this address will activate access.');
+    const instructions = node('p', 'mg-membership-instructions', 'Send the exact amount from your linked Klever wallet and keep extra KLV for network fees. Then paste the transaction hash below. Only a confirmed mainnet KLV transfer to this address will activate access.');
     const hashLabel = node('label', 'mg-membership-label', 'Klever transaction hash');
     const hash = node('input', 'mg-membership-hash');
     hash.type = 'text';
