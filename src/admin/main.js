@@ -5,14 +5,14 @@ import '../ui/theme.css';
 import './admin.css';
 import { checkDevice, clearAccount, readAccount, signInAccount } from '../wallet/account.js';
 import { adminHref, gameHref, isAdminAccount } from './gate.js';
-import { changeStaff, loadLedger } from './api.js';
+import { changeStaff, issuePassCode, loadLedger, loadPassCodes } from './api.js';
 import { present } from '../../supabase/functions/_shared/ledger.js';
 import { chipsHtml, drawerHtml, leadIndex, stageHtml, toolsNote, windowsHtml } from './view.js';
 import { decorateAllFrames } from '../ui/theme.js';
 
 if (typeof document !== 'undefined') document.documentElement.classList.add('ledger');
 
-const TABS = ['ledger', 'hunters', 'coffers', 'bestiary', 'paths'];
+const TABS = ['ledger', 'hunters', 'coffers', 'bestiary', 'paths', 'passes'];
 const WINDOWS = ['all', '1', '7', '30'];
 const state = {
   tab: 'ledger',
@@ -32,6 +32,9 @@ const state = {
   ledger: null,
   role: '',
   canPromote: false,
+  passCodes: [],
+  newPassCode: '',
+  passCodeBusy: false,
 };
 
 let session = null;
@@ -98,6 +101,7 @@ async function refresh() {
     state.ledger = await loadLedger(session);
     state.role = state.ledger.role === 'moderator' ? 'moderator' : 'master';
     state.canPromote = state.role === 'master';
+    if (state.canPromote) state.passCodes = await loadPassCodes(session);
     state.error = '';
     if (state.selected && !state.ledger.players.some((player) => player.id === state.selected)) {
       state.selected = '';
@@ -203,7 +207,28 @@ function onClick(event) {
     setStaff('demote', button.dataset.demote);
     return;
   }
+  if (button.dataset.issuePasscode !== undefined) {
+    createPassCode();
+    return;
+  }
   paint();
+}
+
+async function createPassCode() {
+  if (!session || !state.canPromote || state.passCodeBusy) return;
+  state.passCodeBusy = true;
+  state.error = '';
+  paint();
+  try {
+    const result = await issuePassCode(session);
+    state.newPassCode = result.code || '';
+    state.passCodes = await loadPassCodes(session);
+  } catch (err) {
+    state.error = err.message || 'A free pass code could not be issued.';
+  } finally {
+    state.passCodeBusy = false;
+    paint();
+  }
 }
 
 async function setStaff(op, id) {
@@ -252,7 +277,7 @@ function onKey(event) {
     $('q').focus();
     return;
   }
-  if (event.key >= '1' && event.key <= '5') {
+  if (event.key >= '1' && event.key <= '6') {
     state.tab = TABS[Number(event.key) - 1];
     paint();
     return;

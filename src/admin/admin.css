@@ -619,3 +619,13 @@ html.ledger .shell {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+
+.pass-admin { max-width: 760px; }
+.pass-admin > p { margin: 0 0 10px; }
+.pass-admin h3 { margin: 20px 0 8px; color: var(--mg-gold-title); font: 11px var(--font-px); }
+.pass-admin .act { max-width: 360px; }
+.issued-pass { display: grid; gap: 8px; margin-top: 14px; padding: 14px; border: 2px solid var(--mg-gold-hi); background: rgba(231,197,106,.08); }
+.issued-pass span { color: var(--mg-gold-dim); font-size: 13px; }
+.issued-pass code { color: var(--mg-gold-title); font: 700 18px/1.5 ui-monospace,monospace; overflow-wrap: anywhere; user-select: all; }
+.pass-code-row { cursor: default; }

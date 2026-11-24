@@ -80,6 +80,34 @@ async function guildMaster(admin: Admin, accessToken: unknown): Promise<Staff | 
   return user;
 }
 
+const PASS_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function makePassCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const raw = Array.from(bytes, (value) => PASS_ALPHABET[value & 31]).join("");
+  return `MG-${raw.slice(0,4)}-${raw.slice(4,8)}-${raw.slice(8,12)}-${raw.slice(12,16)}`;
+}
+async function passCodeHash(code: string): Promise<string> {
+  const normalized = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalized));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+async function passCodeList(admin: Admin): Promise<Response> {
+  const { data, error } = await admin.from("membership_pass_codes")
+    .select("id, code_hint, created_at, redeemed_at, redeemed_by")
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) return json({ error: "Free pass codes could not be loaded." }, 503);
+  return json({ codes: Array.isArray(data) ? data : [] });
+}
+async function issuePassCode(admin: Admin, issuerId: string): Promise<Response> {
+  const code = makePassCode();
+  const hash = await passCodeHash(code);
+  const { data, error } = await admin.from("membership_pass_codes")
+    .insert({ code_hash: hash, code_hint: code.slice(-4), issued_by: issuerId })
+    .select("id, code_hint, created_at").single();
+  if (error || !data) return json({ error: "A free pass code could not be issued. Please try again." }, 503);
+  return json({ code, pass: data });
+}
+
 function hunterId(raw: unknown): string {
   const value = String(raw || "").trim();
   const id = value.startsWith("acct:") ? value.slice(5) : value;
@@ -151,6 +179,14 @@ export default {
       if (user instanceof Response) return user;
       if (user.role !== "master") return json({ error: "This gate is for the guild master." }, 403);
       return overview(admin, user.role, user.sessionId);
+    }
+    if (body.op === "passcodes_list" || body.op === "passcode_issue") {
+      const user = await seatStaff(admin, body);
+      if (user instanceof Response) return user;
+      if (user.role !== "master") return json({ error: "Only the guild master can issue free passes." }, 403);
+      return body.op === "passcodes_list"
+        ? passCodeList(admin)
+        : issuePassCode(admin, user.id);
     }
     if (body.op === "promote" || body.op === "demote") {
       const user = await seatStaff(admin, body);

@@ -96,12 +96,6 @@ export async function ensureMembership(session, game) {
     return false;
   }
   if (status.active) return true;
-  if (!status.connected || !status.walletAddress) {
-    game.charSelect?.note?.('Connect your Klever wallet above before entering the world.', true, true);
-    document.getElementById('cs-wallet-connect')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    return false;
-  }
-
   return new Promise((resolve) => {
     let settled = false;
     let quote = null;
@@ -132,7 +126,25 @@ export async function ensureMembership(session, game) {
     head.append(mark, brandcopy);
     const title = node('h2', 'mg-gatepass-title', 'The Gate Pass');
     title.id = 'mg-gatepass-title';
-    const intro = node('p', 'mg-gatepass-lede', 'Your key to the world beyond the Gate. Unlock 30 days of hunting, exploring, and fighting alongside the community.');
+    const intro = node('p', 'mg-gatepass-lede', 'Your key to the world beyond the Gate. Pay for 30 days or redeem a free 10-day pass code.');
+    const codePanel = node('section', 'mg-gatepass-code-panel');
+    const codeHeading = node('span', 'mg-gatepass-sectionlabel', 'Have a 10-day free pass code?');
+    const codeRow = node('div', 'mg-gatepass-code-row');
+    const codeInput = node('input', 'mg-gatepass-code-input');
+    codeInput.type = 'text';
+    codeInput.placeholder = 'MG-XXXX-XXXX-XXXX-XXXX';
+    codeInput.autocomplete = 'off';
+    codeInput.autocapitalize = 'characters';
+    codeInput.spellcheck = false;
+    codeInput.maxLength = 23;
+    codeInput.setAttribute('aria-label', '10-day free pass code');
+    const redeemButton = node('button', 'mg-gatepass-redeem', 'Redeem code');
+    redeemButton.type = 'button';
+    const codeFeedback = node('p', 'mg-gatepass-code-feedback', status.walletAddress ? 'Each code can be used once.' : 'You can redeem a free pass without connecting a Klever wallet.');
+    codeRow.append(codeInput, redeemButton);
+    codePanel.append(codeHeading, codeRow, codeFeedback);
+    const paymentPanel = node('div', 'mg-gatepass-payment-panel');
+    paymentPanel.hidden = !status.walletAddress;
     const priceGrid = node('div', 'mg-gatepass-pricegrid');
     const usdBox = node('div', 'mg-gatepass-pricebox primary');
     usdBox.append(node('span', 'mg-gatepass-label', 'Membership'), node('strong', 'mg-gatepass-usd', '$5.00 USD'));
@@ -216,6 +228,38 @@ export async function ensureMembership(session, game) {
       overlay.remove();
       resolve(value);
     };
+    const redeemPass = async () => {
+      if (settled || redeemButton.disabled) return;
+      const code = codeInput.value.trim().toUpperCase();
+      if (!code) {
+        codeFeedback.textContent = 'Enter your free pass code.';
+        codeInput.focus();
+        return;
+      }
+      redeemButton.disabled = true;
+      redeemButton.textContent = 'Redeeming…';
+      codeFeedback.textContent = 'Checking your code…';
+      try {
+        const result = await post(currentSession, { op: 'redeem', code });
+        currentSession = result.session;
+        codeFeedback.textContent = 'Free pass activated — 10 days added to your Gate Pass.';
+        setTimeout(() => finish(true), 700);
+      } catch (error) {
+        codeFeedback.textContent = error.message || 'That code could not be redeemed.';
+      } finally {
+        if (!settled) {
+          redeemButton.disabled = false;
+          redeemButton.textContent = 'Redeem code';
+        }
+      }
+    };
+    redeemButton.addEventListener('click', redeemPass);
+    codeInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        redeemPass();
+      }
+    });
     const onKeyDown = (event) => {
       if (event.key === 'Escape') finish(false);
     };
@@ -334,10 +378,14 @@ export async function ensureMembership(session, game) {
     close.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
 
-    card.append(close, head, title, intro, priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
+    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
+    card.append(close, head, title, intro, codePanel, paymentPanel);
     overlay.append(card);
     document.body.append(overlay);
     document.addEventListener('keydown', onKeyDown);
-    loadQuote();
+    if (status.walletAddress) loadQuote();
+    else {
+      setWatch('Redeem a free pass code', 'A free pass code grants 10 days of access and does not require a wallet.');
+    }
   });
 }

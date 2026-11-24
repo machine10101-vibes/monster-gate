@@ -143,3 +143,33 @@
 .mg-profile-pass .mg-title { margin:0 0 8px; }
 .mg-profile-pass .wallet-link-copy { margin:0 0 10px; }
 @media (max-width:520px) { .mg-gatepass-actions { grid-template-columns:1fr; } }
+
+
+.mg-gatepass-code-panel {
+  margin: 18px 0 4px;
+  padding: 15px;
+  border: 1px solid rgba(242,199,125,.36);
+  border-radius: 14px;
+  background: rgba(0,0,0,.22);
+}
+.mg-gatepass-code-panel .mg-gatepass-sectionlabel { margin-top: 0; }
+.mg-gatepass-code-row { display: flex; gap: 8px; }
+.mg-gatepass-code-input {
+  flex: 1; min-width: 0; width: 100%;
+  padding: 12px; border: 1px solid rgba(242,199,125,.34); border-radius: 10px;
+  color: #fff1d8; background: rgba(4,5,10,.72);
+  font: 700 13px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;
+  text-transform: uppercase;
+}
+.mg-gatepass-redeem {
+  flex: 0 0 auto; min-height: 44px; padding: 10px 14px;
+  border: 1px solid #f1c57c; border-radius: 10px;
+  color: #281a13; background: linear-gradient(145deg,#ffe2a7,#d18b43);
+  font-family: inherit; font-size: 11px; font-weight: 800; cursor: pointer;
+}
+.mg-gatepass-redeem:disabled { opacity: .55; cursor: wait; }
+.mg-gatepass-code-feedback { margin: 8px 0 0; color: #b8c8c1; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  .mg-gatepass-code-row { flex-direction: column; }
+  .mg-gatepass-redeem { width: 100%; }
+}

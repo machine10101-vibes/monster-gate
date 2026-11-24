@@ -283,12 +283,24 @@ async function watchPayment(db:Admin,id:string,quoteId:string,requestedHash=""):
  return out({ok:false,found:false,checkedAt:new Date().toISOString()});
 }
 
+async function redeemPassCode(db:Admin,id:string,rawCode:any):Promise<Response>{
+ const normalized=String(rawCode??"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ if(!/^MG[A-HJ-NP-Z2-9]{16}$/.test(normalized))return out({error:"Enter a valid 10-day free pass code."},400);
+ const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(normalized));
+ const hash=Array.from(new Uint8Array(digest),(byte)=>byte.toString(16).padStart(2,"0")).join("");
+ const {data,error}=await db.rpc("redeem_membership_pass_code",{p_user_id:id,p_code_hash:hash});
+ if(error)return out({error:"The free pass could not be redeemed. Please try again."},503);
+ if(!data?.ok)return out({error:"That free pass code is invalid or has already been used."},409);
+ return out({ok:true,expiresAt:data.expires_at,daysAdded:10});
+}
+
 async function handle(db:Admin,id:string,b:any){
  if(b.op==="status"){const a=await walletFor(db,id);if(a instanceof Response)return a;
  const {data,error}=await db.from("memberships").select("expires_at").eq("user_id",id).maybeSingle();if(error)return out({error:"Could not read membership."},503);
  const expiresAt=data?.expires_at||null,active=!!expiresAt&&Date.parse(expiresAt)>Date.now();
  return out({connected:!!a,walletAddress:a||null,expiresAt,active})}
  if(b.op==="watch")return watchPayment(db,id,String(b.quoteId||""),String(b.txHash||""));
+ if(b.op==="redeem")return redeemPassCode(db,id,b.code);
  if(b.op==="quote"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({error:"Connect your Klever wallet in character selection before paying."},409);
  const p=await ticker();if(!p)return out({error:"Swopus live KLV/USDT price feed is temporarily unavailable. Please refresh your quote."},503);
  const atomic=BigInt(Math.ceil(5/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();

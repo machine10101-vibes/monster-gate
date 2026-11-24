@@ -274,12 +274,37 @@ function pathsTab(model, ui) {
   return `<div class="split paths">${groups}</div>${skills}`;
 }
 
+export function passCodesHtml(ui) {
+  const rows = (ui.passCodes || []).map((pass) => {
+    const status = pass.redeemed_at
+      ? `Redeemed ${new Date(pass.redeemed_at).toLocaleString()}`
+      : 'Ready to redeem';
+    return `<div class="recent pass-code-row">
+      <b>••••-${esc(pass.code_hint)}</b>
+      <span>Issued ${esc(new Date(pass.created_at).toLocaleString())}</span>
+      <em>${esc(status)}</em>
+    </div>`;
+  }).join('');
+  const issued = ui.newPassCode
+    ? `<div class="issued-pass"><span>New code — copy it now. It is only shown once.</span><code>${esc(ui.newPassCode)}</code><button type="button" class="act" data-copy="${esc(ui.newPassCode)}">Copy free pass code</button></div>`
+    : '';
+  return `<section class="sheet mg-frame pass-admin">
+    <header><span>Guild master tools</span><h2>10-day free passes</h2></header>
+    <p class="empty">Issue a single-use code. Each code adds 10 days to the player's Gate Pass and can be redeemed by one game account.</p>
+    <button type="button" class="act" data-issue-passcode ${ui.passCodeBusy ? 'disabled' : ''}>${ui.passCodeBusy ? 'Creating code…' : 'Issue 10-day free pass code'}</button>
+    ${issued}
+    <h3>Issued codes</h3>
+    <div class="recents">${rows || '<p class="empty">No free pass codes have been issued yet.</p>'}</div>
+  </section>`;
+}
+
 export function stageHtml(model, ui) {
   if (!model) return '<p class="empty">Opening the guild record…</p>';
   if (ui.tab === 'hunters') return huntersTab(model, ui);
   if (ui.tab === 'coffers') return coffersTab(model, ui);
   if (ui.tab === 'bestiary') return bestiaryTab(model, ui);
   if (ui.tab === 'paths') return pathsTab(model, ui);
+  if (ui.tab === 'passes') return passCodesHtml(ui);
   return ledgerTab(model, ui);
 }
 
