@@ -101,6 +101,20 @@ jobs:
           if "  fox:" not in h:
               h = h.replace("  eve: { userId: '55555555-5555-4555-8555-555555555555', name: 'Eve' },", "  eve: { userId: '55555555-5555-4555-8555-555555555555', name: 'Eve' },\n  fox: { userId: '66666666-6666-4666-8666-666666666666', name: 'Fox' },")
           helpers.write_text(h)
+
+          schema = Path("server/persistence/schema.js")
+          s = schema.read_text()
+          if "pvp: { rating: 1000, wins: 0, losses: 0 }," not in s:
+              s = s.replace("    crafted: { knife: true },", "    crafted: { knife: true },\n    pvp: { rating: 1000, wins: 0, losses: 0 },", 1)
+          if "pvp: importMode ? { rating: 1000, wins: 0, losses: 0 }" not in s:
+              s = s.replace("    crafted,\n    portals:", """    crafted,
+            pvp: importMode ? { rating: 1000, wins: 0, losses: 0 } : {
+              rating: clampInt(hunt.pvp?.rating, 100, 3000, 1000),
+              wins: clampInt(hunt.pvp?.wins, 0, 100000, 0),
+              losses: clampInt(hunt.pvp?.losses, 0, 100000, 0),
+            },
+            portals:""", 1)
+          schema.write_text(s)
           PY
           git add server/world.js server/protocol.js
           git commit -m "Verified World 1 PvP integration"
