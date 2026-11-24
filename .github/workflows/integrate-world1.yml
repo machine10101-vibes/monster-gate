@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   merge-and-verify:
-    if: "!contains(github.event.head_commit.message, 'Verified Colosseum integration')"
+    if: "!contains(github.event.head_commit.message, 'Verified World 1 PvP integration')"
     runs-on: ubuntu-latest
     steps:
       - name: Check out integration branch
@@ -26,20 +26,38 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Bring over only the World 1 PvP feature
+      - name: Merge World 1 history while preserving current main on conflicts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin mg-servers/world-1-live
-          git merge -s ours --no-commit origin/mg-servers/world-1-live
-          git diff --binary bc4be20b31067f61c0b20ce66dec2f5fe80cbd83^ b26f0f42d72ad3d62f90624af5421e6217c9e858 -- \
-            server/content.js server/persistence/schema.js server/persistence/tests/pvp-rating.test.js \
-            server/protocol.js server/pvp.js server/tests/lib/helpers.js server/tests/pvp.test.js server/world.js \
-            src/debug/flags.js src/entities/monsters.js src/entities/player.js src/main.js src/net/mmo.js \
-            src/net/worldProtocol.js src/net/worldView.js src/systems/skillcast.js src/world/colosseum.js \
-            src/world/gilantre.js src/world/world.js tests/debug-flags.test.js tests/mg-gilantre.test.js \
-            tests/mmo-client.test.js tests/world-view.test.js | git apply --3way --index
-          git commit -m "Verified Colosseum integration from World 1"
+          git merge --no-edit -X ours -m "Integrate World 1 server branch into main" FETCH_HEAD
+      - name: Keep main's current client and social implementation
+        run: |
+          git checkout HEAD -- src/ tests/ server/auth.js server/index.js server/social.js server/social-store.js server/social-world.js server/store.js
+      - name: Ensure the PvP runtime is initialized after social
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("server/world.js")
+          s = p.read_text()
+          marker = "import { createCombatLoot } from './combat-loot.js';"
+          if "import { createPvpRuntime } from './pvp.js';" not in s:
+              s = s.replace(marker, marker + "\nimport { createPvpRuntime } from './pvp.js';")
+          needle = """    this.social = opts.social || createSocialRuntime(this, {
+            friends: opts.friends,
+            friendsCap: opts.friendsCap,
+            partyMax: opts.partyMax,
+            inviteTtl: opts.inviteTtl,
+          });"""
+          if "this.pvp = opts.pvp || createPvpRuntime(this);" not in s:
+              if needle not in s:
+                  raise SystemExit("Could not locate the World social runtime constructor for PvP initialization")
+              s = s.replace(needle, needle + "\n    this.pvp = opts.pvp || createPvpRuntime(this);")
+          p.write_text(s)
+          PY
+          git add server/world.js
+          git commit -m "Initialize the World 1 Colosseum runtime"
       - name: Install game dependencies
         run: npm ci
       - name: Install persistence dependencies
@@ -52,5 +70,5 @@ jobs:
         run: npm run test --prefix server/persistence -- --test-force-exit
       - name: Build production client
         run: npm run build
-      - name: Push verified merge commit
+      - name: Push verified integration branch
         run: git push origin HEAD:integrate/world1-into-main
