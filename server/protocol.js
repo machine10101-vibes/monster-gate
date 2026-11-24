@@ -246,6 +246,8 @@ export function playerView(p, extra = {}) {
     armor: p.armor,
     zone: p.zone,
     hp: p.hp,
+    pvp_team: p.pvpTeam ?? null,
+    pvp_dead: !!p.pvpDead,
     ...extra,
   };
 }
@@ -309,10 +311,12 @@ export function quantizedPlayer(p) {
     armor: p.armor || {},
     zone: p.zone,
     hp: p.hp,
+    pvp_team: p.pvpTeam ?? null,
+    pvp_dead: !!p.pvpDead,
   };
 }
 
-const POSE_KEYS = ['name', 'x', 'y', 'z', 'yaw', 'move', 'anim', 'held', 'sheath', 'zone', 'hp'];
+const POSE_KEYS = ['name', 'x', 'y', 'z', 'yaw', 'move', 'anim', 'held', 'sheath', 'zone', 'hp', 'pvp_team', 'pvp_dead'];
 
 function sameLook(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -361,6 +365,11 @@ export function parseZoneCap(env = process.env, override) {
 
 export function inAoi(observer, other, radius = AOI_RADIUS) {
   if (!observer || !other) return false;
+  const arenaA = String(observer.zone || '').startsWith('colosseum:');
+  const arenaB = String(other.zone || '').startsWith('colosseum:');
+  if (arenaA || arenaB) {
+    if (!arenaA || !arenaB || observer.zone !== other.zone) return false;
+  }
   const caveA = observer.zone === 'cave';
   const caveB = other.zone === 'cave';
   if (caveA !== caveB) return false;

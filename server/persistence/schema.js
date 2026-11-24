@@ -76,6 +76,7 @@ export function blankState(name = 'Hunter', look = DEFAULT_LOOK) {
     seen: {},
     kills: {},
     crafted: { knife: true },
+    pvp: { rating: 1000, wins: 0, losses: 0 },
     portals: [],
     journal: { quests: {}, activity: [], challengeNew: 0 },
     hunter: {
@@ -159,7 +160,12 @@ export function sanitizeState(raw, { importMode = false } = {}) {
     seen: normalizeSeen(hunt.seen, kills),
     kills,
     crafted,
-    portals: normalizePortals(hunt.portals),
+  pvp: importMode ? { rating: 1000, wins: 0, losses: 0 } : {
+    rating: clampInt(hunt.pvp?.rating, 100, 3000, 1000),
+    wins: clampInt(hunt.pvp?.wins, 0, 100000, 0),
+    losses: clampInt(hunt.pvp?.losses, 0, 100000, 0),
+  },
+  portals: normalizePortals(hunt.portals),
     journal,
     hunter,
     last_seen: normalizeTime(hunt.last_seen),

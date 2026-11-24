@@ -11,6 +11,9 @@ const USERS = {
   ann: { userId: ANN, name: 'Ann' },
   bea: { userId: BEA, name: 'Bea' },
   cal: { userId: CAL, name: 'Cal' },
+  dan: { userId: '44444444-4444-4444-8444-444444444444', name: 'Dan' },
+  eve: { userId: '55555555-5555-4555-8555-555555555555', name: 'Eve' },
+  fox: { userId: '66666666-6666-4666-8666-666666666666', name: 'Fox' },
 };
 
 export async function verifyToken(token) {
