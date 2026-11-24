@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { identify, verifyActiveMembership } from '../server/auth.js';
+import { identify, verifyActiveMembership } from '../auth.js';
 
 const USER_ID = '123e4567-e89b-42d3-a456-426614174000';
 const ENV = {
