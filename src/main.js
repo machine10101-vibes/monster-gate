@@ -1075,27 +1075,43 @@ class Game {
     if (this.started || this.worldJoining) return;
     const search = typeof location !== 'undefined' ? location.search : '';
     if (!worldServerConfigured(search)) return;
-    if (!hasWorldSessionToken()) {
+
+    // Resolve the signed-in account and Gate Pass before asking for the
+    // separate World 1 session token. Otherwise an account with no world
+    // token is sent straight back to sign-in and never sees membership.
+    const account = readAccount();
+    if (this.wallet?.kind !== 'email' || !account?.userId
+      || this.wallet.userId !== account.userId || !account?.accessToken) {
       rememberWorldMode('online');
       markWorldJoin('online');
       this.openSocialSignIn();
       return;
     }
 
-    // World 1 navigates directly to the online client, so enforce the same
-    // membership gate here before leaving the picker (not only at solo entry).
     this.worldJoining = true;
     this.paintWorldPickerUi();
     try {
-      const account = readAccount();
-      if (this.wallet?.kind !== 'email' || !account?.userId
-        || this.wallet.userId !== account.userId || !account?.accessToken) {
+      const allowed = await ensureMembership(account, this);
+      if (!allowed) {
+        // ensureMembership may ask the player to link a Klever wallet. The
+        // world picker hides the character camp, so expose that screen and
+        // its existing, unchanged wallet-connect control.
+        this.hideWorldPicker();
+        if (!this.charSelect?.active) this.charSelect?.open?.();
+        return;
+      }
+      this.membershipGatePassed = true;
+
+      // Membership can now be purchased/verified even when the multiplayer
+      // session token needs to be refreshed. Continue the existing sign-in
+      // flow only after the Gate Pass UI has had a chance to run.
+      if (!hasWorldSessionToken()) {
+        rememberWorldMode('online');
+        markWorldJoin('online');
         this.openSocialSignIn();
         return;
       }
-      const allowed = await ensureMembership(account, this);
-      if (!allowed) return;
-      this.membershipGatePassed = true;
+
       rememberWorldMode('online');
       markWorldJoin('online');
       enterOnlineWorld();
@@ -1103,6 +1119,8 @@ class Game {
       const message = error?.message || 'Could not verify your Gate Pass.';
       this.charSelect?.note?.(message, true, true);
       this.hud?.toast?.(message, 4200);
+      this.hideWorldPicker();
+      if (!this.charSelect?.active) this.charSelect?.open?.();
     } finally {
       this.worldJoining = false;
       if (!this.started) this.paintWorldPickerUi();
