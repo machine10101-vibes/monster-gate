@@ -107,6 +107,7 @@ import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, i
 import { clearRotationRecovery, consumeRotationRecovery, isRotationRecoveryPending, rememberRotationRecovery, screenOrientation } from './engine/rotationRecovery.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
+import { ensureMembership } from './wallet/membership.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
 const DEVICE_CHECK_MS = 4000;
@@ -1177,8 +1178,21 @@ class Game {
   }
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
-  enterWorld(char) {
-    if (this.started || !this.roster?.get(char.id)) return;
+  async enterWorld(char) {
+    if (this.started || !this.roster?.get(char.id) || this.membershipChecking) return;
+    this.membershipChecking = true;
+    try {
+      const account = readAccount();
+      if (!account?.userId || !account?.accessToken) {
+        this.charSelect?.note?.('Sign in with an account and connect Klever to play.', true, true);
+        this.openSocialSignIn();
+        return;
+      }
+      const allowed = await ensureMembership(account, this);
+      if (!allowed || this.started || !this.roster?.get(char.id)) return;
+    } finally {
+      this.membershipChecking = false;
+    }
     rememberRotationRecovery(
       localStorage,
       char.id,
