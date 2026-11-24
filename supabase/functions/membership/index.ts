@@ -53,27 +53,20 @@ function poolPrice(pool:any,reserve:any):number|null{
  const baseIsKlv=base===KLV_ASSET&&quote===USDT_ASSET;
  const reverse=base===USDT_ASSET&&quote===KLV_ASSET;
  if(!baseIsKlv&&!reverse)return null;
- if(pool?.deprecated===true||pool?.stale===true||reserve?.stale===true)return null;
- const lag=Number(reserve?.indexer_lag_blocks??pool?.indexer_lag_blocks??0);
- if(Number.isFinite(lag)&&lag>20)return null;
- const r0=numericField(reserve,"reserve0","reserve_0","reserve0_scaled")??numericField(pool,"reserve0","reserve_0","reserve0_scaled");
- const r1=numericField(reserve,"reserve1","reserve_1","reserve1_scaled")??numericField(pool,"reserve1","reserve_1","reserve1_scaled");
- let ratio:number|null=null;
- if(r0&&r1)ratio=r1/r0;
- else{
-  const raw0=numericField(reserve,"reserve0_raw","reserve_0_raw")??numericField(pool,"reserve0_raw","reserve_0_raw");
-  const raw1=numericField(reserve,"reserve1_raw","reserve_1_raw")??numericField(pool,"reserve1_raw","reserve_1_raw");
-  const d0=Number(pool?.base_decimals??pool?.token0_decimals??pool?.token0?.decimals??6);
-  const d1=Number(pool?.quote_decimals??pool?.token1_decimals??pool?.token1?.decimals??6);
-  if(raw0&&raw1&&Number.isInteger(d0)&&Number.isInteger(d1)){
-   const scaled0=raw0/10**d0,scaled1=raw1/10**d1;
-   ratio=scaled1/scaled0;
-  }
- }
- if(!Number.isFinite(ratio)||!ratio||ratio<=0)return null;
+ const d0=Number(pool?.base_decimals??pool?.token0_decimals??pool?.token0?.decimals??6);
+ const d1=Number(pool?.quote_decimals??pool?.token1_decimals??pool?.token1?.decimals??6);
+ if(!Number.isInteger(d0)||!Number.isInteger(d1)||d0<0||d1<0||d0>18||d1>18)return null;
+ const raw0=numericField(reserve,"reserve0_raw","reserve0","reserve_0");
+ const raw1=numericField(reserve,"reserve1_raw","reserve1","reserve_1");
+ if(!raw0||!raw1)return null;
+ // /api/pools/reserves returns raw base units; convert with each token's decimals.
+ const scaled0=raw0/10**d0,scaled1=raw1/10**d1;
+ const ratio=scaled1/scaled0;
+ if(!Number.isFinite(ratio)||ratio<=0)return null;
  const price=baseIsKlv?ratio:1/ratio;
  return Number.isFinite(price)&&price>0?price:null;
 }
+
 async function ticker(){
  if(priceCache&&Date.now()-priceCache.at<10000)return priceCache;
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
@@ -102,9 +95,13 @@ async function ticker(){
    const reserveRows=collection(reservesPayload);
    const reserve=reserveRows.find((item:any)=>String(item?.pair_id??item?.pairId??item?.id)===String(pairId))??reserveRows[0];
    if(!reserve)throw new Error("Swopus has not returned live KLV/USDT reserves.");
+   const lag=Number(reservesPayload?.indexer_lag_blocks??0);
+   if(reservesPayload?.stale===true||(Number.isFinite(lag)&&lag>20))throw new Error("Swopus KLV/USDT reserve data is stale.");
+   const reserveMillis=epochMillis(reserve?.ts);
+   if(!reserveMillis||reserveMillis>Date.now()+120000||Date.now()-reserveMillis>180000)throw new Error("Swopus KLV/USDT reserves are too old.");
    const price=poolPrice(pool,reserve);
-   if(!price)throw new Error("Swopus KLV/USDT pool data is stale or incomplete.");
-   const sourceTime=new Date().toISOString();
+   if(!price)throw new Error("Swopus KLV/USDT pool data is incomplete.");
+   const sourceTime=new Date(reserveMillis).toISOString();
    return priceCache={price,sourceTime,source:"Swopus",pairId:String(pairId),at:Date.now()};
   }finally{clearTimeout(reservesTimer)}
  }catch(error){
