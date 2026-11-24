@@ -54,12 +54,9 @@ async function sendSignedKlvTransfer(quote, expectedAddress) {
   // Payment uses Klever's supported BrowserWallet SDK in extension mode.
   // The existing account-link/connectWallet implementation is intentionally untouched.
   if (!kleverPaymentModules) {
-    kleverPaymentModules = Promise.all([
-      import('https://esm.sh/@klever/connect-wallet@0.2.4'),
-      import('https://esm.sh/@klever/connect-provider@0.2.2'),
-    ]);
+    kleverPaymentModules = import('https://esm.sh/@klever/connect@0.1.9?bundle');
   }
-  const [{ BrowserWallet }, { KleverProvider }] = await kleverPaymentModules;
+  const { BrowserWallet, KleverProvider } = await kleverPaymentModules;
   const provider = new KleverProvider({ network: 'mainnet' });
   const wallet = new BrowserWallet(provider);
   await wallet.connect();
