@@ -30,11 +30,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          MAIN_HEAD=$(git rev-parse HEAD)
           git fetch origin mg-servers/world-1-live
           git merge --no-edit -X ours -m "Integrate World 1 server branch into main" FETCH_HEAD
-      - name: Keep main's current client and social implementation
-        run: |
-          git checkout HEAD -- src/ tests/ server/auth.js server/index.js server/social.js server/social-store.js server/social-world.js server/store.js
+          git checkout "$MAIN_HEAD" -- src/ tests/ server/auth.js server/index.js server/social.js server/social-store.js server/social-world.js server/store.js
       - name: Ensure the PvP runtime is initialized after social
         run: |
           python3 - <<'PY'
@@ -44,20 +43,15 @@ jobs:
           marker = "import { createCombatLoot } from './combat-loot.js';"
           if "import { createPvpRuntime } from './pvp.js';" not in s:
               s = s.replace(marker, marker + "\nimport { createPvpRuntime } from './pvp.js';")
-          needle = """    this.social = opts.social || createSocialRuntime(this, {
-            friends: opts.friends,
-            friendsCap: opts.friendsCap,
-            partyMax: opts.partyMax,
-            inviteTtl: opts.inviteTtl,
-          });"""
+          anchor = "    });\n  }\n\n  async idle()"
           if "this.pvp = opts.pvp || createPvpRuntime(this);" not in s:
-              if needle not in s:
-                  raise SystemExit("Could not locate the World social runtime constructor for PvP initialization")
-              s = s.replace(needle, needle + "\n    this.pvp = opts.pvp || createPvpRuntime(this);")
+              if anchor not in s:
+                  raise SystemExit("Could not locate the end of the World constructor")
+              s = s.replace(anchor, "    });\n    this.pvp = opts.pvp || createPvpRuntime(this);\n  }\n\n  async idle()", 1)
           p.write_text(s)
           PY
           git add server/world.js
-          git commit -m "Initialize the World 1 Colosseum runtime"
+          git commit -m "Verified World 1 PvP integration"
       - name: Install game dependencies
         run: npm ci
       - name: Install persistence dependencies
