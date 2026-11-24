@@ -33,13 +33,14 @@ test('Gate Pass codes are redeemed by the signed-in account and add ten days ato
 test('the Gate Pass window accepts free codes even without a connected Klever wallet', () => {
   const client = src('../src/wallet/membership.js');
   const admin = src('../src/admin/main.js');
+  const adminView = src('../src/admin/view.js');
   const api = src('../src/admin/api.js');
   const page = src('../admin.html');
   assert.match(client, /MG-XXXX-XXXX-XXXX-XXXX/);
   assert.match(client, /post\(currentSession, \{ op: 'redeem', code \}\)/);
   assert.match(client, /paymentPanel\.hidden = !status\.walletAddress/);
   assert.match(client, /if \(status\.walletAddress\) loadQuote\(\)/);
-  assert.match(admin, /data-issue-passcode/);
+  assert.match(adminView, /data-issue-passcode/);
   assert.match(admin, /issuePassCode\(session\)/);
   assert.match(api, /export async function loadPassCodes/);
   assert.match(api, /export async function issuePassCode/);
