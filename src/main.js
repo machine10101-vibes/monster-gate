@@ -107,6 +107,7 @@ import { exitGameFullscreen, isFullscreen, isIOS, isLandscape as landscapeNow, i
 import { clearRotationRecovery, consumeRotationRecovery, isRotationRecoveryPending, rememberRotationRecovery, screenOrientation } from './engine/rotationRecovery.js';
 import { openLegacyBridge, runLegacySaveBridge } from './systems/savebridge.js';
 import { INVENTORY_FULL } from './systems/stacks.js';
+import { ensureMembership } from './wallet/membership.js';
 
 const CLOUD_AUTOSAVE_MS = 30000;
 const DEVICE_CHECK_MS = 4000;
@@ -600,9 +601,25 @@ class Game {
     requestAnimationFrame(this.loop);
   }
 
-  start() {
+  async start() {
     if (this.started) return;
     if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
+    if (!this.membershipGatePassed) {
+      if (this.membershipChecking) return;
+      this.membershipChecking = true;
+      try {
+        const account = readAccount();
+        if (this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken) {
+          this.openSocialSignIn();
+          return;
+        }
+        const allowed = await ensureMembership(account, this);
+        if (!allowed || this.started) return;
+        this.membershipGatePassed = true;
+      } finally {
+        this.membershipChecking = false;
+      }
+    }
     if (this.wallet.kind === 'guest') this.cloudState = 'off';
     document.body.classList.add('hunting');
     if (this.input.touch && (this.isLandscape() || isTablet())) {
@@ -1049,7 +1066,8 @@ class Game {
     }
     this.hideWorldPicker();
     this.charSelect?.hideWorldMenu?.();
-    this.enterWorld(char);
+    await this.enterWorld(char);
+    if (!this.started) return;
     await this.ensureOnlineClient();
   }
 
@@ -1177,8 +1195,22 @@ class Game {
   }
 
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
-  enterWorld(char) {
-    if (this.started || !this.roster?.get(char.id)) return;
+  async enterWorld(char) {
+    if (this.started || !this.roster?.get(char.id) || this.membershipChecking) return;
+    this.membershipChecking = true;
+    try {
+      const account = readAccount();
+      if (this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken) {
+        this.charSelect?.note?.('Sign in with an account and connect Klever to play.', true, true);
+        this.openSocialSignIn();
+        return;
+      }
+      const allowed = await ensureMembership(account, this);
+      if (!allowed || this.started || !this.roster?.get(char.id)) return;
+      this.membershipGatePassed = true;
+    } finally {
+      this.membershipChecking = false;
+    }
     rememberRotationRecovery(
       localStorage,
       char.id,

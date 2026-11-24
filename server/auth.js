@@ -29,8 +29,9 @@ export function authConfig(env = process.env) {
   const url = envOf(env, 'SUPABASE_URL').replace(/\/$/, '');
   const anon = envOf(env, 'SUPABASE_ANON_KEY') || envOf(env, 'SUPABASE_PUBLISHABLE_KEY');
   const jwtSecret = envOf(env, 'SUPABASE_JWT_SECRET');
+  const serviceRole = envOf(env, 'SUPABASE_SERVICE_ROLE_KEY');
   const allowDev = envOf(env, 'ALLOW_DEV_TOKENS') === '1';
-  return { url, anon, jwtSecret, allowDev };
+  return { url, anon, jwtSecret, serviceRole, allowDev };
 }
 
 export function parseOrigins(env = process.env) {
@@ -145,6 +146,31 @@ export function parseDevToken(token) {
   return { userId: m[1].toLowerCase(), name: cleanName(m[2] || 'Hunter'), guest: false };
 }
 
+
+/** Check membership at the authoritative World 1 entry point. No Supabase URL means local test/dev mode. */
+export async function verifyActiveMembership(userId, env = process.env, fetchFn = fetch) {
+  const cfg = authConfig(env);
+  if (!cfg.url) return true;
+  if (!cfg.serviceRole || !UUID_RE.test(String(userId || ''))) return null;
+  try {
+    const query = new URLSearchParams({ user_id: `eq.${userId}`, select: 'expires_at' });
+    const res = await fetchFn(`${cfg.url}/rest/v1/memberships?${query}`, {
+      headers: {
+        apikey: cfg.serviceRole,
+        authorization: `Bearer ${cfg.serviceRole}`,
+      },
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.some((row) => {
+      const expiresAt = Date.parse(row?.expires_at || '');
+      return Number.isFinite(expiresAt) && expiresAt > Date.now();
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function verifyAccessToken(token, env = process.env) {
   const cfg = authConfig(env);
   if (cfg.allowDev) {
@@ -178,7 +204,7 @@ export async function verifyAccessToken(token, env = process.env) {
 /**
  * @returns {Promise<{ userId: string, name: string, guest: false }>}
  */
-export async function identify(hello, env = process.env, verifyToken) {
+export async function identify(hello, env = process.env, verifyToken, membershipCheck = verifyActiveMembership) {
   const token = hello?.token || '';
   if (!token) {
     throw new ProtocolError('auth', 'Sign in to hunt online. Guests stay solo.');
@@ -193,6 +219,13 @@ export async function identify(hello, env = process.env, verifyToken) {
   }
   if (!user?.userId || !UUID_RE.test(user.userId)) {
     throw new ProtocolError('auth', 'That sign-in is not valid.');
+  }
+  const membership = await membershipCheck(user.userId, env);
+  if (membership === false) {
+    throw new ProtocolError('auth', 'An active Monster Gate membership is required to enter World 1. Subscribe for $5 in KLV for 30 days.');
+  }
+  if (membership !== true) {
+    throw new ProtocolError('auth', 'Membership verification is temporarily unavailable. Please try again shortly.');
   }
   return {
     userId: String(user.userId).toLowerCase(),

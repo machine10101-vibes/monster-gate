@@ -5144,3 +5144,21 @@ html:has(#panel:not(.hidden)) #debug-badge {
 @media (max-width: 620px) {
   .cs-wallet-connect { min-width: 190px; padding: 7px 10px; }
 }
+
+
+/* Paid membership gate */
+.mg-membership-overlay{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:18px;background:rgba(5,3,8,.88);backdrop-filter:blur(8px);overflow:auto}
+.mg-membership-card{position:relative;width:min(100%,520px);max-height:min(92dvh,820px);overflow:auto;padding:30px 26px 24px;border:2px solid #a66c39;border-radius:12px;background:linear-gradient(155deg,#21151a,#100d12 72%);box-shadow:0 18px 70px #000b;color:#f5e9d7;font-family:inherit}
+.mg-membership-close{position:absolute;right:12px;top:10px;border:0;background:transparent;color:#e8d4b8;font-size:28px;cursor:pointer}
+.mg-membership-eyebrow{margin:0 0 10px;color:#d69a54;font-size:10px;letter-spacing:2px}
+.mg-membership-card h2{margin:0 0 12px;color:#f7d9a6;font-size:clamp(20px,5vw,28px)}
+.mg-membership-intro,.mg-membership-details,.mg-membership-instructions{color:#d3c3b1;line-height:1.55;font-size:13px}
+.mg-membership-price{margin:18px 0 8px;color:#f3c77d;font-size:22px;font-weight:700}
+.mg-membership-label{display:block;margin:17px 0 7px;color:#e7c99d;font-size:12px;font-weight:700}
+.mg-membership-address,.mg-membership-amount{display:block;overflow-wrap:anywhere;padding:11px;border-radius:6px;background:#08070a;border:1px solid #574333;color:#f6e5ca;font-size:12px;user-select:all}
+.mg-membership-copy,.mg-membership-submit,.mg-membership-cancel{margin-top:9px;padding:11px 14px;border:1px solid #987044;border-radius:6px;background:#35231a;color:#f7e5c9;font:inherit;font-size:12px;cursor:pointer}
+.mg-membership-copy:disabled,.mg-membership-submit:disabled{opacity:.5;cursor:wait}
+.mg-membership-hash{box-sizing:border-box;width:100%;padding:12px;border:1px solid #80613e;border-radius:6px;background:#09080b;color:#fff;font:12px monospace}
+.mg-membership-error{min-height:18px;color:#efb7a0;font-size:12px;overflow-wrap:anywhere}
+.mg-membership-submit{width:100%;margin-top:14px;background:linear-gradient(#9a6533,#69401e);font-weight:700}
+.mg-membership-cancel{width:100%;background:transparent;border-color:#594b40}
