@@ -135,7 +135,7 @@
   min-height:48px; padding:13px 18px; border:1px solid #ffe0a0; border-radius:12px;
   color:#281a13; background:linear-gradient(145deg,#ffe8b5,#d78b3d);
   box-shadow:0 8px 24px rgba(184,116,50,.28),inset 0 1px rgba(255,255,255,.65);
-  font:800 12px inherit; cursor:pointer; transition:transform .15s,filter .15s;
+  font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; transition:transform .15s,filter .15s;
 }
 .mg-gatepass-pay:hover:not(:disabled) { transform:translateY(-1px); filter:brightness(1.08); }
 .mg-gatepass-pay:disabled { opacity:.55; cursor:wait; }
