@@ -58,14 +58,24 @@ function validTransfer(j:any,hash:string,from:string,min:bigint,quotedAt:string)
  let sender=String(tx?.sender??tx?.from??tx?.senderAddress??"");
  if(!ADDR.test(sender)){const pub=b64(String(raw?.Sender??raw?.sender??""));if(pub.length===32)sender=bech32.encode("klv",bech32.toWords(pub),120)}
  if(sender!==from)return null;
- const contracts=raw?.Contract??raw?.contract??tx?.contracts??tx?.Contract??[];
+ // The Klever proxy API exposes parsed transfer receipts (typeString/from/to/value/assetId).
+ const receipts=tx?.receipts??tx?.Receipts??[];
+ if(Array.isArray(receipts))for(const receipt of receipts){
+  const kind=String(receipt?.typeString??receipt?.type_string??"").toLowerCase();
+  const asset=String(receipt?.assetId??receipt?.asset_id??"").toUpperCase();
+  const receiptFrom=String(receipt?.from??"");
+  const receiver=String(receipt?.to??"");
+  let amount=0n;try{amount=BigInt(String(receipt?.value??0))}catch{amount=0n}
+  if(kind==="transfer"&&receiptFrom===from&&receiver===RECEIVER&&asset==="KLV"&&amount>=min)return{receiver,amount,asset};
+ }
+ const contracts=raw?.Contract??raw?.contract??tx?.contracts??tx?.contract??tx?.Contract??[];
  if(!Array.isArray(contracts))return null;
- for(const c of contracts){const p=c?.Parameter??c?.parameter??{},type=String(p.type_url??p.typeUrl??c.type??c.contractType??"");
+ for(const c of contracts){const p=c?.Parameter??c?.parameter??{},type=String(p.type_url??p.typeUrl??c.typeString??c.type_string??c.type??c.contractType??"");
  if(!type.toLowerCase().includes("transfer"))continue;
- let x=null;const decoded=p.value&&typeof p.value==="object"?p.value:(c?.value&&typeof c.value==="object"?c.value:null);
- if(decoded){const amount=BigInt(String(decoded.amount??decoded.Amount??0));const rawReceiver=String(decoded.receiver??decoded.Receiver??"");let receiver=rawReceiver;
+ let x=null;const decoded=p.value&&typeof p.value==="object"?p.value:(c?.value&&typeof c.value==="object"?c.value:p);
+ if(decoded){const amount=BigInt(String(decoded.amount??decoded.Amount??0));const rawReceiver=String(decoded.receiver??decoded.Receiver??decoded.toAddress??decoded.to_address??"");let receiver=rawReceiver;
   if(!ADDR.test(receiver)){const bytes=b64(rawReceiver);if(bytes.length===32)receiver=bech32.encode("klv",bech32.toWords(bytes),120)}
-  x=receiver&&amount>0n?{receiver,amount,asset:String(decoded.kda??decoded.KDA??"")}:null;
+  x=receiver&&amount>0n?{receiver,amount,asset:String(decoded.kda??decoded.KDA??decoded.assetId??decoded.asset_id??"")}:null;
  }else x=transfer(String(p.value??c.value??""));
  if(x&&x.receiver===RECEIVER&&(!x.asset||x.asset.toUpperCase()==="KLV")&&x.amount>=min)return x}
  return null;
