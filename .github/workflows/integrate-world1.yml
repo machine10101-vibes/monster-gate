@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   merge-and-verify:
-    if: "!contains(github.event.head_commit.message, 'Verified World 1 PvP integration')"
+    if: "!contains(github.event.head_commit.message, 'Verified World 1 PvP integration') && !contains(github.event.head_commit.message, 'Finalize verified integration')"
     runs-on: ubuntu-latest
     steps:
       - name: Check out integration branch
@@ -130,5 +130,11 @@ jobs:
         run: npm run test --prefix server/persistence -- --test-force-exit
       - name: Build production client
         run: npm run build
-      - name: Push verified integration branch
-        run: git push origin HEAD:integrate/world1-into-main
+      - name: Sync latest integration commits and remove temporary triggers
+        run: |
+          git fetch origin integrate/world1-into-main
+          git merge --no-edit -m "Sync latest integration branch commits" FETCH_HEAD
+          rm -f tmp/world1-*-trigger*.txt
+          git add -A tmp
+          git commit -m "Finalize verified integration"
+          git push origin HEAD:integrate/world1-into-main
