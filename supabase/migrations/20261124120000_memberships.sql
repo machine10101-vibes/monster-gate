@@ -1,9 +1,9 @@
-create table public.memberships (
+create table if not exists public.memberships (
  user_id uuid primary key references auth.users(id) on delete cascade,
  klever_address text not null check (klever_address ~ '^klv1[02-9ac-hj-np-z]{58}$'),
  expires_at timestamptz not null, updated_at timestamptz not null default now()
 );
-create table public.membership_quotes (
+create table if not exists public.membership_quotes (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references auth.users(id) on delete cascade,
  klever_address text not null check (klever_address ~ '^klv1[02-9ac-hj-np-z]{58}$'),
@@ -12,7 +12,7 @@ create table public.membership_quotes (
  source_time timestamptz, expires_at timestamptz not null, used_at timestamptz,
  created_at timestamptz not null default now()
 );
-create table public.membership_payments (
+create table if not exists public.membership_payments (
  tx_hash text primary key check (tx_hash ~ '^[0-9a-f]{64}$'),
  user_id uuid not null references auth.users(id) on delete cascade,
  klever_address text not null check (klever_address ~ '^klv1[02-9ac-hj-np-z]{58}$'),
@@ -22,7 +22,7 @@ create table public.membership_payments (
  quote_id uuid not null references public.membership_quotes(id),
  created_at timestamptz not null default now()
 );
-create index membership_quotes_user_created_idx on public.membership_quotes(user_id,created_at desc);
+create index if not exists membership_quotes_user_created_idx on public.membership_quotes(user_id,created_at desc);
 alter table public.memberships enable row level security;
 alter table public.membership_quotes enable row level security;
 alter table public.membership_payments enable row level security;
