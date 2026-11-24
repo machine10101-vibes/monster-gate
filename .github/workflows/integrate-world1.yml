@@ -116,7 +116,7 @@ jobs:
             portals:""", 1)
           schema.write_text(s)
           PY
-          git add server/world.js server/protocol.js
+          git add server/world.js server/protocol.js server/tests/lib/helpers.js server/persistence/schema.js
           git commit -m "Verified World 1 PvP integration"
       - name: Install game dependencies
         run: npm ci
