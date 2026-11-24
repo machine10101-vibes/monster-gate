@@ -110,7 +110,9 @@ export async function ensureMembership(session, game) {
     let quote = null;
     let pollTimer = null;
     let pollInFlight = false;
-    let quoteLoading = false;\n    let paymentInFlight = false;\n    let paymentHash = '';
+    let quoteLoading = false;
+    let paymentInFlight = false;
+    let paymentHash = '';
     let pollCount = 0;
     const destination = 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv';
 
@@ -251,11 +253,12 @@ export async function ensureMembership(session, game) {
           setWatch('Refresh your quote', message, true);
           return;
         }
-        setWatch('Still watching for your payment', 'KleverScan is taking a moment to respond. We’ll retry automatically.', true);
+        setWatch('Still watching for your payment', 'Klever mainnet is taking a moment to respond. We’ll retry automatically.', true);
       } finally {
         pollInFlight = false;
         checkNow.disabled = false;
         if (!quote) {
+          payNow.disabled = true;
           checkNow.disabled = true;
           checkNow.textContent = 'Refresh quote to continue';
         } else if (checkNow.textContent !== 'Payment confirmed') {
@@ -273,7 +276,7 @@ export async function ensureMembership(session, game) {
       refresh.disabled = true;
       checkNow.disabled = true;
       livePrice.textContent = 'Fetching live KLV price…';
-      quoteExpiry.textContent = 'Bitcoin.me · KLV/USDT';
+      quoteExpiry.textContent = 'Swopus live pool · KLV/USDT';
       amount.textContent = '— KLV';
       copyAmount.disabled = true;
       setWatch('Preparing your Gate Pass', 'Getting a fresh KLV/USDT quote before you send anything.');
@@ -299,7 +302,32 @@ export async function ensureMembership(session, game) {
         refresh.disabled = false;
       }
     };
-    payNow.addEventListener('click', async () => {\n      if (settled || !quote || paymentInFlight) return;\n      paymentInFlight = true;\n      payNow.disabled = true;\n      refresh.disabled = true;\n      checkNow.disabled = true;\n      payNow.textContent = 'Approve in Klever Wallet…';\n      setWatch('Approve your payment in Klever Wallet', `Review the ${quote.klvAmount} KLV transfer to the Monster Gate membership vault. Your wallet will ask you to sign it.`);\n      try {\n        paymentHash = await sendSignedKlvTransfer(quote, status.walletAddress);\n        payNow.textContent = 'Payment sent';\n        setWatch('Transfer broadcast — verifying', 'Your signed transaction was submitted. We are waiting for Klever mainnet confirmation before activating access.');\n        schedulePoll(1000);\n        checkPayment();\n      } catch (error) {\n        const message = error?.message || 'The payment could not be signed.';\n        setWatch('Payment not sent', message, true);\n        payNow.textContent = 'Pay with Klever Wallet';\n        payNow.disabled = false;\n      } finally {\n        paymentInFlight = false;\n        refresh.disabled = false;\n        if (quote && !paymentHash) checkNow.disabled = false;\n      }\n    });\n    checkNow.addEventListener('click', () => {
+    payNow.addEventListener('click', async () => {
+      if (settled || !quote || paymentInFlight) return;
+      paymentInFlight = true;
+      payNow.disabled = true;
+      refresh.disabled = true;
+      checkNow.disabled = true;
+      payNow.textContent = 'Approve in Klever Wallet…';
+      setWatch('Approve your payment in Klever Wallet', `Review the ${quote.klvAmount} KLV transfer to the Monster Gate membership vault. Your wallet will ask you to sign it.`);
+      try {
+        paymentHash = await sendSignedKlvTransfer(quote, status.walletAddress);
+        payNow.textContent = 'Payment sent';
+        setWatch('Transfer broadcast — verifying', 'Your signed transaction was submitted. We are waiting for Klever mainnet confirmation before activating access.');
+        schedulePoll(1000);
+        checkPayment();
+      } catch (error) {
+        const message = error?.message || 'The payment could not be signed.';
+        setWatch('Payment not sent', message, true);
+        payNow.textContent = 'Pay with Klever Wallet';
+        payNow.disabled = false;
+      } finally {
+        paymentInFlight = false;
+        refresh.disabled = false;
+        if (quote && !paymentHash) checkNow.disabled = false;
+      }
+    });
+    checkNow.addEventListener('click', () => {
       if (pollTimer) clearTimeout(pollTimer);
       checkPayment();
     });
