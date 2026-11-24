@@ -156,11 +156,20 @@ async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>
   if(membership?.expires_at&&Date.parse(membership.expires_at)>Date.now())return out({ok:true,expiresAt:membership.expires_at});
   return out({error:"This quote has already been used. Refresh your quote."},409);
  }
- if(Date.now()-Date.parse(q.created_at)>7*24*60*60*1000)return out({error:"Your quote has expired. Refresh it to continue."},410);
+ const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+ if(Date.parse(q.created_at)<Date.parse(cutoff))return out({error:"Your quote has expired. Refresh it to continue."},410);
  const a=await walletFor(db,id);
  if(a instanceof Response)return a;
  if(!a||a!==q.klever_address)return out({error:"Your linked Klever wallet changed. Refresh your quote."},409);
- const rows=await recentIncoming(q);
+ // Include every recent unused quote for this account/wallet. If the player closes
+ // checkout after sending, a later checkout can still find the original payment.
+ const {data:pendingQuotes,error:pendingError}=await db.from("membership_quotes")
+  .select("*").eq("user_id",id).eq("klever_address",a).is("used_at",null)
+  .gte("created_at",cutoff).order("created_at",{ascending:true}).limit(100);
+ if(pendingError)return out({error:"Could not load pending membership quotes."},503);
+ const quotes=(pendingQuotes||[]).filter((item:any)=>item?.id&&Date.parse(item.created_at)>=Date.parse(cutoff));
+ if(!quotes.some((item:any)=>item.id===q.id))quotes.unshift(q);
+ const rows=await recentIncoming(quotes[0]||q);
  if(rows instanceof Response)return rows;
  let examined=0;
  for(const row of rows){
@@ -168,20 +177,26 @@ async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>
   const hash=String(tx?.hash??row?.hash??tx?.txHash??row?.txHash??"").trim().toLowerCase();
   if(!HASH.test(hash))continue;
   const stamp=epochMillis(tx?.timestamp??tx?.block?.timestamp??tx?.blockTimestamp??tx?.createdAt);
-  if(stamp&&(stamp<Date.parse(q.created_at)||stamp>Date.parse(q.expires_at)||stamp>Date.now()+60000))continue;
+  if(stamp&&stamp<Date.parse(cutoff))continue;
   const sender=String(tx?.sender??tx?.from??tx?.senderAddress??"");
   if(sender&&sender!==a)continue;
   const state=String(tx?.status??row?.status??"").toLowerCase();
   if(state&& !["success","onchain","on-chain","confirmed"].includes(state))continue;
   examined+=1;
-  let detail=row;
-  let payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+  let detail=row,matchedQuote:any=null,payment:any=null;
+  for(const candidate of quotes){
+   payment=validTransfer(detail,hash,a,BigInt(candidate.klv_amount_atomic),candidate.created_at,candidate.expires_at);
+   if(payment){matchedQuote=candidate;break}
+  }
   if(!payment){
    detail=await transactionByHash(hash);
    if(!detail)continue;
-   payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+   for(const candidate of quotes){
+    payment=validTransfer(detail,hash,a,BigInt(candidate.klv_amount_atomic),candidate.created_at,candidate.expires_at);
+    if(payment){matchedQuote=candidate;break}
+   }
   }
-  if(payment)return activatePayment(db,id,q,a,hash,payment);
+  if(payment&&matchedQuote)return activatePayment(db,id,matchedQuote,a,hash,payment);
   if(examined>=20)break;
  }
  return out({ok:false,found:false,checkedAt:new Date().toISOString()});
