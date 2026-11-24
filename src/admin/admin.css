@@ -795,3 +795,15 @@ tr:hover { background:rgba(231,197,106,.055); }
   .cards { grid-template-columns:minmax(0,1fr); }
   .page-heading h1 { font-size:16px; }
 }
+
+
+.activity-chart { min-width:0; padding:2px 2px 0; }
+.chart-meta { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:4px; }
+.chart-meta strong { display:block; color:var(--mg-gold-title); font:22px var(--font-px); }
+.chart-meta small,.chart-meta > span { color:var(--mg-muted); font-size:11px; }
+.chart-meta small { display:block; margin-top:7px; }
+.activity-chart svg { display:block; width:100%; height:190px; overflow:visible; }
+.chart-grid { stroke:rgba(96,119,145,.22); stroke-width:1; stroke-dasharray:4 7; }
+.chart-line { fill:none; stroke:#e7c56a; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 2px 5px rgba(231,197,106,.2)); }
+.chart-point { fill:#f4dfaa; stroke:#243a54; stroke-width:2; }
+.chart-labels { display:flex; justify-content:space-between; gap:8px; color:var(--mg-muted); font-size:10px; }
