@@ -1050,7 +1050,8 @@ class Game {
     }
     this.hideWorldPicker();
     this.charSelect?.hideWorldMenu?.();
-    this.enterWorld(char);
+    await this.enterWorld(char);
+    if (!this.started) return;
     await this.ensureOnlineClient();
   }
 
