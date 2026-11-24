@@ -1,0 +1,130 @@
+/* Monster Gate — Gate Pass checkout */
+.mg-gatepass-overlay {
+  position: fixed; inset: 0; z-index: 10060; display: grid; place-items: center;
+  padding: 20px; overflow: auto; background: rgba(5, 6, 12, .84);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  animation: mg-gatepass-fade .22s ease-out;
+}
+.mg-gatepass-card {
+  --gp-gold: #f2c77d; --gp-amber: #d99a4b; --gp-muted: #b9b5c1;
+  position: relative; isolation: isolate; width: min(100%, 560px);
+  max-height: min(94dvh, 860px); overflow: auto; padding: 28px;
+  color: #f7f0e7; border: 1px solid rgba(230, 177, 98, .65); border-radius: 22px;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(182, 104, 42, .24), transparent 52%),
+    linear-gradient(155deg, #211d29 0%, #14131d 56%, #101019 100%);
+  box-shadow: 0 30px 100px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.07), 0 0 0 5px rgba(205,145,71,.07);
+  font-family: inherit;
+}
+.mg-gatepass-card::before, .mg-gatepass-card::after {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+}
+.mg-gatepass-card::before {
+  inset: 8px; border: 1px solid rgba(224, 174, 104, .16); border-radius: 15px;
+}
+.mg-gatepass-card::after {
+  width: 210px; height: 210px; right: -110px; top: 150px; border-radius: 50%;
+  background: rgba(155, 87, 42, .13); filter: blur(35px);
+}
+.mg-gatepass-head { display:flex; align-items:center; gap:13px; padding-right:36px; }
+.mg-gatepass-mark {
+  display:grid; place-items:center; flex:0 0 46px; width:46px; height:46px;
+  border:1px solid rgba(242,199,125,.75); border-radius:14px; color:#21151a;
+  background:linear-gradient(145deg,#ffe0a3,#bd7c37);
+  box-shadow:0 5px 22px rgba(211,146,65,.25), inset 0 1px rgba(255,255,255,.55);
+  font: 700 16px/1 "Press Start 2P", monospace;
+}
+.mg-gatepass-kicker { margin:0 0 5px; color:var(--gp-amber); font-size:10px; font-weight:800; letter-spacing:2.3px; }
+.mg-gatepass-brand { margin:0; color:#f6e8d2; font-size:13px; font-weight:800; letter-spacing:1.1px; }
+.mg-gatepass-close {
+  position:absolute; right:19px; top:17px; display:grid; place-items:center;
+  width:38px; height:38px; padding:0; border:1px solid rgba(255,255,255,.12);
+  border-radius:12px; color:#e9dece; background:rgba(255,255,255,.045);
+  font: 24px/1 inherit; cursor:pointer; transition:background .16s,border-color .16s,transform .16s;
+}
+.mg-gatepass-close:hover { background:rgba(255,255,255,.11); border-color:rgba(242,199,125,.5); transform:rotate(5deg); }
+.mg-gatepass-title { margin:24px 0 8px; color:#fff1d8; font-size:clamp(27px,6vw,36px); line-height:1.12; letter-spacing:-.8px; }
+.mg-gatepass-lede { max-width:440px; margin:0; color:#c9c3ce; font-size:14px; line-height:1.65; }
+.mg-gatepass-pricegrid { display:grid; grid-template-columns:1fr 1fr; gap:11px; margin:22px 0 13px; }
+.mg-gatepass-pricebox {
+  min-width:0; padding:16px; border:1px solid rgba(242,199,125,.22); border-radius:15px;
+  background:linear-gradient(145deg,rgba(255,255,255,.065),rgba(255,255,255,.025));
+}
+.mg-gatepass-pricebox.primary { border-color:rgba(242,199,125,.55); background:linear-gradient(145deg,rgba(171,105,48,.22),rgba(255,255,255,.035)); }
+.mg-gatepass-label { display:block; margin-bottom:8px; color:#aaa5b2; font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; }
+.mg-gatepass-usd { display:block; color:#ffe0a6; font-size:28px; font-weight:850; letter-spacing:-.8px; }
+.mg-gatepass-days { display:block; color:#f2d5a7; font-size:21px; font-weight:800; }
+.mg-gatepass-tokenline { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 18px; padding:11px 13px; border:1px solid rgba(255,255,255,.09); border-radius:12px; background:rgba(0,0,0,.2); }
+.mg-gatepass-tokenline strong { color:#f1d09b; font-size:13px; }
+.mg-gatepass-tokenline span { color:#aaa5b2; font-size:11px; text-align:right; }
+.mg-gatepass-sectionlabel { display:block; margin:17px 0 8px; color:#e8d0aa; font-size:11px; font-weight:800; letter-spacing:1.1px; text-transform:uppercase; }
+.mg-gatepass-amountrow, .mg-gatepass-addressrow {
+  display:flex; align-items:center; gap:10px; min-width:0; padding:12px 13px;
+  border:1px solid rgba(242,199,125,.27); border-radius:13px; background:rgba(4,5,10,.52);
+}
+.mg-gatepass-amount { min-width:0; flex:1; color:#ffe0a6; font:700 18px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+.mg-gatepass-address { min-width:0; flex:1; color:#e4d9ca; font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; user-select:all; }
+.mg-gatepass-copy {
+  flex:0 0 auto; padding:9px 11px; border:1px solid rgba(242,199,125,.34); border-radius:10px;
+  color:#f8dfb5; background:rgba(174,111,52,.15); font:700 11px inherit; cursor:pointer;
+  transition:background .15s,border-color .15s;
+}
+.mg-gatepass-copy:hover { background:rgba(174,111,52,.3); border-color:rgba(242,199,125,.7); }
+.mg-gatepass-copy:disabled { opacity:.45; cursor:wait; }
+.mg-gatepass-steps { display:grid; gap:9px; margin:18px 0; }
+.mg-gatepass-step { display:flex; align-items:flex-start; gap:11px; color:#d0c9d2; font-size:12px; line-height:1.55; }
+.mg-gatepass-stepnum {
+  display:grid; place-items:center; flex:0 0 23px; width:23px; height:23px; border-radius:8px;
+  color:#2a1b16; background:linear-gradient(145deg,#ffe0a3,#c17c39); font-size:11px; font-weight:900;
+}
+.mg-gatepass-watch {
+  display:flex; align-items:flex-start; gap:12px; margin-top:18px; padding:14px;
+  border:1px solid rgba(118,185,155,.28); border-radius:14px; background:rgba(36,105,82,.13);
+}
+.mg-gatepass-watch.error { border-color:rgba(225,142,111,.38); background:rgba(128,56,44,.14); }
+.mg-gatepass-watchicon {
+  position:relative; flex:0 0 10px; width:10px; height:10px; margin:4px 2px 0;
+  border-radius:50%; background:#73d5a4; box-shadow:0 0 0 5px rgba(115,213,164,.12),0 0 16px rgba(115,213,164,.55);
+}
+.mg-gatepass-watchicon::after { content:""; position:absolute; inset:-5px; border:1px solid rgba(115,213,164,.42); border-radius:50%; animation:mg-gatepass-pulse 2s ease-out infinite; }
+.mg-gatepass-watch.error .mg-gatepass-watchicon { background:#e7a087; box-shadow:0 0 0 5px rgba(231,160,135,.12); }
+.mg-gatepass-watch.error .mg-gatepass-watchicon::after { display:none; }
+.mg-gatepass-watchcopy { min-width:0; flex:1; }
+.mg-gatepass-watchtitle { margin:0 0 4px; color:#b8f0d1; font-size:12px; font-weight:850; }
+.mg-gatepass-watch.error .mg-gatepass-watchtitle { color:#ffc4ae; }
+.mg-gatepass-watchtext { margin:0; color:#b8c8c1; font-size:11px; line-height:1.55; overflow-wrap:anywhere; }
+.mg-gatepass-actions { display:grid; grid-template-columns:1fr auto; gap:10px; margin-top:16px; }
+.mg-gatepass-check, .mg-gatepass-refresh {
+  min-height:46px; padding:12px 16px; border-radius:12px; font:800 12px inherit; cursor:pointer;
+  transition:transform .15s,filter .15s,background .15s;
+}
+.mg-gatepass-check {
+  border:1px solid #f1c57c; color:#281a13;
+  background:linear-gradient(145deg,#ffe2a7,#d18b43);
+  box-shadow:0 7px 20px rgba(184,116,50,.2),inset 0 1px rgba(255,255,255,.55);
+}
+.mg-gatepass-refresh { border:1px solid rgba(255,255,255,.15); color:#ded5ca; background:rgba(255,255,255,.045); }
+.mg-gatepass-check:hover:not(:disabled), .mg-gatepass-refresh:hover:not(:disabled) { transform:translateY(-1px); filter:brightness(1.08); }
+.mg-gatepass-check:disabled, .mg-gatepass-refresh:disabled { opacity:.55; cursor:wait; }
+.mg-gatepass-footnote { margin:14px 0 0; color:#888493; font-size:10px; line-height:1.6; text-align:center; }
+.mg-gatepass-explorer { color:#f1c77e; text-decoration:none; border-bottom:1px solid rgba(241,199,126,.35); }
+.mg-gatepass-explorer:hover { color:#ffe3b0; }
+@keyframes mg-gatepass-fade { from { opacity:0; } to { opacity:1; } }
+@keyframes mg-gatepass-pulse { 0% { transform:scale(.8); opacity:.85; } 100% { transform:scale(2.2); opacity:0; } }
+@media (max-width:520px) {
+  .mg-gatepass-overlay { padding:10px; align-items:end; }
+  .mg-gatepass-card { padding:23px 18px 18px; border-radius:20px 20px 15px 15px; max-height:95dvh; }
+  .mg-gatepass-title { margin-top:20px; }
+  .mg-gatepass-pricegrid { gap:8px; }
+  .mg-gatepass-pricebox { padding:13px; }
+  .mg-gatepass-usd { font-size:25px; }
+  .mg-gatepass-amount { font-size:15px; }
+  .mg-gatepass-addressrow { align-items:flex-start; }
+  .mg-gatepass-copy { padding:8px; }
+  .mg-gatepass-actions { grid-template-columns:1fr; }
+  .mg-gatepass-refresh { min-height:40px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .mg-gatepass-overlay, .mg-gatepass-watchicon::after { animation:none; }
+  .mg-gatepass-close, .mg-gatepass-copy, .mg-gatepass-check, .mg-gatepass-refresh { transition:none; }
+}
