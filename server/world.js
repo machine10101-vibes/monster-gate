@@ -51,6 +51,7 @@ export class World {
     this.now = opts.now || (() => Date.now());
     this.tickMs = opts.tickMs ?? Math.round(1000 / TICK_HZ);
     this.verifyToken = opts.verifyToken;
+    this.verifyMembership = opts.verifyMembership;
     this.aoi = opts.aoi ?? AOI_RADIUS;
     this.aoiNear = opts.aoiNear ?? AOI_NEAR;
     this.farHz = opts.farHz ?? AOI_FAR_HZ;
@@ -257,7 +258,7 @@ export class World {
     const hello = readHello(msg);
     let ident;
     try {
-      ident = await identify(hello, this.env, this.verifyToken);
+      ident = await identify(hello, this.env, this.verifyToken, this.verifyMembership);
     } catch (err) {
       if (session.helloTimer) clearTimeout(session.helloTimer);
       const code = err instanceof ProtocolError ? err.code : 'auth';
@@ -894,6 +895,7 @@ export async function createWorldServer(options = {}) {
     now: options.now,
     tickMs: options.tickMs,
     verifyToken: options.verifyToken,
+    verifyMembership: options.verifyMembership,
     aoi: options.aoi,
     aoiNear: options.aoiNear,
     farHz: options.farHz,
