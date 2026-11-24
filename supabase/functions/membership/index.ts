@@ -223,7 +223,16 @@ async function watchPayment(db:Admin,id:string,quoteId:string,requestedHash=""):
  const a=await walletFor(db,id);
  if(a instanceof Response)return a;
  if(!a||a!==q.klever_address)return out({error:"Your linked Klever wallet changed. Refresh your quote."},409);
- if(requestedHash){\n  const hash=requestedHash.trim().toLowerCase();\n  if(!HASH.test(hash))return out({error:"Klever returned an invalid transaction hash."},400);\n  const detail=await transactionByHash(hash);\n  if(detail){\n   const payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);\n   if(payment)return activatePayment(db,id,q,a,hash,payment);\n  }\n }\n // Include every recent unused quote for this account/wallet. If the player closes
+ if(requestedHash){
+  const hash=requestedHash.trim().toLowerCase();
+  if(!HASH.test(hash))return out({error:"Klever returned an invalid transaction hash."},400);
+  const detail=await transactionByHash(hash);
+  if(detail){
+   const payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+   if(payment)return activatePayment(db,id,q,a,hash,payment);
+  }
+ }
+ // Include every recent unused quote for this account/wallet. If the player closes
  // checkout after sending, a later checkout can still find the original payment.
  const {data:pendingQuotes,error:pendingError}=await db.from("membership_quotes")
   .select("*").eq("user_id",id).eq("klever_address",a).is("used_at",null)
