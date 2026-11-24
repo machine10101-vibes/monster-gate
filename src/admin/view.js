@@ -182,6 +182,51 @@ function sortHead(label, key, ui) {
   return `<th><button type="button" data-sort="${esc(key)}" aria-sort="${on ? (ui.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">${esc(label)}${mark}</button></th>`;
 }
 
+function dateLabel(ms) {
+  return ms ? new Date(ms).toLocaleString() : '—';
+}
+
+function accessFacts(player, now = Date.now()) {
+  if (player.kind !== 'account') return '';
+  const wallet = player.walletAddress
+    ? `Connected · ${esc(player.walletAddress.slice(0, 9))}…${esc(player.walletAddress.slice(-6))}`
+    : 'Not connected';
+  const paidActive = player.paidExpiresAt > now;
+  const trialActive = player.trialPassExpiresAt > now;
+  const membershipActive = player.membershipExpiresAt > now;
+  return `<section class="sheet mg-frame account-access">
+    <header><span>Account access</span><h3>Wallet & Gate Pass</h3></header>
+    <dl class="facts">
+      <div><dt>Connected wallet</dt><dd>${wallet}</dd></div>
+      <div><dt>Paid subscription</dt><dd>${paidActive ? 'Active' : 'Not active'} · ${esc(dateLabel(player.paidExpiresAt))}</dd></div>
+      <div><dt>10-day trial pass</dt><dd>${trialActive ? 'Active' : player.trialPassExpiresAt ? 'Expired' : 'Not used'} · ${esc(dateLabel(player.trialPassExpiresAt))}</dd></div>
+      <div><dt>Gate Pass access</dt><dd>${membershipActive ? 'Active' : 'Inactive'} · ${esc(dateLabel(player.membershipExpiresAt))}</dd></div>
+    </dl>
+  </section>`;
+}
+
+function accountsTab(model) {
+  const rows = model.players.filter((player) => player.kind === 'account');
+  const body = rows.length ? rows.map((player) => {
+    const wallet = player.walletAddress ? 'Connected' : '—';
+    const paid = player.paidExpiresAt > model.now ? 'Active' : '—';
+    const trial = player.trialPassExpiresAt > model.now ? 'Active' : player.trialPassExpiresAt ? 'Expired' : '—';
+    const gate = player.membershipExpiresAt > model.now ? 'Active' : 'Inactive';
+    return `<tr class="${player.id === model.selected?.id ? 'on' : ''}" data-player="${esc(player.id)}">
+      <td data-label="Account"><b>${esc(player.email || player.name)}</b><small>Joined ${esc(dateLabel(player.createdAt))}</small></td>
+      <td data-label="Wallet">${esc(wallet)}</td>
+      <td data-label="Paid subscription">${esc(paid)}<small>${esc(dateLabel(player.paidExpiresAt))}</small></td>
+      <td data-label="10-day pass">${esc(trial)}<small>${esc(dateLabel(player.trialPassExpiresAt))}</small></td>
+      <td data-label="Gate Pass">${esc(gate)}<small>${esc(dateLabel(player.membershipExpiresAt))}</small></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">No email accounts in this slice.</td></tr>';
+  return `<div class="table-wrap mg-frame">
+    <table class="hunters account-table"><thead><tr>
+      <th>Account</th><th>Wallet</th><th>Paid subscription</th><th>10-day pass</th><th>Gate Pass</th>
+    </tr></thead><tbody>${body}</tbody></table>
+  </div><p class="more">${rows.length.toLocaleString()} email accounts. Select a row for full account and hunter details.</p>`;
+}
+
 function huntersTab(model, ui) {
   const rows = model.players.slice(0, RENDER_CAP);
   const body = rows.length
@@ -300,7 +345,7 @@ export function passCodesHtml(ui) {
 
 export function stageHtml(model, ui) {
   if (!model) return '<p class="empty">Opening the guild record…</p>';
-  if (ui.tab === 'hunters') return huntersTab(model, ui);
+  if (ui.tab === 'accounts') return accountsTab(model);\n  if (ui.tab === 'hunters') return huntersTab(model, ui);
   if (ui.tab === 'coffers') return coffersTab(model, ui);
   if (ui.tab === 'bestiary') return bestiaryTab(model, ui);
   if (ui.tab === 'paths') return pathsTab(model, ui);
