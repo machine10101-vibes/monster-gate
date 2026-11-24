@@ -981,7 +981,6 @@ export class Player {
             armRz = family === 'spear' ? 0.12 : 0.28 * comboSide;
             armL = family === 'spear' ? lerp(-0.8, pre ? -1.45 : -0.75, q) : lerp(-0.9, pre ? -2.05 : -1.0, q);
             armLz = family === 'spear' ? -0.12 : -0.2 * comboSide;
-            const wind = pre ? q : 1 - q;
             if (family === 'spear') {
               // A polearm is driven from the rear hand with the lead hand guiding the shaft.
               armR = pre ? lerp(-1.05, -2.0, q) : lerp(-2.0, -0.25, q);
