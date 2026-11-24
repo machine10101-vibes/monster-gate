@@ -274,9 +274,10 @@ async function watchPayment(db:Admin,id:string,quoteId:string,requestedHash=""):
 }
 
 async function handle(db:Admin,id:string,b:any){
- if(b.op==="status"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({connected:false,active:false});
+ if(b.op==="status"){const a=await walletFor(db,id);if(a instanceof Response)return a;
  const {data,error}=await db.from("memberships").select("expires_at").eq("user_id",id).maybeSingle();if(error)return out({error:"Could not read membership."},503);
- return out({connected:true,walletAddress:a,expiresAt:data?.expires_at||null,active:!!data?.expires_at&&Date.parse(data.expires_at)>Date.now()})}
+ const expiresAt=data?.expires_at||null,active=!!expiresAt&&Date.parse(expiresAt)>Date.now();
+ return out({connected:!!a,walletAddress:a||null,expiresAt,active})}
  if(b.op==="watch")return watchPayment(db,id,String(b.quoteId||""),String(b.txHash||""));
  if(b.op==="quote"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({error:"Connect your Klever wallet in character selection before paying."},409);
  const p=await ticker();if(!p)return out({error:"Swopus live KLV/USDT price feed is temporarily unavailable. Please refresh your quote."},503);
