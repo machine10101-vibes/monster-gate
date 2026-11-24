@@ -1184,7 +1184,7 @@ class Game {
     this.membershipChecking = true;
     try {
       const account = readAccount();
-      if (!account?.userId || !account?.accessToken) {
+      if (this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken) {
         this.charSelect?.note?.('Sign in with an account and connect Klever to play.', true, true);
         this.openSocialSignIn();
         return;
