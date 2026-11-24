@@ -112,7 +112,7 @@ export async function ensureMembership(session, game) {
     priceGrid.append(usdBox, daysBox);
     const tokenLine = node('div', 'mg-gatepass-tokenline');
     const livePrice = node('strong', '', 'Fetching live KLV price…');
-    const quoteExpiry = node('span', '', 'Bitcoin.me → MEXC backup · KLV/USDT');
+    const quoteExpiry = node('span', '', 'Swopus live pool · KLV/USDT');
     tokenLine.append(livePrice, quoteExpiry);
 
     const amountLabel = node('span', 'mg-gatepass-sectionlabel', 'Your exact payment amount');
@@ -252,7 +252,7 @@ export async function ensureMembership(session, game) {
         currentSession = result.session;
         quote = result.data;
         livePrice.textContent = `1 KLV = $${Number(quote.usdPrice).toFixed(8)} USDT`;
-        quoteExpiry.textContent = `${quote.priceSource || 'Bitcoin.me'} · Quote valid until ${dateLabel(quote.expiresAt)}`;
+        quoteExpiry.textContent = `${quote.priceSource || 'Swopus'} · Quote valid until ${dateLabel(quote.expiresAt)}`;
         amount.textContent = `${quote.klvAmount} KLV`;
         copyAmount.disabled = false;
         setWatch('Waiting for your KLV transfer', 'Once you send the exact amount from your linked wallet, we’ll detect it and activate your pass automatically.');
