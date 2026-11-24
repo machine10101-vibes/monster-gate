@@ -52,6 +52,7 @@ test('admin account records include wallet, paid membership and trial pass facts
   const adminView = src('../src/admin/view.js');
   const adminPage = src('../admin.html');
   const migration = src('../supabase/migrations/20261124150000_admin_account_access_facts.sql');
+  const allAccounts = src('../supabase/migrations/20261124153000_admin_all_auth_accounts.sql');
   assert.match(ledger, /walletAddress: kind === 'account'/);
   assert.match(ledger, /paidExpiresAt: kind === 'account'/);
   assert.match(ledger, /trialPassExpiresAt: kind === 'account'/);
@@ -62,4 +63,6 @@ test('admin account records include wallet, paid membership and trial pass facts
   assert.match(migration, /trial_pass_expires_at/);
   assert.match(migration, /paid_expires_at/);
   assert.match(migration, /klever_address/);
+  assert.match(allAccounts, /from auth\.users u/i);
+  assert.match(allAccounts, /left join public\.hunter_accounts h/i);
 });
