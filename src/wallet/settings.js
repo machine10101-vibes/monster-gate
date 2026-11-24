@@ -2,7 +2,6 @@ import { decorateFrame } from '../ui/theme.js';
 import { shortAddress } from './klever.js';
 import { isMockWallet, mockAddress } from './mock.js';
 import { linkKleverWallet, linkedWalletStatus, unlinkKleverWallet } from './link.js';
-import { ensureMembership, membershipStatus } from './membership.js';
 
 function el(tag, className, text) {
   const n = document.createElement(tag);
@@ -98,6 +97,7 @@ export function mountWalletSettings(body, game) {
     passAction.disabled = true;
     passStatus.textContent = 'Preparing secure checkout…';
     try {
+      const { ensureMembership, membershipStatus } = await import('./membership.js');
       await ensureMembership(game.wallet, game);
       membership = await membershipStatus(game.wallet);
       paint();
@@ -131,7 +131,7 @@ export function mountWalletSettings(body, game) {
   };
 
   paint();
-  membershipStatus(game.wallet).then((status) => { membership = status; paint(); }).catch(() => { passStatus.textContent = 'Subscription status is temporarily unavailable.'; });
+  import('./membership.js').then(({ membershipStatus }) => membershipStatus(game.wallet)).then((status) => { membership = status; paint(); }).catch(() => { passStatus.textContent = 'Subscription status is temporarily unavailable.'; });
   linkedWalletStatus(game.wallet).then((status) => {
     if (status.address !== undefined) {
       address = status.address || '';
