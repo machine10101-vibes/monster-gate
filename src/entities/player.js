@@ -548,8 +548,10 @@ export class Player {
     if (wantShield && this.state === 'idle') this.state = 'idle';
     if (this.model.shieldG) this.model.shieldG.visible = this.shielding;
     const dualHeld = DUAL_KINDS.has(this.heldKind);
+    const heldFamily = weaponFamily({ kind: 'melee' }, this.heldKind);
+    const twoHandHeld = isTwoHandedFamily(heldFamily);
     if (this.model.offhand) this.model.offhand.visible = dualHeld && !this.shielding;
-    if (this.model.bookG) this.model.bookG.visible = !dualHeld && !this.shielding;
+    if (this.model.bookG) this.model.bookG.visible = !dualHeld && !twoHandHeld && !this.shielding;
 
     let speed = 0;
     const moveDir = new THREE.Vector3();
@@ -897,6 +899,8 @@ export class Player {
     const mv = this.moveAmt;
     const run = Math.min(1.1, mv);
     const heldBlade = BLADES.has(this.heldKind);
+    const heldFamily = weaponFamily({ kind: 'melee' }, this.heldKind);
+    const twoHandHeld = isTwoHandedFamily(heldFamily);
     let armR = heldBlade ? -0.85 : -0.25;
     let armL = 0;
     let armRz = 0;
@@ -917,6 +921,18 @@ export class Player {
     let rate = 22;
 
     const idle = 1 - Math.min(1, mv * 2);
+    if (twoHandHeld) {
+      // Keep both hands on long hafts, stocks and two-handed grips while moving.
+      armR = -0.92;
+      armL = heldFamily === 'bow' || heldFamily === 'crossbow' ? -0.38 : -0.78;
+      armLz = -0.12;
+    } else if (heldFamily === 'dual') {
+      armR = -0.72;
+      armL = -0.68;
+    } else if (heldFamily === 'magic') {
+      armR = -0.62;
+      armL = -0.18;
+    }
     armR += walk * 0.55 * mv * (heldBlade ? 0.4 : 1);
     armL = -walk * 1.0 * mv;
     armLz = 0.05 + run * 0.1;
