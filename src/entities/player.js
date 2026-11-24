@@ -934,9 +934,9 @@ export class Player {
       armL = -0.18;
     }
     armR += walk * 0.55 * mv * (heldBlade ? 0.4 : 1);
-    armL = -walk * 1.0 * mv;
-    armLz = 0.05 + run * 0.1;
-    armRz = -0.05 - run * 0.08;
+    armL = twoHandHeld ? -0.78 + walk * 0.18 * mv : heldFamily === 'dual' ? -0.68 - walk * 0.28 * mv : -walk * 1.0 * mv;
+    armLz = twoHandHeld ? -0.12 + run * 0.025 : 0.05 + run * 0.1;
+    armRz = -0.05 - run * (twoHandHeld ? 0.025 : 0.08);
     let legL = walk * 0.8 * mv;
     let legR = -walk * 0.8 * mv;
     liftL = Math.max(0, -cs) * 0.11 * run;
