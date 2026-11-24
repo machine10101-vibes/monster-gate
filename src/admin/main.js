@@ -12,7 +12,7 @@ import { decorateAllFrames } from '../ui/theme.js';
 
 if (typeof document !== 'undefined') document.documentElement.classList.add('ledger');
 
-const TABS = ['ledger', 'hunters', 'coffers', 'bestiary', 'paths', 'passes'];
+const TABS = ['ledger', 'hunters', 'coffers', 'bestiary', 'paths', 'passes', 'accounts'];
 const WINDOWS = ['all', '1', '7', '30'];
 const state = {
   tab: 'ledger',
@@ -277,7 +277,7 @@ function onKey(event) {
     $('q').focus();
     return;
   }
-  if (event.key >= '1' && event.key <= '6') {
+  if (event.key >= '1' && event.key <= '7') {
     state.tab = TABS[Number(event.key) - 1];
     paint();
     return;
