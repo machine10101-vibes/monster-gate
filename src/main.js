@@ -1071,7 +1071,7 @@ class Game {
     await this.ensureOnlineClient();
   }
 
-  pickWorldOnline() {
+  async pickWorldOnline() {
     if (this.started || this.worldJoining) return;
     const search = typeof location !== 'undefined' ? location.search : '';
     if (!worldServerConfigured(search)) return;
@@ -1081,11 +1081,32 @@ class Game {
       this.openSocialSignIn();
       return;
     }
+
+    // World 1 navigates directly to the online client, so enforce the same
+    // membership gate here before leaving the picker (not only at solo entry).
     this.worldJoining = true;
     this.paintWorldPickerUi();
-    rememberWorldMode('online');
-    markWorldJoin('online');
-    enterOnlineWorld();
+    try {
+      const account = readAccount();
+      if (this.wallet?.kind !== 'email' || !account?.userId
+        || this.wallet.userId !== account.userId || !account?.accessToken) {
+        this.openSocialSignIn();
+        return;
+      }
+      const allowed = await ensureMembership(account, this);
+      if (!allowed) return;
+      this.membershipGatePassed = true;
+      rememberWorldMode('online');
+      markWorldJoin('online');
+      enterOnlineWorld();
+    } catch (error) {
+      const message = error?.message || 'Could not verify your Gate Pass.';
+      this.charSelect?.note?.(message, true, true);
+      this.hud?.toast?.(message, 4200);
+    } finally {
+      this.worldJoining = false;
+      if (!this.started) this.paintWorldPickerUi();
+    }
   }
 
   pickWorldSolo() {
