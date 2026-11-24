@@ -54,9 +54,15 @@ function dateLabel(value) {
 }
 
 export async function ensureMembership(session, game) {
+  let currentSession = session;
   let status;
   try {
-    status = await membershipStatus(session);
+    const checked = await post(currentSession, { op: 'status' });
+    currentSession = checked.session;
+    status = checked.data;
+    if (status.walletAddress && currentSession.kleverAddress !== status.walletAddress) {
+      currentSession = saveAccount({ ...currentSession, kleverAddress: status.walletAddress });
+    }
   } catch (error) {
     game.charSelect?.note?.(error.message || 'Could not check membership.', true, true);
     return false;
@@ -139,7 +145,8 @@ export async function ensureMembership(session, game) {
       submit.textContent = 'Checking Klever mainnet…';
       error.textContent = '';
       try {
-        const result = await post(session, { op: 'verify', quoteId: quote.quoteId, txHash });
+        const result = await post(currentSession, { op: 'verify', quoteId: quote.quoteId, txHash });
+        currentSession = result.session;
         error.textContent = `Membership active until ${dateLabel(result.data.expiresAt)}.`;
         submit.textContent = 'Membership active';
         setTimeout(() => finish(true), 650);
@@ -154,7 +161,8 @@ export async function ensureMembership(session, game) {
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
     document.body.append(overlay);
     hash.focus();
-    post(session, { op: 'quote' }).then(({ data }) => {
+    post(currentSession, { op: 'quote' }).then(({ data, session: refreshed }) => {
+      currentSession = refreshed;
       quote = data;
       price.textContent = `$5.00 USD = ${data.klvAmount} KLV`;
       details.textContent = `1 KLV = $${Number(data.usdPrice).toFixed(8)} USDT · Quote valid until ${dateLabel(data.expiresAt)}.`;
