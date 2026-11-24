@@ -1063,7 +1063,6 @@ export class Player {
             armLz = 0.12 * p;
             torsoYaw = -0.34 * p;
             lean = -0.04 * p - rel * 0.06;
-            eR = 0.18 + 0.95 * p;
           } else if (family === 'crossbow') {
             // Stock braced at the shoulder; lead hand supports the fore-end.
             armR = lerp(-0.5, -1.42, p);
@@ -1072,8 +1071,6 @@ export class Player {
             armLz = 0.08 * p;
             torsoYaw = -0.18 * p;
             lean = -0.08 * p - rel * 0.04;
-            eR = 0.2 + 0.32 * p;
-            eL = 0.22 + 0.28 * p;
           } else {
             // Focus weapons rise into a controlled casting line rather than mimicking a bow draw.
             armR = lerp(-0.35, -1.85, p);
