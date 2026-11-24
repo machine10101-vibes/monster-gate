@@ -95,7 +95,7 @@ async function handle(db:Admin,id:string,b:any){
  if(qe)return out({error:"Could not read payment quote."},503);if(!q||q.used_at||Date.parse(q.expires_at)<=Date.now())return out({error:"Quote expired. Request a new one."},410);
  const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a||a!==q.klever_address)return out({error:"Your linked wallet changed. Request a new quote."},409);
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);let chain:any;
- try{const r=await fetch(CHAIN_API+"/transaction/"+hash+"?withResults=true",{signal:ctl.signal});if(!r.ok)return out({error:r.status===404?"Transaction not indexed on Klever mainnet yet.":"Klever could not confirm the transaction."},409);chain=await r.json()}
+ try{const r=await fetch(CHAIN_API+"/v1.0/transaction/"+hash,{signal:ctl.signal});if(!r.ok)return out({error:r.status===404?"Transaction not indexed on Klever mainnet yet.":"Klever could not confirm the transaction."},409);chain=await r.json()}
  catch{return out({error:"Klever mainnet is unavailable. Try again shortly."},503)}finally{clearTimeout(timer)}
  const payment=validTransfer(chain,hash,a,BigInt(q.klv_amount_atomic),q.created_at);if(!payment)return out({error:"The confirmed transaction does not match the required KLV amount, linked sender and membership receiving address."},400);
  const {data:activated,error}=await db.rpc("activate_membership_service",{p_user_id:id,p_klever_address:a,p_tx_hash:hash,p_receiver_address:RECEIVER,p_amount_atomic:payment.amount.toString(),p_usd_price:q.usd_price,p_quote_id:qid});
