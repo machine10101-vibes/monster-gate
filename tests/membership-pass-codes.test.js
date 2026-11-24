@@ -46,3 +46,20 @@ test('the Gate Pass window accepts free codes even without a connected Klever wa
   assert.match(api, /export async function issuePassCode/);
   assert.match(page, /data-tab="passes"/);
 });
+
+test('admin account records include wallet, paid membership and trial pass facts', () => {
+  const ledger = src('../supabase/functions/_shared/ledger.js');
+  const adminView = src('../src/admin/view.js');
+  const adminPage = src('../admin.html');
+  const migration = src('../supabase/migrations/20261124150000_admin_account_access_facts.sql');
+  assert.match(ledger, /walletAddress: kind === 'account'/);
+  assert.match(ledger, /paidExpiresAt: kind === 'account'/);
+  assert.match(ledger, /trialPassExpiresAt: kind === 'account'/);
+  assert.match(adminView, /function accountsTab/);
+  assert.match(adminView, /Paid subscription/);
+  assert.match(adminView, /10-day trial pass/);
+  assert.match(adminPage, /data-tab="accounts"/);
+  assert.match(migration, /trial_pass_expires_at/);
+  assert.match(migration, /paid_expires_at/);
+  assert.match(migration, /klever_address/);
+});
