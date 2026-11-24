@@ -41,13 +41,26 @@ async function ticker(){
    if(j?.success!==true||!row||!Number.isFinite(p)||p<=0)continue;
    const sourceMillis=epochMillis(row.time??row.timestamp??row.updatedAt??row.updated_at)??epochMillis(r.headers.get("date"));
    if(!sourceMillis||sourceMillis>Date.now()+120000||Date.now()-sourceMillis>600000)continue;
-   return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),at:Date.now()};
+   return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),source:"Bitcoin.me",at:Date.now()};
   }catch{
    /* Try the alternate documented ticker endpoint. */
   }finally{clearTimeout(t)}
  }
- return null;
+ // Bitcoin.me can have a stale last-trade timestamp when its KLV market is quiet.
+ // MEXC's public recent-trades endpoint supplies both the KLV/USDT price and trade time.
+ const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);
+ try{
+  const r=await fetch("https://api.mexc.com/api/v3/trades?symbol=KLVUSDT&limit=1",{
+   signal:c.signal,headers:{accept:"application/json","cache-control":"no-cache"},
+  });
+  if(!r.ok)return null;
+  const rows=await r.json(),trade=Array.isArray(rows)?rows[0]:null;
+  const p=Number(trade?.price),sourceMillis=epochMillis(trade?.time);
+  if(!Number.isFinite(p)||p<=0||!sourceMillis||sourceMillis>Date.now()+120000||Date.now()-sourceMillis>600000)return null;
+  return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),source:"MEXC",at:Date.now()};
+ }catch{return null}finally{clearTimeout(timer)}
 }
+
 function b64(s:string){try{const b=atob(s);return Uint8Array.from(b,c=>c.charCodeAt(0))}catch{return new Uint8Array()}}
 function vi(b:Uint8Array,i:number){let v=0n,s=0n;while(i<b.length&&s<=63n){const x=b[i++];v|=BigInt(x&127)<<s;if(!(x&128))return{v,i};s+=7n}return null}
 function transfer(encoded:string){
@@ -212,7 +225,7 @@ async function handle(db:Admin,id:string,b:any){
  const atomic=BigInt(Math.ceil(5/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();
  const {data,error}=await db.from("membership_quotes").insert({user_id:id,klever_address:a,usd_price:p.price,klv_amount_atomic:atomic.toString(),source_time:p.sourceTime,expires_at:expires}).select("id").single();
  if(error||!data?.id)return out({error:"Could not prepare a membership quote."},503);
- return out({quoteId:data.id,usdPrice:p.price,usdAmount:5,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,receiverAddress:RECEIVER})}
+ return out({quoteId:data.id,usdPrice:p.price,usdAmount:5,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,priceSource:p.source,receiverAddress:RECEIVER})}
  if(b.op==="verify"){const qid=String(b.quoteId||""),hash=String(b.txHash||"").trim().toLowerCase();if(!UUID.test(qid)||!HASH.test(hash))return out({error:"Enter the 64-character transaction hash from Klever."},400);
  const {data:q,error:qe}=await db.from("membership_quotes").select("*").eq("id",qid).eq("user_id",id).maybeSingle();
  if(qe)return out({error:"Could not read payment quote."},503);if(!q||q.used_at||Date.parse(q.created_at)<Date.now()-7*24*60*60*1000)return out({error:"Quote expired. Request a new one."},410);
