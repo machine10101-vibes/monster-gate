@@ -95,13 +95,23 @@ async function ticker(){
    const reserveRows=collection(reservesPayload);
    const reserve=reserveRows.find((item:any)=>String(item?.pair_id??item?.pairId??item?.id)===String(pairId))??reserveRows[0];
    if(!reserve)throw new Error("Swopus has not returned live KLV/USDT reserves.");
-   const lag=Number(reservesPayload?.indexer_lag_blocks??0);
-   if(reservesPayload?.stale===true||(Number.isFinite(lag)&&lag>20))throw new Error("Swopus KLV/USDT reserve data is stale.");
-   const reserveMillis=epochMillis(reserve?.ts);
-   if(!reserveMillis||reserveMillis>Date.now()+120000||Date.now()-reserveMillis>180000)throw new Error("Swopus KLV/USDT reserves are too old.");
+   const metadata=reservesPayload?.data&&!Array.isArray(reservesPayload.data)?reservesPayload.data:reservesPayload;
+   const lag=Number(metadata?.indexer_lag_blocks??reserve?.indexer_lag_blocks??0);
+   const stale=metadata?.stale===true||String(metadata?.stale??"").toLowerCase()==="true"||reserve?.stale===true;
+   if(stale||(Number.isFinite(lag)&&lag>20))throw new Error("Swopus KLV/USDT reserve index is stale.");
+   const reserveMillis=epochMillis(reserve?.ts??reserve?.updated_at??reserve?.timestamp??metadata?.ts??metadata?.updated_at);
+   if(reserveMillis&&reserveMillis>Date.now()+120000)throw new Error("Swopus KLV/USDT reserve timestamp is in the future.");
+   // A pool's reserve timestamp advances on swaps/liquidity changes, not on every
+   // read. An unchanged pool can therefore have an old ts while its reserves are
+   // still the latest indexed on-chain state. Use Swopus's explicit stale/lag
+   // indicators for freshness, not an arbitrary three-minute trade-activity rule.
    const price=poolPrice(pool,reserve);
    if(!price)throw new Error("Swopus KLV/USDT pool data is incomplete.");
-   const sourceTime=new Date(reserveMillis).toISOString();
+   const sourceTime=new Date(reserveMillis||Date.now()).toISOString();
+   console.info("Swopus KLV/USDT quote loaded",{
+    pairId:String(pairId),reserveAgeMs:reserveMillis?Date.now()-reserveMillis:null,
+    indexerLagBlocks:Number.isFinite(lag)?lag:null,stale,
+   });
    return priceCache={price,sourceTime,source:"Swopus",pairId:String(pairId),at:Date.now()};
   }finally{clearTimeout(reservesTimer)}
  }catch(error){
