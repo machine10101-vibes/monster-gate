@@ -984,28 +984,28 @@ export class Player {
             const wind = pre ? q : 1 - q;
             if (family === 'spear') {
               // A polearm is driven from the rear hand with the lead hand guiding the shaft.
-              armR = lerp(-1.05, pre ? -2.0 : -0.25, q);
-              armL = lerp(-0.85, pre ? -1.35 : -0.65, q);
-              torsoYaw = lerp(-0.18, pre ? -0.42 : 0.22, q);
-              lean = pre ? -0.08 * wind : 0.13 * wind;
+              armR = pre ? lerp(-1.05, -2.0, q) : lerp(-2.0, -0.25, q);
+              armL = pre ? lerp(-0.85, -1.35, q) : lerp(-1.35, -0.65, q);
+              torsoYaw = pre ? lerp(-0.18, -0.42, q) : lerp(-0.42, 0.22, q);
+              lean = pre ? -0.08 * q : 0.13 * (1 - q);
               legL = lerp(0.12, pre ? 0.35 : -0.05, q);
               legR = lerp(-0.08, pre ? -0.18 : -0.3, q);
             } else if (family === 'scythe') {
               // Long haft, two hands, and a broad hip-and-shoulder sweep.
-              torsoYaw = lerp(0, pre ? 0.9 * comboSide : -1.05 * comboSide, q);
-              lean = pre ? -0.16 * wind : 0.22 * wind;
-              armR = lerp(-1.25, pre ? -2.7 : -0.45, q);
-              armL = lerp(-0.95, pre ? -2.15 : -0.55, q);
+              torsoYaw = pre ? lerp(0, 0.9 * comboSide, q) : lerp(0.9 * comboSide, -1.05 * comboSide, q);
+              lean = pre ? -0.16 * q : 0.22 * (1 - q);
+              armR = pre ? lerp(-1.25, -2.7, q) : lerp(-2.7, -0.45, q);
+              armL = pre ? lerp(-0.95, -2.15, q) : lerp(-2.15, -0.55, q);
               legL = lerp(0.2, pre ? 0.5 : 0.72, q);
               legR = lerp(-0.1, pre ? -0.25 : -0.55, q);
             } else {
               // Heavy heads travel overhead; hips and knees load before the downswing.
-              torsoYaw = lerp(0, pre ? 0.25 * comboSide : -0.12 * comboSide, q);
-              lean = pre ? -0.24 * wind : 0.32 * wind;
-              crouch = pre ? 0.08 * q : 0.12 * wind;
-              armR = lerp(-1.15, pre ? -3.05 : -0.25, q);
-              armL = lerp(-0.9, pre ? -2.45 : -0.65, q);
-              armRz = lerp(0, pre ? 0.2 : -0.08, q);
+              torsoYaw = pre ? lerp(0, 0.25 * comboSide, q) : lerp(0.25 * comboSide, -0.12 * comboSide, q);
+              lean = pre ? -0.24 * q : 0.32 * (1 - q);
+              crouch = pre ? 0.08 * q : 0.12 * (1 - q);
+              armR = pre ? lerp(-1.15, -3.05, q) : lerp(-3.05, -0.25, q);
+              armL = pre ? lerp(-0.9, -2.45, q) : lerp(-2.45, -0.65, q);
+              armRz = pre ? lerp(0, 0.2, q) : lerp(0.2, -0.08, q);
               legL = lerp(0.1, pre ? 0.48 : 0.85, q);
               legR = lerp(-0.08, pre ? -0.3 : -0.72, q);
             }
