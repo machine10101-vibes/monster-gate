@@ -70,13 +70,68 @@ export class Audio8 {
     return true;
   }
 
-  swing() {
-    this.noise(0.16, 0.16, 2600, 0.6);
-    this.tone(320, 0.12, 'triangle', 0.05, -140);
+  /** Procedural weapon-specific air, tension and mechanism sounds. */
+  swing(family = 'sword') {
+    if (family === 'bow') {
+      this.noise(0.11, 0.075, 1750, 1.1);
+      this.tone(460, 0.1, 'triangle', 0.035, -180);
+    } else if (family === 'crossbow') {
+      this.noise(0.07, 0.08, 1100, 1.4);
+      this.tone(210, 0.075, 'square', 0.045, -70);
+    } else if (family === 'magic' || family === 'staff') {
+      this.tone(520, 0.18, 'sine', 0.055, 380);
+      this.noise(0.12, 0.035, 2400, 0.7);
+    } else if (family === 'heavy') {
+      this.noise(0.24, 0.19, 1050, 0.55);
+      this.tone(115, 0.18, 'triangle', 0.07, 90);
+    } else if (family === 'spear') {
+      this.noise(0.13, 0.12, 1950, 0.75);
+      this.tone(260, 0.09, 'triangle', 0.035, -110);
+    } else if (family === 'scythe') {
+      this.noise(0.22, 0.17, 1450, 0.55);
+      this.tone(185, 0.16, 'sawtooth', 0.035, -80);
+    } else if (family === 'dual') {
+      this.noise(0.12, 0.12, 2900, 0.7);
+      this.noise(0.09, 0.075, 2100, 0.9, 0.055);
+    } else {
+      this.noise(0.16, 0.14, 2600, 0.6);
+      this.tone(320, 0.12, 'triangle', 0.05, -140);
+    }
   }
-  hit() {
-    this.noise(0.1, 0.25, 900, 0.9);
-    this.tone(150, 0.12, 'square', 0.14, -80);
+  /** Contact sounds distinguish edge, blunt, polearm and magical impacts. */
+  hit(family = 'sword') {
+    if (family === 'heavy') {
+      this.noise(0.16, 0.27, 420, 0.65);
+      this.tone(92, 0.2, 'sine', 0.16, -42);
+      this.noise(0.055, 0.11, 2600, 1.3, 0.025);
+    } else if (family === 'spear') {
+      this.noise(0.07, 0.19, 1250, 1.2);
+      this.tone(185, 0.1, 'triangle', 0.08, -65);
+    } else if (family === 'scythe' || family === 'sword' || family === 'dual') {
+      this.noise(0.095, 0.24, family === 'scythe' ? 720 : 980, 0.9);
+      this.tone(family === 'dual' ? 210 : 165, 0.11, 'square', 0.11, -90);
+      this.noise(0.04, 0.09, 3400, 1.4, 0.018);
+    } else if (family === 'magic' || family === 'staff') {
+      this.tone(360, 0.18, 'sine', 0.12, -220);
+      this.noise(0.13, 0.1, 1850, 0.65);
+    } else {
+      this.noise(0.1, 0.22, 900, 0.9);
+      this.tone(150, 0.12, 'square', 0.14, -80);
+    }
+  }
+  /** Release is timed to the projectile spawn, not the start of the draw animation. */
+  release(family = 'bow') {
+    if (family === 'crossbow') {
+      this.tone(260, 0.07, 'square', 0.1, -150);
+      this.noise(0.045, 0.12, 1900, 1.5);
+      this.tone(780, 0.055, 'triangle', 0.035, -300, 0.025);
+    } else if (family === 'bow') {
+      this.tone(720, 0.085, 'triangle', 0.1, -440);
+      this.noise(0.07, 0.075, 2600, 0.85);
+    } else {
+      this.tone(520, 0.14, 'sawtooth', 0.075, -260);
+      this.noise(0.12, 0.055, 2200, 0.7);
+    }
   }
   hurt() {
     this.tone(220, 0.25, 'sawtooth', 0.14, -150);
