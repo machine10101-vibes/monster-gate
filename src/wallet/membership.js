@@ -216,7 +216,8 @@ export async function ensureMembership(session, game) {
         );
       } catch (error) {
         const message = error.message || 'The chain could not be checked just now.';
-        if (/quote expired|wallet changed|membership already active/i.test(message)) {
+        if (/quote expired|wallet changed|already been used|could not be found/i.test(message)) {
+          quote = null;
           setWatch('Refresh your quote', message, true);
           return;
         }
@@ -224,12 +225,20 @@ export async function ensureMembership(session, game) {
       } finally {
         pollInFlight = false;
         checkNow.disabled = false;
-        if (checkNow.textContent !== 'Payment confirmed') checkNow.textContent = 'Check for payment now';
+        if (!quote) {
+          checkNow.disabled = true;
+          checkNow.textContent = 'Refresh quote to continue';
+        } else if (checkNow.textContent !== 'Payment confirmed') {
+          checkNow.disabled = false;
+          checkNow.textContent = 'Check for payment now';
+        }
         schedulePoll();
       }
     };
     const loadQuote = async () => {
       if (settled || quoteLoading) return;
+      if (pollTimer) clearTimeout(pollTimer);
+      quote = null;
       quoteLoading = true;
       refresh.disabled = true;
       checkNow.disabled = true;
