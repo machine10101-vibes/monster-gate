@@ -45,8 +45,10 @@ function transfer(encoded:string){
  return receiver&&amount>0n?{receiver,amount,asset}:null;
 }
 function transaction(j:any){return j?.data?.transaction??j?.transaction??j?.data??j}
-function validTransfer(j:any,from:string,min:bigint){
- const tx=transaction(j),status=String(j?.data?.status??j?.status??tx?.status??tx?.receipt?.status??"").toLowerCase();
+function validTransfer(j:any,hash:string,from:string,min:bigint){
+ const tx=transaction(j),reportedHash=String(tx?.hash??j?.data?.hash??j?.hash??"").toLowerCase();
+ if(reportedHash&&reportedHash!==hash.toLowerCase())return null;
+ const status=String(j?.data?.status??j?.status??tx?.status??tx?.receipt?.status??"").toLowerCase();
  if(!["success","onchain","on-chain","confirmed"].includes(status))return null;
  const raw=tx?.RawData??tx?.rawData??tx?.raw?.RawData??tx?.raw?.rawData??{};
  let sender=String(tx?.sender??tx?.from??tx?.senderAddress??"");
@@ -54,8 +56,13 @@ function validTransfer(j:any,from:string,min:bigint){
  if(sender!==from)return null;
  const contracts=raw?.Contract??raw?.contract??tx?.contracts??tx?.Contract??[];
  if(!Array.isArray(contracts))return null;
- for(const c of contracts){const p=c?.Parameter??c?.parameter??{},type=String(p.type_url??p.typeUrl??c.type??"");
- if(!type.toLowerCase().includes("transfer"))continue;const x=transfer(String(p.value??c.value??""));
+ for(const c of contracts){const p=c?.Parameter??c?.parameter??{},type=String(p.type_url??p.typeUrl??c.type??c.contractType??"");
+ if(!type.toLowerCase().includes("transfer"))continue;
+ let x=null;const decoded=p.value&&typeof p.value==="object"?p.value:(c?.value&&typeof c.value==="object"?c.value:null);
+ if(decoded){const amount=BigInt(String(decoded.amount??decoded.Amount??0));const rawReceiver=String(decoded.receiver??decoded.Receiver??"");let receiver=rawReceiver;
+  if(!ADDR.test(receiver)){const bytes=b64(rawReceiver);if(bytes.length===32)receiver=bech32.encode("klv",bech32.toWords(bytes),120)}
+  x=receiver&&amount>0n?{receiver,amount,asset:String(decoded.kda??decoded.KDA??"")}:null;
+ }else x=transfer(String(p.value??c.value??""));
  if(x&&x.receiver===RECEIVER&&(!x.asset||x.asset.toUpperCase()==="KLV")&&x.amount>=min)return x}
  return null;
 }
@@ -76,7 +83,7 @@ async function handle(db:Admin,id:string,b:any){
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);let chain:any;
  try{const r=await fetch(CHAIN_API+"/transaction/"+hash+"?withResults=true",{signal:ctl.signal});if(!r.ok)return out({error:r.status===404?"Transaction not indexed on Klever mainnet yet.":"Klever could not confirm the transaction."},409);chain=await r.json()}
  catch{return out({error:"Klever mainnet is unavailable. Try again shortly."},503)}finally{clearTimeout(timer)}
- const payment=validTransfer(chain,a,BigInt(q.klv_amount_atomic));if(!payment)return out({error:"The confirmed transaction does not match the required KLV amount, linked sender and membership receiving address."},400);
+ const payment=validTransfer(chain,hash,a,BigInt(q.klv_amount_atomic));if(!payment)return out({error:"The confirmed transaction does not match the required KLV amount, linked sender and membership receiving address."},400);
  const {data:activated,error}=await db.rpc("activate_membership_service",{p_user_id:id,p_klever_address:a,p_tx_hash:hash,p_receiver_address:RECEIVER,p_amount_atomic:payment.amount.toString(),p_usd_price:q.usd_price,p_quote_id:qid});
  if(error||!activated?.ok)return out({error:error?.message?.toLowerCase().includes("duplicate")?"This transaction was already used.":"Could not activate membership. Contact support with your transaction hash."},503);
  return out({ok:true,expiresAt:activated.expires_at})}
