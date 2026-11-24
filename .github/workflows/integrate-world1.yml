@@ -1,0 +1,48 @@
+name: Integrate World 1 into main
+
+on:
+  push:
+    branches:
+      - integrate/world1-into-main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-world1-into-main
+  cancel-in-progress: false
+
+jobs:
+  merge-and-verify:
+    if: "!contains(github.event.head_commit.message, 'Merge remote-tracking branch')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Merge World 1 branch, preferring current main on conflicts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin mg-servers/world-1-live
+          git merge --no-edit -X ours -m "Integrate World 1 server work into main" FETCH_HEAD
+      - name: Install game dependencies
+        run: npm ci
+      - name: Install persistence dependencies
+        run: npm ci --prefix server/persistence
+      - name: Run client and server tests
+        timeout-minutes: 15
+        run: node --test --test-force-exit tests/*.js server/tests/*.test.js
+      - name: Run persistence tests
+        timeout-minutes: 15
+        run: npm run test --prefix server/persistence -- --test-force-exit
+      - name: Build production client
+        run: npm run build
+      - name: Push verified merge commit
+        run: git push origin HEAD:integrate/world1-into-main
