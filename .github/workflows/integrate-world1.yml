@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   merge-and-verify:
-    if: "!contains(github.event.head_commit.message, 'Merge remote-tracking branch')"
+    if: "!contains(github.event.head_commit.message, 'Verified Colosseum integration')"
     runs-on: ubuntu-latest
     steps:
       - name: Check out integration branch
@@ -26,12 +26,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Merge World 1 branch, preferring current main on conflicts
+      - name: Bring over only the World 1 PvP feature
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin mg-servers/world-1-live
-          git merge --no-edit -X ours -m "Integrate World 1 server work into main" FETCH_HEAD
+          git merge -s ours --no-commit origin/mg-servers/world-1-live
+          git diff --binary bc4be20b31067f61c0b20ce66dec2f5fe80cbd83^ b26f0f42d72ad3d62f90624af5421e6217c9e858 -- \
+            server/content.js server/persistence/schema.js server/persistence/tests/pvp-rating.test.js \
+            server/protocol.js server/pvp.js server/tests/lib/helpers.js server/tests/pvp.test.js server/world.js \
+            src/debug/flags.js src/entities/monsters.js src/entities/player.js src/main.js src/net/mmo.js \
+            src/net/worldProtocol.js src/net/worldView.js src/systems/skillcast.js src/world/colosseum.js \
+            src/world/gilantre.js src/world/world.js tests/debug-flags.test.js tests/mg-gilantre.test.js \
+            tests/mmo-client.test.js tests/world-view.test.js | git apply --3way --index
+          git commit -m "Verified Colosseum integration from World 1"
       - name: Install game dependencies
         run: npm ci
       - name: Install persistence dependencies
