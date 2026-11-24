@@ -380,6 +380,7 @@ export class World {
   }
 
   move(session, msg) {
+    if (session.pvpMatchId && session.pvpDead) { session.move = 0; return; }
     if (!session.limiter.allowMove()) {
       send(session.ws, errorFrame('rate', 'Slow down.'));
       return;
@@ -726,6 +727,7 @@ export class World {
 
   drop(session, closeSocket = false) {
     if (session.gone) return;
+    this.pvp.disconnect(session);
     session.gone = true;
     if (session.helloTimer) clearTimeout(session.helloTimer);
     if (session.authed && session.id) {

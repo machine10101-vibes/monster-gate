@@ -15,7 +15,7 @@
  * Full contract: docs/worldView-interface.md
  *
  * Flags: ?mmo=1 mounts this module. ?mmo=1&mock=1 also starts a local crowd.
- * ?mmo=1&mockwake=1 simulates a 30s waking queue, then online.
+ * ?mmo=1&mockwake=1 simulates a 60s waking queue, then online.
  * ?mmo=1&mockwake=90 waits 90 seconds (Almost there…, Retry, Play offline).
  * ?mmo=1&mock=1&mockerr=name_taken shows the hunter-name prompt and stays final.
  */

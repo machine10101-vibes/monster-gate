@@ -361,7 +361,7 @@ export function mountSocialHud(game) {
     menu.querySelector('[data-act="friend"]').onclick = async () => {
       hideMenu();
       const res = await report(game, await social.requestFriend(player.name));
-      if (res?.ok) toast(game, `Request sent to ${player.name}`, 1600);
+      if (res?.ok && res.pending) toast(game, `Request sent to ${player.name}`, 1600);
     };
     menu.querySelector('[data-act="party"]').onclick = async () => {
       hideMenu();
@@ -375,6 +375,12 @@ export function mountSocialHud(game) {
         focusWhisper(game, player);
       };
     }
+    const muteBtn = menu.querySelector('[data-act="mute"]');
+    if (muteBtn) muteBtn.onclick = () => {
+      hideMenu();
+      const muted=game?.worldView?.toggleMutePlayer?.(player.id,player.name);
+      toast(game, muted ? `Muted ${player.name}` : `Unmuted ${player.name}`, 1400);
+    };
     const blockBtn = menu.querySelector('[data-act="block"]');
     if (blockBtn) {
       blockBtn.onclick = async () => {

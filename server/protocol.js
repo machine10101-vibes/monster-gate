@@ -246,6 +246,8 @@ export function playerView(p, extra = {}) {
     armor: p.armor,
     zone: p.zone,
     hp: p.hp,
+    pvp_team: p.pvpTeam ?? null,
+    pvp_dead: !!p.pvpDead,
     ...extra,
   };
 }

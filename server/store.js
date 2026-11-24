@@ -2,15 +2,12 @@ import { createPersistence } from './persistence/api.js';
 import { createMemoryAdapter } from './persistence/adapters/memory.js';
 
 /**
- * Character persistence seam.
+ * Persistence entry for the world server.
  *
- * PR #60 ships `server/persistence/index.js` with:
- *   openPersistence() → { loadCharacter, createCharacter, saveCharacter, flushAll }
- *
- * Until that module is on main, this file provides an in-memory adapter with
- * the same methods. When `./persistence/index.js` exists, it is used instead.
- *
- * SUPABASE_SERVICE_ROLE_KEY is read from the environment only. Never commit it.
+ * Prefers PR #60's `server/persistence/index.js` (`openPersistence()`).
+ * When that module is missing, or Supabase env is unset, the #60 helper
+ * already falls back to an in-memory adapter so tests run without secrets.
+ * This file does not modify `server/persistence/`.
  */
 
 export function createMemoryPersistence(options = {}) {
@@ -21,9 +18,6 @@ export function createMemoryPersistence(options = {}) {
 }
 
 export async function openPersistence(options = {}) {
-  if (options.memory || options.adapterKind === 'memory') {
-    return options.adapter || createMemoryPersistence();
-  }
   try {
     const mod = await import('./persistence/index.js');
     if (typeof mod.openPersistence === 'function') {
@@ -32,5 +26,13 @@ export async function openPersistence(options = {}) {
   } catch (err) {
     if (err?.code !== 'ERR_MODULE_NOT_FOUND') throw err;
   }
-  return createMemoryPersistence();
+  const { createMemoryAdapter, createPersistence } = await fallback();
+  return createPersistence({
+    ...options,
+    adapter: options.adapter || createMemoryAdapter(),
+  });
+}
+
+async function fallback() {
+  throw new Error('server/persistence/index.js is required (merge PR #60).');
 }
