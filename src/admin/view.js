@@ -382,6 +382,7 @@ export function drawerHtml(model, ui) {
     </header>
     ${player.email ? `<button type="button" class="copy" data-copy="${esc(player.email)}">Copy email</button>` : ''}
     ${staffAction}
+    ${accessFacts(player, model.now)}
     ${tabs ? `<div class="char-tabs">${tabs}</div>` : ''}
     ${body}
     ${retired}
