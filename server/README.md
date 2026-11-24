@@ -2,7 +2,7 @@
 
 Authoritative WebSocket server for Monster Gate's shared world. Protocol: [PROTOCOL.md](./PROTOCOL.md).
 
-Accounts are required to go online. Guests stay offline and solo. Character rows come from `server/persistence/` ([PR #60](https://github.com/machine10101-vibes/monster-gate/pull/60)); this package does not modify that folder.
+Accounts and an active 30-day Monster Gate membership are required to go online. Membership is checked again by the World 1 server at WebSocket sign-in; guests stay offline and solo. Character rows come from `server/persistence/` ([PR #60](https://github.com/machine10101-vibes/monster-gate/pull/60)); this package does not modify that folder.
 
 ## Start
 
