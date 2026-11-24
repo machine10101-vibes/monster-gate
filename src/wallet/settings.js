@@ -1,7 +1,7 @@
 import { decorateFrame } from '../ui/theme.js';
 import { shortAddress } from './klever.js';
 import { isMockWallet, mockAddress } from './mock.js';
-import { linkKleverWallet, linkedWalletStatus, unlinkKleverWallet } from './link.js';
+import { linkKleverWallet, linkedWalletStatus, unlinkKleverWallet } from './link.js';\nimport { ensureMembership, membershipStatus } from './membership.js';
 
 function el(tag, className, text) {
   const n = document.createElement(tag);
@@ -31,11 +31,11 @@ export function mountWalletSettings(body, game) {
   no.type = 'button';
   confirmRow.append(yes, no);
   confirm.appendChild(confirmRow);
-  card.append(title, copy, who, err, actions, confirm);
+  const pass = el('section', 'mg-profile-pass');\n  const passTitle = el('h3', 'mg-title', 'Gate Pass');\n  const passStatus = el('p', 'wallet-link-copy', 'Checking subscription…');\n  const passAction = el('button', 'mg-btn', 'Get 30-day access');\n  passAction.type = 'button';\n  pass.append(passTitle, passStatus, passAction);\n  card.append(title, copy, who, err, actions, confirm, pass);
   body.appendChild(card);
 
   let busy = false;
-  let address = game.wallet.kleverAddress || '';
+  let address = game.wallet.kleverAddress || '';\n  let membership = null;
 
   const paint = () => {
     err.textContent = '';
@@ -84,7 +84,7 @@ export function mountWalletSettings(body, game) {
     }
   };
 
-  yes.onclick = async () => {
+  passAction.onclick = async () => {\n    if (busy || !address) return;\n    busy = true;\n    passAction.disabled = true;\n    passStatus.textContent = 'Preparing secure checkout…';\n    try {\n      await ensureMembership(game.wallet, game);\n      membership = await membershipStatus(game.wallet);\n      paint();\n    } catch (e) {\n      passStatus.textContent = e.message || 'Could not open Gate Pass checkout.';\n      passAction.disabled = false;\n    } finally {\n      busy = false;\n      paint();\n    }\n  };\n\n  yes.onclick = async () => {
     if (busy) return;
     busy = true;
     yes.disabled = true;
@@ -105,7 +105,7 @@ export function mountWalletSettings(body, game) {
   };
 
   paint();
-  linkedWalletStatus(game.wallet).then((status) => {
+  membershipStatus(game.wallet).then((status) => { membership = status; paint(); }).catch(() => { passStatus.textContent = 'Subscription status is temporarily unavailable.'; });\n  linkedWalletStatus(game.wallet).then((status) => {
     if (status.address !== undefined) {
       address = status.address || '';
       game.wallet.kleverAddress = address;
