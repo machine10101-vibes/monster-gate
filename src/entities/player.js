@@ -973,6 +973,10 @@ export class Player {
         rate = 30;
         const family = weaponFamily(it, it.held || this.heldKind);
         if (it.kind === 'melee') {
+          legExtraL = 0;
+          legExtraR = 0;
+          liftL = 0;
+          liftR = 0;
           if (family === 'heavy' || family === 'spear' || family === 'scythe') {
             const q = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : ease((tt - hitT) / Math.max(0.05, 1 - hitT));
             const pre = tt < hitT;
@@ -1068,8 +1072,9 @@ export class Player {
           liftR = 0;
           }
         } else if (it.kind === 'ranged') {
-          const p = tt < 0.68 ? ease(tt / 0.68) : 1 - ease((tt - 0.68) / 0.32);
-          const rel = tt > 0.68 ? Math.max(0, 1 - (tt - 0.68) / 0.14) : 0;
+          const releaseT = Number.isFinite(hitT) ? clamp(hitT, 0.2, 0.85) : 0.68;
+          const p = tt < releaseT ? ease(tt / releaseT) : 1 - ease((tt - releaseT) / (1 - releaseT));
+          const rel = tt > releaseT ? Math.max(0, 1 - (tt - releaseT) / 0.14) : 0;
           if (family === 'bow') {
             // Bow arm points at the target; draw hand travels back to the cheek.
             armR = lerp(-0.35, -1.72, p);
