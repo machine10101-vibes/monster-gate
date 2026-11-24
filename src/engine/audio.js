@@ -78,7 +78,7 @@ export class Audio8 {
     } else if (family === 'crossbow') {
       this.noise(0.07, 0.08, 1100, 1.4);
       this.tone(210, 0.075, 'square', 0.045, -70);
-    } else if (family === 'magic') {
+    } else if (family === 'magic' || family === 'staff') {
       this.tone(520, 0.18, 'sine', 0.055, 380);
       this.noise(0.12, 0.035, 2400, 0.7);
     } else if (family === 'heavy') {
@@ -111,7 +111,7 @@ export class Audio8 {
       this.noise(0.095, 0.24, family === 'scythe' ? 720 : 980, 0.9);
       this.tone(family === 'dual' ? 210 : 165, 0.11, 'square', 0.11, -90);
       this.noise(0.04, 0.09, 3400, 1.4, 0.018);
-    } else if (family === 'magic') {
+    } else if (family === 'magic' || family === 'staff') {
       this.tone(360, 0.18, 'sine', 0.12, -220);
       this.noise(0.13, 0.1, 1850, 0.65);
     } else {
