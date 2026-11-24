@@ -7,7 +7,8 @@ export function weaponFamily(item = {}, heldKind = item.held || '') {
   const style = String(item.style || '').toLowerCase();
   if (has(held, /crossbow/) || style === 'crossbow') return 'crossbow';
   if (has(held, /bow/) || style.includes('bow')) return 'bow';
-  if (style === 'staff' || has(held, /staff|wand|tome|book/)) return 'magic';
+  if (style === 'staff' || has(held, /staff/)) return 'staff';
+  if (has(held, /wand|tome|book/)) return 'magic';
   if (has(held, /scythe/)) return 'scythe';
   if (has(held, /spear|pike|lance/)) return 'spear';
   if (DUAL(held) || style === 'dual') return 'dual';
@@ -18,5 +19,5 @@ export function weaponFamily(item = {}, heldKind = item.held || '') {
 }
 
 export function isTwoHandedFamily(family) {
-  return ['heavy', 'spear', 'scythe', 'bow', 'crossbow', 'magic'].includes(family);
+  return ['heavy', 'spear', 'scythe', 'bow', 'crossbow', 'staff'].includes(family);
 }
