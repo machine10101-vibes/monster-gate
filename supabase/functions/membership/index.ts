@@ -2,7 +2,9 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { bech32 } from "bech32";
 const RECEIVER="klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv";
-const PRICE_URLS=["https://api.exchange.bitcoin.me/v1/market/ticker?symbol=KLV-USDT","https://api.exchange.bitcoin.me/v1/market/tickers"];
+const SWOPUS_API="https://api4.swopus.com";
+const KLV_ASSET="KLV";
+const USDT_ASSET="USDT-23V8";
 const CHAIN_API="https://api.mainnet.klever.org";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH=/^[0-9a-f]{64}$/i, ADDR=/^klv1[02-9ac-hj-np-z]{58}$/;
@@ -28,26 +30,86 @@ function epochMillis(value:any):number|null{
  if(/^\d+(?:\.\d+)?$/.test(text)){const n=Number(text);return Number.isFinite(n)?(n<1e12?n*1000:n):null}
  const parsed=Date.parse(text);return Number.isFinite(parsed)?parsed:null;
 }
-async function ticker(){
- if(priceCache&&Date.now()-priceCache.at<30000&&Date.now()-Date.parse(priceCache.sourceTime)<600000)return priceCache;
- for(const url of PRICE_URLS){
-  const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
-  try{
-   const r=await fetch(url,{signal:c.signal,headers:{accept:"application/json","cache-control":"no-cache"}});
-   if(!r.ok)continue;
-   const j=await r.json(),rows=Array.isArray(j?.data)?j.data:[j?.data];
-   const row=rows.find((item:any)=>item?.symbol==="KLV-USDT");
-   const p=Number(row?.price);
-   if(j?.success!==true||!row||!Number.isFinite(p)||p<=0)continue;
-   const sourceMillis=epochMillis(row.time??row.timestamp??row.updatedAt??row.updated_at)??epochMillis(r.headers.get("date"));
-   if(!sourceMillis||sourceMillis>Date.now()+120000||Date.now()-sourceMillis>600000)continue;
-   return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),at:Date.now()};
-  }catch{
-   /* Try the alternate documented ticker endpoint. */
-  }finally{clearTimeout(t)}
+function collection(value:any):any[]{
+ const root=value?.data??value;
+ if(Array.isArray(root))return root;
+ for(const key of ["pools","items","results","reserves"])if(Array.isArray(root?.[key]))return root[key];
+ return [];
+}
+function assetId(value:any):string{
+ if(typeof value==="string")return value;
+ return String(value?.asset_id??value?.assetId??value?.id??value?.ticker??value?.symbol??"");
+}
+function numericField(value:any,...keys:string[]):number|null{
+ for(const key of keys){
+  const n=Number(value?.[key]);
+  if(Number.isFinite(n)&&n>0)return n;
  }
  return null;
 }
+function poolPrice(pool:any,reserve:any):number|null{
+ const base=assetId(pool?.base_asset_id??pool?.baseAssetId??pool?.token0??pool?.base_token);
+ const quote=assetId(pool?.quote_asset_id??pool?.quoteAssetId??pool?.token1??pool?.quote_token);
+ const baseIsKlv=base===KLV_ASSET&&quote===USDT_ASSET;
+ const reverse=base===USDT_ASSET&&quote===KLV_ASSET;
+ if(!baseIsKlv&&!reverse)return null;
+ const d0=Number(pool?.base_decimals??pool?.token0_decimals??pool?.token0?.decimals??6);
+ const d1=Number(pool?.quote_decimals??pool?.token1_decimals??pool?.token1?.decimals??6);
+ if(!Number.isInteger(d0)||!Number.isInteger(d1)||d0<0||d1<0||d0>18||d1>18)return null;
+ const raw0=numericField(reserve,"reserve0_raw","reserve0","reserve_0");
+ const raw1=numericField(reserve,"reserve1_raw","reserve1","reserve_1");
+ if(!raw0||!raw1)return null;
+ // /api/pools/reserves returns raw base units; convert with each token's decimals.
+ const scaled0=raw0/10**d0,scaled1=raw1/10**d1;
+ const ratio=scaled1/scaled0;
+ if(!Number.isFinite(ratio)||ratio<=0)return null;
+ const price=baseIsKlv?ratio:1/ratio;
+ return Number.isFinite(price)&&price>0?price:null;
+}
+
+async function ticker(){
+ if(priceCache&&Date.now()-priceCache.at<10000)return priceCache;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+ try{
+  const response=await fetch(SWOPUS_API+"/api/public/pools",{
+   signal:controller.signal,headers:{accept:"application/json","cache-control":"no-cache"},
+  });
+  if(!response.ok)throw new Error("Swopus pool market data is unavailable.");
+  const payload=await response.json();
+  const pools=collection(payload);
+  const pool=pools.find((item:any)=>{
+   const a=assetId(item?.base_asset_id??item?.baseAssetId??item?.token0??item?.base_token);
+   const b=assetId(item?.quote_asset_id??item?.quoteAssetId??item?.token1??item?.quote_token);
+   return(a===KLV_ASSET&&b===USDT_ASSET)||(a===USDT_ASSET&&b===KLV_ASSET);
+  });
+  if(!pool)throw new Error("Swopus does not currently list a KLV/USDT pool.");
+  const pairId=pool?.pair_id??pool?.pairId??pool?.id;
+  if(pairId===undefined||pairId===null)throw new Error("Swopus KLV/USDT pool identifier is missing.");
+  const reservesController=new AbortController(),reservesTimer=setTimeout(()=>reservesController.abort(),10000);
+  try{
+   const reservesResponse=await fetch(SWOPUS_API+"/api/pools/reserves?pair_ids="+encodeURIComponent(String(pairId)),{
+    signal:reservesController.signal,headers:{accept:"application/json","cache-control":"no-cache"},
+   });
+   if(!reservesResponse.ok)throw new Error("Swopus live KLV/USDT reserves are unavailable.");
+   const reservesPayload=await reservesResponse.json();
+   const reserveRows=collection(reservesPayload);
+   const reserve=reserveRows.find((item:any)=>String(item?.pair_id??item?.pairId??item?.id)===String(pairId))??reserveRows[0];
+   if(!reserve)throw new Error("Swopus has not returned live KLV/USDT reserves.");
+   const lag=Number(reservesPayload?.indexer_lag_blocks??0);
+   if(reservesPayload?.stale===true||(Number.isFinite(lag)&&lag>20))throw new Error("Swopus KLV/USDT reserve data is stale.");
+   const reserveMillis=epochMillis(reserve?.ts);
+   if(!reserveMillis||reserveMillis>Date.now()+120000||Date.now()-reserveMillis>180000)throw new Error("Swopus KLV/USDT reserves are too old.");
+   const price=poolPrice(pool,reserve);
+   if(!price)throw new Error("Swopus KLV/USDT pool data is incomplete.");
+   const sourceTime=new Date(reserveMillis).toISOString();
+   return priceCache={price,sourceTime,source:"Swopus",pairId:String(pairId),at:Date.now()};
+  }finally{clearTimeout(reservesTimer)}
+ }catch(error){
+  console.error("Swopus KLV/USDT quote failed:",error);
+  return null;
+ }finally{clearTimeout(timer)}
+}
+
 function b64(s:string){try{const b=atob(s);return Uint8Array.from(b,c=>c.charCodeAt(0))}catch{return new Uint8Array()}}
 function vi(b:Uint8Array,i:number){let v=0n,s=0n;while(i<b.length&&s<=63n){const x=b[i++];v|=BigInt(x&127)<<s;if(!(x&128))return{v,i};s+=7n}return null}
 function transfer(encoded:string){
@@ -156,11 +218,20 @@ async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>
   if(membership?.expires_at&&Date.parse(membership.expires_at)>Date.now())return out({ok:true,expiresAt:membership.expires_at});
   return out({error:"This quote has already been used. Refresh your quote."},409);
  }
- if(Date.now()-Date.parse(q.created_at)>7*24*60*60*1000)return out({error:"Your quote has expired. Refresh it to continue."},410);
+ const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+ if(Date.parse(q.created_at)<Date.parse(cutoff))return out({error:"Your quote has expired. Refresh it to continue."},410);
  const a=await walletFor(db,id);
  if(a instanceof Response)return a;
  if(!a||a!==q.klever_address)return out({error:"Your linked Klever wallet changed. Refresh your quote."},409);
- const rows=await recentIncoming(q);
+ // Include every recent unused quote for this account/wallet. If the player closes
+ // checkout after sending, a later checkout can still find the original payment.
+ const {data:pendingQuotes,error:pendingError}=await db.from("membership_quotes")
+  .select("*").eq("user_id",id).eq("klever_address",a).is("used_at",null)
+  .gte("created_at",cutoff).order("created_at",{ascending:true}).limit(100);
+ if(pendingError)return out({error:"Could not load pending membership quotes."},503);
+ const quotes=(pendingQuotes||[]).filter((item:any)=>item?.id&&Date.parse(item.created_at)>=Date.parse(cutoff));
+ if(!quotes.some((item:any)=>item.id===q.id))quotes.unshift(q);
+ const rows=await recentIncoming(quotes[0]||q);
  if(rows instanceof Response)return rows;
  let examined=0;
  for(const row of rows){
@@ -168,20 +239,26 @@ async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>
   const hash=String(tx?.hash??row?.hash??tx?.txHash??row?.txHash??"").trim().toLowerCase();
   if(!HASH.test(hash))continue;
   const stamp=epochMillis(tx?.timestamp??tx?.block?.timestamp??tx?.blockTimestamp??tx?.createdAt);
-  if(stamp&&(stamp<Date.parse(q.created_at)||stamp>Date.parse(q.expires_at)||stamp>Date.now()+60000))continue;
+  if(stamp&&stamp<Date.parse(cutoff))continue;
   const sender=String(tx?.sender??tx?.from??tx?.senderAddress??"");
   if(sender&&sender!==a)continue;
   const state=String(tx?.status??row?.status??"").toLowerCase();
   if(state&& !["success","onchain","on-chain","confirmed"].includes(state))continue;
   examined+=1;
-  let detail=row;
-  let payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+  let detail=row,matchedQuote:any=null,payment:any=null;
+  for(const candidate of quotes){
+   payment=validTransfer(detail,hash,a,BigInt(candidate.klv_amount_atomic),candidate.created_at,candidate.expires_at);
+   if(payment){matchedQuote=candidate;break}
+  }
   if(!payment){
    detail=await transactionByHash(hash);
    if(!detail)continue;
-   payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+   for(const candidate of quotes){
+    payment=validTransfer(detail,hash,a,BigInt(candidate.klv_amount_atomic),candidate.created_at,candidate.expires_at);
+    if(payment){matchedQuote=candidate;break}
+   }
   }
-  if(payment)return activatePayment(db,id,q,a,hash,payment);
+  if(payment&&matchedQuote)return activatePayment(db,id,matchedQuote,a,hash,payment);
   if(examined>=20)break;
  }
  return out({ok:false,found:false,checkedAt:new Date().toISOString()});
@@ -197,7 +274,7 @@ async function handle(db:Admin,id:string,b:any){
  const atomic=BigInt(Math.ceil(5/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();
  const {data,error}=await db.from("membership_quotes").insert({user_id:id,klever_address:a,usd_price:p.price,klv_amount_atomic:atomic.toString(),source_time:p.sourceTime,expires_at:expires}).select("id").single();
  if(error||!data?.id)return out({error:"Could not prepare a membership quote."},503);
- return out({quoteId:data.id,usdPrice:p.price,usdAmount:5,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,receiverAddress:RECEIVER})}
+ return out({quoteId:data.id,usdPrice:p.price,usdAmount:5,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,priceSource:p.source,receiverAddress:RECEIVER})}
  if(b.op==="verify"){const qid=String(b.quoteId||""),hash=String(b.txHash||"").trim().toLowerCase();if(!UUID.test(qid)||!HASH.test(hash))return out({error:"Enter the 64-character transaction hash from Klever."},400);
  const {data:q,error:qe}=await db.from("membership_quotes").select("*").eq("id",qid).eq("user_id",id).maybeSingle();
  if(qe)return out({error:"Could not read payment quote."},503);if(!q||q.used_at||Date.parse(q.created_at)<Date.now()-7*24*60*60*1000)return out({error:"Quote expired. Request a new one."},410);
