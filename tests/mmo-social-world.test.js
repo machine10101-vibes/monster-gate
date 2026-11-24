@@ -73,7 +73,7 @@ test('signed-in friends persist in social store and whispers are private', async
   t.after(async () => { for (const ws of sockets) { try { ws.terminate(); } catch {} } if (srv) await srv.close().catch(() => {}); });
   const env = { SUPABASE_URL: 'https://social-test.invalid', SUPABASE_ANON_KEY: 'anon' };
   const socialStore = createMemorySocialStore();
-  srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), socialStore, env, tickMs: 40, verifyToken });
+  srv = await createWorldServer({ port: 0, persist: createMemoryPersistence(), socialStore, env, tickMs: 40, verifyToken, verifyMembership: async () => true });
   const a = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(a);
   const b = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(b);
   const c = await open(`ws://127.0.0.1:${srv.port}`); sockets.push(c);
