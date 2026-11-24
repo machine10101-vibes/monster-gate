@@ -66,7 +66,7 @@ function validTransfer(j:any,hash:string,from:string,min:bigint,quotedAt:string)
   const receiptFrom=String(receipt?.from??"");
   const receiver=String(receipt?.to??"");
   let amount=0n;try{amount=BigInt(String(receipt?.value??0))}catch{amount=0n}
-  if(kind==="transfer"&&receiptFrom===from&&receiver===RECEIVER&&asset==="KLV"&&amount>=min)return{receiver,amount,asset};
+  if(kind==="transfer"&&receiptFrom===from&&receiver===RECEIVER&&(!asset||asset==="KLV")&&amount>=min)return{receiver,amount,asset};
  }
  const contracts=raw?.Contract??raw?.contract??tx?.contracts??tx?.contract??tx?.Contract??[];
  if(!Array.isArray(contracts))return null;
