@@ -259,7 +259,8 @@ export class MmoSocial {
       }
       if (typeof client.send === 'function') {
         const payload = payloadOf(name, a, b);
-        return await Promise.resolve(client.send(name, payload));
+        client.send(name, payload);
+        return { ok: true };
       }
       if (client.ws && client.ws.readyState === 1) {
         const extra = payloadOf(name, a, b);
