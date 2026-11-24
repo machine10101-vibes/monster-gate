@@ -91,3 +91,45 @@ export async function loadLedger(session) {
 export async function changeStaff(session, op, userId) {
   return postAdmin(session, { op, userId });
 }
+
+
+async function postAdminData(session, body) {
+  const cfg = await loadCloudConfig();
+  if (!cfg.url || !cfg.key) throw fail('unavailable', 'Supabase is not connected to this site yet.');
+  if (!session?.accessToken && !session?.refreshToken) throw fail('denied', 'Sign in again to open the ledger.');
+  const accessToken = await freshToken(session, cfg);
+  if (!accessToken) throw fail('denied', 'Sign in again to open the ledger.');
+  let res;
+  try {
+    res = await fetch(`${cfg.url}/functions/v1/admin`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        apikey: cfg.key,
+        authorization: `Bearer ${cfg.key}`,
+      },
+      body: JSON.stringify({ ...body, accessToken, sessionId: session.sessionId || '' }),
+    });
+  } catch {
+    throw fail('unavailable', 'The guild ledger could not be reached.');
+  }
+  const json = await res.json().catch(() => ({}));
+  if (typeof json.sessionId === 'string' && json.sessionId) {
+    session.sessionId = json.sessionId;
+    saveAccount(session);
+  }
+  if (res.status === 401) throw fail('denied', json.error || 'Sign in again.');
+  if (res.status === 409 && json.taken) throw fail('taken', json.error || SESSION_TAKEN);
+  if (res.status === 403) throw fail('denied', json.error || 'Only the guild master can issue free passes.');
+  if (!res.ok) throw fail('fail', json.error || 'The request could not be completed.');
+  return json;
+}
+
+export async function loadPassCodes(session) {
+  const result = await postAdminData(session, { op: 'passcodes_list' });
+  return Array.isArray(result.codes) ? result.codes : [];
+}
+
+export async function issuePassCode(session) {
+  return postAdminData(session, { op: 'passcode_issue' });
+}
