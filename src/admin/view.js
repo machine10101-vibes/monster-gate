@@ -345,7 +345,8 @@ export function passCodesHtml(ui) {
 
 export function stageHtml(model, ui) {
   if (!model) return '<p class="empty">Opening the guild record…</p>';
-  if (ui.tab === 'accounts') return accountsTab(model);\n  if (ui.tab === 'hunters') return huntersTab(model, ui);
+  if (ui.tab === 'accounts') return accountsTab(model);
+  if (ui.tab === 'hunters') return huntersTab(model, ui);
   if (ui.tab === 'coffers') return coffersTab(model, ui);
   if (ui.tab === 'bestiary') return bestiaryTab(model, ui);
   if (ui.tab === 'paths') return pathsTab(model, ui);
