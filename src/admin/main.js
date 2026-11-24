@@ -66,6 +66,9 @@ function paint() {
   $('who').textContent = session?.email
     ? (state.role === 'moderator' ? `${session.email} · moderator` : session.email)
     : '';
+  const pageTitles = { ledger: 'Dashboard', hunters: 'Hunters', accounts: 'Accounts', coffers: 'Coffers', bestiary: 'Bestiary', paths: 'Paths', passes: 'Free passes' };
+  const pageTitle = $('page-title');
+  if (pageTitle) pageTitle.textContent = pageTitles[state.tab] || 'Dashboard';
   document.querySelectorAll('#rail button').forEach((button) => {
     button.classList.toggle('on', button.dataset.tab === state.tab);
   });

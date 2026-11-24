@@ -26,47 +26,58 @@
     </div>
 
     <div id="app" class="shell hidden">
-      <header class="top">
-        <div class="brand">
-          <b>MONSTER <em>GATE</em></b>
-          <span>Guild ledger</span>
-        </div>
-        <span id="who" class="who"></span>
-        <button type="button" class="mini" id="refresh">Refresh</button>
-        <button type="button" class="mini" id="hold" aria-pressed="false">Live</button>
-        <button type="button" class="mini" id="signout">Sign out</button>
-      </header>
-      <div class="tools">
-        <input id="q" type="search" placeholder="Search accounts and hunters" autocomplete="off" spellcheck="false" maxlength="64" aria-label="Search accounts and hunters" />
-        <div id="windows" class="seg-row"></div>
-        <div id="chips" class="chips"></div>
-        <span id="note" class="note"></span>
-      </div>
-      <p id="banner" class="banner hidden" role="alert"></p>
-      <div class="work">
+      <aside class="sidebar">
+        <a class="side-brand" href="./admin.html" aria-label="Monster Gate Guild Ledger">
+          <span class="brand-mark">M</span>
+          <span><b>MONSTER <em>GATE</em></b><small>GUILD LEDGER</small></span>
+        </a>
+        <label class="side-search" for="q"><span aria-hidden="true">⌕</span><input id="q" type="search" placeholder="Search accounts…" autocomplete="off" spellcheck="false" maxlength="64" aria-label="Search accounts and hunters" /><kbd>/</kbd></label>
+        <div class="nav-caption">GUILD</div>
         <nav id="rail" class="rail" aria-label="Ledger">
-          <button type="button" data-tab="ledger"><kbd>1</kbd>Ledger</button>
-          <button type="button" data-tab="hunters"><kbd>2</kbd>Hunters</button>
-          <button type="button" data-tab="coffers"><kbd>3</kbd>Coffers</button>
-          <button type="button" data-tab="bestiary"><kbd>4</kbd>Bestiary</button>
-          <button type="button" data-tab="paths"><kbd>5</kbd>Paths</button>
-          <button type="button" data-tab="passes"><kbd>6</kbd>Free passes</button>
-          <button type="button" data-tab="accounts"><kbd>7</kbd>Accounts</button>
+          <button type="button" data-tab="ledger"><span class="nav-icon">▦</span><span>Dashboard</span><kbd>1</kbd></button>
+          <button type="button" data-tab="hunters"><span class="nav-icon">♙</span><span>Hunters</span><kbd>2</kbd></button>
+          <button type="button" data-tab="accounts"><span class="nav-icon">◎</span><span>Accounts</span><kbd>7</kbd></button>
+          <button type="button" data-tab="coffers"><span class="nav-icon">◇</span><span>Coffers</span><kbd>3</kbd></button>
+          <button type="button" data-tab="bestiary"><span class="nav-icon">♜</span><span>Bestiary</span><kbd>4</kbd></button>
+          <button type="button" data-tab="paths"><span class="nav-icon">⌁</span><span>Paths</span><kbd>5</kbd></button>
+          <button type="button" data-tab="passes"><span class="nav-icon">✧</span><span>Free passes</span><kbd>6</kbd></button>
         </nav>
-        <div id="board" class="board">
-          <div id="stage" class="stage"></div>
-          <div id="drawer"></div>
-        </div>
-      </div>
-      <footer class="keys">
-        <span><kbd>1-7</kbd> pages</span>
-        <span><kbd>/</kbd> search</span>
-        <span><kbd>J K</kbd> hunters</span>
-        <span><kbd>F</kbd> span</span>
-        <span><kbd>R</kbd> refresh</span>
-        <span><kbd>Esc</kbd> close</span>
-        <span>Guest hunts stay on the device.</span>
-      </footer>
+        <div class="sidebar-spacer"></div>
+        <section class="side-note">
+          <span class="side-note-icon">✦</span>
+          <b>The guild record</b>
+          <p>Keep watch over accounts, hunters, and Gate Pass access.</p>
+          <a href="./">Return to the hunt ↗</a>
+        </section>
+        <div class="side-foot"><span class="status-dot"></span> GUILD SYSTEM ONLINE</div>
+      </aside>
+
+      <main class="main-column">
+        <header class="top">
+          <div class="page-heading"><span class="eyebrow">MONSTER GATE / CONTROL ROOM</span><h1 id="page-title">Dashboard</h1><p>Guild activity and account intelligence at a glance.</p></div>
+          <div class="top-actions">
+            <span id="who" class="who"></span>
+            <button type="button" class="mini" id="refresh">↻ Refresh</button>
+            <button type="button" class="mini" id="hold" aria-pressed="false">● Live</button>
+            <button type="button" class="mini" id="signout">Sign out</button>
+          </div>
+        </header>
+        <section class="tools" aria-label="Dashboard filters">
+          <div id="windows" class="seg-row"></div>
+          <div id="chips" class="chips"></div>
+          <span id="note" class="note"></span>
+        </section>
+        <p id="banner" class="banner hidden" role="alert"></p>
+        <section class="work">
+          <div id="board" class="board">
+            <div id="stage" class="stage"></div>
+            <div id="drawer"></div>
+          </div>
+        </section>
+        <footer class="keys">
+          <span><kbd>1-7</kbd> pages</span><span><kbd>/</kbd> search</span><span><kbd>J K</kbd> hunters</span><span><kbd>F</kbd> span</span><span><kbd>R</kbd> refresh</span><span><kbd>Esc</kbd> close</span>
+        </footer>
+      </main>
     </div>
     <script type="module" src="/src/admin/main.js"></script>
   </body>
