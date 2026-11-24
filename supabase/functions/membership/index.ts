@@ -47,7 +47,8 @@ function transfer(encoded:string){
 function transaction(j:any){return j?.data?.transaction??j?.transaction??j?.data??j}
 function validTransfer(j:any,hash:string,from:string,min:bigint,quotedAt:string,quoteExpiresAt:string){
  const tx=transaction(j),reportedHash=String(tx?.hash??j?.data?.hash??j?.hash??"").toLowerCase();
- if(reportedHash&&reportedHash!==hash.toLowerCase())return null;
+ if(reportedHash!==hash.toLowerCase())return null;
+ if(String(tx?.chainID??tx?.chainId??"")!=="108")return null;
  const status=String(j?.data?.status??j?.status??tx?.status??tx?.receipt?.status??"").toLowerCase();
  if(!["success","onchain","on-chain","confirmed"].includes(status))return null;
  const stamp=tx?.timestamp??tx?.block?.timestamp??tx?.blockTimestamp??tx?.createdAt??j?.data?.timestamp;
