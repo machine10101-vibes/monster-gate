@@ -124,14 +124,41 @@ function cards(model) {
   </div>`;
 }
 
+function activityChart(activity) {
+  const rows = activity || [];
+  if (!rows.length) return '<p class="empty">No recent account activity yet.</p>';
+  const max = Math.max(1, ...rows.map((day) => day.active));
+  const points = rows.map((day, index) => {
+    const x = rows.length === 1 ? 400 : 22 + (756 * index) / (rows.length - 1);
+    const y = 154 - (day.active / max) * 112;
+    return { x: Number(x.toFixed(1)), y: Number(y.toFixed(1)), day };
+  });
+  const line = points.map((point) => `${point.x},${point.y}`).join(' ');
+  const area = `22,164 ${line} 778,164`;
+  const ticks = [0, 1, 2, 3].map((index) => {
+    const y = 42 + index * 40;
+    return `<line x1="18" y1="${y}" x2="782" y2="${y}" class="chart-grid"/>`;
+  }).join('');
+  const labels = [points[0], points[Math.floor((points.length - 1) / 2)], points[points.length - 1]]
+    .filter((point, index, all) => all.findIndex((item) => item.x === point.x) === index)
+    .map((point) => `<span>${esc(point.day.month || '')} ${esc(point.day.label)}</span>`).join('');
+  return `<div class="activity-chart">
+    <div class="chart-meta"><div><strong>${esc(formatCount(rows.reduce((sum, day) => sum + day.active, 0)))}</strong><small>active account-days</small></div><span>Last 14 days</span></div>
+    <svg viewBox="0 0 800 184" role="img" aria-label="Daily active accounts over the last 14 days" preserveAspectRatio="none">
+      <defs><linearGradient id="activity-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e7c56a" stop-opacity=".26"/><stop offset="100%" stop-color="#4aa0ff" stop-opacity=".015"/></linearGradient></defs>
+      ${ticks}
+      <polygon points="${area}" fill="url(#activity-fill)"/>
+      <polyline points="${line}" class="chart-line"/>
+      ${points.map((point) => `<circle cx="${point.x}" cy="${point.y}" r="3.2" class="chart-point"><title>${esc(point.day.month)} ${esc(point.day.label)}: ${esc(point.day.active)} active</title></circle>`).join('')}
+    </svg>
+    <div class="chart-labels">${labels}</div>
+  </div>`;
+}
+
 function ledgerTab(model, ui) {
   const view = model.view;
   const latest = model.players.slice(0, 6);
-  const maxActive = Math.max(1, ...view.activity.map((day) => day.active));
-  const days = view.activity.map((day) => `<button type="button" class="day" title="${esc(`${day.month} ${day.label}: ${day.active} wrote, ${day.joined} new`)}">
-      <u class="${day.active ? '' : 'flat'}" style="--p:${pct(day.active, maxActive)}%"></u>
-      <span>${esc(day.label)}</span>
-    </button>`).join('');
+  const activity = activityChart(view.activity);
   const rows = latest.length
     ? latest.map((player) => `<button type="button" class="recent${player.id === model.selected?.id ? ' on' : ''}" data-player="${esc(player.id)}">
         <b>${esc(player.name)}</b>
@@ -144,7 +171,7 @@ function ledgerTab(model, ui) {
       ${sheet('Paths', 'Characters', barList(view.classes, 'n', 'data-class', ui.classId))}
       ${sheet('Levels', 'Characters', barList(view.levels, 'n', 'data-band', ui.band))}
     </div>
-    ${sheet('Last 14 days', 'Accounts that wrote', `<div class="days">${days}</div>`)}
+    ${sheet('Account activity', 'Daily active accounts', activity)}
     <div class="split">
       ${sheet('Realms', 'Where a hunter stands', barList(view.realms.filter((row) => row.n), 'n', 'data-realm', ui.realm))}
       ${sheet('Latest writing', 'Open a hunter', `<div class="recents">${rows}</div>`)}
