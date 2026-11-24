@@ -1,0 +1,1 @@
+Trigger the World 1 PvP protocol wiring verification.
