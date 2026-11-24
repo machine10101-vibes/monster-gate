@@ -1,3 +1,4 @@
+import './membership.css';
 import { loadCloudConfig } from './cloud.js';
 import { refreshAccountSession, saveAccount } from './account.js';
 
@@ -50,7 +51,7 @@ function copyText(value) {
 
 function dateLabel(value) {
   const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleString() : value;
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : String(value || '');
 }
 
 export async function ensureMembership(session, game) {
@@ -77,101 +78,209 @@ export async function ensureMembership(session, game) {
   return new Promise((resolve) => {
     let settled = false;
     let quote = null;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      overlay.remove();
-      resolve(value);
-    };
-    const overlay = node('div', 'mg-membership-overlay');
+    let pollTimer = null;
+    let pollInFlight = false;
+    let quoteLoading = false;
+    let pollCount = 0;
+    const destination = 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv';
+
+    const overlay = node('div', 'mg-gatepass-overlay');
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'mg-membership-title');
-    const card = node('section', 'mg-membership-card');
-    const close = node('button', 'mg-membership-close', '×');
+    overlay.setAttribute('aria-labelledby', 'mg-gatepass-title');
+    const card = node('section', 'mg-gatepass-card');
+    const close = node('button', 'mg-gatepass-close', '×');
     close.type = 'button';
-    close.setAttribute('aria-label', 'Close membership');
-    close.addEventListener('click', () => finish(false));
-    const eyebrow = node('p', 'mg-membership-eyebrow', 'MONSTER GATE MEMBERSHIP');
-    const title = node('h2', '', 'The Gate Pass');
-    title.id = 'mg-membership-title';
-    const intro = node('p', 'mg-membership-intro', 'A membership gives this account 30 days of access to the world. Renewals are manual; the wallet is never charged automatically.');
-    const price = node('div', 'mg-membership-price', 'Loading live KLV price…');
-    const details = node('p', 'mg-membership-details', 'The KLV amount is calculated from the live KLV/USDT ticker on Bitcoin.me. USDT is used as the USD reference.');
-    const addressLabel = node('label', 'mg-membership-label', 'Send KLV to this address');
-    const address = node('code', 'mg-membership-address', status.walletAddress ? '' : '');
-    const destination = 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv';
-    address.textContent = destination;
-    const copyAddress = node('button', 'mg-membership-copy', 'Copy receiving address');
-    copyAddress.type = 'button';
-    copyAddress.addEventListener('click', async () => {
-      try { await copyText(destination); copyAddress.textContent = 'Address copied'; }
-      catch { copyAddress.textContent = 'Copy unavailable — select the address'; }
-    });
-    const amountLabel = node('label', 'mg-membership-label', 'Exact KLV amount');
-    const amount = node('code', 'mg-membership-amount', '…');
-    const copyAmount = node('button', 'mg-membership-copy', 'Copy amount');
+    close.setAttribute('aria-label', 'Close Gate Pass');
+    const head = node('div', 'mg-gatepass-head');
+    const mark = node('div', 'mg-gatepass-mark', 'MG');
+    mark.setAttribute('aria-hidden', 'true');
+    const brandcopy = node('div');
+    brandcopy.append(
+      node('p', 'mg-gatepass-kicker', 'MONSTER GATE MEMBERSHIP'),
+      node('p', 'mg-gatepass-brand', 'OFFICIAL WORLD ACCESS'),
+    );
+    head.append(mark, brandcopy);
+    const title = node('h2', 'mg-gatepass-title', 'The Gate Pass');
+    title.id = 'mg-gatepass-title';
+    const intro = node('p', 'mg-gatepass-lede', 'Your key to the world beyond the Gate. Unlock 30 days of hunting, exploring, and fighting alongside the community.');
+    const priceGrid = node('div', 'mg-gatepass-pricegrid');
+    const usdBox = node('div', 'mg-gatepass-pricebox primary');
+    usdBox.append(node('span', 'mg-gatepass-label', 'Membership'), node('strong', 'mg-gatepass-usd', '$5.00 USD'));
+    const daysBox = node('div', 'mg-gatepass-pricebox');
+    daysBox.append(node('span', 'mg-gatepass-label', 'Access period'), node('strong', 'mg-gatepass-days', '30 days'));
+    priceGrid.append(usdBox, daysBox);
+    const tokenLine = node('div', 'mg-gatepass-tokenline');
+    const livePrice = node('strong', '', 'Fetching live KLV price…');
+    const quoteExpiry = node('span', '', 'Bitcoin.me · KLV/USDT');
+    tokenLine.append(livePrice, quoteExpiry);
+
+    const amountLabel = node('span', 'mg-gatepass-sectionlabel', 'Your exact payment amount');
+    const amountRow = node('div', 'mg-gatepass-amountrow');
+    const amount = node('code', 'mg-gatepass-amount', '— KLV');
+    const copyAmount = node('button', 'mg-gatepass-copy', 'Copy');
     copyAmount.type = 'button';
     copyAmount.disabled = true;
     copyAmount.addEventListener('click', async () => {
       if (!quote) return;
-      try { await copyText(quote.klvAmount); copyAmount.textContent = 'Amount copied'; }
-      catch { copyAmount.textContent = quote.klvAmount; }
+      try { await copyText(quote.klvAmount); copyAmount.textContent = 'Copied'; }
+      catch { copyAmount.textContent = 'Select amount'; }
     });
-    const instructions = node('p', 'mg-membership-instructions', 'Send the exact amount from your linked Klever wallet and keep extra KLV for network fees. Then paste the transaction hash below. Only a confirmed mainnet KLV transfer to this address will activate access.');
-    const hashLabel = node('label', 'mg-membership-label', 'Klever transaction hash');
-    const hash = node('input', 'mg-membership-hash');
-    hash.type = 'text';
-    hash.autocomplete = 'off';
-    hash.spellcheck = false;
-    hash.placeholder = '64-character transaction hash';
-    hash.maxLength = 66;
-    const error = node('p', 'mg-membership-error', '');
-    error.setAttribute('role', 'status');
-    const submit = node('button', 'mg-membership-submit', 'Verify payment & enter world');
-    submit.type = 'button';
-    const cancel = node('button', 'mg-membership-cancel', 'Not now');
-    cancel.type = 'button';
-    cancel.addEventListener('click', () => finish(false));
-    submit.addEventListener('click', async () => {
-      if (!quote) return;
-      const txHash = hash.value.trim().replace(/^0x/i, '');
-      if (!/^[0-9a-f]{64}$/i.test(txHash)) {
-        error.textContent = 'Paste the 64-character transaction hash from Klever.';
-        hash.focus();
-        return;
-      }
-      submit.disabled = true;
-      submit.textContent = 'Checking Klever mainnet…';
-      error.textContent = '';
+    amountRow.append(amount, copyAmount);
+
+    const addressLabel = node('span', 'mg-gatepass-sectionlabel', 'Send KLV to the membership vault');
+    const addressRow = node('div', 'mg-gatepass-addressrow');
+    const address = node('code', 'mg-gatepass-address', destination);
+    const copyAddress = node('button', 'mg-gatepass-copy', 'Copy');
+    copyAddress.type = 'button';
+    copyAddress.addEventListener('click', async () => {
+      try { await copyText(destination); copyAddress.textContent = 'Copied'; }
+      catch { copyAddress.textContent = 'Select address'; }
+    });
+    addressRow.append(address, copyAddress);
+
+    const steps = node('div', 'mg-gatepass-steps');
+    const step1 = node('div', 'mg-gatepass-step');
+    step1.append(node('span', 'mg-gatepass-stepnum', '1'), node('span', '', 'Send the exact KLV amount from the Klever wallet linked to this game account. Keep a little extra KLV for network fees.'));
+    const step2 = node('div', 'mg-gatepass-step');
+    step2.append(node('span', 'mg-gatepass-stepnum', '2'), node('span', '', 'That’s it. We automatically watch the Klever chain and verify your payment. No transaction hash to copy or paste.'));
+    steps.append(step1, step2);
+
+    const watch = node('div', 'mg-gatepass-watch');
+    const watchIcon = node('span', 'mg-gatepass-watchicon');
+    watchIcon.setAttribute('aria-hidden', 'true');
+    const watchCopy = node('div', 'mg-gatepass-watchcopy');
+    const watchTitle = node('p', 'mg-gatepass-watchtitle', 'Waiting for your KLV transfer');
+    const watchText = node('p', 'mg-gatepass-watchtext', 'This window will update automatically when KleverScan indexes a matching payment.');
+    watchCopy.append(watchTitle, watchText);
+    watch.append(watchIcon, watchCopy);
+
+    const actions = node('div', 'mg-gatepass-actions');
+    const checkNow = node('button', 'mg-gatepass-check', 'Check for payment now');
+    checkNow.type = 'button';
+    const refresh = node('button', 'mg-gatepass-refresh', 'Refresh quote');
+    refresh.type = 'button';
+    actions.append(checkNow, refresh);
+
+    const footnote = node('p', 'mg-gatepass-footnote', 'Manual renewal · No recurring wallet charge · Network fees are paid separately.');
+    const explorer = node('a', 'mg-gatepass-explorer', 'View membership wallet on KleverScan');
+    explorer.href = `https://kleverscan.org/address/${destination}`;
+    explorer.target = '_blank';
+    explorer.rel = 'noopener noreferrer';
+    explorer.style.display = 'block';
+    explorer.style.width = 'fit-content';
+    explorer.style.margin = '12px auto 0';
+    explorer.style.fontSize = '11px';
+
+    const setWatch = (heading, message, isError = false) => {
+      watch.classList.toggle('error', isError);
+      watchTitle.textContent = heading;
+      watchText.textContent = message;
+    };
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+      document.removeEventListener('keydown', onKeyDown);
+      overlay.remove();
+      resolve(value);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') finish(false);
+    };
+    const schedulePoll = (delay = 5000) => {
+      if (settled || !quote) return;
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = setTimeout(checkPayment, delay);
+    };
+    const checkPayment = async () => {
+      if (settled || !quote || pollInFlight) return;
+      pollInFlight = true;
+      pollCount += 1;
+      checkNow.disabled = true;
+      checkNow.textContent = 'Checking KleverScan…';
       try {
-        const result = await post(currentSession, { op: 'verify', quoteId: quote.quoteId, txHash });
+        const result = await post(currentSession, { op: 'watch', quoteId: quote.quoteId });
         currentSession = result.session;
-        error.textContent = `Membership active until ${dateLabel(result.data.expiresAt)}.`;
-        submit.textContent = 'Membership active';
-        setTimeout(() => finish(true), 650);
-      } catch (err) {
-        error.textContent = err.message || 'Payment could not be verified.';
-        submit.disabled = false;
-        submit.textContent = 'Try verification again';
+        if (result.data?.ok && result.data.expiresAt) {
+          setWatch('Gate Pass activated!', `Your 30-day access is active until ${dateLabel(result.data.expiresAt)}.`);
+          checkNow.textContent = 'Payment confirmed';
+          setTimeout(() => finish(true), 900);
+          return;
+        }
+        setWatch(
+          'Watching the Klever chain',
+          pollCount > 1
+            ? 'No matching transfer yet. We’ll keep checking in the background.'
+            : 'Your payment has not appeared yet. You can leave this open while we keep watching.',
+        );
+      } catch (error) {
+        const message = error.message || 'The chain could not be checked just now.';
+        if (/quote expired|wallet changed|already been used|could not be found/i.test(message)) {
+          quote = null;
+          setWatch('Refresh your quote', message, true);
+          return;
+        }
+        setWatch('Still watching for your payment', 'KleverScan is taking a moment to respond. We’ll retry automatically.', true);
+      } finally {
+        pollInFlight = false;
+        checkNow.disabled = false;
+        if (!quote) {
+          checkNow.disabled = true;
+          checkNow.textContent = 'Refresh quote to continue';
+        } else if (checkNow.textContent !== 'Payment confirmed') {
+          checkNow.disabled = false;
+          checkNow.textContent = 'Check for payment now';
+        }
+        schedulePoll();
       }
+    };
+    const loadQuote = async () => {
+      if (settled || quoteLoading) return;
+      if (pollTimer) clearTimeout(pollTimer);
+      quote = null;
+      quoteLoading = true;
+      refresh.disabled = true;
+      checkNow.disabled = true;
+      livePrice.textContent = 'Fetching live KLV price…';
+      quoteExpiry.textContent = 'Bitcoin.me · KLV/USDT';
+      amount.textContent = '— KLV';
+      copyAmount.disabled = true;
+      setWatch('Preparing your Gate Pass', 'Getting a fresh KLV/USDT quote before you send anything.');
+      try {
+        const result = await post(currentSession, { op: 'quote' });
+        currentSession = result.session;
+        quote = result.data;
+        livePrice.textContent = `1 KLV = $${Number(quote.usdPrice).toFixed(8)} USDT`;
+        quoteExpiry.textContent = `Quote valid until ${dateLabel(quote.expiresAt)}`;
+        amount.textContent = `${quote.klvAmount} KLV`;
+        copyAmount.disabled = false;
+        setWatch('Waiting for your KLV transfer', 'Once you send the exact amount from your linked wallet, we’ll detect it and activate your pass automatically.');
+        checkNow.disabled = false;
+        schedulePoll(2500);
+      } catch (error) {
+        quote = null;
+        livePrice.textContent = 'Live KLV price unavailable';
+        quoteExpiry.textContent = 'Tap Refresh quote to retry';
+        setWatch('Could not load a live quote', error.message || 'The live KLV price service is temporarily unavailable. No payment has been requested.', true);
+        checkNow.disabled = true;
+      } finally {
+        quoteLoading = false;
+        refresh.disabled = false;
+      }
+    };
+    checkNow.addEventListener('click', () => {
+      if (pollTimer) clearTimeout(pollTimer);
+      checkPayment();
     });
-    card.append(close, eyebrow, title, intro, price, details, addressLabel, address, copyAddress, amountLabel, amount, copyAmount, instructions, hashLabel, hash, error, submit, cancel);
-    overlay.append(card);
+    refresh.addEventListener('click', loadQuote);
+    close.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
+
+    card.append(close, head, title, intro, priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
+    overlay.append(card);
     document.body.append(overlay);
-    hash.focus();
-    post(currentSession, { op: 'quote' }).then(({ data, session: refreshed }) => {
-      currentSession = refreshed;
-      quote = data;
-      price.textContent = `$5.00 USD = ${data.klvAmount} KLV`;
-      details.textContent = `1 KLV = $${Number(data.usdPrice).toFixed(8)} USDT · Quote valid until ${dateLabel(data.expiresAt)}.`;
-      amount.textContent = data.klvAmount + ' KLV';
-      copyAmount.disabled = false;
-    }).catch((err) => {
-      price.textContent = 'Live KLV price unavailable';
-      error.textContent = err.message || 'Could not load a price quote.';
-      submit.disabled = true;
-    });
+    document.addEventListener('keydown', onKeyDown);
+    loadQuote();
   });
 }

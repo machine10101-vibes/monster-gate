@@ -2,7 +2,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { bech32 } from "bech32";
 const RECEIVER="klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv";
-const PRICE_URL="https://api.exchange.bitcoin.me/v1/market/ticker?symbol=KLV-USDT";
+const PRICE_URLS=["https://api.exchange.bitcoin.me/v1/market/ticker?symbol=KLV-USDT","https://api.exchange.bitcoin.me/v1/market/tickers"];
 const CHAIN_API="https://api.mainnet.klever.org";
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH=/^[0-9a-f]{64}$/i, ADDR=/^klv1[02-9ac-hj-np-z]{58}$/;
@@ -22,15 +22,31 @@ async function walletFor(db:Admin,id:string):Promise<any>{
  if(error)return out({error:"Could not check your linked wallet."},503);
  const a=data?.klever_address||"";return ADDR.test(a)?a:"";
 }
+function epochMillis(value:any):number|null{
+ if(value===null||value===undefined||value==="")return null;
+ const text=String(value);
+ if(/^\d+(?:\.\d+)?$/.test(text)){const n=Number(text);return Number.isFinite(n)?(n<1e12?n*1000:n):null}
+ const parsed=Date.parse(text);return Number.isFinite(parsed)?parsed:null;
+}
 async function ticker(){
- if(priceCache&&Date.now()-priceCache.at<30000)return priceCache;
- const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
- try{const r=await fetch(PRICE_URL,{signal:c.signal});if(!r.ok)return null;const j=await r.json(),p=Number(j?.data?.price),sec=Number(j?.data?.time);
- if(j?.success!==true||j?.data?.symbol!=="KLV-USDT"||!Number.isFinite(p)||p<=0)return null;
- const sourceTime=sec>0?new Date(sec*1000).toISOString():null;
- if(sourceTime&&Date.now()-Date.parse(sourceTime)>600000)return null;
- return priceCache={price:p,sourceTime,at:Date.now()};
- }catch{return null}finally{clearTimeout(t)}
+ if(priceCache&&Date.now()-priceCache.at<30000&&Date.now()-Date.parse(priceCache.sourceTime)<600000)return priceCache;
+ for(const url of PRICE_URLS){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),8000);
+  try{
+   const r=await fetch(url,{signal:c.signal,headers:{accept:"application/json","cache-control":"no-cache"}});
+   if(!r.ok)continue;
+   const j=await r.json(),rows=Array.isArray(j?.data)?j.data:[j?.data];
+   const row=rows.find((item:any)=>item?.symbol==="KLV-USDT");
+   const p=Number(row?.price);
+   if(j?.success!==true||!row||!Number.isFinite(p)||p<=0)continue;
+   const sourceMillis=epochMillis(row.time??row.timestamp??row.updatedAt??row.updated_at)??epochMillis(r.headers.get("date"));
+   if(!sourceMillis||sourceMillis>Date.now()+120000||Date.now()-sourceMillis>600000)continue;
+   return priceCache={price:p,sourceTime:new Date(sourceMillis).toISOString(),at:Date.now()};
+  }catch{
+   /* Try the alternate documented ticker endpoint. */
+  }finally{clearTimeout(t)}
+ }
+ return null;
 }
 function b64(s:string){try{const b=atob(s);return Uint8Array.from(b,c=>c.charCodeAt(0))}catch{return new Uint8Array()}}
 function vi(b:Uint8Array,i:number){let v=0n,s=0n;while(i<b.length&&s<=63n){const x=b[i++];v|=BigInt(x&127)<<s;if(!(x&128))return{v,i};s+=7n}return null}
@@ -52,7 +68,7 @@ function validTransfer(j:any,hash:string,from:string,min:bigint,quotedAt:string,
  const status=String(j?.data?.status??j?.status??tx?.status??tx?.receipt?.status??"").toLowerCase();
  if(!["success","onchain","on-chain","confirmed"].includes(status))return null;
  const stamp=tx?.timestamp??tx?.block?.timestamp??tx?.blockTimestamp??tx?.createdAt??j?.data?.timestamp;
- const numeric=typeof stamp==="number"||/^\\d+(?:\\.\\d+)?$/.test(String(stamp??""))?Number(stamp):Date.parse(String(stamp??""));
+ const numeric=typeof stamp==="number"||/^\d+(?:\.\d+)?$/.test(String(stamp??""))?Number(stamp):Date.parse(String(stamp??""));
  const txMillis=Number.isFinite(numeric)?(numeric<1e12?numeric*1000:numeric):NaN;
  if(!Number.isFinite(txMillis)||txMillis<Date.parse(quotedAt)||txMillis>Date.parse(quoteExpiresAt)||txMillis>Date.now()+60000)return null;
  const raw=tx?.RawData??tx?.rawData??tx?.raw?.RawData??tx?.raw?.rawData??{};
@@ -81,27 +97,116 @@ function validTransfer(j:any,hash:string,from:string,min:bigint,quotedAt:string,
  if(x&&x.receiver===RECEIVER&&(!x.asset||x.asset.toUpperCase()==="KLV")&&x.amount>=min)return x}
  return null;
 }
+
+function transactionRows(j:any):any[]{
+ const root=j?.data??j;
+ if(Array.isArray(root))return root;
+ for(const key of ["transactions","list","items","results","transactionList","transaction_list"]){
+  if(Array.isArray(root?.[key]))return root[key];
+ }
+ if(Array.isArray(j?.transactions))return j.transactions;
+ if(root?.transaction&&typeof root.transaction==="object")return[root.transaction];
+ return [];
+}
+async function recentIncoming(q:any):Promise<any[]|Response>{
+ const params=new URLSearchParams({
+  receiver:RECEIVER,toAddress:RECEIVER,asset:"KLV",type:"0",limit:"100",
+  startTime:String(Math.floor(Date.parse(q.created_at)/1000)),
+ });
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);
+ try{
+  const r=await fetch(CHAIN_API+"/v1.0/transaction/list?"+params.toString(),{
+   signal:ctl.signal,headers:{accept:"application/json","cache-control":"no-cache"},
+  });
+  if(r.status===204)return[];
+  if(!r.ok)return out({error:"KleverScan transaction feed is temporarily unavailable."},503);
+  const j=await r.json();
+  if(j?.error&&j?.code!=="successful")return out({error:"KleverScan could not list recent transactions."},503);
+  return transactionRows(j);
+ }catch{
+  return out({error:"KleverScan transaction feed is temporarily unavailable. We’ll retry shortly."},503);
+ }finally{clearTimeout(timer)}
+}
+async function transactionByHash(hash:string):Promise<any|null>{
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),8000);
+ try{
+  const r=await fetch(CHAIN_API+"/v1.0/transaction/"+hash,{signal:ctl.signal,headers:{accept:"application/json","cache-control":"no-cache"}});
+  if(!r.ok)return null;
+  return await r.json();
+ }catch{return null}finally{clearTimeout(timer)}
+}
+async function activatePayment(db:Admin,id:string,q:any,a:string,hash:string,payment:any):Promise<Response>{
+ const {data:activated,error}=await db.rpc("activate_membership_service",{
+  p_user_id:id,p_klever_address:a,p_tx_hash:hash,p_receiver_address:RECEIVER,
+  p_amount_atomic:payment.amount.toString(),p_usd_price:q.usd_price,p_quote_id:q.id,
+ });
+ if(error||!activated?.ok){
+  const message=String(error?.message||"").toLowerCase();
+  return out({error:message.includes("duplicate")?"This transaction was already used.":"Could not activate membership. Please retry or contact support."},503);
+ }
+ return out({ok:true,expiresAt:activated.expires_at,txHash:hash});
+}
+async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>{
+ if(!UUID.test(quoteId))return out({error:"Refresh your Gate Pass quote to continue."},400);
+ const {data:q,error:qe}=await db.from("membership_quotes").select("*").eq("id",quoteId).eq("user_id",id).maybeSingle();
+ if(qe)return out({error:"Could not read your membership quote."},503);
+ if(!q)return out({error:"This quote could not be found. Refresh your quote."},404);
+ if(q.used_at){
+  const {data:membership}=await db.from("memberships").select("expires_at").eq("user_id",id).maybeSingle();
+  if(membership?.expires_at&&Date.parse(membership.expires_at)>Date.now())return out({ok:true,expiresAt:membership.expires_at});
+  return out({error:"This quote has already been used. Refresh your quote."},409);
+ }
+ if(Date.now()-Date.parse(q.created_at)>7*24*60*60*1000)return out({error:"Your quote has expired. Refresh it to continue."},410);
+ const a=await walletFor(db,id);
+ if(a instanceof Response)return a;
+ if(!a||a!==q.klever_address)return out({error:"Your linked Klever wallet changed. Refresh your quote."},409);
+ const rows=await recentIncoming(q);
+ if(rows instanceof Response)return rows;
+ let examined=0;
+ for(const row of rows){
+  const tx=transaction(row);
+  const hash=String(tx?.hash??row?.hash??tx?.txHash??row?.txHash??"").trim().toLowerCase();
+  if(!HASH.test(hash))continue;
+  const stamp=epochMillis(tx?.timestamp??tx?.block?.timestamp??tx?.blockTimestamp??tx?.createdAt);
+  if(stamp&&(stamp<Date.parse(q.created_at)||stamp>Date.parse(q.expires_at)||stamp>Date.now()+60000))continue;
+  const sender=String(tx?.sender??tx?.from??tx?.senderAddress??"");
+  if(sender&&sender!==a)continue;
+  const state=String(tx?.status??row?.status??"").toLowerCase();
+  if(state&& !["success","onchain","on-chain","confirmed"].includes(state))continue;
+  examined+=1;
+  let detail=row;
+  let payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+  if(!payment){
+   detail=await transactionByHash(hash);
+   if(!detail)continue;
+   payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+  }
+  if(payment)return activatePayment(db,id,q,a,hash,payment);
+  if(examined>=20)break;
+ }
+ return out({ok:false,found:false,checkedAt:new Date().toISOString()});
+}
+
 async function handle(db:Admin,id:string,b:any){
  if(b.op==="status"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({connected:false,active:false});
  const {data,error}=await db.from("memberships").select("expires_at").eq("user_id",id).maybeSingle();if(error)return out({error:"Could not read membership."},503);
  return out({connected:true,walletAddress:a,expiresAt:data?.expires_at||null,active:!!data?.expires_at&&Date.parse(data.expires_at)>Date.now()})}
+ if(b.op==="watch")return watchPayment(db,id,String(b.quoteId||""));
  if(b.op==="quote"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({error:"Connect your Klever wallet in character selection before paying."},409);
- const p=await ticker();if(!p)return out({error:"Live KLV/USDT price unavailable or stale. Try again shortly."},503);
+ const p=await ticker();if(!p)return out({error:"Bitcoin.me live KLV/USDT price feed is temporarily unavailable. Please refresh your quote."},503);
  const atomic=BigInt(Math.ceil(5/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();
  const {data,error}=await db.from("membership_quotes").insert({user_id:id,klever_address:a,usd_price:p.price,klv_amount_atomic:atomic.toString(),source_time:p.sourceTime,expires_at:expires}).select("id").single();
  if(error||!data?.id)return out({error:"Could not prepare a membership quote."},503);
  return out({quoteId:data.id,usdPrice:p.price,usdAmount:5,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,receiverAddress:RECEIVER})}
  if(b.op==="verify"){const qid=String(b.quoteId||""),hash=String(b.txHash||"").trim().toLowerCase();if(!UUID.test(qid)||!HASH.test(hash))return out({error:"Enter the 64-character transaction hash from Klever."},400);
  const {data:q,error:qe}=await db.from("membership_quotes").select("*").eq("id",qid).eq("user_id",id).maybeSingle();
- if(qe)return out({error:"Could not read payment quote."},503);if(!q||q.used_at||Date.parse(q.created_at)<Date.now()-QUOTE_VERIFY_MS)return out({error:"Quote expired. Request a new one."},410);
+ if(qe)return out({error:"Could not read payment quote."},503);if(!q||q.used_at||Date.parse(q.created_at)<Date.now()-7*24*60*60*1000)return out({error:"Quote expired. Request a new one."},410);
  const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a||a!==q.klever_address)return out({error:"Your linked wallet changed. Request a new quote."},409);
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);let chain:any;
  try{const r=await fetch(CHAIN_API+"/v1.0/transaction/"+hash,{signal:ctl.signal});if(!r.ok)return out({error:r.status===404?"Transaction not indexed on Klever mainnet yet.":"Klever could not confirm the transaction."},409);chain=await r.json()}
  catch{return out({error:"Klever mainnet is unavailable. Try again shortly."},503)}finally{clearTimeout(timer)}
  const payment=validTransfer(chain,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);if(!payment)return out({error:"The confirmed transaction does not match the required KLV amount, linked sender and membership receiving address."},400);
- const {data:activated,error}=await db.rpc("activate_membership_service",{p_user_id:id,p_klever_address:a,p_tx_hash:hash,p_receiver_address:RECEIVER,p_amount_atomic:payment.amount.toString(),p_usd_price:q.usd_price,p_quote_id:qid});
- if(error||!activated?.ok)return out({error:error?.message?.toLowerCase().includes("duplicate")?"This transaction was already used.":"Could not activate membership. Contact support with your transaction hash."},503);
- return out({ok:true,expiresAt:activated.expires_at})}
+ return activatePayment(db,id,q,a,hash,payment)}
  return out({error:"Unknown membership operation."},400)
 }
 export default {fetch:withSupabase({auth:["publishable"],cors:{headers:{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"}}},async(req,ctx)=>{
