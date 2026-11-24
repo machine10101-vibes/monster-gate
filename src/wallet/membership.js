@@ -49,6 +49,33 @@ function copyText(value) {
   return Promise.resolve();
 }
 
+let kleverPaymentModules;
+async function sendSignedKlvTransfer(quote, expectedAddress) {
+  // Payment uses Klever's supported BrowserWallet SDK in extension mode.
+  // The existing account-link/connectWallet implementation is intentionally untouched.
+  if (!kleverPaymentModules) {
+    kleverPaymentModules = import('https://esm.sh/@klever/connect@0.1.9?bundle');
+  }
+  const { BrowserWallet, KleverProvider } = await kleverPaymentModules;
+  const provider = new KleverProvider({ network: 'mainnet' });
+  const wallet = new BrowserWallet(provider);
+  await wallet.connect();
+  if (!wallet.address || wallet.address !== expectedAddress) {
+    throw new Error('The wallet approved for payment does not match the Klever wallet linked to this game account.');
+  }
+  const atomic = BigInt(Math.round(Number(quote.klvAmount) * 1_000_000));
+  if (atomic <= 0n) throw new Error('The KLV quote is invalid. Refresh the quote and try again.');
+  const result = await wallet.transfer({
+    receiver: quote.receiverAddress || 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv',
+    amount: atomic.toString(),
+  });
+  const hash = String(result?.hash?.hash || result?.hash || result?.txHash || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(hash)) {
+    throw new Error('Klever Wallet did not return a valid transaction hash. Check your wallet before trying again.');
+  }
+  return hash;
+}
+
 function dateLabel(value) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toLocaleString() : String(value || '');
@@ -81,6 +108,8 @@ export async function ensureMembership(session, game) {
     let pollTimer = null;
     let pollInFlight = false;
     let quoteLoading = false;
+    let paymentInFlight = false;
+    let paymentHash = '';
     let pollCount = 0;
     const destination = 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv';
 
@@ -160,7 +189,7 @@ export async function ensureMembership(session, game) {
     checkNow.type = 'button';
     const refresh = node('button', 'mg-gatepass-refresh', 'Refresh quote');
     refresh.type = 'button';
-    actions.append(checkNow, refresh);
+    actions.append(payNow, checkNow, refresh);
 
     const footnote = node('p', 'mg-gatepass-footnote', 'Manual renewal · No recurring wallet charge · Network fees are paid separately.');
     const explorer = node('a', 'mg-gatepass-explorer', 'View membership wallet on KleverScan');
@@ -200,7 +229,7 @@ export async function ensureMembership(session, game) {
       checkNow.disabled = true;
       checkNow.textContent = 'Checking KleverScan…';
       try {
-        const result = await post(currentSession, { op: 'watch', quoteId: quote.quoteId });
+        const result = await post(currentSession, { op: 'watch', quoteId: quote.quoteId, txHash: paymentHash || undefined });
         currentSession = result.session;
         if (result.data?.ok && result.data.expiresAt) {
           setWatch('Gate Pass activated!', `Your 30-day access is active until ${dateLabel(result.data.expiresAt)}.`);
@@ -221,11 +250,12 @@ export async function ensureMembership(session, game) {
           setWatch('Refresh your quote', message, true);
           return;
         }
-        setWatch('Still watching for your payment', 'KleverScan is taking a moment to respond. We’ll retry automatically.', true);
+        setWatch('Still watching for your payment', 'Klever mainnet is taking a moment to respond. We’ll retry automatically.', true);
       } finally {
         pollInFlight = false;
         checkNow.disabled = false;
         if (!quote) {
+          payNow.disabled = true;
           checkNow.disabled = true;
           checkNow.textContent = 'Refresh quote to continue';
         } else if (checkNow.textContent !== 'Payment confirmed') {
@@ -243,7 +273,7 @@ export async function ensureMembership(session, game) {
       refresh.disabled = true;
       checkNow.disabled = true;
       livePrice.textContent = 'Fetching live KLV price…';
-      quoteExpiry.textContent = 'Bitcoin.me · KLV/USDT';
+      quoteExpiry.textContent = 'Swopus live pool · KLV/USDT';
       amount.textContent = '— KLV';
       copyAmount.disabled = true;
       setWatch('Preparing your Gate Pass', 'Getting a fresh KLV/USDT quote before you send anything.');
@@ -269,6 +299,31 @@ export async function ensureMembership(session, game) {
         refresh.disabled = false;
       }
     };
+    payNow.addEventListener('click', async () => {
+      if (settled || !quote || paymentInFlight) return;
+      paymentInFlight = true;
+      payNow.disabled = true;
+      refresh.disabled = true;
+      checkNow.disabled = true;
+      payNow.textContent = 'Approve in Klever Wallet…';
+      setWatch('Approve your payment in Klever Wallet', `Review the ${quote.klvAmount} KLV transfer to the Monster Gate membership vault. Your wallet will ask you to sign it.`);
+      try {
+        paymentHash = await sendSignedKlvTransfer(quote, status.walletAddress);
+        payNow.textContent = 'Payment sent';
+        setWatch('Transfer broadcast — verifying', 'Your signed transaction was submitted. We are waiting for Klever mainnet confirmation before activating access.');
+        schedulePoll(1000);
+        checkPayment();
+      } catch (error) {
+        const message = error?.message || 'The payment could not be signed.';
+        setWatch('Payment not sent', message, true);
+        payNow.textContent = 'Pay with Klever Wallet';
+        payNow.disabled = false;
+      } finally {
+        paymentInFlight = false;
+        refresh.disabled = false;
+        if (quote && !paymentHash) checkNow.disabled = false;
+      }
+    });
     checkNow.addEventListener('click', () => {
       if (pollTimer) clearTimeout(pollTimer);
       checkPayment();

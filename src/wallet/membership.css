@@ -128,3 +128,18 @@
   .mg-gatepass-overlay, .mg-gatepass-watchicon::after { animation:none; }
   .mg-gatepass-close, .mg-gatepass-copy, .mg-gatepass-check, .mg-gatepass-refresh { transition:none; }
 }
+
+/* One-tap signed payment */
+.mg-gatepass-actions { grid-template-columns: minmax(0,1fr) auto auto; }
+.mg-gatepass-pay {
+  min-height:48px; padding:13px 18px; border:1px solid #ffe0a0; border-radius:12px;
+  color:#281a13; background:linear-gradient(145deg,#ffe8b5,#d78b3d);
+  box-shadow:0 8px 24px rgba(184,116,50,.28),inset 0 1px rgba(255,255,255,.65);
+  font-family:inherit; font-size:12px; font-weight:800; cursor:pointer; transition:transform .15s,filter .15s;
+}
+.mg-gatepass-pay:hover:not(:disabled) { transform:translateY(-1px); filter:brightness(1.08); }
+.mg-gatepass-pay:disabled { opacity:.55; cursor:wait; }
+.mg-profile-pass { margin-top:16px; padding:14px; border:1px solid rgba(213,163,94,.3); border-radius:12px; background:rgba(13,12,17,.55); }
+.mg-profile-pass .mg-title { margin:0 0 8px; }
+.mg-profile-pass .wallet-link-copy { margin:0 0 10px; }
+@media (max-width:520px) { .mg-gatepass-actions { grid-template-columns:1fr; } }

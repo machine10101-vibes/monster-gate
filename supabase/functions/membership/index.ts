@@ -208,7 +208,7 @@ async function activatePayment(db:Admin,id:string,q:any,a:string,hash:string,pay
  }
  return out({ok:true,expiresAt:activated.expires_at,txHash:hash});
 }
-async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>{
+async function watchPayment(db:Admin,id:string,quoteId:string,requestedHash=""):Promise<Response>{
  if(!UUID.test(quoteId))return out({error:"Refresh your Gate Pass quote to continue."},400);
  const {data:q,error:qe}=await db.from("membership_quotes").select("*").eq("id",quoteId).eq("user_id",id).maybeSingle();
  if(qe)return out({error:"Could not read your membership quote."},503);
@@ -223,6 +223,15 @@ async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>
  const a=await walletFor(db,id);
  if(a instanceof Response)return a;
  if(!a||a!==q.klever_address)return out({error:"Your linked Klever wallet changed. Refresh your quote."},409);
+ if(requestedHash){
+  const hash=requestedHash.trim().toLowerCase();
+  if(!HASH.test(hash))return out({error:"Klever returned an invalid transaction hash."},400);
+  const detail=await transactionByHash(hash);
+  if(detail){
+   const payment=validTransfer(detail,hash,a,BigInt(q.klv_amount_atomic),q.created_at,q.expires_at);
+   if(payment)return activatePayment(db,id,q,a,hash,payment);
+  }
+ }
  // Include every recent unused quote for this account/wallet. If the player closes
  // checkout after sending, a later checkout can still find the original payment.
  const {data:pendingQuotes,error:pendingError}=await db.from("membership_quotes")
@@ -265,12 +274,13 @@ async function watchPayment(db:Admin,id:string,quoteId:string):Promise<Response>
 }
 
 async function handle(db:Admin,id:string,b:any){
- if(b.op==="status"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({connected:false,active:false});
+ if(b.op==="status"){const a=await walletFor(db,id);if(a instanceof Response)return a;
  const {data,error}=await db.from("memberships").select("expires_at").eq("user_id",id).maybeSingle();if(error)return out({error:"Could not read membership."},503);
- return out({connected:true,walletAddress:a,expiresAt:data?.expires_at||null,active:!!data?.expires_at&&Date.parse(data.expires_at)>Date.now()})}
- if(b.op==="watch")return watchPayment(db,id,String(b.quoteId||""));
+ const expiresAt=data?.expires_at||null,active=!!expiresAt&&Date.parse(expiresAt)>Date.now();
+ return out({connected:!!a,walletAddress:a||null,expiresAt,active})}
+ if(b.op==="watch")return watchPayment(db,id,String(b.quoteId||""),String(b.txHash||""));
  if(b.op==="quote"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({error:"Connect your Klever wallet in character selection before paying."},409);
- const p=await ticker();if(!p)return out({error:"Bitcoin.me live KLV/USDT price feed is temporarily unavailable. Please refresh your quote."},503);
+ const p=await ticker();if(!p)return out({error:"Swopus live KLV/USDT price feed is temporarily unavailable. Please refresh your quote."},503);
  const atomic=BigInt(Math.ceil(5/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();
  const {data,error}=await db.from("membership_quotes").insert({user_id:id,klever_address:a,usd_price:p.price,klv_amount_atomic:atomic.toString(),source_time:p.sourceTime,expires_at:expires}).select("id").single();
  if(error||!data?.id)return out({error:"Could not prepare a membership quote."},503);

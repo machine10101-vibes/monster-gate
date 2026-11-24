@@ -31,11 +31,18 @@ export function mountWalletSettings(body, game) {
   no.type = 'button';
   confirmRow.append(yes, no);
   confirm.appendChild(confirmRow);
-  card.append(title, copy, who, err, actions, confirm);
+  const pass = el('section', 'mg-profile-pass');
+  const passTitle = el('h3', 'mg-title', 'Gate Pass');
+  const passStatus = el('p', 'wallet-link-copy', 'Checking subscription…');
+  const passAction = el('button', 'mg-btn', 'Get 30-day access');
+  passAction.type = 'button';
+  pass.append(passTitle, passStatus, passAction);
+  card.append(title, copy, who, err, actions, confirm, pass);
   body.appendChild(card);
 
   let busy = false;
   let address = game.wallet.kleverAddress || '';
+  let membership = null;
 
   const paint = () => {
     err.textContent = '';
@@ -84,6 +91,25 @@ export function mountWalletSettings(body, game) {
     }
   };
 
+  passAction.onclick = async () => {
+    if (busy || !address) return;
+    busy = true;
+    passAction.disabled = true;
+    passStatus.textContent = 'Preparing secure checkout…';
+    try {
+      const { ensureMembership, membershipStatus } = await import('./membership.js');
+      await ensureMembership(game.wallet, game);
+      membership = await membershipStatus(game.wallet);
+      paint();
+    } catch (e) {
+      passStatus.textContent = e.message || 'Could not open Gate Pass checkout.';
+      passAction.disabled = false;
+    } finally {
+      busy = false;
+      paint();
+    }
+  };
+
   yes.onclick = async () => {
     if (busy) return;
     busy = true;
@@ -105,6 +131,7 @@ export function mountWalletSettings(body, game) {
   };
 
   paint();
+  import('./membership.js').then(({ membershipStatus }) => membershipStatus(game.wallet)).then((status) => { membership = status; paint(); }).catch(() => { passStatus.textContent = 'Subscription status is temporarily unavailable.'; });
   linkedWalletStatus(game.wallet).then((status) => {
     if (status.address !== undefined) {
       address = status.address || '';
