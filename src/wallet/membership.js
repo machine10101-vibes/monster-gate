@@ -400,8 +400,6 @@ export async function ensureMembership(session, game) {
       livePrice.textContent = 'Fetching live KLV price…';
       quoteExpiry.textContent = 'Swopus live pool · KLV/USDT';
       if (!estimatedKlvAmount) amount.textContent = 'Calculating…';
-      amountLabel.textContent = 'Exact payment amount';
-      copyAmount.disabled = !estimatedKlvAmount;
       setWatch('Preparing your Gate Pass', 'Getting a fresh KLV/USDT quote before you send anything.');
       const requestedPlanId = selectedPlanId;
       try {
