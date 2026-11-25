@@ -78,7 +78,7 @@ test('the live KLV estimate is displayed before wallet linking and Buy Membershi
   const client = src('../src/wallet/membership.js');
   const membership = src('../supabase/functions/membership/index.ts');
   assert.match(client, /op: 'rate'/);
-  assert.match(client, /Math\.ceil\(\(5 \/ price\) \* 1_000_000\)/);
+  assert.match(client, /Math\.ceil\(\(selectedPlan\(\)\.total \/ price\) \* 1_000_000\)/);
   assert.match(client, /amount\.textContent = `\$\{estimatedKlvAmount\} KLV`/);
   assert.match(client, /payNow\.textContent = 'Buy Membership'/);
   assert.match(client, /if \(!status\.walletAddress\)[\s\S]*?linkKleverWallet\(currentSession\)/);
