@@ -412,3 +412,142 @@
 .mg-gatepass-link-wallet:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
 .mg-gatepass-link-wallet:disabled { opacity: .6; cursor: wait; }
 .mg-gatepass-link-wallet:focus-visible { outline: 2px solid rgba(148,224,232,.9); outline-offset: 3px; }
+
+
+/* Compact, viewport-fitted Gate Pass: preserve both payment and free-code paths without an inner scrollbar. */
+.mg-gatepass-overlay {
+  padding: 12px;
+  overflow: hidden;
+}
+.mg-gatepass-card {
+  width: min(100%, 760px);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  padding: 18px 22px 16px;
+  border-radius: 20px;
+}
+.mg-gatepass-head { gap: 10px; }
+.mg-gatepass-mark { flex-basis: 38px; width: 38px; height: 38px; font-size: 13px; border-radius: 11px; }
+.mg-gatepass-kicker { margin-bottom: 2px; font-size: 9px; letter-spacing: 1.8px; }
+.mg-gatepass-brand { font-size: 11px; }
+.mg-gatepass-close { top: 12px; right: 13px; width: 32px; height: 32px; }
+.mg-gatepass-title { margin: 9px 0 3px; font-size: clamp(22px, 3vw, 28px); line-height: 1.05; }
+.mg-gatepass-lede { max-width: none; font-size: 11px; line-height: 1.35; }
+.mg-gatepass-code-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px 10px;
+  margin: 10px 0 8px;
+  padding: 8px 10px;
+}
+.mg-gatepass-code-panel .mg-gatepass-sectionlabel { margin: 0; font-size: 9px; letter-spacing: .7px; }
+.mg-gatepass-code-row { min-width: 0; gap: 6px; }
+.mg-gatepass-code-input { min-width: 0; padding: 8px 9px; font-size: 11px; }
+.mg-gatepass-redeem { min-height: 34px; padding: 7px 11px; white-space: nowrap; }
+.mg-gatepass-code-feedback { grid-column: 1 / -1; margin: 0; font-size: 9px; line-height: 1.25; }
+.mg-gatepass-payment-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 5px 12px;
+  align-items: center;
+}
+.mg-gatepass-wallet-link {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+  margin: 0 0 3px;
+  padding: 8px 11px;
+}
+.mg-gatepass-wallet-link strong { grid-column: 1; font-size: 12px; }
+.mg-gatepass-wallet-link p { grid-column: 1; margin: 2px 0 0; font-size: 10px; line-height: 1.3; }
+.mg-gatepass-link-wallet { grid-column: 2; grid-row: 1 / span 2; min-height: 34px; padding: 7px 11px; font-size: 10px; }
+.mg-gatepass-pricegrid { grid-column: 1 / -1; gap: 8px; margin: 0; }
+.mg-gatepass-pricebox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 11px;
+}
+.mg-gatepass-label { margin: 0; font-size: 9px; letter-spacing: .8px; }
+.mg-gatepass-usd { font-size: 20px; }
+.mg-gatepass-days { font-size: 17px; }
+.mg-gatepass-tokenline { grid-column: 1 / -1; margin: 0; padding: 6px 10px; }
+.mg-gatepass-tokenline strong { font-size: 11px; }
+.mg-gatepass-tokenline span { font-size: 9px; }
+.mg-gatepass-sectionlabel { margin: 3px 0 1px; font-size: 9px; letter-spacing: .7px; }
+.mg-gatepass-amountrow, .mg-gatepass-addressrow { min-height: 36px; gap: 6px; padding: 6px 8px; border-radius: 9px; }
+.mg-gatepass-amount { font-size: 14px; }
+.mg-gatepass-address { font-size: 9px; line-height: 1.25; overflow-wrap: anywhere; }
+.mg-gatepass-copy { padding: 6px 8px; font-size: 9px; }
+.mg-gatepass-steps { grid-column: 1; gap: 3px; margin: 3px 0 0; }
+.mg-gatepass-step { gap: 6px; font-size: 9px; line-height: 1.25; }
+.mg-gatepass-stepnum { flex-basis: 17px; width: 17px; height: 17px; border-radius: 6px; font-size: 9px; }
+.mg-gatepass-watch { grid-column: 2; gap: 7px; align-items: center; min-height: 42px; margin: 3px 0 0; padding: 7px 9px; border-radius: 10px; }
+.mg-gatepass-watchicon { flex-basis: 7px; width: 7px; height: 7px; margin: 0 2px 0 0; }
+.mg-gatepass-watchicon::after { display: none; }
+.mg-gatepass-watchtitle { margin: 0 0 2px; font-size: 10px; }
+.mg-gatepass-watchtext { font-size: 9px; line-height: 1.25; }
+.mg-gatepass-actions { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; margin-top: 3px; }
+.mg-gatepass-pay, .mg-gatepass-check, .mg-gatepass-refresh { min-height: 36px; padding: 8px 11px; font-size: 10px; border-radius: 9px; white-space: nowrap; }
+.mg-gatepass-footnote { grid-column: 1; margin: 0; font-size: 8px; line-height: 1.2; text-align: left; }
+.mg-gatepass-explorer { grid-column: 2; justify-self: end; margin: 0 !important; font-size: 9px !important; }
+.mg-gatepass-card::-webkit-scrollbar { display: none; }
+
+@media (max-width: 600px) {
+  .mg-gatepass-overlay { padding: 8px; }
+  .mg-gatepass-card { width: 100%; max-height: calc(100dvh - 16px); padding: 14px 13px 12px; border-radius: 17px; }
+  .mg-gatepass-title { margin-top: 7px; font-size: 23px; }
+  .mg-gatepass-lede { font-size: 10px; }
+  .mg-gatepass-code-panel { grid-template-columns: 1fr auto; gap: 5px 7px; margin: 8px 0 6px; padding: 7px 8px; }
+  .mg-gatepass-code-panel .mg-gatepass-sectionlabel { grid-column: 1 / -1; }
+  .mg-gatepass-code-row { grid-column: 1 / -1; }
+  .mg-gatepass-code-feedback { grid-column: 1 / -1; }
+  .mg-gatepass-payment-panel { gap: 4px 7px; }
+  .mg-gatepass-pricegrid { gap: 6px; }
+  .mg-gatepass-pricebox { padding: 6px 8px; }
+  .mg-gatepass-label { font-size: 8px; }
+  .mg-gatepass-usd { font-size: 18px; }
+  .mg-gatepass-days { font-size: 15px; }
+  .mg-gatepass-wallet-link { padding: 7px 8px; gap: 2px 6px; }
+  .mg-gatepass-wallet-link strong { font-size: 11px; }
+  .mg-gatepass-wallet-link p { font-size: 9px; }
+  .mg-gatepass-link-wallet { min-height: 31px; padding: 6px 8px; font-size: 9px; }
+  .mg-gatepass-sectionlabel { font-size: 8px; }
+  .mg-gatepass-amount { font-size: 12px; }
+  .mg-gatepass-address { font-size: 8px; }
+  .mg-gatepass-steps { display: none; }
+  .mg-gatepass-watch { grid-column: 1 / -1; min-height: 34px; margin-top: 2px; }
+  .mg-gatepass-watchtext { font-size: 8px; }
+  .mg-gatepass-actions { grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; }
+  .mg-gatepass-pay, .mg-gatepass-check, .mg-gatepass-refresh { min-width: 0; padding: 7px 6px; font-size: 9px; white-space: normal; }
+  .mg-gatepass-footnote { font-size: 7px; }
+  .mg-gatepass-explorer { display: none !important; }
+}
+@media (max-width: 360px) {
+  .mg-gatepass-card { padding-inline: 10px; }
+  .mg-gatepass-payment-panel { grid-template-columns: minmax(0, 1fr); }
+  .mg-gatepass-wallet-link, .mg-gatepass-pricegrid, .mg-gatepass-tokenline,
+  .mg-gatepass-watch, .mg-gatepass-actions { grid-column: 1; }
+  .mg-gatepass-steps { display: none; }
+  .mg-gatepass-footnote { grid-column: 1; }
+  .mg-gatepass-addressrow { min-width: 0; }
+  .mg-gatepass-address { overflow-wrap: anywhere; }
+}
+@media (max-height: 700px) {
+  .mg-gatepass-card { padding-top: 11px; padding-bottom: 10px; }
+  .mg-gatepass-title { margin-top: 5px; }
+  .mg-gatepass-code-panel { margin-top: 6px; margin-bottom: 5px; }
+  .mg-gatepass-payment-panel { gap-top: 3px; row-gap: 3px; }
+  .mg-gatepass-wallet-link { padding-block: 6px; }
+  .mg-gatepass-pricebox { padding-block: 5px; }
+  .mg-gatepass-tokenline { padding-block: 5px; }
+  .mg-gatepass-steps { display: none; }
+  .mg-gatepass-watch { margin-top: 1px; padding-block: 5px; }
+  .mg-gatepass-actions { margin-top: 1px; }
+  .mg-gatepass-pay, .mg-gatepass-check, .mg-gatepass-refresh { min-height: 32px; padding-block: 6px; }
+}
