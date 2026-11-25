@@ -198,7 +198,7 @@ test('desktop minimap stays top-left and combat hints sit bottom-right between s
   assert.match(style, /#hints \{[\s\S]*right: calc\(var\(--menu-col-w, 44px\) \+ 20px \+ var\(--safe-r\)\)/);
   assert.match(style, /#hints \{[\s\S]*bottom: calc\(12px \+ var\(--safe-b\)\)/);
   assert.match(theme, /#hints \{[\s\S]*left: calc\(50% \+ 370px \* var\(--ui, 1\) \+ 14px\)/);
-  assert.match(theme, /body\.touch #hints[\\s\\S]*display: none/);
+  assert.match(style, /body\.touch #hints,[\s\S]*display: none/);
   const desktop = hudRects({ name: 'desktop', w: 1920, h: 1080, touch: false });
   assert.ok(desktop.minimap.y <= 8);
   assert.ok(desktop.minimap.x <= 8);
