@@ -141,6 +141,7 @@ export async function ensureMembership(session, game) {
   return new Promise((resolve) => {
     let settled = false;
     let quote = null;
+    let estimatedKlvAmount = '';
     let pollTimer = null;
     let pollInFlight = false;
     let quoteLoading = false;
@@ -188,13 +189,6 @@ export async function ensureMembership(session, game) {
     codePanel.append(codeHeading, codeRow, codeFeedback);
     const paymentPanel = node('div', 'mg-gatepass-payment-panel');
     paymentPanel.hidden = false;
-    const walletLinkNotice = node('div', 'mg-gatepass-wallet-link');
-    const walletLinkTitle = node('strong', '', 'Pay $5/month with Klever Wallet');
-    const walletLinkText = node('p', '', 'Link a Klever wallet to this game account to see your live KLV amount and approve the monthly membership payment securely.');
-    const linkWalletButton = node('button', 'mg-gatepass-link-wallet', 'Link Klever Wallet');
-    linkWalletButton.type = 'button';
-    walletLinkNotice.append(walletLinkTitle, walletLinkText, linkWalletButton);
-    walletLinkNotice.hidden = Boolean(status.walletAddress);
     const priceGrid = node('div', 'mg-gatepass-pricegrid');
     const usdBox = node('div', 'mg-gatepass-pricebox primary');
     usdBox.append(node('span', 'mg-gatepass-label', 'Membership'), node('strong', 'mg-gatepass-usd', '$5.00 USD'));
@@ -206,15 +200,16 @@ export async function ensureMembership(session, game) {
     const quoteExpiry = node('span', '', 'Swopus live pool · KLV/USDT');
     tokenLine.append(livePrice, quoteExpiry);
 
-    const amountLabel = node('span', 'mg-gatepass-sectionlabel', 'Your exact payment amount');
+    const amountLabel = node('span', 'mg-gatepass-sectionlabel', 'Estimated payment amount');
     const amountRow = node('div', 'mg-gatepass-amountrow');
     const amount = node('code', 'mg-gatepass-amount', '— KLV');
     const copyAmount = node('button', 'mg-gatepass-copy', 'Copy');
     copyAmount.type = 'button';
     copyAmount.disabled = true;
     copyAmount.addEventListener('click', async () => {
-      if (!quote) return;
-      try { await copyText(quote.klvAmount); copyAmount.textContent = 'Copied'; }
+      const value = quote?.klvAmount || estimatedKlvAmount;
+      if (!value) return;
+      try { await copyText(value); copyAmount.textContent = 'Copied'; }
       catch { copyAmount.textContent = 'Select amount'; }
     });
     amountRow.append(amount, copyAmount);
@@ -247,7 +242,7 @@ export async function ensureMembership(session, game) {
     watch.append(watchIcon, watchCopy);
 
     const actions = node('div', 'mg-gatepass-actions');
-    const payNow = node('button', 'mg-gatepass-pay', 'Pay with Klever Wallet');
+    const payNow = node('button', 'mg-gatepass-pay', 'Buy Membership');
     payNow.type = 'button';
     const checkNow = node('button', 'mg-gatepass-check', 'Check for payment now');
     checkNow.type = 'button';
@@ -369,11 +364,20 @@ export async function ensureMembership(session, game) {
       try {
         const result = await post(currentSession, { op: 'rate' });
         currentSession = result.session;
-        livePrice.textContent = `1 KLV = ${Number(result.data.usdPrice).toFixed(8)} USDT`;
-        quoteExpiry.textContent = `Live rate · ${result.data.priceSource || 'Swopus'} KLV/USDT`;
+        const price = Number(result.data.usdPrice);
+        if (!Number.isFinite(price) || price <= 0) throw new Error('Swopus returned an invalid KLV price.');
+        const atomic = Math.ceil((5 / price) * 1_000_000);
+        estimatedKlvAmount = (atomic / 1_000_000).toFixed(6);
+        livePrice.textContent = `1 KLV = ${price.toFixed(8)} USDT`;
+        quoteExpiry.textContent = `Live estimate · ${result.data.priceSource || 'Swopus'} KLV/USDT`;
+        amountLabel.textContent = 'Estimated payment amount';
+        amount.textContent = `${estimatedKlvAmount} KLV`;
+        copyAmount.disabled = false;
       } catch (error) {
         livePrice.textContent = 'KLV rate temporarily unavailable';
         quoteExpiry.textContent = 'Swopus live pool · retry shortly';
+        amount.textContent = 'Rate unavailable';
+        copyAmount.disabled = true;
       } finally {
         rateLoading = false;
       }
@@ -390,8 +394,9 @@ export async function ensureMembership(session, game) {
       checkNow.disabled = true;
       livePrice.textContent = 'Fetching live KLV price…';
       quoteExpiry.textContent = 'Swopus live pool · KLV/USDT';
-      amount.textContent = '— KLV';
-      copyAmount.disabled = true;
+      if (!estimatedKlvAmount) amount.textContent = 'Calculating…';
+      amountLabel.textContent = 'Exact payment amount';
+      copyAmount.disabled = !estimatedKlvAmount;
       setWatch('Preparing your Gate Pass', 'Getting a fresh KLV/USDT quote before you send anything.');
       try {
         const result = await post(currentSession, { op: 'quote' });
@@ -402,7 +407,7 @@ export async function ensureMembership(session, game) {
         amount.textContent = `${quote.klvAmount} KLV`;
         copyAmount.disabled = false;
         payNow.disabled = false;
-        payNow.textContent = 'Pay with Klever Wallet';
+        payNow.textContent = 'Buy Membership';
         payNow.title = 'Approve the exact quoted KLV amount in Klever Wallet.';
         setWatch('Waiting for your KLV transfer', 'Once you send the exact amount from your linked wallet, we’ll detect it and activate your pass automatically.');
         checkNow.disabled = false;
@@ -412,8 +417,9 @@ export async function ensureMembership(session, game) {
         livePrice.textContent = 'Live KLV price unavailable';
         quoteExpiry.textContent = 'Tap Refresh quote to retry';
         payNow.disabled = true;
-        payNow.textContent = 'Quote unavailable';
-        payNow.title = 'Use Refresh quote to try again. No payment has been requested.';
+        payNow.textContent = 'Buy Membership';
+        payNow.disabled = false;
+        payNow.title = 'Select Buy Membership to retry the live payment quote. No payment has been requested.';
         setWatch('Could not load a live quote', error.message || 'The live KLV price service is temporarily unavailable. No payment has been requested.', true);
         checkNow.disabled = true;
       } finally {
@@ -422,7 +428,36 @@ export async function ensureMembership(session, game) {
       }
     };
     payNow.addEventListener('click', async () => {
-      if (settled || !quote || paymentInFlight) return;
+      if (settled || paymentInFlight) return;
+      if (!status.walletAddress) {
+        paymentInFlight = true;
+        payNow.disabled = true;
+        payNow.textContent = 'Connecting wallet…';
+        setWatch('Connect your Klever wallet to pay', 'Your live KLV amount is already shown above. Klever Wallet will ask you to approve linking this wallet to your game account before payment.');
+        try {
+          currentSession = await linkKleverWallet(currentSession);
+          const refreshed = await post(currentSession, { op: 'status' });
+          currentSession = refreshed.session;
+          status.walletAddress = refreshed.data.walletAddress || currentSession.kleverAddress || '';
+          if (!status.walletAddress) throw new Error('The wallet was not linked to this game account. Please try again.');
+          currentSession = saveAccount({ ...currentSession, kleverAddress: status.walletAddress });
+          setWatch('Wallet linked', 'Preparing your exact KLV payment amount. Select Buy Membership again to approve the transfer.');
+          await loadQuote();
+        } catch (error) {
+          setWatch('Wallet not linked', error.message || 'Klever Wallet could not be linked. Please try again.', true);
+        } finally {
+          paymentInFlight = false;
+          if (!settled) {
+            payNow.disabled = false;
+            payNow.textContent = 'Buy Membership';
+          }
+        }
+        return;
+      }
+      if (!quote) {
+        await loadQuote();
+        return;
+      }
       paymentInFlight = true;
       payNow.disabled = true;
       refresh.disabled = true;
@@ -438,7 +473,7 @@ export async function ensureMembership(session, game) {
       } catch (error) {
         const message = error?.message || 'The payment could not be signed.';
         setWatch('Payment not sent', message, true);
-        payNow.textContent = 'Pay with Klever Wallet';
+        payNow.textContent = 'Buy Membership';
         payNow.disabled = false;
       } finally {
         paymentInFlight = false;
@@ -450,54 +485,25 @@ export async function ensureMembership(session, game) {
       if (pollTimer) clearTimeout(pollTimer);
       checkPayment();
     });
-    refresh.addEventListener('click', loadQuote);
+    refresh.addEventListener('click', () => status.walletAddress ? loadQuote() : loadRate());
     close.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
 
-    paymentPanel.append(walletLinkNotice, priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
+    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
     card.append(close, head, title, intro, codePanel, paymentPanel);
     overlay.append(card);
     document.body.append(overlay);
     document.addEventListener('keydown', onKeyDown);
-    loadRate();
-    if (status.walletAddress) loadQuote();
-    else {
-      payNow.disabled = true;
-      payNow.textContent = 'Link wallet to see KLV amount';
-      payNow.title = 'Link a Klever wallet to this game account before requesting the exact payment amount.';
-      payNow.setAttribute('aria-label', 'Link a Klever wallet to see the exact KLV payment amount');
+    if (status.walletAddress) {
+      loadQuote();
+    } else {
+      loadRate();
+      payNow.disabled = false;
+      payNow.textContent = 'Buy Membership';
+      payNow.title = 'View the live KLV estimate above, then select Buy Membership to connect your wallet and pay.';
       checkNow.disabled = true;
-      refresh.disabled = true;
-      setWatch('Link your Klever wallet to continue', 'Your $5 monthly subscription is available here. Link the wallet associated with this game account to load the exact KLV amount and pay.');
+      refresh.disabled = false;
+      setWatch('Ready to buy membership', 'Your live KLV amount is shown above. Select Buy Membership when you are ready to connect Klever Wallet and approve payment.');
     }
-    const linkWallet = async () => {
-      if (settled || linkWalletButton.disabled) return;
-      linkWalletButton.disabled = true;
-      linkWalletButton.textContent = 'Connecting Klever…';
-      setWatch('Approve wallet linking', 'Klever Wallet will ask you to approve linking this wallet to your game account.');
-      try {
-        currentSession = await linkKleverWallet(currentSession);
-        const refreshed = await post(currentSession, { op: 'status' });
-        currentSession = refreshed.session;
-        status.walletAddress = refreshed.data.walletAddress || currentSession.kleverAddress || '';
-        if (!status.walletAddress) throw new Error('The wallet was not linked to this game account. Please try again.');
-        currentSession = saveAccount({ ...currentSession, kleverAddress: status.walletAddress });
-        walletLinkNotice.hidden = true;
-        payNow.disabled = true;
-        payNow.textContent = 'Preparing KLV quote…';
-        payNow.title = 'A fresh, wallet-bound KLV quote is being prepared.';
-        payNow.removeAttribute('aria-label');
-        checkNow.disabled = true;
-        refresh.disabled = false;
-        setWatch('Wallet linked', 'Fetching your live KLV membership quote…');
-        loadQuote();
-      } catch (error) {
-        setWatch('Wallet not linked', error.message || 'Klever Wallet could not be linked. Please try again.', true);
-      } finally {
-        linkWalletButton.disabled = false;
-        linkWalletButton.textContent = 'Link Klever Wallet';
-      }
-    };
-    linkWalletButton.addEventListener('click', linkWallet);
   });
 }

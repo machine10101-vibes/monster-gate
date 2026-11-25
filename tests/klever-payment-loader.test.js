@@ -19,16 +19,20 @@ test('Klever payment still checks the linked wallet before signing', () => {
 });
 
 
-test('monthly membership payment remains visible when no wallet is linked', () => {
+test('monthly KLV amount is estimated from Swopus before a wallet is linked', () => {
   assert.match(source, /paymentPanel\.hidden = false/);
-  assert.match(source, /Pay \$5\/month with Klever Wallet/);
-  assert.match(source, /Link a Klever wallet to this game account/);
+  assert.match(source, /node\('button', 'mg-gatepass-pay', 'Buy Membership'\)/);
+  assert.match(source, /post\(currentSession, \{ op: 'rate' \}\)/);
+  assert.match(source, /Math\.ceil\(\(5 \/ price\) \* 1_000_000\)/);
+  assert.match(source, /amount\.textContent = `\$\{estimatedKlvAmount\} KLV`/);
+  assert.doesNotMatch(source, /Link wallet to see KLV amount/);
+  assert.doesNotMatch(source, /Pay \$5\/month with Klever Wallet/);
 });
 
-test('Gate Pass can link a wallet from the subscription panel before loading a quote', () => {
+test('Buy Membership links a wallet only when the player chooses to pay, then loads a quote', () => {
   assert.match(source, /import \{ linkKleverWallet \} from '\.\/link\.js'/);
-  assert.match(source, /currentSession = await linkKleverWallet\(currentSession\)/);
+  assert.match(source, /if \(!status\.walletAddress\)[\s\S]*?currentSession = await linkKleverWallet\(currentSession\)/);
   assert.match(source, /status\.walletAddress = refreshed\.data\.walletAddress/);
-  assert.match(source, /walletLinkNotice\.hidden = true/);
-  assert.match(source, /loadQuote\(\)/);
+  assert.match(source, /await loadQuote\(\)/);
+  assert.match(source, /sendSignedKlvTransfer\(quote, status\.walletAddress\)/);
 });
