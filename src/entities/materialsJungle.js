@@ -132,7 +132,25 @@ function boneModel(mat) {
   return meshFrom(M, 16, 1, 16, mat, SZ);
 }
 
+const REX = { grn: 0x56702e, grnLo: 0x3d5222, red: 0x8a2a24, redLo: 0x5a1612, tan: 0xb39a68, fang: 0xf0e6cc, fangLo: 0xc8b890, claw: 0x8a8c90, clawLo: 0x5c5e62, clawTip: 0xc8cace };
+
+function rexHide(mat) {
+  return pelt(mat, (x, y) => {
+    const v = x * 0.6 - y * 0.8 + Math.sin(y * 0.4) * 1.2;
+    const f = ((v % 6) + 6) % 6;
+    if (f < 1) return { hi: REX.red, lo: REX.redLo };
+    const h = hash3(x >> 1, y >> 1, 0, 28);
+    return { hi: h < 0.6 ? REX.grn : h < 0.85 ? REX.grnLo : REX.tan, lo: REX.grnLo };
+  });
+}
+const rexFang = (mat) => curvedClaw(mat, { base: REX.fangLo, tip: 0xffffff, claw: REX.fang, clawLo: REX.fangLo }, 1.2, 0.7, 29);
+const rexClaw = (mat) => curvedClaw(mat, { base: REX.clawLo, tip: REX.clawTip, claw: REX.claw, clawLo: REX.clawLo }, 1.25, 1.4, 30);
+
 export const JUNGLE_MATERIALS = {
+  rexhide: rexHide,
+  rexfang: rexFang,
+  rexclaw: rexClaw,
+  rexbone: (mat) => boneModel(mat),
   tigerskin: tigerSkin,
   tigerclaw: tigerClaw,
   raptorskin: raptorSkin,

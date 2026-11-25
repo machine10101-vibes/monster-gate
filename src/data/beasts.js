@@ -41,3 +41,33 @@ export const RAPTOR = {
   eyeHi: 0xffd45a,
   dark: 0x16160f,
 };
+
+/** Tyrant Rex, after the voxel reference: olive-green hide, tan belly, raked red stripes, amber eye. */
+export const TREX = {
+  S: 0.025,
+  green: 0x56702e,
+  greenHi: 0x6f8a3a,
+  greenLo: 0x3d5222,
+  greenDeep: 0x2c3b18,
+  olive: 0x7a7a3a,
+  tan: 0xb39a68,
+  tanHi: 0xcdb486,
+  tanLo: 0x8f7a4e,
+  belly: 0xc8b07e,
+  stripe: 0x8a2a24,
+  stripeDeep: 0x5a1612,
+  stripeHi: 0xa83a30,
+  ridge: 0x2a2a26,
+  ridgeHi: 0x45453e,
+  mouth: 0x8e3a3c,
+  mouthHi: 0xb45a58,
+  tongue: 0xa04a50,
+  tooth: 0xf0e6cc,
+  toothLo: 0xc8b890,
+  claw: 0x8a8c90,
+  clawTip: 0xc8cace,
+  clawLo: 0x5c5e62,
+  eye: 0xffa818,
+  eyeHi: 0xffe8a0,
+  dark: 0x16100c,
+};

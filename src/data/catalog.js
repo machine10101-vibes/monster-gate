@@ -40,9 +40,13 @@ export const MATERIALS = {
   wormplate: { name: 'Worm Plate', desc: 'A curved plate of sand-coloured hide, ridged like a dune.' },
   scorpchitin: { name: 'Scorpion Chitin', desc: 'A plate of gold-brown shell. Light, and harder than it looks.' },
   scorpsting: { name: 'Scorpion Sting', desc: 'The hooked tip of a desert scorpion\'s tail. The point is still sharp.' },
+  rexhide: { name: 'Rex Hide', desc: 'A slab of olive-green hide raked with dark red stripes. Thick as a door.' },
+  rexfang: { name: 'Rex Fang', desc: 'A serrated cream fang as long as a forearm.' },
+  rexclaw: { name: 'Rex Claw', desc: 'A heavy grey toe claw that has carried a mountain of meat.' },
+  rexbone: { name: 'Rex Bone', desc: 'A thick, dense bone from a Tyrant Rex. It rings like stone.' },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'cinderscale', 'lavavein', 'ashmembrane', 'obsidianclaw', 'spirehorn', 'hearthcore', 'cinderhide', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'cinderscale', 'lavavein', 'ashmembrane', 'obsidianclaw', 'spirehorn', 'hearthcore', 'cinderhide', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting', 'rexhide', 'rexfang', 'rexclaw', 'rexbone'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -89,6 +93,12 @@ export const DROPS = {
   raptor: [
     { id: 'raptorskin', chance: 1, qty: [1, 3], rate: 'Common' },
     { id: 'raptorclaw', chance: 0.8, qty: [1, 3], rate: 'Common' },
+  ],
+  trex: [
+    { id: 'rexhide', chance: 1, qty: [2, 4], rate: 'Common' },
+    { id: 'rexfang', chance: 0.7, qty: [1, 3], rate: 'Uncommon' },
+    { id: 'rexclaw', chance: 0.6, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'rexbone', chance: 0.35, qty: [1, 2], rate: 'Rare' },
   ],
   sandworm: [
     { id: 'wormplate', chance: 1, qty: [1, 3], rate: 'Common' },
@@ -173,6 +183,10 @@ export const MONSTERS = [
   {
     id: 'raptor', name: 'Battle Raptor', level: 6, temper: 'Savage', style: 'Pack Hunter', habitat: 'The jungle oasis, west of Brookside',
     desc: 'A scarred, olive-scaled raptor with a ridge of grey spikes and an orange eye. It hunts in packs, snaps with a mouthful of teeth and leaps with its sickle claws. One alone is a fight and three is a problem.',
+  },
+  {
+    id: 'trex', name: 'Tyrant Rex', level: 200, temper: 'Insatiable', style: 'Apex Predator', habitat: 'Roams from the Lagoon through the Sunken jungle to Pirate Shore',
+    desc: 'A colossal olive-green rex striped in dark red, with one blazing amber eye and a jaw full of cream fangs. It walks the jungle from the Lagoon down to Pirate Shore and eats anything in its way: raptors, tigers, pirates and hunters alike. It roars, bites, stomps, sweeps with its tail and charges. Watch the ground for its tells.',
   },
   {
     id: 'pirate', name: 'Pirate', level: 5, temper: 'Greedy', style: 'Melee', habitat: 'The shipyard docks and the jungle gate on the western coast',
@@ -530,6 +544,39 @@ armorSet(RAPTOR, 'raptorcloth', [
   ['legs', 'raptorclothlegs', 'Mosaicweave Trousers', 1, 'Mosaic trousers tied at the knee with olive cord.', { raptorskin: 3, raptorclaw: 1 }],
   ['boots', 'raptorclothboots', 'Mosaicweave Slippers', 0, 'Soft scale-patterned slippers with a tiny claw toe.', { raptorskin: 2, raptorclaw: 1 }],
   ['book', 'raptorbook', 'Raptorclaw Grimoire', 0, 'A mosaic-scale cover with a sickle-claw clasp and an orange eye.', { raptorskin: 2, raptorclaw: 2 }, { mana: 14, spell: 0.045 }],
+]);
+
+const REX = 'trex';
+GEAR.push(
+  weapon('rexblade', 'onesword', 'Fangsplitter', REX, 'A single serrated rex fang, set red root and all into a claw guard and a striped-hide grip.', { rexfang: 3, rexhide: 2, rexclaw: 1 }, M('swordshield', 44, 2.7, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. One great serrated fang.'), { reqLevel: 34 }),
+  weapon('rexgreatsword', 'twosword', 'Tyrant\'s Jaw', REX, 'A whole lower jawbone, ground into a cleaver. The teeth are still in it, all along the edge.', { rexbone: 2, rexfang: 4, rexhide: 2 }, M('twohand', 66, 3.1, 2.6, 0.62, 0.28, 14, 10, 'Two-handed. Bites as it cuts.'), { reqLevel: 38 }),
+  weapon('rexhammer', 'hammer', 'Skullcrusher Maul', REX, 'A knuckle of rex bone the size of a barrel, ringed with toe claws, on a bone haft.', { rexbone: 3, rexclaw: 3, rexhide: 1 }, M('twohand', 60, 2.7, 2.4, 0.76, 0.36, 17, 13, 'Two-handed. Lands like a footfall.'), { reqLevel: 38 }),
+  weapon('rexspear', 'spear', 'Fang Lance', REX, 'A long rex fang lashed to a bone shaft, with a collar of red-striped hide.', { rexfang: 2, rexbone: 1, rexhide: 2 }, M('twohand', 50, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, serrated reach.'), { reqLevel: 34 }),
+  weapon('rexbow', 'longbow', 'Jawbone Longbow', REX, 'Two curved jawbones joined at a hide grip, still lined with teeth along the belly.', { rexbone: 2, rexhide: 2, rexfang: 1 }, R('longbow', 40, 0.5, 7, 'A longbow. Heavy, bone-backed draw.'), { reqLevel: 34 }),
+  weapon('rexcrossbow', 'crossbow', 'Tyrantlock Crossbow', REX, 'A bone stock wrapped in striped hide and a prod of two toe claws. The bolt leaves like a bite.', { rexbone: 1, rexclaw: 2, rexhide: 3 }, R('crossbow', 46, 0.64, 8, 'A crossbow. Slow and crushing.'), { reqLevel: 36 }),
+  weapon('rexstaff', 'staff', 'Amber Eye Staff', REX, 'A bone staff crowned with a small rex skull. Its amber eye still burns, and it spits that fire.', { rexbone: 2, rexfang: 2, rexhide: 1 }, R('staff', 32, 0.6, 6, 'A war staff. Amber fire.', { spell: true, proj: 'ember', shotLabel: 'Ember' }), { reqLevel: 34 }),
+);
+armorSetReq(REX, 'rexset', 36, [
+  ['helm', 'rexhelm', 'Tyrant Helm', 3, 'Olive scale plate shaped like a rex skull, with a fang-lined visor and amber eye studs.', { rexhide: 3, rexfang: 2, rexbone: 1 }],
+  ['chest', 'rexchest', 'Tyrant Cuirass', 9, 'Heavy green scale plate raked with red, a ridge of dark scutes down the back.', { rexhide: 7, rexbone: 2, rexclaw: 1 }],
+  ['arms', 'rexarms', 'Tyrant Gauntlets', 3, 'Scaled gauntlets with a grey toe claw over each knuckle.', { rexhide: 3, rexclaw: 2 }],
+  ['legs', 'rexlegs', 'Tyrant Greaves', 6, 'Thick scale greaves with fang-cream knee guards.', { rexhide: 5, rexbone: 1, rexfang: 1 }],
+  ['boots', 'rexboots', 'Tyrant Sabatons', 3, 'Three-toed sabatons with grey claws. The ground knows when you walk.', { rexhide: 3, rexclaw: 2 }],
+]);
+armorSetReq(REX, 'rexleather', 32, [
+  ['helm', 'rexleatherhelm', 'Rexhide Cowl', 2, 'A green hide cowl striped in red, with a fang at each temple.', { rexhide: 3, rexfang: 1 }],
+  ['chest', 'rexleatherchest', 'Rexhide Jerkin', 5, 'Striped rex hide over a tan belly panel, laced with sinew.', { rexhide: 6, rexclaw: 1 }],
+  ['arms', 'rexleathergloves', 'Rexhide Gloves', 2, 'Hide gloves with a small grey claw on each bracer.', { rexhide: 2, rexclaw: 1 }],
+  ['legs', 'rexleatherlegs', 'Rexhide Leggings', 4, 'Green leggings raked with red stripes, strapped at the knee.', { rexhide: 4, rexbone: 1 }],
+  ['boots', 'rexleatherboots', 'Rexhide Boots', 2, 'Heavy three-toed boots with fang-cream toe caps.', { rexhide: 2, rexclaw: 1 }],
+]);
+armorSetReq(REX, 'rexcloth', 32, [
+  ['helm', 'rexclothhood', 'Rexweave Hood', 1, 'A green hood striped in red, with a fang-cream brow band.', { rexhide: 2, rexfang: 1 }],
+  ['chest', 'rexclothrobe', 'Rexweave Robe', 3, 'Robes woven in olive and red stripes, with a collar of small fangs.', { rexhide: 5, rexfang: 2 }],
+  ['arms', 'rexclothgloves', 'Rexweave Gloves', 1, 'Striped gloves under wide cream cuffs.', { rexhide: 2, rexclaw: 1 }],
+  ['legs', 'rexclothlegs', 'Rexweave Trousers', 2, 'Striped trousers tied at the knee with sinew cord.', { rexhide: 3, rexbone: 1 }],
+  ['boots', 'rexclothboots', 'Rexweave Slippers', 1, 'Soft slippers with a tiny claw at each toe.', { rexhide: 2, rexclaw: 1 }],
+  ['book', 'rexbook', 'Amber Eye Grimoire', 0, 'A striped hide cover with a fang clasp and one burning amber eye.', { rexhide: 2, rexfang: 2, rexbone: 1 }, { mana: 40, spell: 0.12 }],
 ]);
 
 armorSet(PIRATE, 'pirateset', [

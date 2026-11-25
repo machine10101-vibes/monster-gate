@@ -2481,6 +2481,8 @@ class Game {
   }
 
   onMonsterKilled(m, { serverAuthoritative = false } = {}) {
+    // A monster killed by the Tyrant Rex (or any other monster) gives the hunter nothing.
+    if (m.slainBy) return;
     this.kills++;
     if (!serverAuthoritative) {
     if (m.type === 'orcscout') {

@@ -134,7 +134,7 @@ export class Monster {
     this.obj.add(built.root);
     game.scene.add(this.obj);
     this.obj.position.set(x, this.y, z);
-    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
+    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'trex' ? 3 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
     this.air = false;
     this.attacking = false;
     this.chargeDir = new THREE.Vector3();
@@ -2015,6 +2015,7 @@ export class Spawner {
     this.fillWarden();
     this.fillVolcanum();
     this.fillJungle();
+    this.fillTrex();
     this.fillDesert();
     const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && m.type !== 'volcanum' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
     if (alive >= this.max) return;
@@ -2175,6 +2176,33 @@ export class Spawner {
       return { x, z };
     }
     return null;
+  }
+
+  /** One Tyrant Rex walks the jungle strip from the Lagoon to Pirate Shore; he returns a while after he falls. */
+  fillTrex() {
+    const g = this.game;
+    const J = g.world.jungle;
+    if (!J) return;
+    if (g.monsters.some((m) => !m.dead && m.type === 'trex')) {
+      this.trexT = 0;
+      return;
+    }
+    this.trexT = (this.trexT || 0) + 1;
+    if (this.trexT < 45) return;
+    const lagoon = J.lands.find((l) => l.kind === 'lagoon');
+    if (!lagoon) return;
+    const P = g.player.pos;
+    const w = g.world;
+    for (let i = 0; i < 20; i++) {
+      const x = lagoon.x0 + this.rng.range(20, 124);
+      const z = lagoon.z0 + this.rng.range(20, 124);
+      if (!w.playable(x, z) || w.isWater(x, z) || !w.free(x, z, 3)) continue;
+      const hh = w.heightAt(x, z);
+      if (hh < 1 || hh > 7 || Math.hypot(x - P.x, z - P.z) < 40) continue;
+      this.trexT = 0;
+      this.spawn('trex', x, z);
+      return;
+    }
   }
 
   fillJungle() {

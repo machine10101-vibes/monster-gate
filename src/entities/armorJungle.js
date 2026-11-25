@@ -46,8 +46,22 @@ const raptorHide = (x, y, z, s = 0) => {
   return J(edge ? shade(base, 0.86) : base, x, y, z, 311 + s, 0.035);
 };
 
+/** Tyrant Rex: olive-green hide raked with dark red stripes, tan underbelly. */
+const RX = { grn: 0x56702e, grnLo: 0x3d5222, grnHi: 0x6f8a3a, tan: 0xb39a68, red: 0x8a2a24, redLo: 0x5a1612, fang: 0xf0e6cc, fangLo: 0xc8b890, strap: 0x3a2a18, strapHi: 0x5a4226 };
+const rexHide = (x, y, z, s = 0) => {
+  const v = z * 0.5 - y * 0.7 + Math.round(Math.sin(x * 0.4) * 1.5);
+  const f = ((v % 7) + 7) % 7;
+  if (f < 1) return J(f < 0.45 ? RX.redLo : RX.red, x, y, z, 330 + s, 0.04);
+  const h = hash3(x >> 1, y >> 1, z >> 1, 331 + s);
+  return J(h < 0.5 ? RX.grn : h < 0.75 ? RX.grnLo : h < 0.92 ? RX.grnHi : RX.tan, x, y, z, 332 + s, 0.04);
+};
+
 const STYLES = {
   tiger: { hide: tigerHide, strap: (x, y, z, s) => J(TG.strap, x, y, z, 320 + s, 0.04), strapHi: (x, y, z, s) => J(TG.strapHi, x, y, z, 321 + s, 0.04), claw: TG.claw, clawLo: TG.clawLo },
+  trex: {
+    hide: rexHide, strap: (x, y, z, s) => J(RX.strap, x, y, z, 324 + s, 0.04), strapHi: (x, y, z, s) => J(RX.strapHi, x, y, z, 325 + s, 0.04),
+    claw: RX.fang, clawLo: RX.fangLo, panelLo: RX.redLo, trim: RX.fang, trimLo: RX.red, trimHi: RX.fang,
+  },
   raptor: { hide: raptorHide, strap: (x, y, z, s) => J(RP.strap, x, y, z, 322 + s, 0.04), strapHi: (x, y, z, s) => J(RP.strapHi, x, y, z, 323 + s, 0.04), claw: RP.claw, clawLo: RP.clawLo },
 };
 
@@ -143,7 +157,7 @@ function leatherJungle(kind) {
       for (let x = 5; x <= 20; x++) {
         const panel = x === 12 || x === 13;
         set(x, y, 13, hide(x, y, 13, 10));
-        set(x, y, 14, y >= 7 && x >= 7 && x <= 18 ? (panel ? J(tiger ? TG.orgLo : RP.olvLo, x, y, 14, 11, 0.04) : hide(x, y, 14, 12)) : hide(x, y, 13, 13));
+        set(x, y, 14, y >= 7 && x >= 7 && x <= 18 ? (panel ? J(tiger ? TG.orgLo : S.panelLo ?? RP.olvLo, x, y, 14, 11, 0.04) : hide(x, y, 14, 12)) : hide(x, y, 13, 13));
         set(x, y, 4, hide(x, y, 4, 14));
       }
       for (const x of [4, 21]) for (let z = 5; z <= 12; z++) set(x, y, z, hide(x, y, z, 15));
@@ -304,8 +318,8 @@ function clothJungle(kind) {
   const hide = S.hide;
   const strap = S.strap;
   const strapHi = S.strapHi;
-  const trim = tiger ? (x, y, z, s) => J(TG.blk, x, y, z, 400 + s, 0.03) : (x, y, z, s) => J(RP.greyLo, x, y, z, 400 + s, 0.03);
-  const trimHi = tiger ? (x, y, z, s) => J(TG.wht, x, y, z, 410 + s, 0.03) : (x, y, z, s) => J(RP.grey, x, y, z, 410 + s, 0.03);
+  const trim = tiger ? (x, y, z, s) => J(TG.blk, x, y, z, 400 + s, 0.03) : (x, y, z, s) => J(S.trimLo ?? RP.greyLo, x, y, z, 400 + s, 0.03);
+  const trimHi = tiger ? (x, y, z, s) => J(TG.wht, x, y, z, 410 + s, 0.03) : (x, y, z, s) => J(S.trim ?? RP.grey, x, y, z, 410 + s, 0.03);
 
   const paintHelm = (H, rowY) => {
     const set = (x, y, z, c, g) => H.set(x, y, z, c, g);
@@ -358,7 +372,7 @@ function clothJungle(kind) {
       const y = rowY(12) + 2 + Math.round(k * 0.8);
       const z = 9 - Math.round(k * 0.95);
       const w = k < 3 ? 3 : k < 5 ? 2 : 1;
-      for (let a = 0; a < w; a++) for (let b = 0; b < w; b++) set(9 + a, y, z + b, k === 6 ? (tiger ? J(TG.blk, k, a, b, 432, 0.02) : J(RP.greyHi, k, a, b, 433, 0.02)) : hide(9 + a, y, z + b, 6));
+      for (let a = 0; a < w; a++) for (let b = 0; b < w; b++) set(9 + a, y, z + b, k === 6 ? (tiger ? J(TG.blk, k, a, b, 432, 0.02) : J(S.trimHi ?? RP.greyHi, k, a, b, 433, 0.02)) : hide(9 + a, y, z + b, 6));
     }
   };
 
@@ -840,6 +854,8 @@ const JUNGLE_BUILD = {
   tigercloth: () => clothJungle('tiger'),
   raptorleather: () => leatherJungle('raptor'),
   raptorcloth: () => clothJungle('raptor'),
+  rexleather: () => leatherJungle('trex'),
+  rexcloth: () => clothJungle('trex'),
   pirateset: pirateMetal,
   piratecloth: pirateCloth,
 };
