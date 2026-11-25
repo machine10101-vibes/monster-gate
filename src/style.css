@@ -5162,3 +5162,25 @@ html:has(#panel:not(.hidden)) #debug-badge {
 .mg-membership-error{min-height:18px;color:#efb7a0;font-size:12px;overflow-wrap:anywhere}
 .mg-membership-submit{width:100%;margin-top:14px;background:linear-gradient(#9a6533,#69401e);font-weight:700}
 .mg-membership-cancel{width:100%;background:transparent;border-color:#594b40}
+
+
+/* Never present an empty account as a new player when its cloud roster failed to load. */
+.cs-sync-error {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  color: #e8edf8;
+}
+.cs-sync-error[hidden] { display: none !important; }
+.cs-sync-error b {
+  color: #f1d48d;
+  font: 700 11px/1.5 'Press Start 2P', monospace;
+  letter-spacing: .04em;
+}
+.cs-sync-error p {
+  margin: 0;
+  color: #c2ccdc;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.cs-sync-error .cs-btn { justify-self: start; }

@@ -4,6 +4,11 @@ import { SKILL_ORDER } from '../data/gathering.js';
 import { dropKey, readJson as readStored, writeJson } from './saveio.js';
 
 export const MAX_CHARACTERS = 8;
+
+/** Email-account rosters are editable only after the authoritative cloud copy loads. */
+export function canEditRoster({ kind, cloudState } = {}) {
+  return kind !== 'email' || cloudState === 'on';
+}
 export const META_KEY = 'monster-gate-roster-v1';
 const RESTORE_DAYS = 30;
 const KEEP_DELETED = 4;

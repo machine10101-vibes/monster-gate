@@ -9,6 +9,7 @@ import {
   TUNICS,
   cleanName,
   nameProblem,
+  canEditRoster,
 } from '../systems/roster.js';
 import { CampStage } from '../world/camp.js';
 import { shortAddress } from '../wallet/klever.js';
@@ -155,11 +156,30 @@ export class CharacterSelect {
     const roster = this.roster;
     this.info.clear();
     for (const c of roster.chars) this.info.set(c.id, roster.summary(c.id));
+    const canEdit = canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState });
+    const syncError = $('cs-sync-error');
+    if (syncError) syncError.hidden = canEdit;
     if (!roster.chars.length) {
       this.root?.classList.remove('single-character');
+      if (!canEdit) {
+        this.mode = 'list';
+        this.selectedId = null;
+        $('cs-form').classList.add('hidden');
+        $('cs-panel').classList.remove('hidden');
+        $('cs-search').classList.add('hidden');
+        $('cs-list').classList.add('hidden');
+        $('cs-panel').querySelector('.cs-foot')?.classList.add('hidden');
+        $('cs-enter-wrap').classList.add('hidden');
+        $('cs-toggle').classList.add('hidden');
+        this.root.classList.remove('creating');
+        return;
+      }
       this.showForm();
       return;
     }
+    $('cs-search').classList.remove('hidden');
+    $('cs-list').classList.remove('hidden');
+    $('cs-panel').querySelector('.cs-foot')?.classList.remove('hidden');
     this.mode = 'list';
     this.root?.classList.toggle('single-character', roster.chars.length === 1);
     $('cs-form').classList.add('hidden');
@@ -195,8 +215,13 @@ export class CharacterSelect {
     if (solo) solo.disabled = !canEnter;
     $('cs-delete').disabled = !c;
     $('cs-restore').disabled = !this.roster.canRestore();
-    $('cs-create').disabled = this.roster.full;
-    $('cs-create').title = this.roster.full ? `This account holds ${MAX_CHARACTERS} characters.` : '';
+    const canEdit = canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState });
+    $('cs-create').disabled = this.roster.full || !canEdit;
+    $('cs-delete').disabled = !c || !canEdit;
+    $('cs-restore').disabled = !this.roster.canRestore() || !canEdit;
+    $('cs-create').title = !canEdit
+      ? 'Account sync is unavailable. Retry account sync before changing characters.'
+      : (this.roster.full ? `This account holds ${MAX_CHARACTERS} characters.` : '');
     $('cs-rotate').classList.toggle('hidden', !c && listMode);
     for (const [id, p] of this.plates) p.classList.toggle('selected', id === this.selectedId);
   }
@@ -320,6 +345,22 @@ export class CharacterSelect {
 
   /* ----------------------------------- actions ----------------------------------- */
 
+  async retryAccountSync() {
+    const button = $('cs-sync-retry');
+    const session = readAccount();
+    if (!button || !session || this.game.cloudSyncing) return;
+    button.disabled = true;
+    button.textContent = 'Retrying…';
+    try {
+      await this.game.applyWallet(session);
+    } catch (error) {
+      this.note(error?.message || 'Account sync failed. Your saved characters have not been changed.', true, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Retry account sync';
+    }
+  }
+
   note(text, bad = false, hold = false) {
     let n = $('cs-note');
     if (!n) {
@@ -399,6 +440,7 @@ export class CharacterSelect {
   }
 
   doDelete() {
+    if (!canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState })) return;
     const id = this.pendingDelete;
     this.pendingDelete = null;
     $('cs-confirm').classList.add('hidden');
@@ -410,6 +452,7 @@ export class CharacterSelect {
   }
 
   doRestore() {
+    if (!canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState })) return;
     const c = this.roster.restore();
     if (!c) {
       this.note(this.roster.full ? `This account holds ${MAX_CHARACTERS} characters.` : 'Nothing to restore.', true);
@@ -423,6 +466,10 @@ export class CharacterSelect {
   /* ---------------------------------- creation ---------------------------------- */
 
   showForm() {
+    if (!canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState })) {
+      this.note('Your saved characters could not be loaded. Retry account sync before creating a character.', true, true);
+      return;
+    }
     this.mode = 'create';
     this.root.classList.add('creating');
     $('cs-panel').classList.add('hidden');
@@ -532,6 +579,10 @@ export class CharacterSelect {
 
   submitForm(event) {
     event.preventDefault();
+    if (!canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState })) {
+      $('cs-form-error').textContent = 'Account sync is unavailable. Your characters are safe; retry sync before creating.';
+      return;
+    }
     const name = $('cs-name-input').value;
     const problem = nameProblem(name, this.roster);
     if (problem) {
@@ -564,6 +615,7 @@ export class CharacterSelect {
     $('cs-wallet-connect').addEventListener('click', () => this.connectKlever());
     $('cs-back').addEventListener('click', () => this.back());
     $('cs-create').addEventListener('click', () => this.showForm());
+    $('cs-sync-retry')?.addEventListener('click', () => this.retryAccountSync());
     $('cs-delete').addEventListener('click', () => this.askDelete());
     $('cs-restore').addEventListener('click', () => this.doRestore());
     $('cs-confirm-no').addEventListener('click', () => $('cs-confirm').classList.add('hidden'));

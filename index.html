@@ -332,6 +332,11 @@
         </header>
 
         <aside id="cs-panel" class="cs-panel mg-frame">
+          <div id="cs-sync-error" class="cs-sync-error" role="alert" hidden>
+            <b>YOUR CHARACTERS ARE SAFE</b>
+            <p>We couldn't load this account's saved character list. No character will be created or deleted until your account sync succeeds.</p>
+            <button id="cs-sync-retry" class="cs-btn" type="button">Retry account sync</button>
+          </div>
           <div class="cs-search">
             <input id="cs-search" type="search" placeholder="Search" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="24" />
           </div>
