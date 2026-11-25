@@ -350,6 +350,18 @@ export function mountJournal(body, game) {
     const st = journal.status(q.id);
     const head = el('div', 'qj-title-row');
     head.appendChild(el('h3', 'qj-title', q.name));
+    const tracked = journal.trackedQuest() === q.id;
+    const track = el('button', 'qj-track' + (tracked ? ' on' : ''), tracked ? 'TRACKED' : 'TRACK QUEST');
+    track.type = 'button';
+    track.disabled = st !== 'active' || tracked;
+    track.title = tracked ? 'This quest is shown on your HUD tracker' : 'Show this quest on your HUD tracker';
+    track.addEventListener('click', () => {
+      if (journal.track(q.id)) {
+        game.syncTracker?.();
+        paint();
+      }
+    });
+    head.appendChild(track);
     pane.appendChild(head);
     const log = el('div', 'qj-log' + (state.overview || st === 'available' ? ' overview' : ' story'));
     if (state.overview || st === 'available') {

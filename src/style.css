@@ -4665,6 +4665,40 @@ body.touch .panel-card.adventures #panel-body {
   color: #f0d48a;
   text-shadow: 0 1px 0 #5a4318;
 }
+.qj-title-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 8px;
+}
+.qj-title-row .qj-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+.qj-track {
+  flex: none;
+  padding: 7px 9px;
+  background: #182b40;
+  border: 1px solid #c6a15a;
+  color: #f0d48a;
+  font-family: var(--font-px);
+  font-size: 7px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.qj-track.on {
+  border-color: #70c98a;
+  color: #9ce6ad;
+  background: #142b2a;
+}
+.qj-track:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
 .qj-log {
   flex: 1 1 auto;
   min-height: 0;
