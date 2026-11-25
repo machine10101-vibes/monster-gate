@@ -50,13 +50,41 @@ function copyText(value) {
 }
 
 let kleverPaymentModules;
+async function loadKleverPaymentModules() {
+  if (!kleverPaymentModules) {
+    // esm.sh can intermittently fail to serve browser modules. Retry through
+    // jsDelivr's ESM endpoint before reporting a wallet integration failure.
+    const sources = [
+      'https://esm.sh/@klever/connect@0.1.9?bundle&target=es2022',
+      'https://cdn.jsdelivr.net/npm/@klever/connect@0.1.9/+esm',
+    ];
+    kleverPaymentModules = (async () => {
+      let lastError;
+      for (const source of sources) {
+        try {
+          return await import(/* @vite-ignore */ source);
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      const error = new Error('Klever Wallet payment support could not be loaded. Check your connection or browser content blocker, then try again.');
+      error.cause = lastError;
+      throw error;
+    })();
+  }
+  try {
+    return await kleverPaymentModules;
+  } catch (error) {
+    // Do not cache a rejected import: the player can retry after the network recovers.
+    kleverPaymentModules = null;
+    throw error;
+  }
+}
+
 async function sendSignedKlvTransfer(quote, expectedAddress) {
   // Payment uses Klever's supported BrowserWallet SDK in extension mode.
-  // The existing account-link/connectWallet implementation is intentionally untouched.
-  if (!kleverPaymentModules) {
-    kleverPaymentModules = import('https://esm.sh/@klever/connect@0.1.9?bundle');
-  }
-  const { BrowserWallet, KleverProvider } = await kleverPaymentModules;
+  // The existing account-link/connectWallet implementation is intentionally left unchanged.
+  const { BrowserWallet, KleverProvider } = await loadKleverPaymentModules();
   const provider = new KleverProvider({ network: 'mainnet' });
   const wallet = new BrowserWallet(provider);
   await wallet.connect();
