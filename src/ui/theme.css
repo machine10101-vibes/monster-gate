@@ -1217,11 +1217,11 @@ body.touch #world-status b { font-size: clamp(9px, 2vw, 12px); }
   background-color: var(--mg-navy);
 }
 #hints {
-  left: 50%;
-  right: auto;
-  bottom: calc(max(var(--hud-clear-bottom, 190px), 196px * var(--ui, 1)) + 16px + var(--safe-b));
-  transform: translateX(-50%) scale(var(--ui));
-  transform-origin: bottom center;
+  left: calc(50% + 370px * var(--ui, 1) + 14px);
+  right: calc(var(--menu-col-w, 44px) + 20px + var(--safe-r));
+  bottom: calc(12px + var(--safe-b));
+  transform: scale(var(--ui));
+  transform-origin: bottom left;
 }
 
 body.touch #hud-corner-right,

@@ -464,18 +464,18 @@ kbd {
 /* hints + menu -------------------------------------------------------- */
 #hints {
   position: absolute;
-  left: 50%;
-  right: auto;
-  bottom: calc(max(var(--hud-clear-bottom, 190px), 196px * var(--ui, 1)) + 16px + var(--safe-b));
-  transform-origin: bottom center;
-  transform: translateX(-50%) scale(var(--ui));
+  left: calc(50% + 370px * var(--ui, 1) + 14px);
+  right: calc(var(--menu-col-w, 44px) + 20px + var(--safe-r));
+  bottom: calc(12px + var(--safe-b));
+  transform-origin: bottom left;
+  transform: scale(var(--ui));
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px 16px;
+  justify-content: flex-start;
+  gap: 8px 14px;
   align-items: center;
-  max-width: min(520px, calc(100vw - var(--menu-col-w, 44px) - 48px));
+  max-width: 520px;
   font-size: var(--hud-hint);
   text-shadow: var(--hud-shadow);
   z-index: 11;
