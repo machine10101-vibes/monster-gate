@@ -49,18 +49,6 @@ function node(tag, cls, value) {
   return el;
 }
 
-function copyText(value) {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value);
-  const input = node('textarea');
-  input.value = value;
-  input.style.position = 'fixed';
-  input.style.opacity = '0';
-  document.body.append(input);
-  input.select();
-  document.execCommand('copy');
-  input.remove();
-  return Promise.resolve();
-}
 
 let kleverPaymentModules;
 // Payment SDK loading is retried across independent ESM hosts; do not regress to a single CDN import.
@@ -151,7 +139,6 @@ export async function ensureMembership(session, game) {
     let paymentInFlight = false;
     let paymentHash = '';
     let pollCount = 0;
-    const destination = 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv';
     const plans = [
       { id: 'monthly', days: 30, total: 5, title: '30 days', rate: '$5.00 / month' },
       { id: 'six-month', days: 180, total: 27, title: '6 months', rate: '$4.50 / month' },
@@ -213,7 +200,7 @@ export async function ensureMembership(session, game) {
         node('span', 'mg-gatepass-plan-total', `$${plan.total.toFixed(2)} total`));
       button.setAttribute('aria-label', `${plan.title}, ${plan.rate}, ${plan.total.toFixed(2)} dollars total`);
       button.addEventListener('click', () => {
-        if (selectedPlanId === plan.id || settled) return;
+        if (selectedPlanId === plan.id || settled || paymentInFlight) return;
         selectedPlanId = plan.id;
         renderPlans();
         quote = null;
@@ -257,14 +244,7 @@ export async function ensureMembership(session, game) {
     actions.append(payNow, checkNow, refresh);
 
     const footnote = node('p', 'mg-gatepass-footnote', 'Manual renewal · No recurring wallet charge · Network fees are paid separately.');
-    const explorer = node('a', 'mg-gatepass-explorer', 'View membership wallet on KleverScan');
-    explorer.href = `https://kleverscan.org/address/${destination}`;
-    explorer.target = '_blank';
-    explorer.rel = 'noopener noreferrer';
-    explorer.style.display = 'block';
-    explorer.style.width = 'fit-content';
-    explorer.style.margin = '12px auto 0';
-    explorer.style.fontSize = '11px';
+
 
     const setWatch = (heading, message, isError = false) => {
       watch.classList.toggle('error', isError);
@@ -497,7 +477,7 @@ export async function ensureMembership(session, game) {
     close.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
 
-    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, watch, actions, footnote, explorer);
+    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, watch, actions, footnote);
     card.append(close, head, title, intro, codePanel, paymentPanel);
     overlay.append(card);
     document.body.append(overlay);
