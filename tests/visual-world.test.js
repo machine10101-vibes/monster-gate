@@ -776,9 +776,12 @@ test('melee attacks animate weapon lag, planted feet, offhand recoil and a pinne
   assert.match(player, /sp\.step\('weaponYaw'/);
   assert.match(player, /weaponRollLag/);
   assert.match(player, /offhandPitch/);
-  assert.match(player, /family === 'crossbow' \? 0\.12 : 0\.075/);
+  assert.match(player, /family === 'crossbow' \? 0\.14/);
   assert.match(player, /sp\.step\('legLz'/);
   assert.match(player, /sp\.step\('legRz'/);
-  assert.match(player, /supportHand\(dt\)/);
+  assert.match(player, /armRig\(dt\)/);
+  assert.match(player, /placeSupportHand\(/);
+  assert.match(player, /placeDrawHand\(/);
+  assert.match(player, /bendBowString\(/);
   assert.match(player, /levelWeapon\(\)/);
 });
