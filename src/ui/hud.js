@@ -1,4 +1,4 @@
-import { iconCanvas, iconURL, heartCanvas } from './icons.js';
+import { iconCanvas, iconURL, uiIconURL, heartCanvas } from './icons.js';
 import { GOODS } from '../data/gathering.js';
 import { isUnsellableGood } from '../debug/transient.js';
 import { mountStats } from './stats.js';
@@ -197,14 +197,14 @@ export class HUD {
 
     document.querySelectorAll('.mbtn .ico').forEach((n) => {
       const cls = [...n.classList].find((c) => c !== 'ico');
-      if (cls) n.style.backgroundImage = `url(${iconURL(cls === 'rot' ? 'rot' : cls)})`;
+      if (cls) n.style.backgroundImage = `url(${uiIconURL(cls)})`;
     });
     document.querySelectorAll('.tbtn .ico').forEach((n) => {
       const cls = [...n.classList].find((c) => c !== 'ico');
       if (cls) n.style.backgroundImage = `url(${iconURL(cls)})`;
     });
-    $('btn-fs').style.backgroundImage = `url(${iconURL('fs')})`;
-    $('btn-snd').style.backgroundImage = `url(${iconURL('snd')})`;
+    $('btn-fs').style.backgroundImage = `url(${uiIconURL('fs')})`;
+    $('btn-snd').style.backgroundImage = `url(${uiIconURL('snd')})`;
     decorateAllFrames();
     this.bindQuestToggle();
     this.bindPanelClose();
