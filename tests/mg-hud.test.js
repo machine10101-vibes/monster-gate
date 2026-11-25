@@ -245,7 +245,7 @@ test('MG-UI-17 action cluster keeps a gap from the menu column', () => {
   assert.match(theme, /body\.touch #touch-btns[\s\S]*right:\s*var\(--hud-action-right\)/);
   assert.match(theme, /@media \(max-height: 500px\) \{[\s\S]*#touch-btns \{[\s\S]*right:\s*var\(--hud-action-right\)/);
   assert.match(style, /#touch-btns \{[\s\S]*--hud-action-right/);
-  assert.match(theme, /#hints \{[\s\S]*--hud-clear-bottom/);
+  assert.match(theme, /#hints \{[\s\S]*right: calc\(var\(--menu-col-w, 44px\) \+ 20px \+ var\(--safe-r\)\)/);
 });
 
 test('MG-UI-19 an open window hides the NPC dialogue', () => {
