@@ -19,14 +19,15 @@ test('Klever payment still checks the linked wallet before signing', () => {
 });
 
 
-test('monthly KLV amount is estimated from Swopus before a wallet is linked', () => {
-  assert.match(source, /paymentPanel\.hidden = false/);
-  assert.match(source, /node\('button', 'mg-gatepass-pay', 'Buy Membership'\)/);
-  assert.match(source, /post\(currentSession, \{ op: 'rate' \}\)/);
-  assert.match(source, /Math\.ceil\(\(5 \/ price\) \* 1_000_000\)/);
-  assert.match(source, /amount\.textContent = `\$\{estimatedKlvAmount\} KLV`/);
-  assert.doesNotMatch(source, /Link wallet to see KLV amount/);
-  assert.doesNotMatch(source, /Pay \$5\/month with Klever Wallet/);
+test('subscription tiers are estimated from Swopus before a wallet is linked', () => {
+  assert.ok(source.includes("id: 'monthly', days: 30, total: 5"));
+  assert.ok(source.includes("id: 'six-month', days: 180, total: 27"));
+  assert.ok(source.includes("id: 'annual', days: 365, total: 48"));
+  assert.ok(source.includes("op: 'rate'"));
+  assert.ok(source.includes("selectedPlan().total / liveKlvUsdPrice"));
+  assert.ok(source.includes("const amountRow = node('div', 'mg-gatepass-amountrow')"));
+  assert.ok(!source.includes("mg-gatepass-copy"));
+  assert.ok(!source.includes("Link wallet to see KLV amount"));
 });
 
 test('Buy Membership links a wallet only when the player chooses to pay, then loads a quote', () => {

@@ -303,11 +303,13 @@ async function handle(db:Admin,id:string,b:any){
  if(b.op==="redeem")return redeemPassCode(db,id,b.code);
  if(b.op==="rate"){const p=await ticker();if(!p)return out({error:"Swopus live KLV/USDT price feed is temporarily unavailable."},503);return out({usdPrice:p.price,sourceTime:p.sourceTime,priceSource:p.source});}
  if(b.op==="quote"){const a=await walletFor(db,id);if(a instanceof Response)return a;if(!a)return out({error:"Connect your Klever wallet in character selection before paying."},409);
+ const plans:any={"monthly":{days:30,usd:5},"six-month":{days:180,usd:27},"annual":{days:365,usd:48}};
+ const plan=plans[String(b.plan||"monthly")];if(!plan)return out({error:"Choose a valid membership term."},400);
  const p=await ticker();if(!p)return out({error:"Swopus live KLV/USDT price feed is temporarily unavailable. Please refresh your quote."},503);
- const atomic=BigInt(Math.ceil(5/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();
- const {data,error}=await db.from("membership_quotes").insert({user_id:id,klever_address:a,usd_price:p.price,klv_amount_atomic:atomic.toString(),source_time:p.sourceTime,expires_at:expires}).select("id").single();
+ const atomic=BigInt(Math.ceil(plan.usd/p.price*1e6)),expires=new Date(Date.now()+600000).toISOString();
+ const {data,error}=await db.from("membership_quotes").insert({user_id:id,klever_address:a,usd_price:p.price,usd_amount:plan.usd,duration_days:plan.days,klv_amount_atomic:atomic.toString(),source_time:p.sourceTime,expires_at:expires}).select("id").single();
  if(error||!data?.id)return out({error:"Could not prepare a membership quote."},503);
- return out({quoteId:data.id,usdPrice:p.price,usdAmount:5,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,priceSource:p.source,receiverAddress:RECEIVER})}
+ return out({quoteId:data.id,usdPrice:p.price,usdAmount:plan.usd,durationDays:plan.days,klvAmount:(Number(atomic)/1e6).toFixed(6),expiresAt:expires,sourceTime:p.sourceTime,priceSource:p.source,receiverAddress:RECEIVER})}
  if(b.op==="verify"){const qid=String(b.quoteId||""),hash=String(b.txHash||"").trim().toLowerCase();if(!UUID.test(qid)||!HASH.test(hash))return out({error:"Enter the 64-character transaction hash from Klever."},400);
  const {data:q,error:qe}=await db.from("membership_quotes").select("*").eq("id",qid).eq("user_id",id).maybeSingle();
  if(qe)return out({error:"Could not read payment quote."},503);if(!q||q.used_at||Date.parse(q.created_at)<Date.now()-7*24*60*60*1000)return out({error:"Quote expired. Request a new one."},410);
