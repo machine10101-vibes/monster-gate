@@ -190,13 +190,15 @@ test('MG-UI-16 expanded quest stays in frame at 844x390 and 1280x800', () => {
   assert.match(theme, /overflow-wrap:\s*anywhere/);
 });
 
-test('desktop minimap sits top-left and click hints sit above the hotbar', () => {
+test('desktop minimap stays top-left and combat hints sit bottom-right between skills and menus', () => {
   const style = src('../src/style.css');
   const theme = src('../src/ui/theme.css');
   assert.match(style, /#bottom-left \{[\s\S]*top: calc\(8px \+ var\(--safe-t\)\)/);
-  assert.match(style, /#hints \{[\s\S]*left: 50%/);
-  assert.match(style, /#hints \{[\s\S]*translateX\(-50%\)/);
-  assert.match(theme, /#hints \{[\s\S]*left: 50%/);
+  assert.match(style, /#hints \{[\s\S]*left: calc\(50% \+ 370px \* var\(--ui, 1\) \+ 14px\)/);
+  assert.match(style, /#hints \{[\s\S]*right: calc\(var\(--menu-col-w, 44px\) \+ 20px \+ var\(--safe-r\)\)/);
+  assert.match(style, /#hints \{[\s\S]*bottom: calc\(12px \+ var\(--safe-b\)\)/);
+  assert.match(theme, /#hints \{[\s\S]*left: calc\(50% \+ 370px \* var\(--ui, 1\) \+ 14px\)/);
+  assert.match(theme, /body\.touch #hints[\\s\\S]*display: none/);
   const desktop = hudRects({ name: 'desktop', w: 1920, h: 1080, touch: false });
   assert.ok(desktop.minimap.y <= 8);
   assert.ok(desktop.minimap.x <= 8);
