@@ -601,9 +601,9 @@
 }
 
 
-/* A disabled Gate Pass action explains its prerequisite; it must not mimic a perpetual spinner. */
+/* Disabled states must not show the browser's red prohibited cursor. */
 .mg-gatepass-pay:disabled {
-  cursor: not-allowed;
+  cursor: default;
   opacity: .72;
   filter: saturate(.72);
 }
