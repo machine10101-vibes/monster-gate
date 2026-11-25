@@ -7,6 +7,10 @@ import { YETI } from '../data/yeti.js';
 import { holyHammerVoxels, demonSwordVoxels, demonShieldVoxels } from './knightWeapons.js';
 import { jungleWeapons, jungleShield, jungleBook, JUNGLE_DUAL, JUNGLE_TALL, JUNGLE_EDGE, JUNGLE_SHIELD_SETS, JUNGLE_BOOK_SETS } from './weaponsJungle.js';
 import { METALS, METAL_SET_IDS } from '../data/metals.js';
+import { budgeWeapons } from './weaponsBudge.js';
+import { duskWeapons } from './weaponsDusk.js';
+import { frostWeapons } from './weaponsFrost.js';
+import { volcWeapons } from './weaponsVolc.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
 export const WEAPON_SIZE = 0.015;
@@ -1039,7 +1043,7 @@ function tinderbox() {
 
 /* ------------------------------ registry ---------------------------- */
 
-const KIT = { ctx, rod, ball, orb, ringAt, wrapRod, haft, pathRod, spike, blade, leaf, crossguard, pommelAt, sword, scythe, bow, crossbow, spearShaft: spear };
+const KIT = { ctx, rod, ball, orb, ringAt, wrapRod, haft, pathRod, spike, blade, leaf, crossguard, pommelAt, sword, scythe, bow, crossbow, spearShaft: spear, WEAPON_SIZE, THEMES };
 
 const BUILDERS = {
   ...SWORDS,
@@ -1093,6 +1097,11 @@ const BUILDERS = {
   yeticrossbow: () => crossbow(THEMES.frost, 'dark'),
   holyhammer: holyHammerVoxels,
   demonsword: demonSwordVoxels,
+  // Bespoke monster sets: each weapon sculpted from its own monster's parts.
+  ...budgeWeapons(KIT),
+  ...duskWeapons(KIT),
+  ...frostWeapons(KIT),
+  ...volcWeapons(KIT),
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */

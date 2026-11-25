@@ -1,0 +1,61 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildWeaponVoxels, WEAPON_SIZE } from '../src/entities/weaponModels.js';
+
+const MONSTERS = {
+  budge: { onesword: 'budgeblade', twosword: 'budgegreatsword', dual: 'budgedual', hammer: 'budgemaul', spear: 'budgespear', staff: 'budgestaff', wand: 'budgewand', shortbow: 'budgeshortbow', longbow: 'budgebow', crossbow: 'budgecrossbow' },
+  dusk: { onesword: 'darksword', twosword: 'darkgreatsword', dual: 'darkdual', hammer: 'darkhammer', spear: 'darkspear', staff: 'darkstaff', wand: 'darkwand', shortbow: 'darkshortbow', longbow: 'darkbow', crossbow: 'darkcrossbow', scythe: 'darkscythe' },
+  frost: { onesword: 'yetisword', twosword: 'yetigreatsword', dual: 'yetidual', hammer: 'yetihammer', spear: 'yetispear', staff: 'yetistaff', wand: 'yetiwand', shortbow: 'yetishortbow', longbow: 'yetilongbow', crossbow: 'yeticrossbow', scythe: 'yetiscythe' },
+  volc: { onesword: 'volcsword', twosword: 'volcgreatsword', dual: 'volcdual', hammer: 'volchammer', spear: 'volcspear', staff: 'volcstaff', wand: 'volcwand', shortbow: 'volcshortbow', longbow: 'volcbow', crossbow: 'volccrossbow', scythe: 'volcscythe' },
+};
+
+const models = new Map();
+function model(kind) {
+  if (!models.has(kind)) models.set(kind, buildWeaponVoxels(kind));
+  return models.get(kind);
+}
+
+/** A cheap shape signature: occupancy of the voxel grid, ignoring colour. */
+function signature(m) {
+  const { M } = m;
+  let filled = 0;
+  for (let i = 0; i < M.data.length; i++) if (M.data[i]) filled++;
+  return `${M.sx}x${M.sy}x${M.sz}:${filled}`;
+}
+
+test('every monster weapon is sculpted, not a recoloured shared shape', () => {
+  const types = new Set(Object.values(MONSTERS).flatMap((m) => Object.keys(m)));
+  for (const type of types) {
+    const kinds = Object.values(MONSTERS).map((m) => m[type]).filter(Boolean);
+    const sigs = kinds.map((k) => signature(model(k)));
+    assert.equal(new Set(sigs).size, kinds.length, `${type}: ${kinds.join(', ')} share a silhouette`);
+  }
+});
+
+test('monster weapons stay inside the size envelope the animations expect', () => {
+  const limit = { onesword: 1.6, twosword: 2.0, dual: 1.05, hammer: 1.7, spear: 2.45, staff: 2.1, wand: 1.15, crossbow: 1.2, scythe: 1.7 };
+  for (const set of Object.values(MONSTERS)) {
+    for (const [type, kind] of Object.entries(set)) {
+      const { M, oz } = model(kind);
+      if (type === 'shortbow' || type === 'longbow') {
+        const half = (M.sy * WEAPON_SIZE) / 2;
+        assert.ok(half > 0.4 && half < 0.9, `${kind} bow span ${half.toFixed(2)}`);
+        continue;
+      }
+      const top = (M.sz - oz) * WEAPON_SIZE;
+      assert.ok(top < limit[type], `${kind} reaches ${top.toFixed(2)}m`);
+      assert.ok(oz * WEAPON_SIZE < 0.65, `${kind} butt ${(oz * WEAPON_SIZE).toFixed(2)}m`);
+    }
+  }
+});
+
+test('monster bows carry a drawable string', () => {
+  for (const set of Object.values(MONSTERS)) {
+    for (const kind of [set.shortbow, set.longbow]) {
+      const s = model(kind).bowString;
+      assert.ok(s, `${kind} has a string`);
+      assert.ok(s.top[1] > 0.3 && s.bottom[1] < -0.3, `${kind} string spans the limbs`);
+      assert.ok(s.top[2] < 0, `${kind} string sits behind the riser`);
+    }
+  }
+});
