@@ -769,3 +769,16 @@ test('weapon combos use full-body follow-through and a dedicated two-hand staff 
     assert.match(combat, new RegExp(`return '${family}'`));
   }
 });
+
+
+test('melee attacks animate wrist lag, elbow compression, and planted-foot follow-through', () => {
+  const player = src('src/entities/player.js');
+  assert.match(player, /weaponPitch = impact/);
+  assert.match(player, /weaponYaw = side/);
+  assert.match(player, /sp\.step\('weaponPitch'/);
+  assert.match(player, /sp\.step\('weaponYaw'/);
+  assert.match(player, /eR \+= impact/);
+  assert.match(player, /legLz = -bodySide/);
+  assert.match(player, /sp\.step\('legLz'/);
+  assert.match(player, /sp\.step\('legRz'/);
+});
