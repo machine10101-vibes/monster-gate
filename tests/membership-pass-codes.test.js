@@ -39,9 +39,13 @@ test('the Gate Pass window accepts free codes even without a connected Klever wa
   assert.match(client, /MG-XXXX-XXXX-XXXX-XXXX/);
   assert.match(client, /post\(currentSession, \{ op: 'redeem', code \}\)/);
   assert.match(client, /paymentPanel\.hidden = false/);
-  assert.match(client, /Link Klever Wallet/);
+  assert.match(client, /node\('button', 'mg-gatepass-pay', 'Buy Membership'\)/);
+  assert.match(client, /estimatedKlvAmount = \(atomic \/ 1_000_000\)\.toFixed\(6\)/);
+  assert.match(client, /post\(currentSession, \{ op: 'rate' \}\)/);
+  assert.match(client, /if \(!status\.walletAddress\)/);
   assert.match(client, /linkKleverWallet\(currentSession\)/);
-  assert.match(client, /if \(status\.walletAddress\) loadQuote\(\)/);
+  assert.doesNotMatch(client, /Link wallet to see KLV amount/);
+  assert.doesNotMatch(client, /mg-gatepass-link-wallet/);
   assert.match(adminView, /data-issue-passcode/);
   assert.match(admin, /issuePassCode\(session\)/);
   assert.match(api, /export async function loadPassCodes/);
@@ -67,4 +71,17 @@ test('admin account records include wallet, paid membership and trial pass facts
   assert.match(migration, /klever_address/);
   assert.match(allAccounts, /from auth\.users u/i);
   assert.match(allAccounts, /left join public\.hunter_accounts h/i);
+});
+
+
+test('the live KLV estimate is displayed before wallet linking and Buy Membership starts checkout', () => {
+  const client = src('../src/wallet/membership.js');
+  const membership = src('../supabase/functions/membership/index.ts');
+  assert.match(client, /op: 'rate'/);
+  assert.match(client, /Math\.ceil\(\(5 \/ price\) \* 1_000_000\)/);
+  assert.match(client, /amount\.textContent = `\$\{estimatedKlvAmount\} KLV`/);
+  assert.match(client, /payNow\.textContent = 'Buy Membership'/);
+  assert.match(client, /if \(!status\.walletAddress\)[\s\S]*?linkKleverWallet\(currentSession\)/);
+  assert.match(membership, /if\(b\.op==="rate"\)/);
+  assert.match(membership, /if\(b\.op==="quote"\)\{const a=await walletFor\(db,id\)/);
 });
