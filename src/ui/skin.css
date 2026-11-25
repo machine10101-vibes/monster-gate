@@ -1,0 +1,748 @@
+/*
+ * Runestone skin.
+ *
+ * The game's own brand art is a voxel stone gate cut with blood-red runes,
+ * set in bronze plaques studded with ruby diamonds. Every menu, button, tab,
+ * slot and HUD piece here is dressed in that same material: charcoal stone,
+ * bevelled bronze, ruby gems and rune glow.
+ *
+ * Loaded after style.css and theme.css. Every rule is anchored on :root so it
+ * outranks the equivalent rule in the older sheets without !important.
+ *
+ * Plates and frames are tiny 9-slice SVGs used as border-image, so their
+ * stepped pixel corners stay crisp at any size.
+ */
+
+:root {
+  --rs-stone-0: #0b090c;
+  --rs-stone-1: #15111a;
+  --rs-stone-2: #1e1922;
+  --rs-stone-3: #2a232d;
+  --rs-stone-4: #3a3140;
+  --rs-mortar: #08060a;
+  --rs-bronze-lo: #5c3f1a;
+  --rs-bronze: #9a7232;
+  --rs-bronze-hi: #d2a756;
+  --rs-gold: #edc874;
+  --rs-gold-pale: #f7e3b0;
+  --rs-bone: #f1e8d8;
+  --rs-text: #ddd3c4;
+  --rs-muted: #a2968a;
+  --rs-rune: #ff3b3b;
+  --rs-rune-hi: #ff8a74;
+  --rs-rune-lo: #a3121f;
+  --rs-blood: #4e0a12;
+  --rs-ember: #ffa040;
+  --rs-glow: 0 0 10px rgba(255, 59, 59, 0.55), 0 0 2px rgba(255, 138, 116, 0.9);
+
+  /* Re-point the shared theme variables so everything built on them follows. */
+  --mg-navy: var(--rs-stone-1);
+  --mg-navy-2: var(--rs-stone-1);
+  --mg-navy-3: var(--rs-stone-2);
+  --mg-navy-4: var(--rs-stone-2);
+  --mg-navy-5: var(--rs-stone-3);
+  --mg-navy-6: var(--rs-stone-3);
+  --mg-navy-7: var(--rs-stone-3);
+  --mg-ink: #050406;
+  --mg-gold: var(--rs-bronze-hi);
+  --mg-gold-hi: var(--rs-gold);
+  --mg-gold-title: var(--rs-gold-pale);
+  --mg-gold-text: var(--rs-gold);
+  --mg-gold-bright: var(--rs-bone);
+  --mg-gold-dim: var(--rs-bronze);
+  --mg-gold-edge: #2a1a08;
+  --mg-ink-text: var(--rs-text);
+  --mg-muted: var(--rs-muted);
+  --mg-tab: #b8aa98;
+  --mg-line: #3c3038;
+  --mg-line-2: #4a3a40;
+  --mg-line-3: #54424a;
+  --mg-blue-hi: #b0222c;
+  --mg-blue-lo: #5e0d16;
+  --mg-blue-edge: var(--rs-gold);
+  --mg-blue-shadow: #1a0306;
+  --mg-quiet-hi: var(--rs-stone-3);
+  --mg-quiet-lo: var(--rs-stone-1);
+  --mg-scroll-track: var(--rs-stone-0);
+  --mg-scroll-thumb: linear-gradient(#e2bb6a, #7a5424);
+  --panel: rgba(21, 17, 26, 0.94);
+  --panel-edge: var(--rs-bronze-hi);
+  --panel-hi: var(--rs-gold);
+  --gold: var(--rs-gold);
+  --gold-dim: var(--rs-bronze);
+
+  /* Voxel stone wall: offset blocks with mortar lines and a lit top edge. */
+  --rs-stone-tex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32' shape-rendering='crispEdges'%3E%3Crect width='64' height='32' fill='%2308060a'/%3E%3Crect x='1' y='1' width='30' height='14' fill='%231c171f'/%3E%3Crect x='33' y='1' width='30' height='14' fill='%2319151c'/%3E%3Crect x='-15' y='17' width='30' height='14' fill='%231a161d'/%3E%3Crect x='17' y='17' width='30' height='14' fill='%231f1922'/%3E%3Crect x='49' y='17' width='30' height='14' fill='%231a161d'/%3E%3Crect x='1' y='1' width='30' height='1' fill='%23292229'/%3E%3Crect x='33' y='1' width='30' height='1' fill='%23262027'/%3E%3Crect x='0' y='17' width='15' height='1' fill='%23272027'/%3E%3Crect x='17' y='17' width='30' height='1' fill='%232b242c'/%3E%3Crect x='49' y='17' width='15' height='1' fill='%23272027'/%3E%3Crect x='9' y='6' width='2' height='2' fill='%23221c24'/%3E%3Crect x='44' y='9' width='3' height='2' fill='%23151118'/%3E%3Crect x='27' y='24' width='2' height='2' fill='%23251e27'/%3E%3C/svg%3E");
+  --rs-panel-bg:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 59, 59, 0.07), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(0, 0, 0, 0.35)),
+    var(--rs-stone-tex) 0 0 / 64px 32px,
+    var(--rs-stone-1);
+
+  /* Panel frame: bronze band, pixel-stepped corners, ruby diamond studs. 48x48, slice 16. */
+  --rs-frame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' shape-rendering='crispEdges'%3E%3Cpath d='M4 0h40v2h2v2h2v40h-2v2h-2v2H4v-2H2v-2H0V4h2V2h2z' fill='%23070406'/%3E%3Cpath d='M4 1h40v2h2v2h1v38h-1v2h-2v2H4v-2H2v-2H1V5h1V3h2z' fill='%239a7232'/%3E%3Cpath d='M4 1h40v1H4zM1 5h1v38H1zM2 3h2v1H2z' fill='%23f0cd7c'/%3E%3Cpath d='M4 46h40v1H4zM46 5h1v38h-1zM44 45h2v1h-2z' fill='%23523614'/%3E%3Cpath d='M5 3h38v1H5zM3 5h1v38H3zM44 5h1v38h-1zM5 44h38v1H5z' fill='%23d2a756'/%3E%3Cpath d='M5 4h38v1H5zM4 5h1v38H4zM43 5h1v38h-1zM5 43h38v1H5z' fill='%23070406'/%3E%3Cpath d='M6 1h3v1H6zM39 1h3v1h-3zM6 46h3v1H6zM39 46h3v1h-3z' fill='%23070406'/%3E%3Cg%3E%3Cpath d='M7 3h1v1h1v1h1v1H9v1H8v1H7V7H6V6H5V5h1V4h1z' fill='%23ffb2a2'/%3E%3Cpath d='M7 4h1v1h1v1H8v1H7V6H6V5h1z' fill='%23e01e2e'/%3E%3Cpath d='M7 6h1v1H7z' fill='%237a0a14'/%3E%3C/g%3E%3Cg transform='translate(33 0)'%3E%3Cpath d='M7 3h1v1h1v1h1v1H9v1H8v1H7V7H6V6H5V5h1V4h1z' fill='%23ffb2a2'/%3E%3Cpath d='M7 4h1v1h1v1H8v1H7V6H6V5h1z' fill='%23e01e2e'/%3E%3Cpath d='M7 6h1v1H7z' fill='%237a0a14'/%3E%3C/g%3E%3Cg transform='translate(0 37)'%3E%3Cpath d='M7 3h1v1h1v1h1v1H9v1H8v1H7V7H6V6H5V5h1V4h1z' fill='%23ffb2a2'/%3E%3Cpath d='M7 4h1v1h1v1H8v1H7V6H6V5h1z' fill='%23e01e2e'/%3E%3Cpath d='M7 6h1v1H7z' fill='%237a0a14'/%3E%3C/g%3E%3Cg transform='translate(33 37)'%3E%3Cpath d='M7 3h1v1h1v1h1v1H9v1H8v1H7V7H6V6H5V5h1V4h1z' fill='%23ffb2a2'/%3E%3Cpath d='M7 4h1v1h1v1H8v1H7V6H6V5h1z' fill='%23e01e2e'/%3E%3Cpath d='M7 6h1v1H7z' fill='%237a0a14'/%3E%3C/g%3E%3C/svg%3E");
+  /* Thin frame for small HUD plaques: bronze bevel, stepped corners. 12x12, slice 4. */
+  --rs-rim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' shape-rendering='crispEdges'%3E%3Cpath d='M2 0h8v1h1v1h1v8h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z' fill='%23070406'/%3E%3Cpath d='M2 1h8v1h1v8h-1v1H2v-1H1V2h1z' fill='%239a7232'/%3E%3Cpath d='M2 1h8v1H2zM1 2h1v8H1z' fill='%23f0cd7c'/%3E%3Cpath d='M2 10h8v1H2zM10 2h1v8h-1z' fill='%23523614'/%3E%3Cpath d='M3 2h6v1H3zM2 3h1v6H2zM9 3h1v6H9zM3 9h6v1H3z' fill='%23070406'/%3E%3C/svg%3E");
+
+  /* Buttons: 24x24, slice 6 with fill. Stone plate (secondary). */
+  --rs-plate: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23413743'/%3E%3Cstop offset='.5' stop-color='%23272029'/%3E%3Cstop offset='1' stop-color='%23171219'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 0h20v1h1v1h1v20h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z' fill='%23070406'/%3E%3Cpath d='M2 1h20v1h1v20h-1v1H2v-1H1V2h1z' fill='%239a7232'/%3E%3Cpath d='M2 1h20v1H2zM1 2h1v20H1z' fill='%23f0cd7c'/%3E%3Cpath d='M2 22h20v1H2zM22 2h1v20h-1z' fill='%23523614'/%3E%3Crect x='2' y='2' width='20' height='20' fill='%23070406'/%3E%3Crect x='3' y='3' width='18' height='18' fill='url(%23g)'/%3E%3Crect x='3' y='3' width='18' height='1' fill='%23574a58'/%3E%3C/svg%3E");
+  /* Rune-lit plate (primary): blood-red face with a hot top edge. */
+  --rs-plate-rune: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23c42a2e'/%3E%3Cstop offset='.55' stop-color='%23861620'/%3E%3Cstop offset='1' stop-color='%234e0a12'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 0h20v1h1v1h1v20h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z' fill='%23070406'/%3E%3Cpath d='M2 1h20v1h1v20h-1v1H2v-1H1V2h1z' fill='%23d2a756'/%3E%3Cpath d='M2 1h20v1H2zM1 2h1v20H1z' fill='%23fbe0a0'/%3E%3Cpath d='M2 22h20v1H2zM22 2h1v20h-1z' fill='%23604016'/%3E%3Crect x='2' y='2' width='20' height='20' fill='%23200307'/%3E%3Crect x='3' y='3' width='18' height='18' fill='url(%23g)'/%3E%3Crect x='3' y='3' width='18' height='1' fill='%23ff8a74'/%3E%3C/svg%3E");
+  /* Raised, selected plate (active tab / toggle on): stone with a gold rim and a rune underline. */
+  --rs-plate-on: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%234d4150'/%3E%3Cstop offset='1' stop-color='%232a222c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 0h20v1h1v1h1v20h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z' fill='%23070406'/%3E%3Cpath d='M2 1h20v1h1v20h-1v1H2v-1H1V2h1z' fill='%23edc874'/%3E%3Cpath d='M2 1h20v1H2zM1 2h1v20H1z' fill='%23fff1c8'/%3E%3Cpath d='M2 22h20v1H2zM22 2h1v20h-1z' fill='%237a5424'/%3E%3Crect x='2' y='2' width='20' height='20' fill='%23070406'/%3E%3Crect x='3' y='3' width='18' height='18' fill='url(%23g)'/%3E%3Crect x='3' y='19' width='18' height='2' fill='%23e0202e'/%3E%3Crect x='3' y='19' width='18' height='1' fill='%23ff8a74'/%3E%3C/svg%3E");
+  /* Recessed socket for item slots and inputs: dark well, lit from below. */
+  --rs-socket: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cpath d='M2 0h20v1h1v1h1v20h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z' fill='%23523614'/%3E%3Cpath d='M2 23h20v-1h1v-1h1v1h-1v1h-1v1H2z' fill='%23c9a25a'/%3E%3Cpath d='M23 2h1v20h-1z' fill='%237a5424'/%3E%3Crect x='1' y='1' width='22' height='22' fill='%23070406'/%3E%3Crect x='2' y='2' width='20' height='20' fill='%23100c12'/%3E%3Crect x='2' y='2' width='20' height='2' fill='%23050406'/%3E%3Crect x='2' y='21' width='20' height='1' fill='%23241d26'/%3E%3C/svg%3E");
+  /* Selected socket: gold rim, ember glow pooled in the well. */
+  --rs-socket-on: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cdefs%3E%3CradialGradient id='g' cy='.85' r='.8'%3E%3Cstop offset='0' stop-color='%23802024'/%3E%3Cstop offset='1' stop-color='%23120c12'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M2 0h20v1h1v1h1v20h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z' fill='%23fff1c8'/%3E%3Cpath d='M2 1h20v1h1v20h-1v1H2v-1H1V2h1z' fill='%23edc874'/%3E%3Crect x='2' y='2' width='20' height='20' fill='%23070406'/%3E%3Crect x='3' y='3' width='18' height='18' fill='url(%23g)'/%3E%3C/svg%3E");
+  /* A single ruby diamond, for headers and markers. */
+  --rs-ruby: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' shape-rendering='crispEdges'%3E%3Cpath d='M5 0h1v1h1v1h1v1h1v1h1v1h1v1h-1v1H9v1H8v1H7v1H6v1H5v-1H4V9H3V8H2V7H1V6H0V5h1V4h1V3h1V2h1V1h1z' fill='%23d2a756'/%3E%3Cpath d='M5 1h1v1h1v1h1v1h1v1h1v1H9v1H8v1H7v1H6v1H5V9H4V8H3V7H2V6H1V5h1V4h1V3h1V2h1z' fill='%23070406'/%3E%3Cpath d='M5 2h1v1h1v1h1v1h1v1H8v1H7v1H6v1H5V8H4V7H3V6H2V5h1V4h1V3h1z' fill='%23d81c2c'/%3E%3Cpath d='M5 2h1v1h1v1H6v1H5V4H4V3h1z' fill='%23ffb2a2'/%3E%3Cpath d='M6 6h1v1H6v1H5V7h1z' fill='%236e0812'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------------ */
+/* frames                                                             */
+/* ------------------------------------------------------------------ */
+
+:root .mg-frame,
+:root .panel-card,
+:root .account-panel,
+:root .wallet-unlinked,
+:root .wallet-link-card,
+:root #dialog,
+:root .cs-panel,
+:root .cs-confirm-box,
+:root #world-wake .ww-card,
+:root #gl-fail .gl-fail-card,
+:root #world-name .wn-card,
+:root #mg-import .mg-import-card,
+:root #social-invite {
+  background: var(--rs-panel-bg);
+  border: 12px solid transparent;
+  border-image: var(--rs-frame) 16 / 12px / 3px stretch;
+  border-radius: 0;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  color: var(--rs-text);
+}
+
+:root .wallet-help,
+:root #toast,
+:root #faint,
+:root .cs-note,
+:root #world-status,
+:root #world-mode-pill,
+:root #party-frame,
+:root #social-menu,
+:root #world-chat .wc-body {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3)),
+    var(--rs-stone-tex) 0 0 / 64px 32px,
+    var(--rs-stone-1);
+  border: 4px solid transparent;
+  border-image: var(--rs-rim) 4 / 4px stretch;
+  border-radius: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  color: var(--rs-text);
+}
+
+/* The corner studs are part of the frame image now. */
+:root .mg-corner {
+  display: none;
+}
+
+/* Headers: an engraved plaque with ruby diamonds and a rune line under it. */
+:root .panel-card h2 {
+  padding: 14px 60px 12px 16px;
+  font-size: 12px;
+  color: var(--rs-gold-pale);
+  text-shadow: 0 2px 0 #000, 0 0 12px rgba(237, 200, 116, 0.25);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%),
+    linear-gradient(#2c232e, #17121a);
+  border-bottom: 2px solid var(--rs-bronze);
+  box-shadow: 0 1px 0 #000, 0 3px 0 -1px rgba(255, 59, 59, 0.55), 0 6px 14px -6px rgba(255, 59, 59, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+:root .panel-card h2::before {
+  content: '';
+  flex: none;
+  width: 11px;
+  height: 11px;
+  background: var(--rs-ruby) center / contain no-repeat;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 4px rgba(255, 59, 59, 0.7));
+}
+:root .mg-title,
+:root .qj-title,
+:root .cs-form-title,
+:root .cs-brand {
+  color: var(--rs-gold-pale);
+  text-shadow: 0 2px 0 #000, 0 0 12px rgba(237, 200, 116, 0.25);
+}
+
+/* Close: a bronze-rimmed stone octagon with a rune X. */
+:root .mg-close,
+:root #panel-close,
+:root .qj-info {
+  color: var(--rs-rune-hi);
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 fill / 6px stretch;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: 0 0 6px rgba(255, 59, 59, 0.8), 0 1px 0 #000;
+}
+:root #panel-close {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  right: 8px;
+  top: 6px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+}
+:root .mg-close:hover,
+:root #panel-close:hover,
+:root .qj-info:hover {
+  border-image-source: var(--rs-plate-rune);
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ */
+/* buttons                                                            */
+/* ------------------------------------------------------------------ */
+
+/* Primary: rune-lit blood plate with a bronze rim. */
+:root .mg-btn,
+:root .qj-action,
+:root .wg-btn,
+:root .sk-btn,
+:root #world-chat .wc-send,
+:root #world-chat .wc-toggle,
+:root #world-status .wc-retry {
+  color: var(--rs-bone);
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate-rune) 6 fill / 6px stretch;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: 0 1px 0 #2a0408, 0 0 8px rgba(255, 120, 100, 0.45);
+  transition: filter 0.12s, transform 0.08s;
+}
+
+/* Secondary: stone plate with a bronze rim and gold lettering. */
+:root .start,
+:root #title .account-choices .start,
+:root .cs-btn,
+:root .mg-btn.quiet,
+:root .start.quiet,
+:root .cs-btn.quiet,
+:root .qj-arrow,
+:root .qj-back,
+:root .panel-row button,
+:root .btn,
+:root .set-jump,
+:root .cat-btn,
+:root .tome-go,
+:root .wn-go,
+:root .qj-bounty-go,
+:root .dlg-choice,
+:root .gfx-opt,
+:root .world-switch button,
+:root .cs-rotate button {
+  color: var(--rs-gold-pale);
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 fill / 6px stretch;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: 0 1px 0 #000;
+  transition: filter 0.12s, transform 0.08s;
+}
+
+/* The main call to action on the title and character screens burns red. */
+:root #btn-start,
+:root #btn-guest,
+:root .cs-btn.primary,
+:root .cs-play,
+:root #pick-world1 {
+  border-image-source: var(--rs-plate-rune);
+  color: var(--rs-bone);
+  text-shadow: 0 1px 0 #2a0408, 0 0 8px rgba(255, 120, 100, 0.45);
+}
+
+/* Toggles and options that are on read as a raised, gold-rimmed plate. */
+:root .gfx-opt.on,
+:root .world-switch button.on,
+:root .world-switch button[aria-pressed='true'],
+:root .world-pick[aria-pressed='true'] {
+  border-image-source: var(--rs-plate-on);
+  color: var(--rs-bone);
+}
+
+/* Hover: the runes wake. Press: the plate seats into the stone. */
+:root .mg-btn:hover:not(:disabled),
+:root .qj-action:hover,
+:root .wg-btn:hover,
+:root .sk-btn:hover:not(:disabled),
+:root .start:hover,
+:root .cs-btn:hover:not(:disabled),
+:root .panel-row button:hover:not(:disabled),
+:root .btn:hover,
+:root .set-jump:hover,
+:root .cat-btn:hover,
+:root .tome-go:hover,
+:root .wn-go:hover,
+:root .qj-bounty-go:hover,
+:root .dlg-choice:hover,
+:root .dlg-choice:focus-visible,
+:root .gfx-opt:hover,
+:root .world-switch button:hover,
+:root .qj-arrow:hover,
+:root .qj-back:hover,
+:root #world-chat .wc-send:hover,
+:root #world-chat .wc-toggle:hover {
+  filter: brightness(1.15) drop-shadow(0 0 6px rgba(255, 59, 59, 0.55));
+}
+:root .mg-btn:active:not(:disabled),
+:root .qj-action:active,
+:root .wg-btn:active,
+:root .sk-btn:active:not(:disabled),
+:root .start:active,
+:root .cs-btn:active:not(:disabled),
+:root .panel-row button:active:not(:disabled),
+:root .btn:active,
+:root .set-jump:active,
+:root .dlg-choice:active,
+:root .gfx-opt:active {
+  transform: translateY(1px);
+  filter: brightness(0.92);
+}
+:root .start:disabled,
+:root .cs-btn:disabled,
+:root .mg-btn:disabled,
+:root .sk-btn:disabled,
+:root .panel-row button:disabled {
+  filter: grayscale(0.7) brightness(0.7);
+}
+
+:root .panel-row button,
+:root .btn {
+  padding: 2px 8px;
+  min-height: 30px;
+}
+
+/* Quick jumps in Settings: stone tiles with a ruby marker. */
+:root .set-jump {
+  text-align: left;
+  padding: 4px 8px;
+}
+:root .set-jump b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--rs-gold-pale);
+}
+:root .set-jump b::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  flex: none;
+  background: var(--rs-ruby) center / contain no-repeat;
+  image-rendering: pixelated;
+}
+:root .set-jump small {
+  color: var(--rs-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* tabs and chips                                                     */
+/* ------------------------------------------------------------------ */
+
+:root .mg-tab,
+:root .qj-tab,
+:root .cat-tab,
+:root .bag-tab,
+:root .cg-tab,
+:root .char-tab,
+:root #world-chat .wc-tabs button {
+  color: var(--mg-tab);
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 fill / 6px stretch;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: 0 1px 0 #000;
+  filter: brightness(0.82);
+}
+:root .mg-tab:hover,
+:root .qj-tab:hover,
+:root .cat-tab:hover,
+:root .bag-tab:hover,
+:root .cg-tab:hover,
+:root .char-tab:hover,
+:root #world-chat .wc-tabs button:hover {
+  filter: brightness(1.05);
+  color: var(--rs-gold-pale);
+}
+:root .mg-tab.on,
+:root .qj-tab.on,
+:root .cat-tab.on,
+:root .bag-tab.on,
+:root .cg-tab.on,
+:root .char-tab.on,
+:root #world-chat .wc-tabs button.on {
+  color: var(--rs-bone);
+  border-image-source: var(--rs-plate-on);
+  filter: none;
+  text-shadow: 0 1px 0 #000, 0 0 8px rgba(255, 210, 140, 0.35);
+}
+
+/* ------------------------------------------------------------------ */
+/* inputs, rows, lists, scrollbars                                    */
+/* ------------------------------------------------------------------ */
+
+:root .mg-input,
+:root .account-input,
+:root .cs-input,
+:root .cs-search input,
+:root .wg-input,
+:root .qj-sort select,
+:root #world-chat .wc-in,
+:root #world-name .wn-in {
+  background: none;
+  color: var(--rs-bone);
+  border: 6px solid transparent;
+  border-image: var(--rs-socket) 6 fill / 6px stretch;
+  border-radius: 0;
+  padding: 2px 6px;
+}
+:root .mg-input:focus,
+:root .account-input:focus,
+:root .cs-input:focus,
+:root .cs-search input:focus,
+:root .wg-input:focus,
+:root .qj-sort select:focus,
+:root #world-chat .wc-in:focus,
+:root #world-name .wn-in:focus {
+  outline: none;
+  filter: drop-shadow(0 0 5px rgba(255, 59, 59, 0.6));
+}
+:root .qj-sort select option {
+  background: var(--rs-stone-1);
+}
+
+:root .panel-row,
+:root .quest-card {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035), transparent 70%),
+    var(--rs-stone-2);
+  border: 1px solid #3c3038;
+  border-top-color: #4a3d46;
+  border-bottom-color: #0a080b;
+  border-radius: 0;
+  box-shadow: inset 2px 0 0 rgba(210, 167, 86, 0.35);
+}
+
+:root .mg-list,
+:root .qj-list,
+:root .cs-list,
+:root .qj-log,
+:root #world-chat .wc-log,
+:root #panel-body,
+:root .panel-card {
+  scrollbar-color: var(--rs-bronze-hi) var(--rs-stone-0);
+}
+:root .mg-list::-webkit-scrollbar-thumb,
+:root .qj-list::-webkit-scrollbar-thumb,
+:root .qj-log::-webkit-scrollbar-thumb,
+:root .cs-list::-webkit-scrollbar-thumb,
+:root #world-chat .wc-log::-webkit-scrollbar-thumb,
+:root .panel-card::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #f0cd7c, #9a7232 60%, #5c3f1a);
+  border: 2px solid var(--rs-stone-0);
+}
+
+:root kbd {
+  font-family: var(--font-px);
+  color: var(--rs-gold-pale);
+  background: linear-gradient(#3a3140, #1e1922);
+  border: 1px solid var(--rs-bronze);
+  border-bottom-width: 2px;
+  border-radius: 1px;
+  box-shadow: 0 1px 0 #000;
+}
+
+/* ------------------------------------------------------------------ */
+/* item cells and the hotbar                                          */
+/* ------------------------------------------------------------------ */
+
+:root .bag-cell,
+:root .slot {
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-socket) 6 fill / 6px stretch;
+  border-radius: 0;
+  box-shadow: none;
+}
+:root .bag-cell.sel,
+:root .slot.sel {
+  border-image-source: var(--rs-socket-on);
+  box-shadow: none;
+  filter: drop-shadow(0 0 6px rgba(255, 90, 60, 0.55));
+}
+:root .bag-cell:hover:not(.empty) {
+  filter: brightness(1.2);
+}
+:root .bag-cell.empty {
+  filter: brightness(0.85);
+}
+:root .slot {
+  width: 42px;
+  height: 42px;
+}
+:root .slot canvas {
+  margin: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+}
+:root #hotbar {
+  gap: 1px;
+  padding: 5px;
+  background: var(--rs-panel-bg);
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 / 6px stretch;
+  border-radius: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+/* ------------------------------------------------------------------ */
+/* dialog, toast, banner                                              */
+/* ------------------------------------------------------------------ */
+
+:root #dialog b {
+  color: var(--rs-gold-pale);
+  text-shadow: 0 2px 0 #000;
+}
+:root #toast {
+  color: var(--rs-bone);
+  text-shadow: 0 1px 0 #000;
+}
+:root #banner b {
+  color: var(--rs-gold-pale);
+  text-shadow: 0 3px 0 #000, 0 0 18px rgba(255, 59, 59, 0.55);
+}
+
+/* ------------------------------------------------------------------ */
+/* HUD                                                                */
+/* ------------------------------------------------------------------ */
+
+/* Menu column: rune-stone tiles in bronze; the open panel's tile burns red. */
+:root .mbtn,
+:root #hud .mbtn {
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 fill / 6px stretch;
+  border-radius: 0;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  transition: filter 0.12s, transform 0.08s;
+}
+:root .mbtn .ico {
+  inset: 1px;
+  filter: drop-shadow(0 1px 0 #000);
+}
+:root .mbtn:hover {
+  filter: brightness(1.2) drop-shadow(0 0 6px rgba(255, 59, 59, 0.6));
+}
+:root .mbtn.on,
+:root .mbtn[aria-pressed='true'],
+:root .mbtn.active {
+  border-image-source: var(--rs-plate-rune);
+}
+:root .mbtn kbd {
+  right: -5px;
+  bottom: -5px;
+  font-size: 6px;
+  padding: 1px 2px;
+}
+
+/* Minimap: set in a bronze frame with ruby studs; the area name on a plaque. */
+:root #minimap-wrap {
+  background: var(--rs-stone-1);
+  border: 8px solid transparent;
+  border-image: var(--rs-frame) 16 / 8px / 2px stretch;
+  border-radius: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  padding: 0;
+}
+:root #minimap {
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 18px rgba(0, 0, 0, 0.55);
+}
+:root #area-label {
+  left: 50%;
+  top: auto;
+  bottom: -14px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 3px 8px 2px;
+  font-size: 7px;
+  color: var(--rs-gold-pale);
+  background: linear-gradient(#2c232e, #120e14);
+  border: 1px solid var(--rs-bronze-hi);
+  box-shadow: 0 0 0 1px #000, 0 2px 4px rgba(0, 0, 0, 0.6);
+  opacity: 1;
+}
+
+/* Quest tracker, status pills, clock and mini buttons: small bronze plaques. */
+:root #quest,
+:root #clock,
+:root .mini,
+:root #hud .mini {
+  background-color: var(--rs-stone-1);
+  border: 4px solid transparent;
+  border-image: var(--rs-rim) 4 / 4px stretch;
+  border-radius: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+:root #quest {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.3));
+}
+:root #quest .q-title,
+:root #clock {
+  color: var(--rs-gold-pale);
+}
+:root #quest .q-bar {
+  background: #0a070b;
+  box-shadow: inset 0 0 0 1px #000;
+}
+:root #quest .q-bar i {
+  background: linear-gradient(#ff8a74, #c41f2c 60%, #6e0a14);
+  box-shadow: 0 0 6px rgba(255, 59, 59, 0.6);
+}
+:root .mini:hover {
+  filter: brightness(1.2) drop-shadow(0 0 5px rgba(255, 59, 59, 0.55));
+}
+
+/* Stamina: a rune-red channel in a bronze groove. */
+:root #stamina {
+  background: #0a070b;
+  border: 1px solid var(--rs-bronze);
+  box-shadow: 0 0 0 1px #000;
+  border-radius: 0;
+}
+
+/* Orbs and skill sockets get bronze rings. */
+:root .orb .ring {
+  background: conic-gradient(from 20deg, #5c3f1a, #f0cd7c, #7a5424, #d2a756, #4a3214, #f0cd7c, #5c3f1a);
+}
+:root .orb::after {
+  box-shadow: 0 0 0 2px #070406, 0 0 14px rgba(0, 0, 0, 0.6);
+}
+:root .cast {
+  background: radial-gradient(circle at 50% 40%, #3a2f3c, #140f16 70%);
+  border: 3px solid var(--rs-bronze-hi);
+  box-shadow: 0 0 0 2px #070406, inset 0 0 0 2px rgba(0, 0, 0, 0.6), inset 0 -6px 12px rgba(255, 59, 59, 0.18), 0 4px 10px rgba(0, 0, 0, 0.55);
+}
+:root .cast.on {
+  border-color: var(--rs-gold);
+  box-shadow: 0 0 0 2px #070406, 0 0 14px rgba(255, 59, 59, 0.6), inset 0 0 10px rgba(255, 59, 59, 0.4);
+}
+:root .cast b {
+  color: var(--rs-gold);
+}
+
+/* Control hints: small stone plaques. */
+:root .hint {
+  background: rgba(21, 17, 26, 0.82);
+  border: 1px solid rgba(210, 167, 86, 0.6);
+  box-shadow: 0 0 0 1px #000;
+  padding: 2px 8px;
+  border-radius: 0;
+}
+
+/* Dialog choices stack as plates. */
+:root .dlg-choice {
+  color: var(--rs-gold-pale);
+}
+
+/* ------------------------------------------------------------------ */
+/* title and character select                                         */
+/* ------------------------------------------------------------------ */
+
+:root #title {
+  background:
+    radial-gradient(60% 55% at 50% 38%, rgba(160, 14, 26, 0.35), transparent 70%),
+    radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.85)),
+    var(--rs-stone-tex) 0 0 / 64px 32px,
+    #0b090c;
+}
+:root #title .title-inner {
+  background:
+    radial-gradient(70% 45% at 50% 22%, #000 55%, transparent 100%),
+    var(--rs-panel-bg);
+}
+/* The brand logo replaces the text title (the text stays for screen readers). */
+:root #title h1 {
+  width: min(460px, 78vw);
+  aspect-ratio: 672 / 448;
+  margin: 0 auto 4px;
+  color: transparent;
+  text-shadow: none;
+  font-size: 0;
+  background: url('./title-logo.jpg') center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(closest-side, #000 82%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 82%, transparent 100%);
+  filter: drop-shadow(0 0 18px rgba(255, 40, 40, 0.25));
+}
+:root #title h1 em {
+  color: transparent;
+}
+:root #title small {
+  color: var(--rs-gold);
+  text-shadow: 0 1px 0 #000;
+}
+:root #title .wallet-status,
+:root #title p {
+  color: var(--rs-text);
+}
+:root .account-choices .start,
+:root #title .start {
+  min-height: 46px;
+}
+:root .world-guest-note {
+  color: var(--rs-muted);
+}
+
+:root .cs-brand {
+  text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 59, 59, 0.45);
+}
+:root .cs-list > * ,
+:root .cs-row {
+  border-radius: 0;
+}
+:root .cs-row {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 70%), var(--rs-stone-2);
+  border: 1px solid #3c3038;
+  box-shadow: inset 3px 0 0 rgba(210, 167, 86, 0.35);
+}
+:root .cs-row.selected {
+  background: linear-gradient(90deg, rgba(255, 59, 59, 0.22), transparent 80%), var(--rs-stone-3);
+  border-color: var(--rs-gold);
+  box-shadow: inset 3px 0 0 var(--rs-rune), 0 0 10px rgba(255, 59, 59, 0.35);
+}
+
+/* The title card outranks the shared frame rule; give it the gem frame too. */
+:root #title .title-inner.mg-frame {
+  border: 12px solid transparent;
+  border-image: var(--rs-frame) 16 / 12px / 3px stretch;
+  border-radius: 0;
+}
+:root #title .account-choices #btn-guest,
+:root #title #btn-start {
+  border-image-source: var(--rs-plate-rune);
+  color: var(--rs-bone);
+  text-shadow: 0 1px 0 #2a0408, 0 0 8px rgba(255, 120, 100, 0.45);
+}

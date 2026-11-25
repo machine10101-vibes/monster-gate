@@ -3,6 +3,7 @@ import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './style.css';
 import './ui/theme.css';
+import './ui/skin.css';
 import * as THREE from 'three';
 import { World } from './world/world.js';
 import { Sky } from './world/sky.js';
