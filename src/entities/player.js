@@ -1853,9 +1853,9 @@ function supportGrip(kind, g) {
 }
 
 /** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
-const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow', 'volccrossbow', 'raptorcrossbow', 'buccaneergun']);
+const AIMED_KINDS = new Set([...TALL_KINDS, 'crossbow', 'budgecrossbow', 'darkcrossbow', 'yeticrossbow', 'volccrossbow', 'raptorcrossbow', 'buccaneergun', 'rexcrossbow']);
 
-const BLADES = new Set(['blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'volcsword', 'volcgreatsword', 'volcdual', 'volchammer', 'volcspear', 'volcscythe', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer', 'tigerclaws', 'tigerspear', 'raptorsaber', 'raptorscythe', 'piratecutlass', 'piratedual', 'piratecleaver', 'cursedblade']);
+const BLADES = new Set(['rexblade', 'rexgreatsword', 'rexhammer', 'rexspear', 'blade', 'axe', 'pick', 'hammer', 'budgeblade', 'budgemaul', 'darkscythe', 'darksword', 'budgegreatsword', 'darkgreatsword', 'budgedual', 'darkdual', 'darkhammer', 'budgespear', 'darkspear', 'volcsword', 'volcgreatsword', 'volcdual', 'volchammer', 'volcspear', 'volcscythe', 'yetisword', 'yetigreatsword', 'yetidual', 'yetihammer', 'yetispear', 'yetiscythe', 'demonsword', 'holyhammer', 'tigerclaws', 'tigerspear', 'raptorsaber', 'raptorscythe', 'piratecutlass', 'piratedual', 'piratecleaver', 'cursedblade']);
 
 const TRAIL_SPEC = {
   blade: { b: [0, 0, 0.35], t: [0, 0, 1.25], col: 0xfff2c0, hot: 0xffd27a },
@@ -1889,6 +1889,10 @@ const TRAIL_SPEC = {
   tigerspear: { b: [0, 0, 1.6], t: [-0.1, 0, 2.35], col: 0xff9a3a, hot: 0xfff0c0 },
   raptorsaber: { b: [0, 0, 0.35], t: [-0.33, 0, 1.42], col: 0xd2da72, hot: 0xfff6d0 },
   raptorscythe: { b: [-0.1, 0, 1.35], t: [-0.6, 0, 1.15], col: 0xd2da72, hot: 0xfff6d0 },
+  rexblade: { b: [0, 0, 0.4], t: [-0.09, 0, 1.44], col: 0xf0e6cc, hot: 0xffa818 },
+  rexgreatsword: { b: [0, 0, 0.55], t: [0.1, 0, 1.86], col: 0xf0e6cc, hot: 0xffa818 },
+  rexhammer: { b: [0, 0, 0.85], t: [0, 0, 1.25], col: 0xdccfac, hot: 0xffa818 },
+  rexspear: { b: [0, 0, 1.6], t: [0, 0, 2.25], col: 0xf0e6cc, hot: 0xffa818 },
   piratecutlass: { b: [0, 0, 0.3], t: [-0.18, 0, 1.3], col: 0xdfe8f5, hot: 0xffd95a },
   piratedual: { b: [0, 0, 0.2], t: [-0.24, 0, 1.05], col: 0xdfe8f5, hot: 0xffd95a },
   piratecleaver: { b: [0, 0, 0.5], t: [-0.21, 0, 1.86], col: 0xdfe8f5, hot: 0xffd95a },

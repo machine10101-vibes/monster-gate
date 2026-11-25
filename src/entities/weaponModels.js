@@ -11,6 +11,7 @@ import { budgeWeapons } from './weaponsBudge.js';
 import { duskWeapons } from './weaponsDusk.js';
 import { frostWeapons } from './weaponsFrost.js';
 import { volcWeapons } from './weaponsVolc.js';
+import { rexWeapons } from './weaponsRex.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
 export const WEAPON_SIZE = 0.015;
@@ -21,7 +22,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 /** Held kinds that wield a matching blade in each hand. */
 export const DUAL_KINDS = new Set(['dual', 'budgedual', 'darkdual', 'yetidual', 'volcdual', ...JUNGLE_DUAL]);
 /** Held kinds whose model is taller than wide (bows). */
-export const TALL_KINDS = new Set(['bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow', 'volcbow', 'volcshortbow', ...JUNGLE_TALL]);
+export const TALL_KINDS = new Set(['rexbow', 'bow', 'budgebow', 'darkbow', 'budgeshortbow', 'darkshortbow', 'yetilongbow', 'yetishortbow', 'volcbow', 'volcshortbow', ...JUNGLE_TALL]);
 
 /**
  * Swords are sculpted flat in the horizontal plane. Rolled a quarter turn,
@@ -35,6 +36,7 @@ const EDGE_HOLD = new Set([
   'orcblade',
   'yetisword', 'yetigreatsword', 'yetidual',
   'demonsword',
+  'rexblade', 'rexgreatsword',
   'ironsword', 'irongreatsword',
   ...METALS.flatMap((m) => [`${m.id}sword`, `${m.id}greatsword`]),
   ...JUNGLE_EDGE,
@@ -45,7 +47,7 @@ const EDGE_HOLD = new Set([
  * The same quarter roll that stands a sword on its edge stands that bar
  * up and down. The iron mallet's face is already taller than it is wide.
  */
-const HAMMER_HOLD = new Set(['budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer']);
+const HAMMER_HOLD = new Set(['rexhammer', 'budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer']);
 
 /**
  * Resting roll of a weapon in the hand, around the grip.
@@ -1102,6 +1104,7 @@ const BUILDERS = {
   ...duskWeapons(KIT),
   ...frostWeapons(KIT),
   ...volcWeapons(KIT),
+  ...rexWeapons(KIT),
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */

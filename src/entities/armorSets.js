@@ -16,6 +16,8 @@ const BUILD = {
   darksyceset: () => darkMetal,
   volcanumset: () => volcanumMetal,
   yetiset: () => frostMetal,
+  // Tyrant Rex plate: olive-green scale, fang-cream trim, red stripe shadow, amber studs.
+  rexset: () => makeMetalArmor({ plate: 0x56702e, plateLo: 0x3d5222, plateHi: 0x6f8a3a, trim: 0xe8dcbc, trimDk: 0x8a2a24, accent: 0xffa818 }),
   demonset: () => demonPlate,
   holyset: () => holyPlate,
   budgeleather: () => makeSoftArmor('budgeleather'),

@@ -61,9 +61,9 @@ function clawHit(m, P, dmg, reach, arc, knock, fromX = m.x, fromZ = m.z) {
 
 function slash(m, tilt, o = {}) {
   const g = m.game;
-  g.vfx.slashArc(m.x + Math.sin(m.yaw) * 0.5, m.y + 2.1, m.z + Math.cos(m.yaw) * 0.5, m.yaw, {
-    radius: 3.1,
-    thick: 1.5,
+  g.vfx.slashArc(m.x + Math.sin(m.yaw) * 1.0, m.y + 4.2, m.z + Math.cos(m.yaw) * 1.0, m.yaw, {
+    radius: 6.2,
+    thick: 3.0,
     sweep: 2.5,
     color: 0x8fd4ff,
     hot: 0xffffff,
@@ -84,11 +84,11 @@ function begin(m, atk, P, dist) {
   m.fireAcc = 0;
   if (atk === 'rake') {
     m.state = 'rakewind';
-    m.warn('line', 3.4, 4.3, yetiDur(m, 'rakewind'));
+    m.warn('line', 6.8, 4.3, yetiDur(m, 'rakewind'));
     g.audio.tone(80, 0.3, 'sawtooth', 0.09, -30);
   } else if (atk === 'breath') {
     m.state = 'breathwind';
-    m.warn('line', 5.4, 9.5, yetiDur(m, 'breathwind'));
+    m.warn('line', 10.8, 9.5, yetiDur(m, 'breathwind'));
     g.audio.tone(200, 0.7, 'sine', 0.09, 160);
   } else if (atk === 'slam') {
     m.state = 'slamwind';
@@ -98,7 +98,7 @@ function begin(m, atk, P, dist) {
     const tz = m.z + Math.cos(a) * d;
     m.dive = { x: tx, z: tz };
     const gy = g.world.heightAt(tx, tz);
-    m.teleSlot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 4.0, 0, COL, yetiDur(m, 'slamwind') + 0.55);
+    m.teleSlot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 8.0, 0, COL, yetiDur(m, 'slamwind') + 0.55);
     m.teleSlot.owner = m;
     m.teleKind = 'dive';
     g.audio.tone(110, 0.6, 'sawtooth', 0.09, -50);
@@ -108,15 +108,18 @@ function begin(m, atk, P, dist) {
   }
 }
 
+/** Distance bands are measured from the 2x body, so they scale with the yeti's size. */
+const BAND = 2;
 function pickAttack(m, dist, rage) {
   const r = Math.random();
   const last = m.lastAtk;
+  const d = dist / BAND;
   let pick = null;
-  if (dist < 4.2) pick = r < 0.55 ? 'rake' : r < 0.78 ? 'slam' : 'breath';
-  else if (dist < 8) pick = r < 0.34 ? 'slam' : r < 0.68 ? 'breath' : 'hurl';
-  else if (dist < 17) pick = r < 0.55 ? 'hurl' : r < 0.8 && dist < 10.5 ? 'breath' : null;
-  if (pick && pick === last && pick !== 'rake' && Math.random() < 0.7) pick = dist < 6 ? 'rake' : 'hurl';
-  if (pick === 'rake' && dist > 4.4) pick = 'slam';
+  if (d < 4.2) pick = r < 0.55 ? 'rake' : r < 0.78 ? 'slam' : 'breath';
+  else if (d < 8) pick = r < 0.34 ? 'slam' : r < 0.68 ? 'breath' : 'hurl';
+  else if (d < 17) pick = r < 0.55 ? 'hurl' : r < 0.8 && d < 10.5 ? 'breath' : null;
+  if (pick && pick === last && pick !== 'rake' && Math.random() < 0.7) pick = d < 6 ? 'rake' : 'hurl';
+  if (pick === 'rake' && d > 4.4) pick = 'slam';
   return pick;
 }
 
@@ -126,22 +129,22 @@ function launchBoulders(m, P) {
   const a = Math.atan2(P.pos.x - m.x, P.pos.z - m.z);
   const dist = Math.hypot(P.pos.x - m.x, P.pos.z - m.z);
   const T = clamp(dist / 11, 0.85, 1.35);
-  const my = m.y + 4.0;
-  const mx = m.x + Math.sin(a) * 0.9;
-  const mz = m.z + Math.cos(a) * 0.9;
+  const my = m.y + 8.0;
+  const mx = m.x + Math.sin(a) * 1.8;
+  const mz = m.z + Math.cos(a) * 1.8;
   const lead = 0.45;
   const pvx = P.vel?.x || 0;
   const pvz = P.vel?.z || 0;
   for (let i = 0; i < n; i++) {
-    const off = i === 0 ? 0 : (i === 1 ? -1 : 1) * 3.6;
+    const off = i === 0 ? 0 : (i === 1 ? -1 : 1) * 7.2;
     const tx = P.pos.x + pvx * lead + Math.cos(a) * off;
     const tz = P.pos.z + pvz * lead - Math.sin(a) * off;
     const gy = g.world.heightAt(tx, tz);
     const G = 16;
     const vy = (gy + 0.1 - my + 0.5 * G * T * T) / T;
     g.spawnProjectile({ owner: 'enemy', kind: 'iceboulder', x: mx, y: my, z: mz, vx: (tx - mx) / T, vz: (tz - mz) / T, vy, gravity: G, dmg: m.def.dmg, life: T + 1, r: 0.8 });
-    const slot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 2.5, 0, COL, T);
-    m.strikes.push({ kind: 'boulder', x: tx, z: tz, gy, t: 0, dur: T, slot, r: 2.5 });
+    const slot = g.fx.telegraph(tx, gy, tz, 0, 'circle', 5.0, 0, COL, T);
+    m.strikes.push({ kind: 'boulder', x: tx, z: tz, gy, t: 0, dur: T, slot, r: 5.0 });
   }
   g.fx.burst(mx, my, mz, [0xe6f9ff, 0x7fd0ff, 0xffffff], 14, 3.4, 0.1, 0.5);
   g.audio.tone(90, 0.3, 'square', 0.13, -40);
@@ -160,8 +163,8 @@ function groundSpikes(m, cx, cz, rings) {
       if (!g.world.playable(sx, sz)) continue;
       const gy = g.world.heightAt(sx, sz);
       const dur = 0.7 + k * 0.1 + i * 0.03;
-      const slot = g.fx.telegraph(sx, gy, sz, 0, 'circle', 1.5, 0, COL, dur);
-      m.strikes.push({ kind: 'spike', x: sx, z: sz, gy, t: 0, dur, slot, r: 1.5 });
+      const slot = g.fx.telegraph(sx, gy, sz, 0, 'circle', 3.0, 0, COL, dur);
+      m.strikes.push({ kind: 'spike', x: sx, z: sz, gy, t: 0, dur, slot, r: 3.0 });
     }
     k++;
   }
@@ -210,7 +213,7 @@ export function tickYetiStrikes(m, dt, P) {
 }
 
 function mouth(m) {
-  return [m.x + Math.sin(m.yaw) * 1.5, m.y + 3.1, m.z + Math.cos(m.yaw) * 1.5];
+  return [m.x + Math.sin(m.yaw) * 3.0, m.y + 6.2, m.z + Math.cos(m.yaw) * 3.0];
 }
 
 function breathe(m, dt, P) {
@@ -282,7 +285,7 @@ export function yetiThink(m, dt, c) {
       m.wanderT = 4;
     }
     turn(m, toP, 5 * rage, dt);
-    if (dist > 2.6) {
+    if (dist > 2.6 * BAND) {
       mvx = (dx / dist) * spd;
       mvz = (dz / dist) * spd;
     }
@@ -326,7 +329,7 @@ export function yetiThink(m, dt, c) {
       g.audio.tone(70, 0.16, 'square', 0.12, -20);
     }
     if (m.t > yetiDur(m, st)) {
-      if (rage > 1 && dist < 6.5) {
+      if (rage > 1 && dist < 6.5 * BAND) {
         m.state = 'rake3';
         m.t = 0;
         m.hitDone = false;
@@ -373,7 +376,7 @@ export function yetiThink(m, dt, c) {
   } else if (st === 'breath') {
     turn(m, toP, 1.15 * rage, dt);
     breathe(m, dt, P);
-    if (dist > 4) {
+    if (dist > 4 * BAND) {
       mvx = (dx / dist) * spd * 0.28;
       mvz = (dz / dist) * spd * 0.28;
     }
@@ -419,7 +422,7 @@ export function yetiThink(m, dt, c) {
     }
   } else if (st === 'land') {
     if (m.t > yetiDur(m, st)) {
-      if (rage > 1 && dist < 5.5) {
+      if (rage > 1 && dist < 5.5 * BAND) {
         m.cd = 0;
         done('chase');
       } else done();
@@ -452,7 +455,7 @@ export function yetiThink(m, dt, c) {
       g.vfx.glow(m.x, m.y + 3.2, m.z, 0xbfeaff, 4, 0.4, { grow: 0.8 });
       g.shake(0.4);
       g.audio.tone(70, 0.9, 'sawtooth', 0.2, -25);
-      if (m.enraged && !P.dead && dist < 6) {
+      if (m.enraged && !P.dead && dist < 6 * BAND) {
         if (P.hurt(Math.max(2, m.def.dmg - 2), m.x, m.z, 10)) P.chill?.(2);
       }
     }

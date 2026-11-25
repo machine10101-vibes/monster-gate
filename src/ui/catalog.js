@@ -173,7 +173,7 @@ function buildSubject(spec, silhouette) {
       }
     });
   }
-  const fit = spec.kind === 'monster' ? (spec.id === 'volcanum' ? 0.52 : spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'tiger' || spec.id === 'raptor' ? 0.78 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
+  const fit = spec.kind === 'monster' ? (spec.id === 'volcanum' ? 0.52 : spec.id === 'darksycledragon' ? 0.78 : spec.id === 'snowyeti' ? 0.74 : spec.id === 'trex' ? 0.5 : spec.id === 'tiger' || spec.id === 'raptor' ? 0.78 : spec.id === 'demonknight' || spec.id === 'holyknight' ? 0.7 : 0.82) : spec.kind === 'set' || spec.kind === 'hunter' ? 0.9 : 1;
   return { spin, radius: Math.max(0.1, sphere.radius * fit), yaw, pitch };
 }
 
@@ -345,6 +345,7 @@ const SET_HELD = {
   yetiset: 'yetigreatsword', yetileather: 'yeticrossbow', yeticloth: 'yetistaff',
   tigerleather: 'tigerspear', tigercloth: 'tigerclaws', raptorleather: 'raptorcrossbow', raptorcloth: 'raptorsaber',
   pirateset: 'piratecutlass', piratecloth: 'bonestaff',
+  rexset: 'rexgreatsword', rexleather: 'rexcrossbow', rexcloth: 'rexstaff',
   demonset: 'demonsword', holyset: 'holyhammer',
   ...Object.fromEntries(METALS.map((m) => [m.setId, `${m.id}sword`])),
 };
@@ -353,6 +354,9 @@ const SET_BLURB = {
   demonset: 'Jagged black plate lit by cracks of red: a spike-crowned helm with burning eyes, a shard-layered cuirass with a row of spikes across the back, spiked gauntlets under huge pauldrons, spiked greaves and sabatons, with a demon-faced bulwark. Dropped whole, and rarely, by the Demon Knight. The warrior set.',
   holyset: 'White plate trimmed in gold and marked with glowing blue crosses: a horned, gold-crested helm, a cross-bearing cuirass, gold-rimmed gauntlets, diamond-framed greaves and large sabatons. Dropped whole, and rarely, by the Holy Knight. The warrior set.',
   ...Object.fromEntries(METALS.map((m) => [m.setId, setBlurb(m)])),
+  rexset: 'Olive-green scale plate raked with dark red stripes and trimmed in fang cream: a rex-skull helm with a fanged visor and amber eye studs, a scute-ridged cuirass, claw-knuckled gauntlets, fang-capped greaves and three-toed sabatons. The warrior set.',
+  rexleather: 'Striped rex hide over a tan belly panel: a fang-templed cowl, sinew-laced jerkin, claw-bracer gloves, strapped leggings and three-toed boots. The ranger set.',
+  rexcloth: 'Robes woven in olive and red stripes with fang-cream trim: a banded hood, fang-collared robe, wide cuffs, tied trousers and claw-toed slippers, plus an amber-eyed grimoire. The mage set.',
   budgeset: 'Dragon-scale plate: a horned helm, gilded cuirass, clawed gauntlets, banded greaves and talon boots, with a horn-bossed shield. The warrior set.',
   darksyceset: 'Five pieces of indigo scale lit from within by gloom: a sickle-horned helm, a core-burning cuirass, scythe-pauldron gauntlets, rune greaves and silent talon boots, with a gloom-gem shield. The warrior set.',
   budgeleather: 'Laced hide in budge green with bone-stud trim: a horn-stud cap, jerkin, bracer gloves, strapped leggings and claw-toed boots. Light and quiet. The ranger set.',

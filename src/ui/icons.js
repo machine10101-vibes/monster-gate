@@ -853,6 +853,14 @@ ART.raptorsaber = draw((p, line) => {
 });
 ART.raptorcrossbow = recolor(ART.crossbow, { l: 'X', b: 'A', y: 'a' });
 ART.raptorscythe = recolor(ART.darkscythe, { l: 'w', g: 'X', G: 'a', V: 'x', n: 'x', m: 'U', v: 'A' });
+const REX_ICON = { q: 'w', v: 'X', V: 'a', m: 'U', n: 'x', l: 'w', g: 'X', G: 'a', y: 'U', b: 'x', e: 'o', E: 'O', t: 'w' };
+ART.rexblade = recolor(ART.darksword, REX_ICON);
+ART.rexgreatsword = recolor(ART.darkgreatsword, REX_ICON);
+ART.rexhammer = recolor(ART.darkhammer, REX_ICON);
+ART.rexspear = recolor(ART.darkspear, REX_ICON);
+ART.rexbow = recolor(ART.darkbow, REX_ICON);
+ART.rexcrossbow = recolor(ART.darkcrossbow, REX_ICON);
+ART.rexstaff = recolor(ART.darkstaff, REX_ICON);
 
 ART.piratecutlass = draw((p, line) => {
   sabre(p, line, 4, 12, 9, 11, 14, 1, { body: 'L', edge: 'w', back: 'T', guard: 'H', grip: 'B', pommel: 'y', w0: 3, w1: 1 });
