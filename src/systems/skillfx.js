@@ -339,29 +339,49 @@ const SWING = {
   holyhammer: { c: 0x9fd0ff, h: 0xffffff },
 };
 
-export function meleeSwing(game, p, it, combo, reach) {
+export function meleeSwing(game, p, it, combo, reach, shape = null) {
   const v = game.vfx;
   const f = p.facing;
   const yaw = yawOf(f);
   const spec = SWING[it.held] || SWING.blade;
-  const heavy = combo === 2;
+  const heavy = shape ? !!shape.heavy : combo === 2;
   const x = p.pos.x;
   const z = p.pos.z;
   const big = it.style === 'twohand' || it.dur > 0.5;
   const radius = Math.max(1.3, reach * 0.88);
   const thick = reach * (big ? 0.32 : 0.22);
-  if (heavy) {
-    v.slashArc(x, p.pos.y + 1.15, z, yaw, { radius: radius * 1.05, thick: thick * 1.15, sweep: 2.5, color: 0xffd27a, hot: spec.c, tilt: 1.2, life: 0.32, sweepT: 0.17, grow: 0.15, tail: 0.85 });
-    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius: radius * 0.9, thick: thick * 0.6, sweep: 2.2, color: spec.c, hot: spec.c, tilt: 1.1, life: 0.26, sweepT: 0.14, delay: 0 });
+  if (shape?.thrust) {
+    // A thrust reads as a narrow, long streak down the weapon line.
+    v.slashArc(x, p.pos.y + 1.1, z, yaw, { radius: radius * 1.08, thick: thick * (heavy ? 1.5 : 1.15), sweep: heavy ? 0.5 : 0.36, color: spec.c, hot: heavy ? 0xffd27a : spec.h, tilt: 0, life: heavy ? 0.24 : 0.16, sweepT: 0.06, tail: 0.95 });
+    if (heavy) {
+      const gx = x + f.x * reach * 0.95;
+      const gz = z + f.z * reach * 0.95;
+      v.ring(gx, p.pos.y + 1.1, gz, { axis: f, color: 0xffd27a, r0: 0.1, r1: 1.1, life: 0.24, thick: 0.18, fill: 0.15 });
+      v.sparks(gx, p.pos.y + 1.1, gz, [0xffd27a, 0xffffff, spec.c], 10, 6, 0.06, 0.35, 4);
+    }
+  } else if (shape?.spin) {
+    // A full reaping circle around the hunter.
+    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius: radius * 1.02, thick: thick * 1.1, sweep: Math.PI * 2 - 0.2, color: spec.c, hot: 0xffd27a, tilt: 0, flip: -1, life: 0.36, sweepT: 0.22, tail: 0.9 });
+    v.ring(x, game.world.heightAt(x, z) + 0.1, z, { color: spec.c, r0: 0.4, r1: radius * 1.1, life: 0.34, thick: 0.12, fill: 0.15 });
+  } else if (heavy) {
+    const tilt = shape?.tilt ?? 1.2;
+    v.slashArc(x, p.pos.y + 1.15, z, yaw, { radius: radius * 1.05, thick: thick * 1.15, sweep: 2.5, color: 0xffd27a, hot: spec.c, tilt, life: 0.32, sweepT: 0.17, grow: 0.15, tail: 0.85 });
+    if (shape?.cross) {
+      v.slashArc(x, p.pos.y + 1.15, z, yaw, { radius: radius * 1.0, thick: thick, sweep: 2.3, color: spec.c, hot: 0xffd27a, tilt: -tilt, flip: -1, life: 0.3, sweepT: 0.17, delay: 0 });
+    } else {
+      v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius: radius * 0.9, thick: thick * 0.6, sweep: 2.2, color: spec.c, hot: spec.c, tilt: tilt * 0.92, life: 0.26, sweepT: 0.14, delay: 0 });
+    }
     const gx = x + f.x * reach * 0.85;
     const gz = z + f.z * reach * 0.85;
     v.ring(gx, game.world.heightAt(gx, gz) + 0.1, gz, { color: 0xffd27a, r0: 0.2, r1: 1.7, life: 0.32, thick: 0.16, fill: 0.2 });
     v.sparks(gx, game.world.heightAt(gx, gz) + 0.15, gz, [0xffd27a, 0xffffff, 0xd9c9a0], 12, 5, 0.07, 0.45, 9);
     v.scorch(gx, gz, 0.9, 0x3a2e20, 0.35, 3);
   } else {
-    const dir = combo === 1 ? -1 : 1;
-    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius, thick, sweep: 2.1 + (it.arc || 2) * 0.2, color: spec.c, hot: spec.c, tilt: dir * 0.38, flip: dir, life: 0.2, sweepT: 0.11, gain: 0.7 });
-    if (it.style === 'dual') {
+    const dir = shape?.flip ?? (combo === 1 ? -1 : 1);
+    const tilt = shape?.tilt ?? dir * 0.38;
+    const sweep = shape?.sweep ?? 2.1 + (it.arc || 2) * 0.2;
+    v.slashArc(x, p.pos.y + 1.0, z, yaw, { radius, thick, sweep, color: spec.c, hot: spec.c, tilt, flip: dir, life: 0.2, sweepT: 0.11, gain: 0.7 });
+    if (it.style === 'dual' && !shape) {
       v.slashArc(x, p.pos.y + 1.1, z, yaw, { radius: radius * 0.9, thick: thick * 0.8, sweep: 2.0, color: spec.c, hot: spec.h, tilt: -dir * 0.5, flip: -dir, life: 0.2, sweepT: 0.11, delay: 0 });
     }
   }
