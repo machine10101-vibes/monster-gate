@@ -162,6 +162,8 @@ export class CharacterSelect {
     if (!roster.chars.length) {
       this.root?.classList.remove('single-character');
       if (!canEdit) {
+        this.mode = 'list';
+        this.selectedId = null;
         $('cs-form').classList.add('hidden');
         $('cs-panel').classList.remove('hidden');
         $('cs-search').classList.add('hidden');
