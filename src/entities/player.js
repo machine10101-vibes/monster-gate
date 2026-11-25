@@ -543,8 +543,10 @@ export class Player {
     }
 
     const cy = g.cam.yaw;
-    const right = new THREE.Vector3(Math.cos(cy), 0, -Math.sin(cy));
-    const fwd = new THREE.Vector3(-Math.sin(cy), 0, -Math.cos(cy));
+    // In strafe mode movement is relative to the hunter's facing, not the camera.
+    const moveYaw = inp.strafe ? this.yaw : cy;
+    const right = new THREE.Vector3(Math.cos(moveYaw), 0, -Math.sin(moveYaw));
+    const fwd = new THREE.Vector3(-Math.sin(moveYaw), 0, -Math.cos(moveYaw));
     const want = new THREE.Vector3();
     if (!this.dead && !g.uiBlocking) want.addScaledVector(right, inp.moveX).addScaledVector(fwd, -inp.moveY);
     const inputMag = Math.min(1, want.length());
@@ -666,7 +668,13 @@ export class Player {
       if (this.state === 'gather') {
         if (this.gatherReady) target = this.gatherFace;
         else if (speed > 0.2) target = Math.atan2(moveDir.x, moveDir.z);
-      } else if (this.shielding || (inp.attackHeld && !this.game.input.touch)) {
+      } else if (!inp.touch && inp.strafe && !inp.aim?.has) {
+        // Strafe input never changes heading; mouse movement can still aim the hunter.
+        target = this.yaw;
+      } else if (!inp.touch && inp.aim?.has && this.aimDir) {
+        // Desktop mouse-look continuously controls character facing, including while strafing.
+        target = Math.atan2(this.aimDir.x, this.aimDir.z);
+      } else if (this.shielding || (inp.attackHeld && !inp.touch)) {
         if (this.aimDir) target = Math.atan2(this.aimDir.x, this.aimDir.z);
       } else if (inputMag > 0.1) target = Math.atan2(moveDir.x, moveDir.z);
       this.yaw += angDiff(this.yaw, target) * Math.min(1, dt * 16);

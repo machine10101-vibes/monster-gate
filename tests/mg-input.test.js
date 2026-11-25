@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { LOOK_SWIPE_RAD, inStickZone, lookRadiansPerPixel } from '../src/engine/input.js';
+import { LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -33,4 +33,24 @@ test('mouse wheel zooms from the window so HUD overlays do not swallow it', () =
   assert.match(input, /#panel, #dialog, #title/);
   assert.match(main, /clamp\(this\.cam\.targetDist \+ inp\.zoomDelta \* 1\.6, 8, 52\)/);
   assert.match(input, /Math\.abs\(e\.deltaY\) \/ 100/);
+});
+
+
+test('strafe preference persists and movement/facing use independent references', () => {
+  const values = new Map();
+  const store = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  assert.equal(readStrafeSetting(store), false, 'strafe is off by default');
+  assert.equal(writeStrafeSetting(true, store), true);
+  assert.equal(values.get(STRAFE_STORAGE_KEY), '1');
+  assert.equal(readStrafeSetting(store), true);
+  assert.equal(writeStrafeSetting(false, store), false);
+  assert.equal(readStrafeSetting(store), false);
+
+  const player = src('src/entities/player.js');
+  const hud = src('src/ui/hud.js');
+  assert.match(player, /const moveYaw = inp\.strafe \? this\.yaw : cy/);
+  assert.match(player, /!inp\.touch && inp\.strafe && !inp\.aim\?\.has/);
+  assert.match(player, /!inp\.touch && inp\.aim\?\.has && this\.aimDir/);
+  assert.match(hud, /id="set-strafe"/);
+  assert.match(hud, /writeStrafeSetting\(!game\.input\.strafe\)/);
 });
