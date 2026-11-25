@@ -752,3 +752,20 @@ test('map south sea and Hellspire charted edges wander instead of boxing', () =>
   assert.match(play, /outerRimFade/);
   assert.match(play, /FRAME \+ 22/);
 });
+
+
+test('weapon combos use full-body follow-through and a dedicated two-hand staff sequence', () => {
+  const player = src('src/entities/player.js');
+  const combat = src('src/entities/weaponCombat.js');
+  assert.match(player, /family === 'staff'/);
+  assert.match(player, /overhead strike, cross-body sweep, rising return/);
+  assert.match(player, /Whole-body follow-through/);
+  assert.match(player, /impactPulse/);
+  assert.match(player, /headYaw -= torsoYaw/);
+  assert.match(player, /headPitch -= lean/);
+  assert.match(player, /family === 'bow'/);
+  assert.match(player, /family === 'crossbow'/);
+  for (const family of ['heavy', 'spear', 'scythe', 'dual', 'sword']) {
+    assert.match(combat, new RegExp(`return '${family}'`));
+  }
+});

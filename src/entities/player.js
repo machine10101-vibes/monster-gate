@@ -1033,6 +1033,29 @@ export class Player {
             lean = -0.08 * p;
             legL = lerp(legL, 0.28 * p, p);
             legR = lerp(legR, -0.18 * p, p);
+          } else if (family === 'staff') {
+            // A staff is driven by both hands: overhead strike, cross-body sweep, rising return.
+            const side = this.combo === 1 ? -1 : 1;
+            const q = tt < hitT
+              ? ease(tt / Math.max(0.05, hitT))
+              : ease((tt - hitT) / Math.max(0.05, 1 - hitT));
+            const pre = tt < hitT;
+            const windR = this.combo === 0 ? -2.8 : this.combo === 1 ? -1.35 : -2.15;
+            const finishR = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.55 : -2.75;
+            const windL = this.combo === 0 ? -2.25 : this.combo === 1 ? -2.05 : -1.55;
+            const finishL = this.combo === 0 ? -0.45 : this.combo === 1 ? -0.35 : -2.5;
+            armR = pre ? lerp(-0.9, windR, q) : lerp(windR, finishR, q);
+            armL = pre ? lerp(-0.75, windL, q) : lerp(windL, finishL, q);
+            armRz = (this.combo === 0 ? 0.12 : 0.28 * side) * (pre ? q : 1 - q);
+            armLz = -armRz * 0.72;
+            torsoYaw = pre
+              ? lerp(0, (this.combo === 0 ? 0.18 : this.combo === 1 ? -0.72 : 0.58) * side, q)
+              : lerp((this.combo === 0 ? 0.18 : this.combo === 1 ? -0.72 : 0.58) * side, -0.16 * side, q);
+            lean = pre ? -0.12 * q : 0.2 * (1 - q);
+            crouch = pre ? 0.035 * q : 0.075 * (1 - q);
+            legL = lerp(0.12, pre ? 0.38 : 0.62, q);
+            legR = lerp(-0.08, pre ? -0.24 : -0.48, q);
+            headPitch = pre ? -0.08 * q : 0.1 * (1 - q);
           } else {
           const over = this.combo === 2;
           if (tt < hitT) {
@@ -1079,6 +1102,24 @@ export class Player {
           liftL = 0;
           liftR = 0;
           }
+          // Whole-body follow-through: hips and head counter-rotate, then recover
+          // after the weapon has passed the target. This layers over each weapon's
+          // own path without flattening its distinct three-hit choreography.
+          const bodySide = this.combo === 1 ? -1 : 1;
+          const impactPulse = Math.exp(-Math.pow((tt - hitT) / 0.11, 2));
+          const recovery = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
+          const followThrough = Math.sin(Math.PI * clamp(recovery, 0, 1));
+          hipX += bodySide * (0.018 + impactPulse * 0.025) * followThrough;
+          tilt += bodySide * impactPulse * 0.035;
+          headYaw -= torsoYaw * 0.16;
+          headPitch -= lean * 0.12;
+          lean += impactPulse * (this.combo === 2 ? 0.12 : 0.07);
+          if (family !== 'dual') {
+            // The free hand and shoulders absorb momentum instead of staying rigid.
+            armLz += bodySide * impactPulse * 0.08;
+          }
+          legL += (this.combo === 2 ? 0.1 : 0.055) * impactPulse;
+          legR -= (this.combo === 2 ? 0.075 : 0.04) * impactPulse;
         } else if (it.kind === 'ranged') {
           const releaseT = Number.isFinite(hitT) ? clamp(hitT, 0.2, 0.85) : 0.68;
           const p = tt < releaseT ? ease(tt / releaseT) : 1 - ease((tt - releaseT) / (1 - releaseT));
@@ -1108,6 +1149,10 @@ export class Player {
             lean = -0.08 * p;
             headPitch = -0.12 * p;
           }
+          // A shot has a small release recoil and a controlled return to aim.
+          lean -= rel * (family === 'crossbow' ? 0.075 : 0.045);
+          torsoYaw += rel * (family === 'bow' ? 0.09 : 0.045);
+          headPitch += rel * 0.045;
           crouch = 0.025 * p;
           legL = lerp(legL, 0.2, p);
           legR = lerp(legR, -0.18, p);
