@@ -368,3 +368,44 @@
   .mg-gatepass-pricebox:hover { transform: none; }
   .mg-gatepass-pay, .mg-gatepass-check, .mg-gatepass-redeem { transition: none; }
 }
+
+
+/* Keep the monthly subscription path visible even before a wallet is linked. */
+.mg-gatepass-wallet-link {
+  margin: 18px 0 16px;
+  padding: 17px;
+  border: 1px solid rgba(145, 218, 226, .34);
+  border-radius: 15px;
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(255, 221, 168, .12), transparent 70%),
+    linear-gradient(125deg, rgba(76, 157, 176, .12), rgba(171, 135, 255, .09)),
+    rgba(255,255,255,.035);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 0 28px rgba(102,194,212,.07);
+}
+.mg-gatepass-wallet-link strong {
+  display: block;
+  color: #fff0cf;
+  font-size: 15px;
+  letter-spacing: .1px;
+}
+.mg-gatepass-wallet-link p {
+  margin: 7px 0 13px;
+  color: rgba(225,226,240,.82);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.mg-gatepass-link-wallet {
+  min-height: 43px;
+  padding: 11px 16px;
+  border: 1px solid rgba(153,226,231,.8);
+  border-radius: 11px;
+  color: #15242b;
+  background: linear-gradient(112deg,#c5f0e9,#b9d8f5 58%,#e7c9ef);
+  box-shadow: 0 7px 22px rgba(113,205,218,.15), inset 0 1px 0 rgba(255,255,255,.8);
+  font: 800 11px/1.2 inherit;
+  cursor: pointer;
+  transition: transform .18s ease, filter .18s ease;
+}
+.mg-gatepass-link-wallet:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
+.mg-gatepass-link-wallet:disabled { opacity: .6; cursor: wait; }
+.mg-gatepass-link-wallet:focus-visible { outline: 2px solid rgba(148,224,232,.9); outline-offset: 3px; }
