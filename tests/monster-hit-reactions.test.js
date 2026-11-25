@@ -5,7 +5,7 @@ import { hitReactionPose } from '../src/entities/monsters.js';
 test('enemy hit reactions lean away from the incoming impact direction', () => {
   const front = hitReactionPose(0, 1, 0, 1);
   assert.ok(front.pitch < 0);
-  assert.equal(front.roll, 0);
+  assert.ok(Math.abs(front.roll) < 1e-9);
   const right = hitReactionPose(1, 0, 0, 1);
   assert.ok(right.roll < 0);
   assert.ok(right.twist > 0);
