@@ -18,7 +18,9 @@ const FURS = [YETI.furLo, YETI.fur, YETI.fur, YETI.furHi, YETI.furHi, YETI.furWh
 const CRYSTAL = [YETI.ice, YETI.iceDeep, YETI.iceHi];
 
 const fur = (x, y, z, tip = 0) => {
-  if (hash3(x >> 1, y >> 1, z >> 1, 5) < 0.12) return jitter(CRYSTAL[Math.floor(hash3(x, y, z, 6) * 3)], 0.04, hash3(x, y, z, 7));
+  // Frost crystals break through the coat in clusters, blue ice showing between the white tufts.
+  if (hash3(x >> 1, y >> 1, z >> 1, 5) < 0.16) return jitter(CRYSTAL[Math.floor(hash3(x, y, z, 6) * 3)], 0.04, hash3(x, y, z, 7));
+  if (hash3(x >> 2, y >> 2, z >> 2, 8) < 0.22) return jitter(hash3(x, y, z, 9) < 0.5 ? YETI.iceDeep : YETI.furLo, 0.04, hash3(x, y, z, 10));
   const i = clamp(Math.floor(hash3(x, y, z, 21) * 4) + Math.min(2, tip), 0, FURS.length - 1);
   return jitter(FURS[i], 0.04, hash3(x, y, z, 22));
 };
@@ -201,6 +203,28 @@ function paintTorso() {
     const a = (i / 9) * TAU;
     iceSpike(T, CX + Math.cos(a) * 16, ty(20 + (i % 3) * 3), CZ + 5 + Math.sin(a) * 6, Math.cos(a) * 0.9, 0.2, Math.sin(a) * 0.9, 4 + (i % 3), 1.6);
   }
+  // A crest of faceted ice down the spine and over each shoulder, the reference's crisp blue crystals.
+  for (let i = 0; i < 12; i++) {
+    const side = i < 6 ? -1 : 1;
+    const k = i % 6;
+    iceSpike(T, CX + side * (14 + k * 1.2), ty(30 - k * 1.4), CZ - 8 + k * 1.1, side * 0.5, 1, -0.6, 7 + (k % 3) * 2, 2.1);
+  }
+  for (let i = 0; i < 6; i++) {
+    iceSpike(T, CX - 10 + i * 4, ty(34), CZ - 7, (i - 2.5) * 0.12, 1, -0.4, 8 + (i % 2) * 3, 2.3);
+  }
+  // Ice crusted onto the strap where the bandolier crosses the chest, and a brass buckle at the crossing.
+  for (let y = ty(4); y < ty(33); y += 5) {
+    for (const seg of [A, B]) {
+      const t = (y - seg[1]) / (seg[3] - seg[1]);
+      const x = Math.round(seg[0] + (seg[2] - seg[0]) * t);
+      const fz = frontZ(T, x, y);
+      if (fz >= 0 && hash3(x, y, 3, 240) < 0.55) iceSpike(T, x, y, fz + 2, 0, 0.4, 1, 3 + (y % 3), 1.2);
+    }
+  }
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    const fz = frontZ(T, CX + dx, ty(14) + dy);
+    if (fz >= 0) T.set(CX + dx, ty(14) + dy, fz + 1, YETI.trim);
+  }
   return T;
 }
 
@@ -287,7 +311,16 @@ function paintHead() {
       H.ellipsoid(bx, by, 27.4, 2, 1.5, 2.6, (x, y, z) => shade(fur(x, y, z, 1), 0.82));
     }
   }
-  H.ellipsoid(CX, 10.2, 24.6, 6.4, 1.1, 4.6, YETI.mouth);
+  H.ellipsoid(CX, 10.2, 24.6, 7.4, 1.5, 5.2, YETI.mouth);
+  // Heavy brow: a ridge of dark fur that hangs over the eyes and makes the stare menacing.
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 6; k++) {
+      // The brow slopes down toward the nose: a scowl.
+      const bx = CX + s * (2.2 + k * 0.9);
+      const by = 23.4 + k * 0.35 - (s * 0.4 * k) * 0;
+      H.ellipsoid(bx, by, 25.6, 1.9, 1.3, 2.1, (x, y, z) => shade(fur(x, y, z, 1), 0.52));
+    }
+  }
   for (const s of [-1, 1]) {
     const eyeX = CX + s * 4.6 - (s < 0 ? 2 : 0) - (s < 0 ? 0 : 1);
     for (let dy = 0; dy < 2; dy++)
@@ -301,6 +334,12 @@ function paintHead() {
         if (lid) continue;
         H.set(x, y, fz, dy === 1 && inner ? YETI.eyeHi : YETI.eye, true);
         H.set(x, y, fz - 1, YETI.eye, true);
+        // A bright pupil slit and a blue halo spilling onto the fur around each eye.
+        if (dy === 0 && dx === 1) H.set(x, y, fz, YETI.eyeHi, true);
+        if (dx === 0 && dy === 0) {
+          const hz = frontZ(H, x - s, y);
+          if (hz >= 0) H.set(x - s, y, hz, shade(YETI.eye, 0.95), true);
+        }
       }
   }
   relief(H, before);
@@ -329,9 +368,10 @@ function paintHead() {
         }
     }
   };
-  upFang(CX - 5, 7, 1.6);
-  upFang(CX + 4, 7, 1.6);
-  for (const x of [CX - 3, CX - 1, CX + 1, CX + 2]) upFang(x, 3, 0.9);
+  upFang(CX - 6, 9, 2.0);
+  upFang(CX + 5, 9, 2.0);
+  upFang(CX - 2, 5, 1.2);
+  upFang(CX + 1, 5, 1.2);
   return H;
 }
 
@@ -355,9 +395,10 @@ function paintJaw() {
         }
     }
   };
-  loFang(CX - 5, 6, 1.5, 22);
-  loFang(CX + 4, 6, 1.5, 22);
-  for (const x of [CX - 3, CX - 1, CX + 1, CX + 2]) loFang(x, 3, 0.9, 24);
+  loFang(CX - 6, 8, 1.8, 22);
+  loFang(CX + 5, 8, 1.8, 22);
+  loFang(CX - 2, 4, 1.1, 24);
+  loFang(CX + 1, 4, 1.1, 24);
   for (const s of [-1, 1]) for (let z = 10; z < 21; z += 3) loFang(CX + s * 6, 2, 0.8, z);
   return J;
 }

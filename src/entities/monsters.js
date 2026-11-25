@@ -64,7 +64,7 @@ const DEFS = {
   budgedragon: { name: 'Green Budge Dragon', hp: 64, radius: 0.85, speed: 3.1, dmg: 4, gold: [12, 22], aggro: 12, build: buildBudgeDragon },
   darksycledragon: { name: 'Darksycle Dragon', hp: 155, radius: 1.9, speed: 2.7, dmg: 5, gold: [30, 48], aggro: 17, build: buildDarksycleDragon },
   volcanum: { name: 'Volcanum', hp: 2400, radius: 2.55, speed: 3.15, dmg: 12, gold: [700, 1100], aggro: 30, build: buildVolcanumDragon },
-  snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 1.2, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
+  snowyeti: { name: 'Ravenous Snow Yeti', hp: 210, radius: 2.4, speed: 3.0, dmg: 5, gold: [55, 85], aggro: 18, build: buildSnowYeti },
   demonknight: { name: 'Demon Knight', hp: 320, radius: 1.05, speed: 3.1, dmg: 5, gold: [90, 140], aggro: 14, build: buildDemonKnight },
   holyknight: { name: 'Holy Knight', hp: 300, radius: 1.05, speed: 3.0, dmg: 5, gold: [90, 140], aggro: 14, build: buildHolyKnight },
   keepwarden: { name: 'Keep Warden', hp: 420, radius: 1.12, speed: 3.05, dmg: 7, gold: [110, 160], aggro: 16, build: buildDemonKnight },
@@ -134,7 +134,7 @@ export class Monster {
     this.obj.add(built.root);
     game.scene.add(this.obj);
     this.obj.position.set(x, this.y, z);
-    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'keepwarden' ? 1.12 : 1;
+    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
     this.air = false;
     this.attacking = false;
     this.chargeDir = new THREE.Vector3();
@@ -342,7 +342,7 @@ export class Monster {
     const ffx = familyFx(this.type);
     g.audio.tone(dusk ? 160 : volc ? 70 : 90, 0.55, 'sawtooth', 0.16, -30);
     g.fx.ring(this.x, this.y + 0.3 + this.hover, this.z, ffx ? ffx.tele : volc ? 0xff5a12 : dusk ? 0xb25cff : yeti ? 0x7fd0ff : this.type === 'holyknight' ? 0x6fb8ff : this.type === 'demonknight' ? 0xff3a1a : 0xff6a2a, 10, 2.6, 0.1, 0.5);
-    g.hud.floatText(...g.screenOf(this.x, this.y + this.hover + (ffx ? ffx.plateY : yeti ? 4.3 : knight ? 3.8 : volc ? 4.2 : 2.2), this.z), ffx?.rageText || (volc ? 'The mountain wakes!' : dusk ? 'Dusk Frenzy!' : yeti ? 'Ravenous Frenzy!' : knight ? 'The Eternal War!' : 'Enraged!'), 'crit');
+    g.hud.floatText(...g.screenOf(this.x, this.y + this.hover + (ffx ? ffx.plateY : yeti ? 8.6 : knight ? 3.8 : volc ? 4.2 : 2.2), this.z), ffx?.rageText || (volc ? 'The mountain wakes!' : dusk ? 'Dusk Frenzy!' : yeti ? 'Ravenous Frenzy!' : knight ? 'The Eternal War!' : 'Enraged!'), 'crit');
   }
 
   die() {
@@ -1634,7 +1634,7 @@ export class Monster {
     else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'scorpion' && this.state === 'stingwind') && !(this.type === 'darksycledragon' && this.airCharge) && !(this.type === 'volcanum' && (this.state === 'breath' || this.state === 'air' || this.state === 'ascend')) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if ((this.debugTank && !this.dead) || (dist < 14 && this.hp < this.maxHp)) {
-      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' || this.type === 'volcanum' ? 7.2 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 4.4 : knight ? 3.9 : 1.25), this.z, true);
+      const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' || this.type === 'volcanum' ? 7.2 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 8.8 : knight ? 3.9 : 1.25), this.z, true);
       const hpNum = this.debugTank ? `<small>${debugTankHpLabel(this)}</small>` : '';
       g.hud.plate(this.id, `${this.name}${hpNum}<span class="hpbar"><i style="width:${(this.hp / this.maxHp) * 100}%"></i></span>`, 'mon');
       g.hud.placePlate(this.id, sx2, sy2, vis, { dist });
