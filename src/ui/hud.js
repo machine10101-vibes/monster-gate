@@ -897,8 +897,8 @@ export class HUD {
       };
       document.getElementById('wg-leave').onclick = () => game.net.leave();
       game.refreshWaygate();
-    } else if (name === 'settings' || name === 'menu') {
-      title.textContent = name === 'menu' ? 'Menu' : 'Settings';
+    } else if (name === 'settings') {
+      title.textContent = 'Settings';
       const jumps = document.createElement('div');
       jumps.className = 'set-jumps';
       const jumpsList = [
@@ -923,14 +923,6 @@ export class HUD {
       const liveSearch = typeof location !== 'undefined' ? location.search : '';
       const rows = [
         ['Switch world', '<span class="world-switch"><button id="set-world1" type="button">World 1</button><button id="set-world-solo" type="button">Solo</button></span>'],
-        ...(name === 'menu'
-          ? [
-              ['Skill & Spell Book', '<button id="set-book">Open</button>'],
-              ['Hunter Catalog', '<button id="set-cat">Open</button>'],
-              ['Skill Tree', '<button id="set-skills">Open</button>'],
-              ['Hunter Stats', '<button id="set-stats">Open</button>'],
-            ]
-          : []),
         ['Graphics quality', `<span class="gfx-switch">${QUALITIES.map((item) => `<button type="button" class="gfx-opt${item.id === q.id ? ' on' : ''}" data-q="${item.id}">${item.label}</button>`).join('')}</span>`],
         ['Build', `<b id="set-build">${BUILD_ID}</b>`],
         ...(game.debug && !game.mmo && !game.worldView
