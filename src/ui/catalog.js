@@ -235,6 +235,27 @@ class Stage {
     return cv;
   }
 
+  /** Render one thumbnail immediately, without draining the shared UI queue. */
+  thumbNow(spec, px = 64) {
+    const key = `${spec.kind}:${spec.id || ''}:0`;
+    let src = this.cache.get(key);
+    if (!src) {
+      const subject = buildSubject(spec, false);
+      src = document.createElement('canvas');
+      src.width = 192;
+      src.height = 192;
+      this.draw(subject, subject.yaw, src.getContext('2d'), 192, 192);
+      disposeSubject(subject);
+      this.cache.set(key, src);
+    }
+    const cv = document.createElement('canvas');
+    cv.width = px;
+    cv.height = px;
+    cv.getContext('2d').drawImage(src, 0, 0, px, px);
+    return cv;
+  }
+
+
   /** Drop thumbs for a catalog view that has been replaced. */
   cancel() {
     this.queue.length = 0;
@@ -293,6 +314,11 @@ const getStage = () => stage || (stage = new Stage());
 /** Renders a gear or monster to a small canvas (used for the hotbar). */
 export function renderThumb(spec, px = 64) {
   return getStage().thumb(spec, false, px);
+}
+
+/** Synchronous single-item render for UI elements that need the image immediately. */
+export function renderThumbNow(spec, px = 64) {
+  return getStage().thumbNow(spec, px);
 }
 
 /** Paint any thumbnails queued by renderThumb. */
