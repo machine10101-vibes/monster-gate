@@ -260,6 +260,14 @@ test('reconnect intent asks the mock transport to come back online', () => {
   assert.equal(feed.status, STATUS.reconnecting);
 });
 
+test('Reconnect falls back to the registered retry handler when no transport adapter exists', () => {
+  const view = new WorldView(stubGame(), { spawnRemote: stubRemote });
+  let retries = 0;
+  view.onRetry(() => { retries += 1; });
+  view.requestReconnect();
+  assert.equal(retries, 1);
+});
+
 test('hunter nameplates offset overlaps, cull extras, and fade with distance', () => {
   const game = stubGame();
   const placed = [];

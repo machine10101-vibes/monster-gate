@@ -961,7 +961,6 @@ export class WorldView {
 
   retryWake() {
     this.wakeDismissed = false;
-    this._onRetry?.();
     this.requestReconnect();
   }
 
@@ -1313,7 +1312,8 @@ export class WorldView {
   requestReconnect() {
     if (this.nameTakenActive() || (this.status === STATUS.error && this.errorCode() === 'name_taken')) return;
     this.emit({ type: 'reconnect' });
-    this.transport?.reconnect?.();
+    if (typeof this.transport?.reconnect === 'function') this.transport.reconnect();
+    else this._onRetry?.();
   }
 
   mountUi() {

@@ -137,6 +137,20 @@ test('MmoClient maps server frames onto worldView and sends move/chat', async ()
   assert.ok(view.statuses.some((s) => s === 'offline' || s?.status === 'offline'));
 });
 
+test('a valid account token wins over a stale guest wallet marker', () => {
+  const game = { wallet: { kind: 'guest', accessToken: 'signed-in-account-token' } };
+  assert.equal(isGuestSession(game), false);
+
+  const view = stubView();
+  const client = attachMmo(game, view, {
+    search: '?mmo=1&world=ws://world.test',
+    WebSocket: FakeSocket,
+    fetch: okFetch(),
+  });
+  assert.ok(client instanceof MmoClient);
+  client.dispose();
+});
+
 test('auth errors stop reconnect and go offline', async () => {
   const toasts = [];
   const view = stubView();

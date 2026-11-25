@@ -79,8 +79,10 @@ export function readAccessToken(opts = {}) {
 export function isGuestSession(game, opts = {}) {
   if (opts.guest === true) return true;
   if (opts.guest === false) return false;
-  if (game?.wallet?.kind === 'guest') return true;
-  return !readAccessToken(opts);
+  // A signed-in account token is authoritative even if the wallet/UI state
+  // still carries a stale "guest" marker during the sign-in handoff.
+  const token = readAccessToken({ ...opts, wallet: opts.wallet || game?.wallet });
+  return !token;
 }
 
 function localName(game) {
