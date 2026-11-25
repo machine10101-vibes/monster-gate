@@ -1447,9 +1447,17 @@ export class Player {
       // alternate the bend so each hand visibly leads its own cut.
       eR += impact * (family === 'dual' ? 0.18 : family === 'spear' ? 0.1 : 0.24);
       eL += impact * (family === 'dual' ? (this.combo === 1 ? 0.2 : 0.08) : isTwoHandedFamily(family) ? 0.12 : 0.04);
-      const settle = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
-      eR += (family === 'heavy' || family === 'scythe' ? 0.1 : 0.04) * settle;
-      if (family === 'dual') eL += (this.combo === 1 ? 0.12 : 0.03) * settle;
+      const recovery = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
+      const windup = 1 - ease(clamp(tt / Math.max(0.05, hitT), 0, 1));
+      const mass = family === 'heavy' ? 1.35 : family === 'scythe' ? 1.2 : family === 'spear' ? 0.82 : family === 'staff' ? 1.05 : family === 'dual' ? 0.72 : 0.9;
+      // Load the joints before the strike, then let the arms lengthen through
+      // contact. Two-handed families keep the support elbow engaged throughout.
+      eR += windup * (0.08 + mass * 0.08) + recovery * (family === 'heavy' || family === 'scythe' ? 0.14 : 0.07);
+      if (isTwoHandedFamily(family)) {
+        eL += windup * 0.12 + recovery * (family === 'staff' ? 0.16 : 0.1);
+      } else if (family === 'dual') {
+        eL += (this.combo === 1 ? 0.12 : 0.03) * recovery;
+      }
     }
     if (this.state === 'roll') {
       eR = 1.6;
@@ -1526,19 +1534,31 @@ export class Player {
     const aimed = AIMED_KINDS.has(this.heldKind);
     let weaponPitch = 0;
     let weaponYaw = 0;
+    let weaponRollLag = 0;
     if (this.state === 'attack' && this.attackItem?.kind === 'melee') {
       const tt = clamp(this.stateT / this.stateDur, 0, 1);
       const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
       const impact = Math.exp(-Math.pow((tt - hitT) / 0.12, 2));
       const recover = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
+      const windup = 1 - ease(clamp(tt / hitT, 0, 1));
       const family = weaponFamily(this.attackItem, this.attackItem.held || this.heldKind);
       const side = this.combo === 1 ? -1 : 1;
-      const weight = family === 'heavy' ? 1.25 : family === 'scythe' ? 1.1 : family === 'spear' ? 0.7 : family === 'staff' ? 0.9 : 0.55;
-      // A little wrist/haft lag gives the blade a sense of mass instead of
-      // making it rigidly follow the forearm at every point in the swing.
-      weaponPitch = impact * (this.combo === 0 ? -0.16 : this.combo === 2 ? 0.2 : -0.08) * weight
-        + Math.sin(recover * Math.PI) * 0.09 * side * weight;
-      weaponYaw = side * (impact * 0.08 + Math.sin(recover * Math.PI) * 0.12) * weight;
+      const weight = family === 'heavy' ? 1.35 : family === 'scythe' ? 1.2 : family === 'spear' ? 0.82 : family === 'staff' ? 1.05 : family === 'dual' ? 0.72 : 0.62;
+      // The wrist trails the forearm on acceleration, then catches up after contact.
+      weaponPitch = windup * -0.055 * weight
+        + impact * (this.combo === 0 ? -0.19 : this.combo === 2 ? 0.23 : -0.1) * weight
+        + Math.sin(recover * Math.PI) * 0.12 * side * weight;
+      weaponYaw = side * (windup * -0.035 + impact * 0.1 + Math.sin(recover * Math.PI) * 0.15) * weight;
+      weaponRollLag = side * (windup * 0.035 + impact * 0.075 + Math.sin(recover * Math.PI) * 0.11) * weight;
+    } else if (this.state === 'attack' && this.attackItem?.kind === 'ranged') {
+      const tt = clamp(this.stateT / this.stateDur, 0, 1);
+      const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
+      const release = Math.exp(-Math.pow((tt - hitT) / 0.075, 2));
+      const family = weaponFamily(this.attackItem, this.attackItem.held || this.heldKind);
+      // Bow limbs flex and settle; crossbow stock gives a shorter, firmer kick.
+      weaponPitch = -release * (family === 'crossbow' ? 0.12 : 0.075);
+      weaponYaw = release * (family === 'bow' ? 0.045 : 0.025);
+      weaponRollLag = -release * (family === 'crossbow' ? 0.035 : 0.06);
     }
     m.heldSlot.rotation.x = aimed ? -(m.armR.rotation.x + m.elbowR.rotation.x) : sp.step('weaponPitch', weaponPitch, dt, rate * 0.72, 0.8);
     m.heldSlot.rotation.y = sp.step('weaponYaw', weaponYaw, dt, rate * 0.68, 0.8);
@@ -1549,8 +1569,25 @@ export class Player {
       const cut = tt < hitT ? ease(tt / hitT) : 1 - ease(clamp((tt - hitT) / (1 - hitT), 0, 1));
       roll = lerp(roll, roll - Math.PI / 2, cut);
     }
-    m.heldSlot.rotation.z = roll;
-    if (m.offhand) m.offhand.rotation.z = DUAL_KINDS.has(this.heldKind) ? roll : 0;
+    m.heldSlot.rotation.z = roll + sp.step('weaponRollLag', weaponRollLag, dt, rate * 0.62, 0.78);
+    if (m.offhand) {
+      const dual = DUAL_KINDS.has(this.heldKind);
+      let offPitch = 0;
+      let offYaw = 0;
+      let offRoll = 0;
+      if (dual && this.state === 'attack' && this.attackItem?.kind === 'melee') {
+        const tt = clamp(this.stateT / this.stateDur, 0, 1);
+        const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
+        const pulse = Math.exp(-Math.pow((tt - hitT) / 0.13, 2));
+        const lead = this.combo === 1 ? -1 : 1;
+        offPitch = pulse * (this.combo === 2 ? -0.13 : 0.08);
+        offYaw = -lead * pulse * 0.12;
+        offRoll = -lead * pulse * 0.07;
+      }
+      m.offhand.rotation.x = sp.step('offhandPitch', offPitch, dt, rate * 0.65, 0.8);
+      m.offhand.rotation.y = sp.step('offhandYaw', offYaw, dt, rate * 0.65, 0.8);
+      m.offhand.rotation.z = (dual ? roll : 0) + sp.step('offhandRoll', offRoll, dt, rate * 0.65, 0.8);
+    }
 
     const legW = this.state === 'attack' ? 30 : 26;
     m.legL.rotation.x = sp.step('legL', legL, dt, legW, 0.85);
