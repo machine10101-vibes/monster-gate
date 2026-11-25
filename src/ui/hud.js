@@ -20,6 +20,7 @@ import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
 import { mountWalletSettings } from '../wallet/settings.js';
+import { writeStrafeSetting } from '../engine/input.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
@@ -937,6 +938,7 @@ export class HUD {
         ['Time of day', `<button id="set-time">Skip +3h</button>`],
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
         ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
+        ['Strafing', `<button id="set-strafe" aria-pressed="${game.input.strafe ? 'true' : 'false'}">${game.input.strafe ? 'On' : 'Off'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -988,6 +990,12 @@ export class HUD {
         setWeaponCursorEnabled(!weaponCursorEnabled());
         applyWeaponCursor(game);
         document.getElementById('set-wcur').textContent = weaponCursorEnabled() ? 'On' : 'Off';
+      };
+      document.getElementById('set-strafe').onclick = () => {
+        game.input.strafe = writeStrafeSetting(!game.input.strafe);
+        const btn = document.getElementById('set-strafe');
+        btn.textContent = game.input.strafe ? 'On' : 'Off';
+        btn.setAttribute('aria-pressed', game.input.strafe ? 'true' : 'false');
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
       const worldBtn = document.getElementById('set-world1');
