@@ -990,14 +990,19 @@ export class Player {
               legL = lerp(0.2, pre ? 0.5 : 0.72, q);
               legR = lerp(-0.1, pre ? -0.25 : -0.55, q);
             } else {
-              // Heavy heads travel overhead; hips and knees load before the downswing.
-              torsoYaw = pre ? lerp(0, 0.25 * comboSide, q) : lerp(0.25 * comboSide, -0.12 * comboSide, q);
-              lean = pre ? -0.24 * q : 0.32 * (1 - q);
+              // Three weighty linked attacks: overhead chop, horizontal cleave, rising diagonal.
+              const heavySide = this.combo === 1 ? -1 : 1;
+              const heavyWind = this.combo === 0 ? -3.05 : this.combo === 1 ? -2.15 : -1.55;
+              const heavyFinish = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.55 : -2.8;
+              torsoYaw = pre
+                ? lerp(0, (this.combo === 0 ? 0.25 : this.combo === 1 ? -0.82 : 0.72) * heavySide, q)
+                : lerp((this.combo === 0 ? 0.25 : this.combo === 1 ? -0.82 : 0.72) * heavySide, -0.12 * heavySide, q);
+              lean = pre ? (this.combo === 2 ? 0.08 : -0.24) * q : (this.combo === 2 ? -0.08 : 0.32) * (1 - q);
               crouch = pre ? 0.08 * q : 0.12 * (1 - q);
-              armR = pre ? lerp(-1.15, -3.05, q) : lerp(-3.05, -0.25, q);
-              armL = pre ? lerp(-0.9, -2.45, q) : lerp(-2.45, -0.65, q);
-              armRz = pre ? lerp(0, 0.2, q) : lerp(0.2, -0.08, q);
-              legL = lerp(0.1, pre ? 0.48 : 0.85, q);
+              armR = pre ? lerp(-1.15, heavyWind, q) : lerp(heavyWind, heavyFinish, q);
+              armL = pre ? lerp(-0.9, this.combo === 1 ? -2.0 : -2.45, q) : lerp(this.combo === 1 ? -2.0 : -2.45, this.combo === 2 ? -0.35 : -0.65, q);
+              armRz = pre ? lerp(0, this.combo === 2 ? -0.35 : 0.2 * heavySide, q) : lerp(this.combo === 2 ? -0.35 : 0.2 * heavySide, -0.08, q);
+              legL = lerp(0.1, pre ? (this.combo === 2 ? 0.28 : 0.48) : 0.85, q);
               legR = lerp(-0.08, pre ? -0.3 : -0.72, q);
             }
             tilt = lerp(0, (pre ? -0.06 : 0.1) * comboSide, q);
@@ -1005,11 +1010,26 @@ export class Player {
             // Alternating hand cuts; the off-hand follows the combo rather than hanging idle.
             const side = this.combo === 1 ? -1 : 1;
             const p = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : 1 - ease((tt - hitT) / Math.max(0.05, 1 - hitT));
-            armR = lerp(-0.8, -2.25, p);
-            armL = lerp(-0.65, -2.1, p);
-            armRz = 0.48 * side * p;
-            armLz = -0.48 * side * p;
-            torsoYaw = 0.28 * side * p;
+            // Right-hand cut, left-hand return, then a simultaneous crossing finisher.
+            if (this.combo === 0) {
+              armR = lerp(-0.8, -2.35, p);
+              armL = lerp(-0.65, -0.25, p);
+              armRz = 0.55 * p;
+              armLz = -0.08 * p;
+              torsoYaw = 0.34 * p;
+            } else if (this.combo === 1) {
+              armR = lerp(-0.8, -0.3, p);
+              armL = lerp(-0.65, -2.3, p);
+              armRz = 0.08 * p;
+              armLz = -0.55 * p;
+              torsoYaw = -0.36 * p;
+            } else {
+              armR = lerp(-0.8, -2.15, p);
+              armL = lerp(-0.65, -2.2, p);
+              armRz = 0.5 * p;
+              armLz = -0.5 * p;
+              torsoYaw = 0.12 * p;
+            }
             lean = -0.08 * p;
             legL = lerp(legL, 0.28 * p, p);
             legR = lerp(legR, -0.18 * p, p);
