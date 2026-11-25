@@ -8,18 +8,30 @@ async function post(session, body) {
   if (!cfg.url || !cfg.key) throw new Error('The membership service is not configured.');
   const current = await refreshAccountSession(session);
   if (!current?.accessToken) throw new Error('Sign in to your game account again.');
-  const response = await fetch(`${cfg.url}/functions/v1/membership`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      apikey: cfg.key,
-      authorization: `Bearer ${current.accessToken}`,
-    },
-    body: JSON.stringify({ ...body, accessToken: current.accessToken }),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'The membership service could not be reached.');
-  return { data, session: current };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${cfg.url}/functions/v1/membership`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'content-type': 'application/json',
+        apikey: cfg.key,
+        authorization: `Bearer ${current.accessToken}`,
+      },
+      body: JSON.stringify({ ...body, accessToken: current.accessToken }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'The membership service could not be reached.');
+    return { data, session: current };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('The membership service took too long to respond. Please refresh the quote and try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function membershipStatus(session) {
@@ -371,6 +383,9 @@ export async function ensureMembership(session, game) {
       if (pollTimer) clearTimeout(pollTimer);
       quote = null;
       quoteLoading = true;
+      payNow.disabled = true;
+      payNow.textContent = 'Preparing KLV quote…';
+      payNow.title = 'A fresh, wallet-bound KLV quote is being prepared.';
       refresh.disabled = true;
       checkNow.disabled = true;
       livePrice.textContent = 'Fetching live KLV price…';
@@ -386,6 +401,9 @@ export async function ensureMembership(session, game) {
         quoteExpiry.textContent = `${quote.priceSource || 'Swopus'} · Quote valid until ${dateLabel(quote.expiresAt)}`;
         amount.textContent = `${quote.klvAmount} KLV`;
         copyAmount.disabled = false;
+        payNow.disabled = false;
+        payNow.textContent = 'Pay with Klever Wallet';
+        payNow.title = 'Approve the exact quoted KLV amount in Klever Wallet.';
         setWatch('Waiting for your KLV transfer', 'Once you send the exact amount from your linked wallet, we’ll detect it and activate your pass automatically.');
         checkNow.disabled = false;
         schedulePoll(2500);
@@ -393,6 +411,9 @@ export async function ensureMembership(session, game) {
         quote = null;
         livePrice.textContent = 'Live KLV price unavailable';
         quoteExpiry.textContent = 'Tap Refresh quote to retry';
+        payNow.disabled = true;
+        payNow.textContent = 'Quote unavailable';
+        payNow.title = 'Use Refresh quote to try again. No payment has been requested.';
         setWatch('Could not load a live quote', error.message || 'The live KLV price service is temporarily unavailable. No payment has been requested.', true);
         checkNow.disabled = true;
       } finally {
@@ -442,6 +463,9 @@ export async function ensureMembership(session, game) {
     if (status.walletAddress) loadQuote();
     else {
       payNow.disabled = true;
+      payNow.textContent = 'Link wallet to see KLV amount';
+      payNow.title = 'Link a Klever wallet to this game account before requesting the exact payment amount.';
+      payNow.setAttribute('aria-label', 'Link a Klever wallet to see the exact KLV payment amount');
       checkNow.disabled = true;
       refresh.disabled = true;
       setWatch('Link your Klever wallet to continue', 'Your $5 monthly subscription is available here. Link the wallet associated with this game account to load the exact KLV amount and pay.');
@@ -459,7 +483,10 @@ export async function ensureMembership(session, game) {
         if (!status.walletAddress) throw new Error('The wallet was not linked to this game account. Please try again.');
         currentSession = saveAccount({ ...currentSession, kleverAddress: status.walletAddress });
         walletLinkNotice.hidden = true;
-        payNow.disabled = false;
+        payNow.disabled = true;
+        payNow.textContent = 'Preparing KLV quote…';
+        payNow.title = 'A fresh, wallet-bound KLV quote is being prepared.';
+        payNow.removeAttribute('aria-label');
         checkNow.disabled = true;
         refresh.disabled = false;
         setWatch('Wallet linked', 'Fetching your live KLV membership quote…');
