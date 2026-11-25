@@ -21,7 +21,7 @@ const wh = (tone = 1, s = 3) => (x, y, z) => shade(pick(HOLY.plate, x, y, z, s),
 const gold = (x, y, z, s = 0) => (((x * 3 + y * 5 + z) & 3) === 0 ? J(HOLY.goldHi, x, y, z, 20 + s, 0.03) : J(HOLY.gold, x, y, z, 21 + s, 0.04));
 const goldLo = (x, y, z, s = 0) => J(HOLY.goldLo, x, y, z, 22 + s, 0.05);
 const mailC = (x, y, z, s = 0) => J(pick([HOLY.mail, HOLY.mailHi, HOLY.mailLo, HOLY.mail], x, y, z, 23 + s), x, y, z, 24 + s, 0.06);
-const XCROSS = (o = {}) => ({ col: HOLY.glow, core: HOLY.glowCore, glow: true, ...o });
+const XCROSS = (o = {}) => ({ col: HOLY.glow, core: HOLY.glowCore, glow: true, halo: HOLY.halo, ...o });
 
 const H_OY = 10;
 function holyTorso() {
@@ -89,6 +89,7 @@ function holyTorso() {
     spike(T, CX + s * 10.5, ty(34.5), CZ + 2, s * 0.15, 1, 0.1, 5, 1.6, (x, y, z, t) => (t > 0.6 ? HOLY.goldHi : gold(x, y, z, 15)), 0.5);
     ell(T, CX + s * 10.5, ty(-4), CZ + 1, 3.6, 5.5, 8.2, wh(0.95));
     skin(T, ty(-9), ty(-8), (x, y, z) => gold(x, y, z, 16), (x) => Math.abs(x - (CX + s * 10.5)) < 5);
+    inlay(T, CX + s * 10.5, ty(-4), 3, 3.6, { base: wh(1.1), rim: HOLY.gold, rimHi: HOLY.goldHi, cross: XCROSS({ up: 2, down: 2, side: 1, t: 1 }), seed: 18 });
   }
   for (let y = ty(28); y <= ty(33); y++) for (let x = CX - 14; x <= CX + 14; x++) {
     const z = frontZ(T, x, y);
@@ -248,6 +249,7 @@ function holyTabard() {
   panel(CX, 31, 8, 11.5, (dx, x) => 1.5 + Math.abs(dx) * 1.35 + jg(dx, x) * 3.5 + ((Math.floor(x) & 3) === 0 ? 2.5 : 0), 3, 3, [23, 17, 11]);
   for (const s of [-1, 1]) panel(CX + s * 17, 28, 4.5, 6, (dx, x) => 9 + Math.abs(dx) * 1.0 + jg(dx, x + 9) * 5 + ((Math.floor(x) % 5) === 0 ? 3 : 0), 1, 2, [18, 12]);
   inlay(K, CX, 25.5, 4.2, 4.8, { base: wh(1.08), rim: HOLY.gold, rimHi: HOLY.goldHi, cross: XCROSS({ up: 3, down: 3, side: 2, t: 2 }), seed: 6 });
+  for (const s of [-1, 1]) inlay(K, CX + s * 17, 22, 3.2, 3.8, { base: wh(1.08), rim: HOLY.gold, rimHi: HOLY.goldHi, cross: XCROSS({ up: 2, down: 2, side: 1, t: 1 }), seed: 7 });
   return K;
 }
 
@@ -312,11 +314,7 @@ function holyLeg() {
     if (z >= 0) L.set(x, y, z + 1, y % 3 === 0 ? goldLo(x, y, z, 66) : gold(x, y, z, 67));
   }
   skin(L, 18, 19, (x, y, z) => gold(x, y, z, 68), (x, y, z) => z >= CZ + 5);
-  for (const [dx, dz, dy] of [[0, 0, 0]]) {
-    const z = frontZ(L, CX, 21);
-    for (let a = -1; a <= 0; a++) for (let b = -1; b <= 1; b++) L.set(CX + a, 20 + b, z + 1, b === 0 ? HOLY.goldHi : HOLY.gold);
-    void dx; void dz; void dy;
-  }
+  inlay(L, CX, 20.5, 4.4, 4.4, { base: wh(1.1), rim: HOLY.gold, rimHi: HOLY.goldHi, cross: XCROSS({ up: 3, down: 2, side: 2, t: 2 }), seed: 8 });
   skin(L, 24, 24, (x, y, z) => goldLo(x, y, z, 69), (x, y, z) => Math.hypot(x - CX, z - CZ) > 7.6);
   skin(L, 39, 40, (x, y, z) => gold(x, y, z, 70), (x, y, z) => Math.hypot(x - CX, z - CZ) > 8);
   inlay(L, CX, 31, 5.2, 8.4, { base: wh(1.1), rim: HOLY.gold, rimHi: HOLY.goldHi, cross: XCROSS({ up: 5, down: 4, side: 3, t: 2, hy: 1 }), seed: 3 });
@@ -329,7 +327,7 @@ function holyLeg() {
 /* ================================================================== */
 
 const dk = (tone = 1, s = 5) => (x, y, z) => shade(pick(DEMON.plate, x >> 1, y >> 1, z >> 1, s), tone * (0.94 + hash3(x, y, z, 77) * 0.12));
-const spikeC = (s = 0) => (x, y, z, t) => (t > 0.82 ? DEMON.spike[2] : J(pick(DEMON.spike, x, y, z, 70 + s), x, y, z, 71 + s, 0.05));
+const spikeC = (s = 0) => (x, y, z, t) => (t > 0.82 ? DEMON.spikeTip : J(pick(DEMON.spike, x, y, z, 70 + s), x, y, z, 71 + s, 0.05));
 const glowC = (x, y, z, t) => (t > 0.5 ? DEMON.glowHi : DEMON.glow);
 const redEye = (x, y, z) => ((x + y) & 1 ? DEMON.glowHi : DEMON.glowCore);
 const D_OY = 10;
@@ -408,13 +406,16 @@ function demonHead() {
       if (z - 2 >= 0) H.set(x, y, z - 2, 0x020203);
     }
   }
-  for (const s of [-1, 1]) for (let k = 0; k < 4; k++) {
-    const x = s > 0 ? CX + 2 + k : CX - 3 - k;
-    const y = 17 + (k >= 2 ? 1 : 0) + (k === 3 ? 0 : 0);
-    const z = frontZ(H, x, y);
-    if (z >= 0) H.set(x, y, z, k < 2 ? DEMON.glowHi : DEMON.glow, true);
-    const z2 = frontZ(H, x, y + 1);
-    if (z2 >= 0 && k >= 1) H.set(x, y + 1, z2, DEMON.glow, true);
+  // Burning eyes: slanted slits, white-hot at the centre, fading to blood red.
+  for (const s of [-1, 1]) for (let k = 0; k < 5; k++) {
+    const x = s > 0 ? CX + 1 + k : CX - 2 - k;
+    const y = 16 + (k >= 2 ? 1 : 0) + (k >= 4 ? 1 : 0);
+    for (const dy of [0, 1]) {
+      const z = frontZ(H, x, y + dy);
+      if (z < 0) continue;
+      const hot = k >= 1 && k <= 2 && dy === 0;
+      H.set(x, y + dy, z, hot ? DEMON.glowCore : k < 3 ? DEMON.glowHi : DEMON.glow, true);
+    }
   }
   for (let y = 7; y <= 13; y++) for (const dx of [-4, -2, 1, 3]) {
     const x = CX + dx;
@@ -462,7 +463,7 @@ function demonSkirt() {
         const half = Math.max(0.3, w * (1 - t * 0.92));
         for (let x = Math.floor(cx - half); x <= Math.ceil(cx + half); x++) {
           if (Math.abs(x + 0.5 - cx) > half) continue;
-          const c = t > 0.8 ? DEMON.spike[2] : J(pick(DEMON.plate, x >> 1, y >> 1, layer, 90), x, y, layer, 91, 0.06);
+          const c = t > 0.8 ? DEMON.spikeTip : J(pick(DEMON.plate, x >> 1, y >> 1, layer, 90), x, y, layer, 91, 0.06);
           K.set(x, y, z0 + (Math.abs(x - cx) < 1 ? 1 : 0), shade(c, layer === 0 ? 1.12 : 0.9));
           if (Math.abs(x + 0.5 - cx) < half * 0.4) K.set(x, y, z0 + 2, shade(c, 1.08));
         }
