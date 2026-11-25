@@ -4,6 +4,7 @@
  * worldView.localHeld from snapshot/delta for the local id.
  */
 import { GEAR, WEAPON_ORDER, gearById } from '../data/catalog.js';
+import { renderThumbNow } from './catalog.js';
 
 export const CURSOR_KEY = 'mg-weapon-cursor';
 export const CURSOR_KINDS = [
@@ -46,6 +47,32 @@ const HOT = { x: 2, y: 2 };
 function gearForHeld(held) {
   const id = String(held || '');
   return gearById(id) || GEAR.find((g) => g.type === 'weapon' && (g.held === id || g.item?.held === id)) || null;
+}
+
+/** Exact renderer spec for the equipped item, not its broad weapon family. */
+export function cursorSpecForHeld(held) {
+  if (!held) return null;
+  const id = String(held);
+  const gear = gearForHeld(id);
+  if (gear?.type === 'weapon') return { kind: 'weapon', id: gear.id };
+  return { kind: 'held', id };
+}
+
+const weaponCursorImages = new Map();
+
+/** A small image of the actual weapon model, cached by its held item ID. */
+export function cursorImageForHeld(held, px = 64) {
+  const spec = cursorSpecForHeld(held);
+  if (!spec) return null;
+  const key = spec.kind + ':' + spec.id + ':' + px;
+  if (weaponCursorImages.has(key)) return weaponCursorImages.get(key);
+  try {
+    const image = renderThumbNow(spec, px).toDataURL('image/png');
+    weaponCursorImages.set(key, image);
+    return image;
+  } catch {
+    return null;
+  }
 }
 
 export function cursorKindForHeld(held) {
@@ -151,7 +178,10 @@ export function applyWeaponCursor(game) {
   const kind = cursorKindForHeld(held);
   const tier = cursorTierForHeld(held);
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  canvas.style.cursor = cursorCss(kind, tier, dpr);
+  const image = cursorImageForHeld(held, 64);
+  canvas.style.cursor = image
+    ? 'url("' + image + '") 4 4, ' + cursorCss(kind, tier, dpr)
+    : cursorCss(kind, tier, dpr);
 }
 
 export function everyWeaponCursorKind() {
