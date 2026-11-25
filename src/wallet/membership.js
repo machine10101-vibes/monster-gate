@@ -132,6 +132,7 @@ export async function ensureMembership(session, game) {
     let pollTimer = null;
     let pollInFlight = false;
     let quoteLoading = false;
+    let rateLoading = false;
     let paymentInFlight = false;
     let paymentHash = '';
     let pollCount = 0;
@@ -348,6 +349,23 @@ export async function ensureMembership(session, game) {
         schedulePoll();
       }
     };
+    const loadRate = async () => {
+      if (settled || rateLoading) return;
+      rateLoading = true;
+      livePrice.textContent = 'Loading current KLV rate…';
+      quoteExpiry.textContent = 'Swopus live pool · KLV/USDT';
+      try {
+        const result = await post(currentSession, { op: 'rate' });
+        currentSession = result.session;
+        livePrice.textContent = `1 KLV = ${Number(result.data.usdPrice).toFixed(8)} USDT`;
+        quoteExpiry.textContent = `Live rate · ${result.data.priceSource || 'Swopus'} KLV/USDT`;
+      } catch (error) {
+        livePrice.textContent = 'KLV rate temporarily unavailable';
+        quoteExpiry.textContent = 'Swopus live pool · retry shortly';
+      } finally {
+        rateLoading = false;
+      }
+    };
     const loadQuote = async () => {
       if (settled || quoteLoading) return;
       if (pollTimer) clearTimeout(pollTimer);
@@ -420,6 +438,7 @@ export async function ensureMembership(session, game) {
     overlay.append(card);
     document.body.append(overlay);
     document.addEventListener('keydown', onKeyDown);
+    loadRate();
     if (status.walletAddress) loadQuote();
     else {
       payNow.disabled = true;
