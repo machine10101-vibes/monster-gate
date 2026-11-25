@@ -11,6 +11,7 @@ test('MG-UI panels share the journal theme tokens and classes', () => {
   const hud = src('../src/ui/hud.js');
   const main = src('../src/main.js');
   const style = src('../src/style.css');
+  const membership = src('../src/wallet/membership.css');
   const view = src('../src/net/worldView.js');
 
   assert.match(main, /ui\/theme\.css/);
@@ -47,4 +48,6 @@ test('MG-UI panels share the journal theme tokens and classes', () => {
   assert.match(hud, /mountFriends/);
   assert.match(main, /attachSocial/);
   assert.match(style, /\.nameplate\.hunter\.party/);
+  assert.match(style, /--font-body:\s*'Trebuchet MS', Arial, sans-serif/);
+  assert.match(membership, /\.mg-gatepass-card\s*\{[^}]*font-family:\s*inherit/);
 });
