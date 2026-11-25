@@ -173,3 +173,198 @@
   .mg-gatepass-code-row { flex-direction: column; }
   .mg-gatepass-redeem { width: 100%; }
 }
+
+
+/* Radiant glass Gate Pass — layered crystal, warm gold, and arcane light */
+.mg-gatepass-overlay {
+  background:
+    radial-gradient(ellipse at 50% 8%, rgba(101, 76, 158, .24), transparent 48%),
+    radial-gradient(ellipse at 12% 82%, rgba(46, 154, 174, .14), transparent 42%),
+    rgba(4, 6, 14, .76);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
+}
+.mg-gatepass-card {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(148deg, rgba(34, 38, 57, .91), rgba(16, 19, 32, .94) 54%, rgba(22, 17, 34, .93)) padding-box,
+    linear-gradient(132deg, rgba(255, 220, 158, .92), rgba(118, 210, 224, .56) 34%, rgba(171, 135, 255, .72) 68%, rgba(239, 188, 112, .82)) border-box;
+  -webkit-backdrop-filter: blur(30px) saturate(155%);
+  backdrop-filter: blur(30px) saturate(155%);
+  box-shadow:
+    0 34px 110px rgba(0, 0, 0, .68),
+    0 0 44px rgba(126, 113, 211, .13),
+    0 0 70px rgba(86, 188, 206, .09),
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    inset 0 -1px 0 rgba(255, 255, 255, .035);
+}
+.mg-gatepass-card::before {
+  inset: 7px;
+  border: 1px solid rgba(235, 224, 255, .12);
+  border-radius: 16px;
+  box-shadow: inset 0 0 26px rgba(173, 160, 255, .035);
+}
+.mg-gatepass-card::after {
+  inset: -2px;
+  top: 0;
+  right: 0;
+  width: auto;
+  height: auto;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(255, 218, 156, .14), transparent 34%),
+    radial-gradient(ellipse at 100% 42%, rgba(102, 211, 224, .13), transparent 35%),
+    radial-gradient(ellipse at 55% 100%, rgba(161, 124, 255, .12), transparent 40%);
+  filter: blur(24px);
+  opacity: .95;
+}
+.mg-gatepass-mark {
+  border-color: rgba(255, 229, 177, .86);
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255,255,255,.92), transparent 38%),
+    linear-gradient(145deg, #ffe9b8, #d9a2ed 58%, #78cbd5);
+  box-shadow:
+    0 0 0 4px rgba(255, 226, 174, .07),
+    0 0 26px rgba(239, 196, 126, .28),
+    0 0 34px rgba(117, 201, 221, .12),
+    inset 0 1px 0 rgba(255,255,255,.72);
+}
+.mg-gatepass-kicker { color: #f0c987; text-shadow: 0 0 18px rgba(239, 192, 116, .28); }
+.mg-gatepass-brand { color: rgba(240, 238, 255, .88); }
+.mg-gatepass-title {
+  color: #fff7e9;
+  text-shadow: 0 2px 24px rgba(215, 185, 255, .2), 0 0 36px rgba(115, 204, 220, .1);
+}
+.mg-gatepass-lede { color: rgba(225, 226, 240, .82); }
+.mg-gatepass-close {
+  border-color: rgba(225, 220, 255, .2);
+  background: rgba(255, 255, 255, .075);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.mg-gatepass-close:hover {
+  border-color: rgba(255, 222, 164, .62);
+  background: rgba(255, 255, 255, .14);
+  box-shadow: 0 0 22px rgba(231, 190, 125, .16);
+}
+.mg-gatepass-pricebox,
+.mg-gatepass-code-panel {
+  border-color: rgba(206, 209, 244, .19);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.085), rgba(255,255,255,.025)),
+    rgba(105, 115, 153, .055);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(135%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 10px 28px rgba(0,0,0,.12);
+}
+.mg-gatepass-pricebox.primary {
+  border-color: rgba(244, 205, 145, .5);
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(255, 221, 168, .14), transparent 72%),
+    linear-gradient(145deg, rgba(168, 127, 198, .12), rgba(255,255,255,.035));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 0 26px rgba(225, 184, 126, .08);
+}
+.mg-gatepass-pricebox:hover {
+  border-color: rgba(210, 220, 255, .34);
+  transform: translateY(-2px);
+  transition: transform .2s ease, border-color .2s ease;
+}
+.mg-gatepass-usd { text-shadow: 0 0 22px rgba(245, 202, 135, .2); }
+.mg-gatepass-tokenline {
+  border-color: rgba(151, 201, 220, .19);
+  background: linear-gradient(110deg, rgba(76, 157, 176, .11), rgba(255,255,255,.035));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+.mg-gatepass-tokenline strong { color: #d7f0e9; }
+.mg-gatepass-sectionlabel { color: #ead8f4; }
+.mg-gatepass-amountrow,
+.mg-gatepass-addressrow {
+  border-color: rgba(155, 203, 222, .24);
+  background: rgba(5, 10, 20, .43);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 0 22px rgba(102, 194, 212, .045);
+}
+.mg-gatepass-amount { color: #fce3b8; }
+.mg-gatepass-address { color: #e0e8f4; }
+.mg-gatepass-copy,
+.mg-gatepass-refresh {
+  border-color: rgba(198, 202, 238, .23);
+  background: rgba(255,255,255,.07);
+  color: #eee8ff;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.mg-gatepass-copy:hover,
+.mg-gatepass-refresh:hover:not(:disabled) {
+  border-color: rgba(145, 218, 226, .52);
+  background: rgba(112, 190, 207, .13);
+  box-shadow: 0 0 18px rgba(105, 194, 212, .1);
+}
+.mg-gatepass-stepnum {
+  color: #241a25;
+  background: linear-gradient(145deg, #fff0c8, #d6a8eb 58%, #8ed6dc);
+  box-shadow: 0 0 18px rgba(213, 177, 231, .18), inset 0 1px 0 rgba(255,255,255,.7);
+}
+.mg-gatepass-watch {
+  border-color: rgba(117, 218, 184, .28);
+  background: linear-gradient(110deg, rgba(39, 139, 111, .16), rgba(255,255,255,.035));
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.mg-gatepass-watch.error {
+  border-color: rgba(239, 160, 145, .36);
+  background: linear-gradient(110deg, rgba(153, 73, 73, .17), rgba(255,255,255,.035));
+}
+.mg-gatepass-pay,
+.mg-gatepass-check,
+.mg-gatepass-redeem {
+  border-color: rgba(255, 231, 187, .86);
+  background: linear-gradient(112deg, #ffe8b7, #e6b6dc 58%, #9ddce0);
+  color: #211a29;
+  box-shadow: 0 9px 26px rgba(196, 153, 192, .2), 0 0 28px rgba(113, 205, 218, .12), inset 0 1px 0 rgba(255,255,255,.8);
+  transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+}
+.mg-gatepass-pay:hover:not(:disabled),
+.mg-gatepass-check:hover:not(:disabled),
+.mg-gatepass-redeem:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.06) saturate(1.08);
+  box-shadow: 0 12px 30px rgba(196, 153, 192, .26), 0 0 34px rgba(113, 205, 218, .2), inset 0 1px 0 rgba(255,255,255,.86);
+}
+.mg-gatepass-code-input {
+  border-color: rgba(170, 203, 226, .27);
+  background: rgba(5, 9, 19, .58);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045);
+}
+.mg-gatepass-code-input:focus-visible {
+  outline: 2px solid rgba(133, 218, 229, .82);
+  outline-offset: 2px;
+  border-color: rgba(133, 218, 229, .6);
+}
+.mg-gatepass-copy:focus-visible,
+.mg-gatepass-close:focus-visible,
+.mg-gatepass-pay:focus-visible,
+.mg-gatepass-check:focus-visible,
+.mg-gatepass-refresh:focus-visible,
+.mg-gatepass-redeem:focus-visible,
+.mg-gatepass-explorer:focus-visible {
+  outline: 2px solid rgba(148, 224, 232, .9);
+  outline-offset: 3px;
+}
+.mg-gatepass-card::-webkit-scrollbar { width: 8px; }
+.mg-gatepass-card::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 20px;
+  background: rgba(204, 194, 232, .3);
+  background-clip: padding-box;
+}
+@media (max-width: 520px) {
+  .mg-gatepass-card {
+    background:
+      linear-gradient(148deg, rgba(34, 38, 57, .96), rgba(16, 19, 32, .97) 54%, rgba(22, 17, 34, .97)) padding-box,
+      linear-gradient(132deg, rgba(255, 220, 158, .9), rgba(118, 210, 224, .56) 42%, rgba(171, 135, 255, .72)) border-box;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mg-gatepass-pricebox:hover { transform: none; }
+  .mg-gatepass-pay, .mg-gatepass-check, .mg-gatepass-redeem { transition: none; }
+}
