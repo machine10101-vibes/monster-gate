@@ -1,7 +1,8 @@
 :root {
   --ui: 1;
   --font-px: 'Press Start 2P', ui-monospace, monospace;
-  --font-body: 'Pixelify Sans', 'Press Start 2P', ui-monospace, monospace;
+  /* Keep body numerals unambiguous: Pixelify Sans renders 5 too much like 8. */
+  --font-body: 'Trebuchet MS', Arial, sans-serif;
   --panel: rgba(14, 15, 18, 0.78);
   --panel-edge: #3b3d44;
   --panel-hi: #7a7d86;
