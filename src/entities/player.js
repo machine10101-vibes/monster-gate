@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, TALL_KINDS, gripRoll, placeSheath, swingRoll } from './weaponModels.js';
+import { DUAL_KINDS, TALL_KINDS, gripRoll, placeSheath, swingRoll, bendBowString } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -202,8 +202,17 @@ export class Player {
     if (kind) {
       const g = buildHeld(kind);
       g.traverse((o) => (o.castShadow = true));
-      slot.add(g);
+      // Measure in the model's own frame, before it joins the hand.
       this.gripZ = supportGrip(kind, g);
+      this.heldTipZ = gripBox.max.z;
+      slot.add(g);
+    }
+    this.bowStr = kind ? slot.getObjectByName('bowString') || null : null;
+    this.nockArrow = null;
+    if (this.bowStr) {
+      this.nockArrow = buildArrow();
+      this.nockArrow.visible = false;
+      slot.add(this.nockArrow);
     }
     const off = this.model.offhand;
     if (off) {
@@ -470,7 +479,7 @@ export class Player {
     this.stamDelay = 0.7;
     const swing = skillMods(this.game).speed ?? 1;
     const melee = item.kind === 'melee';
-    const step = melee ? comboStep(item, item.held || this.heldKind, combo) : null;
+    const step = melee || item.kind === 'ranged' ? comboStep(item, item.held || this.heldKind, combo) : null;
     this.attackStep = step;
     this.attackHitFrac = step ? step.hit : clamp((item.hit ?? item.dur * 0.6) / item.dur, 0.05, 0.9);
     this.setState('attack', item.dur * swing * (step ? step.dur : 1));
@@ -823,11 +832,13 @@ export class Player {
       if (it.proj) {
         const sp = it.proj === 'gloom' ? 12 : it.proj === 'bolt' ? 16 : 18;
         const lava = it.proj === 'lavabolt';
-        g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: this.pos.x + f.x * 0.6, y: this.pos.y + 1.2, z: this.pos.z + f.z * 0.6, vx: f.x * (lava ? sp * 0.72 : sp), vz: f.z * (lava ? sp * 0.72 : sp), vy: lava ? 4.2 : 0, gravity: lava ? 14 : 0, dmg, life: it.proj === 'gloom' ? 2.6 : lava ? 1.8 : 1.5, r: lava ? 0.58 : 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
+        const mz = this.muzzle(f, 0.6, 1.2);
+        g.spawnProjectile({ owner: 'player', kind: it.proj, spell: focus, x: mz.x, y: mz.y, z: mz.z, vx: mz.dx * (lava ? sp * 0.72 : sp), vz: mz.dz * (lava ? sp * 0.72 : sp), vy: lava ? 4.2 : 0, gravity: lava ? 14 : 0, dmg, life: it.proj === 'gloom' ? 2.6 : lava ? 1.8 : 1.5, r: lava ? 0.58 : 0.5, pierce, homing: it.proj === 'gloom' ? 3.2 : 0, crit: aimed });
         g.audio.release(weaponFamily(it, it.held || this.heldKind));
       } else {
         if (!g.progress.drawArrow()) return;
-        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.15, z: this.pos.z + f.z * 0.5, vx: f.x * (it.style === 'crossbow' ? 26 : 20), vz: f.z * (it.style === 'crossbow' ? 26 : 20), dmg, life: 1.3, r: 0.35, crit: aimed, pierce });
+        const mz = this.muzzle(f, 0.5, 1.15);
+        g.spawnProjectile({ owner: 'player', kind: 'arrow', x: mz.x, y: mz.y, z: mz.z, vx: mz.dx * (it.style === 'crossbow' ? 26 : 20), vz: mz.dz * (it.style === 'crossbow' ? 26 : 20), dmg, life: 1.3, r: 0.35, crit: aimed, pierce });
         g.audio.release(weaponFamily(it, it.held || this.heldKind));
       }
     } else if (it.kind === 'throw') {
@@ -836,6 +847,41 @@ export class Player {
       g.itemsChanged();
       g.spawnProjectile({ owner: 'player', kind: 'stone', x: this.pos.x + f.x * 0.5, y: this.pos.y + 1.3, z: this.pos.z + f.z * 0.5, vx: f.x * 12, vz: f.z * 12, vy: 3.5, dmg: it.dmg, life: 1.4, r: 0.4, gravity: 12 });
     }
+  }
+
+  /**
+   * Where a shot leaves the weapon: the arrow rest of a bow, the nose of a
+   * crossbow, the head of a staff or the tip of a wand. The flight converges on
+   * the hunter's line of fire, so aim at range is exactly as before. Falls back
+   * to the old chest point if the pose is unusable.
+   */
+  muzzle(f, ahead, height) {
+    const out = MUZZLE;
+    out.x = this.pos.x + f.x * ahead;
+    out.y = this.pos.y + height;
+    out.z = this.pos.z + f.z * ahead;
+    out.dx = f.x;
+    out.dz = f.z;
+    const m = this.model;
+    if (!this.heldKind || !m?.heldSlot) return out;
+    this.obj.updateMatrixWorld(true);
+    const p = this.bowStr ? RIG_V1.set(0.03, NOCK_RISE, 0.14) : RIG_V1.set(0, 0, (this.heldTipZ || 0.5) * 0.96);
+    m.heldSlot.localToWorld(p);
+    const rx = p.x - this.pos.x;
+    const rz = p.z - this.pos.z;
+    const along = rx * f.x + rz * f.z;
+    const side = Math.abs(rx * f.z - rz * f.x);
+    const up = p.y - this.pos.y;
+    if (!Number.isFinite(along + side + up) || along < 0.15 || along > 2.6 || side > 0.8 || up < 0.5 || up > 2.2) return out;
+    out.x = p.x;
+    out.y = p.y;
+    out.z = p.z;
+    const tx = this.pos.x + f.x * 14 - p.x;
+    const tz = this.pos.z + f.z * 14 - p.z;
+    const d = Math.hypot(tx, tz) || 1;
+    out.dx = tx / d;
+    out.dz = tz / d;
+    return out;
   }
 
   castBolt() {
@@ -893,39 +939,84 @@ export class Player {
     const m = this.model;
     this.pivot.updateMatrixWorld(true);
     const parent = m.hand.getWorldQuaternion(LV_Q1).invert();
-    const want = this.pivot.getWorldQuaternion(LV_Q2).multiply(LV_Q3.setFromEuler(LV_E.set(this.levelPitch || 0, 0, gripRoll(this.heldKind))));
+    const want = this.pivot.getWorldQuaternion(LV_Q2).multiply(LV_Q3.setFromEuler(LV_E.set(this.levelPitch || 0, 0, gripRoll(this.heldKind) + (this.levelRoll || 0))));
     m.heldSlot.quaternion.slerp(parent.multiply(want), Math.min(1, w));
   }
 
   /**
-   * Two-handed melee weapons keep the support hand on the haft. An analytic
-   * two-bone solve places the left hand on the weapon's grip point after the
-   * rest of the pose is set, blended in and out so it never pops.
+   * Hand placement after the keyed pose: the weapon arm aims, the weapon is
+   * aligned to the line of fire, the support hand is pinned to the second grip
+   * and an archer's draw hand is pinned to the string. Every solve is blended
+   * by a weight so it eases in and out without popping.
    */
-  supportHand(dt) {
+  armRig(dt) {
     const m = this.model;
     const fam = weaponFamily({ kind: 'melee' }, this.heldKind);
+    const step = this.state === 'attack' ? this.attackStep : null;
+    const ranged = !!step && this.attackItem?.kind === 'ranged';
+    const k = step ? this.atkPose : null;
     const busy = this.state === 'roll' || this.state === 'dead' || this.state === 'stagger' || this.state === 'use' || this.state === 'gather';
-    const want = SUPPORT_FAMILIES.has(fam) && !busy && !this.shielding && !this.sipping && !(this.castT > 0) && !this.leapArm && !(this.leapT > 0) && !(this.hurtT > 0.15) && (this.state !== 'attack' || this.attackItem?.kind === 'melee') ? 1 : 0;
-    this.ikW = (this.ikW || 0) + (want - (this.ikW || 0)) * Math.min(1, dt * 14);
-    if (this.ikW < 0.01) {
-      this.levelWeapon();
-      return;
+    const free = !busy && !this.shielding && !this.sipping && !(this.castT > 0) && !this.leapArm && !(this.leapT > 0) && !(this.hurtT > 0.15);
+    let want = 0;
+    if (free) {
+      if (ranged) want = clamp(k.two || 0, 0, 1);
+      else if (SUPPORT_FAMILIES.has(fam) && (this.state !== 'attack' || this.attackItem?.kind === 'melee')) want = 1;
     }
-    const grip = this.gripPoint || (this.gripPoint = new THREE.Vector3());
-    const L1 = Math.abs(m.elbowL.position.y);
-    const L2 = Math.abs(m.offhand.position.y);
-    const reach = (L1 + L2) * 0.97;
+    this.ikW = (this.ikW || 0) + (want - (this.ikW || 0)) * Math.min(1, dt * (ranged ? 24 : 14));
+    const aimW = free && ranged ? clamp(k.aim || 0, 0, 1) : 0;
+    const drawW = free && ranged ? clamp(k.dw || 0, 0, 1) : 0;
+    this.pivot.updateMatrixWorld(true);
+    if (aimW > 0.01) this.aimArm(step, aimW);
+    if (this.ikW > 0.01) this.pullLeadArm();
+    this.levelWeapon();
+    if (this.ikW > 0.01) this.placeSupportHand(this.ikW);
+    if (drawW > 0.01) this.placeDrawHand(k, step, drawW);
+    this.updateBowRig(ranged ? k : null, step, drawW);
+  }
+
+  /** Bring the weapon arm onto the line of fire (straight arm), or the grip to a point by the shoulder. */
+  aimArm(step, w) {
+    const m = this.model;
+    const L1 = Math.abs(m.elbowR.position.y);
+    const L2 = Math.abs(m.hand.position.y);
+    const t = RIG_V1;
+    if (step.aimMode === 'pt') {
+      const [x, y, z] = step.aimPt || [0.1, 0, 0.3];
+      m.armR.getWorldPosition(t);
+      this.pivot.worldToLocal(t);
+      t.x -= x * Math.sign(m.armR.position.x || 1);
+      t.y += y;
+      t.z += z;
+      this.pivot.localToWorld(t);
+      m.upper.worldToLocal(t);
+      t.sub(m.armR.position);
+    } else {
+      // Straight down the facing, a touch above level, expressed in the torso's frame.
+      const up = m.upper.getWorldQuaternion(RIG_Q1).invert();
+      t.set(0, 0.06, 1).applyQuaternion(this.pivot.getWorldQuaternion(RIG_Q2)).applyQuaternion(up).normalize().multiplyScalar(L1 + L2);
+    }
+    applyArm(m.armR, m.elbowR, solveArm(t, L1, L2), w);
+    m.armR.updateMatrixWorld(true);
+  }
+
+  /** Weapon grip point in the torso's frame, relative to the left shoulder. */
+  gripFromLeftShoulder(out, z) {
+    const m = this.model;
+    for (const o of [m.heldSlot, m.hand, m.elbowR, m.armR]) o.updateMatrix();
+    out.set(0, 0, z).applyMatrix4(m.heldSlot.matrix).applyMatrix4(m.hand.matrix).applyMatrix4(m.elbowR.matrix).applyMatrix4(m.armR.matrix);
+    return out.sub(m.armL.position);
+  }
+
+  /** Draw the lead arm across the chest just far enough for the support hand to reach the grip. */
+  pullLeadArm() {
+    const m = this.model;
+    const reach = (Math.abs(m.elbowL.position.y) + Math.abs(m.offhand.position.y)) * 0.97;
     const gz = this.gripZ ?? -0.18;
-    for (const o of [m.heldSlot, m.hand, m.elbowR]) o.updateMatrix();
     const baseZ = m.armR.rotation.z;
     const need = (off) => {
       m.armR.rotation.z = baseZ - off;
-      m.armR.updateMatrix();
-      grip.set(0, 0, gz).applyMatrix4(m.heldSlot.matrix).applyMatrix4(m.hand.matrix).applyMatrix4(m.elbowR.matrix).applyMatrix4(m.armR.matrix);
-      return grip.sub(m.armL.position).length();
+      return this.gripFromLeftShoulder(RIG_V2, gz).length();
     };
-    // Draw the lead arm across the chest just far enough for the support hand to reach the grip.
     let off = 0;
     if (need(0) > reach) {
       let lo = 0;
@@ -940,33 +1031,78 @@ export class Player {
         off = hi;
       }
     }
-    need(off * this.ikW);
-    // Level the haft after the lead arm settles, then re-measure the grip for the support hand.
-    if ((this.levelW || 0) > 0.01) {
-      this.levelWeapon();
-      m.heldSlot.updateMatrix();
-      need(off * this.ikW);
+    m.armR.rotation.z = baseZ - off * this.ikW;
+    m.armR.updateMatrixWorld(true);
+  }
+
+  /**
+   * Level-held weapons (spears, aimed bows, crossbows, casting wands) point
+   * along the hunter's facing in body space, whatever the torso and arms are
+   * doing, so the weapon stays on the line while the arms supply the motion.
+   */
+  levelWeapon() {
+    const w = this.levelW || 0;
+    if (w < 0.01) return;
+    const m = this.model;
+    m.hand.updateMatrixWorld(true);
+    const parent = m.hand.getWorldQuaternion(LV_Q1).invert();
+    const want = this.pivot.getWorldQuaternion(LV_Q2).multiply(LV_Q3.setFromEuler(LV_E.set(this.levelPitch || 0, 0, gripRoll(this.heldKind) + (this.levelRoll || 0))));
+    m.heldSlot.quaternion.slerp(parent.multiply(want), Math.min(1, w));
+    m.heldSlot.updateMatrixWorld(true);
+  }
+
+  /** Pin the left hand to the weapon's second grip. */
+  placeSupportHand(w) {
+    const m = this.model;
+    const L1 = Math.abs(m.elbowL.position.y);
+    const L2 = Math.abs(m.offhand.position.y);
+    const t = this.gripFromLeftShoulder(RIG_V2, this.gripZ ?? -0.18);
+    applyArm(m.armL, m.elbowL, solveArm(t, L1, L2), w);
+  }
+
+  /** Pin the draw hand to the bowstring, drawn back `pull` of the bow's draw length. */
+  placeDrawHand(k, step, w) {
+    const m = this.model;
+    const s = this.bowStr;
+    if (!s) return;
+    const [tx, ty, tz] = s.userData.top;
+    const [, by] = s.userData.bottom;
+    // The nock sits above the grip, so the anchor lands at the chin, above the bow arm.
+    const t = RIG_V2.set(tx, (ty + by) / 2 + NOCK_RISE, tz - clamp(k.pull || 0, 0, 1.1) * (step.drawLen || 0.55));
+    m.heldSlot.localToWorld(t);
+    m.upper.worldToLocal(t);
+    t.sub(m.armL.position);
+    applyArm(m.armL, m.elbowL, solveArm(t, Math.abs(m.elbowL.position.y), Math.abs(m.offhand.position.y)), w);
+  }
+
+  /** Bend the string to the draw hand and keep a nocked arrow on it until the release. */
+  updateBowRig(k, step, drawW) {
+    const s = this.bowStr;
+    if (!s) return;
+    const m = this.model;
+    const [tx, ty, tz] = s.userData.top;
+    const [, by] = s.userData.bottom;
+    const mid = RIG_V3.set(tx, (ty + by) / 2 + NOCK_RISE, tz);
+    let nock = null;
+    if (k && drawW > 0.05) {
+      m.armL.updateMatrixWorld(true);
+      const hand = m.offhand.getWorldPosition(RIG_V1);
+      m.heldSlot.worldToLocal(hand);
+      // The string never pushes forward of rest; it follows the hand back and sideways.
+      hand.z = Math.min(hand.z, tz);
+      nock = mid.clone().lerp(hand, clamp(drawW, 0, 1));
     }
-    const d = clamp(grip.length(), Math.abs(L1 - L2) + 1e-3, L1 + L2 - 1e-4);
-    grip.setLength(d);
-    const e = Math.acos(clamp((d * d - L1 * L1 - L2 * L2) / (2 * L1 * L2), -1, 1));
-    const bend = clamp(e, 0.04, 2.5);
-    // Hand offset in the shoulder frame for this elbow bend (forearm swings forward).
-    const hy = -L1 - L2 * Math.cos(bend);
-    const hz = L2 * Math.sin(bend);
-    const sinC = clamp(grip.x / -hy, -1, 1);
-    const c = Math.asin(sinC);
-    const yc = hy * Math.cos(c);
-    const a = Math.atan2(grip.z, grip.y) - Math.atan2(hz, yc);
-    let ax = m.armL.rotation.x;
-    // Keep the solution in the same turn as the current shoulder angle.
-    let target = a;
-    while (target - ax > Math.PI) target -= TAU;
-    while (target - ax < -Math.PI) target += TAU;
-    const w = this.ikW;
-    m.armL.rotation.x = lerp(ax, target, w);
-    m.armL.rotation.z = lerp(m.armL.rotation.z, c, w);
-    m.elbowL.rotation.x = lerp(m.elbowL.rotation.x, -bend, w);
+    bendBowString(s, nock);
+    const arrow = this.nockArrow;
+    if (!arrow) return;
+    const show = !!k && (k.arw || 0) > 0.5;
+    arrow.visible = show;
+    if (!show) return;
+    const tail = nock || mid;
+    arrow.position.copy(tail);
+    // The shaft runs from the nock to the arrow rest just above the grip, on the riser's side.
+    const dir = RIG_V1.set(0.03 - tail.x, mid.y - 0.02 - tail.y, 0.05 - tail.z).normalize();
+    arrow.quaternion.setFromUnitVectors(RIG_Z, dir);
   }
 
   updateTrail(dt) {
@@ -1081,10 +1217,10 @@ export class Player {
         rate = 30;
         const family = weaponFamily(it, it.held || this.heldKind);
         const step = this.attackStep;
-        if (it.kind === 'melee' && step) {
+        if (step) {
           // Each weapon class plays its own keyed three-step chain (attackCombos.js).
           const k = sampleStep(step, tt, this.atkPose);
-          rate = 44;
+          rate = it.kind === 'melee' ? 44 : 34;
           armR = k.aR;
           armRz = k.aRz;
           armL = k.aL;
@@ -1100,6 +1236,16 @@ export class Player {
           legExtraR = 0;
           liftL = 0;
           liftR = 0;
+          if (it.kind === 'ranged') {
+            // Shooters keep their eyes on the line of fire while the torso turns side-on,
+            // and the shot gives a small kick back through the shoulders.
+            const kick = Math.exp(-Math.pow((tt - hitT) / 0.06, 2)) * (tt > hitT - 0.02 ? 1 : 0);
+            headYaw -= torsoYaw * 0.62;
+            headPitch -= lean * 0.2;
+            lean -= kick * (family === 'crossbow' ? 0.07 : 0.035);
+            torsoYaw += kick * (family === 'bow' ? 0.06 : 0.03);
+            break;
+          }
           // Whole-body follow-through: hips and head counter-rotate, then recover
           // after the weapon has passed the target.
           const bodySide = step.side;
@@ -1427,19 +1573,17 @@ export class Player {
       eR += run * (0.3 + 0.55 * swingR) * (heldBlade ? 0.65 : 1);
       eL += run * (0.3 + 0.55 * swingL);
     }
-    if (rangedAim) {
-      const tt = clamp(this.stateT / this.stateDur, 0, 1);
-      const pull = tt < 0.6 ? ease(tt / 0.6) : 1 - ease((tt - 0.6) / 0.4);
-      eR = AIMED_KINDS.has(this.heldKind) ? 0.1 : eR;
-      eL = 0.3 + 0.8 * pull;
-    } else if (this.state === 'attack' && this.attackItem?.kind === 'melee' && this.attackStep) {
+    if (this.state === 'attack' && this.attackStep) {
       // Elbows come from the step's keys: loaded on the wind-up, snapping
       // straight through contact, with a brief compression as the blow lands.
       const k = this.atkPose;
       const tt = clamp(this.stateT / this.stateDur, 0, 1);
       const impact = Math.exp(-Math.pow((tt - this.attackHitFrac) / 0.08, 2));
-      eR = Math.max(0.04, eR + (k.eR || 0) + impact * 0.1);
-      eL = Math.max(0.04, eL + (k.eL || 0) + impact * 0.06);
+      const ranged = this.attackItem?.kind === 'ranged';
+      eR = Math.max(0.04, eR + (k.eR || 0) + impact * (ranged ? 0.02 : 0.1));
+      eL = Math.max(0.04, eL + (k.eL || 0) + impact * (ranged ? 0 : 0.06));
+    } else if (rangedAim) {
+      eR = AIMED_KINDS.has(this.heldKind) ? 0.1 : eR;
     }
     if (this.state === 'roll') {
       eR = 1.6;
@@ -1518,9 +1662,20 @@ export class Player {
     let weaponYaw = 0;
     let weaponRollLag = 0;
     // A spear rests level along the forearm with its point slightly raised.
-    let level = heldFamily === 'spear' && this.state !== 'roll' && this.state !== 'dead' ? 1 : 0;
+    // Bows and crossbows stay upright and level with the body the same way.
+    let level = (heldFamily === 'spear' || aimed) && this.state !== 'roll' && this.state !== 'dead' && !this.sipping ? 1 : 0;
     if (level) weaponPitch = -0.4;
-    if (this.state === 'attack' && this.attackItem?.kind === 'melee' && this.attackStep) {
+    this.levelRoll = 0;
+    if (this.state === 'attack' && this.attackItem?.kind === 'ranged' && this.attackStep) {
+      // Shots and casts aim the weapon down the line of fire; a brief kick follows the release.
+      const k = this.atkPose;
+      level = aimed ? 1 : k.lv || 0;
+      const tt = clamp(this.stateT / this.stateDur, 0, 1);
+      const kick = Math.exp(-Math.pow((tt - this.attackHitFrac) / 0.05, 2)) * (tt > this.attackHitFrac - 0.01 ? 1 : 0);
+      const family = weaponFamily(this.attackItem, this.attackItem.held || this.heldKind);
+      weaponPitch = (k.wp || 0) - kick * (family === 'crossbow' ? 0.14 : family === 'bow' ? 0.05 : 0.09);
+      this.levelRoll = k.wr || 0;
+    } else if (this.state === 'attack' && this.attackItem?.kind === 'melee' && this.attackStep) {
       const k = this.atkPose;
       level = k.lv || 0;
       const tt = clamp(this.stateT / this.stateDur, 0, 1);
@@ -1534,17 +1689,13 @@ export class Player {
       weaponPitch = (k.wp || 0) + impact * 0.06 * weight;
       weaponYaw = (k.wy || 0) + side * (impact * 0.08 + Math.sin(recover * Math.PI) * 0.1) * weight;
       weaponRollLag = (k.wr || 0) + side * (impact * 0.06 + Math.sin(recover * Math.PI) * 0.08) * weight;
-    } else if (this.state === 'attack' && this.attackItem?.kind === 'ranged') {
-      const tt = clamp(this.stateT / this.stateDur, 0, 1);
-      const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
-      const release = Math.exp(-Math.pow((tt - hitT) / 0.075, 2));
-      const family = weaponFamily(this.attackItem, this.attackItem.held || this.heldKind);
-      // Bow limbs flex and settle; crossbow stock gives a shorter, firmer kick.
-      weaponPitch = -release * (family === 'crossbow' ? 0.12 : 0.075);
-      weaponYaw = release * (family === 'bow' ? 0.045 : 0.025);
-      weaponRollLag = -release * (family === 'crossbow' ? 0.035 : 0.06);
     }
     this.levelW = sp.step('weaponLevel', level, dt, rate * 0.8, 0.9);
+    if (this.state === 'attack' && this.attackItem?.kind === 'ranged' && this.attackStep) {
+      // Shot and cast keys are already eased; follow them exactly so a snap cast lands on the line.
+      sp.get('weaponLevel').snap(level);
+      this.levelW = level;
+    }
     this.levelPitch = weaponPitch;
     m.heldSlot.rotation.x = aimed ? -(m.armR.rotation.x + m.elbowR.rotation.x) : sp.step('weaponPitch', weaponPitch, dt, rate * 0.72, 0.8);
     m.heldSlot.rotation.y = sp.step('weaponYaw', weaponYaw, dt, rate * 0.68, 0.8);
@@ -1602,13 +1753,70 @@ export class Player {
       m.hip.position.y = d + bobExtra;
     }
     m.hip.position.x += (hipX - m.hip.position.x) * Math.min(1, dt * 14);
-    this.supportHand(dt);
     this.pivot.rotation.x = pivotX;
     // Spinning steps turn the whole body; the turn ends on a full circle so it hands back cleanly.
     this.pivot.rotation.y = this.state === 'attack' && this.attackStep ? this.atkPose.spin || 0 : 0;
     this.pivot.rotation.z += (tilt * 0.4 - this.pivot.rotation.z) * Math.min(1, dt * 10);
     this.pivot.position.y = pivotY;
+    this.armRig(dt);
   }
+}
+
+const RIG_V1 = new THREE.Vector3();
+const RIG_V2 = new THREE.Vector3();
+const RIG_V3 = new THREE.Vector3();
+const RIG_Z = new THREE.Vector3(0, 0, 1);
+const NOCK_RISE = 0.1;
+const MUZZLE = { x: 0, y: 0, z: 0, dx: 0, dz: 1 };
+const RIG_Q1 = new THREE.Quaternion();
+const RIG_Q2 = new THREE.Quaternion();
+const ARM_SOL = { x: 0, z: 0, bend: 0 };
+
+/**
+ * Analytic two-bone solve for an arm whose hand hangs along -y. Given the hand
+ * target relative to the shoulder (in the arm's parent frame), returns the
+ * shoulder pitch (x), roll (z) and elbow bend that reach it; out-of-reach
+ * targets get a straight arm pointed at them.
+ */
+function solveArm(t, L1, L2) {
+  const d = clamp(t.length(), Math.abs(L1 - L2) + 1e-3, L1 + L2 - 1e-4);
+  t.setLength(d);
+  const bend = clamp(Math.acos(clamp((d * d - L1 * L1 - L2 * L2) / (2 * L1 * L2), -1, 1)), 0.04, 2.5);
+  const hy = -L1 - L2 * Math.cos(bend);
+  const hz = L2 * Math.sin(bend);
+  const c = Math.asin(clamp(t.x / -hy, -1, 1));
+  ARM_SOL.x = Math.atan2(t.z, t.y) - Math.atan2(hz, hy * Math.cos(c));
+  ARM_SOL.z = c;
+  ARM_SOL.bend = bend;
+  return ARM_SOL;
+}
+
+/** Blend an arm toward a solve, staying in the same turn as its current shoulder angle. */
+function applyArm(arm, elbow, sol, w) {
+  let x = sol.x;
+  while (x - arm.rotation.x > Math.PI) x -= TAU;
+  while (x - arm.rotation.x < -Math.PI) x += TAU;
+  arm.rotation.x = lerp(arm.rotation.x, x, w);
+  arm.rotation.z = lerp(arm.rotation.z, sol.z, w);
+  elbow.rotation.x = lerp(elbow.rotation.x, -sol.bend, w);
+}
+
+let arrowParts = null;
+/** A nocked arrow: tail at the origin, pointing along +z. */
+function buildArrow() {
+  if (!arrowParts) {
+    const box = (w, h, d, z) => new THREE.BoxGeometry(w, h, d).translate(0, 0, z);
+    arrowParts = [
+      [box(0.018, 0.018, 0.92, 0.46), new THREE.MeshLambertMaterial({ color: 0x8a6a42 })],
+      [box(0.04, 0.012, 0.08, 0.95), new THREE.MeshLambertMaterial({ color: 0x5c6168 })],
+      [box(0.004, 0.05, 0.11, 0.08), new THREE.MeshLambertMaterial({ color: 0xe2dccb })],
+      [box(0.05, 0.004, 0.11, 0.08), new THREE.MeshLambertMaterial({ color: 0xb8402e })],
+    ];
+  }
+  const g = new THREE.Group();
+  g.name = 'nockArrow';
+  for (const [geo, mat] of arrowParts) g.add(new THREE.Mesh(geo, mat));
+  return g;
 }
 
 const LV_Q1 = new THREE.Quaternion();
@@ -1617,7 +1825,7 @@ const LV_Q3 = new THREE.Quaternion();
 const LV_E = new THREE.Euler();
 
 /** Melee families held with both hands on the haft. */
-const SUPPORT_FAMILIES = new Set(['heavy', 'spear', 'scythe']);
+const SUPPORT_FAMILIES = new Set(['heavy', 'spear', 'scythe', 'crossbow']);
 const gripBox = new THREE.Box3();
 
 /**
@@ -1627,10 +1835,12 @@ const gripBox = new THREE.Box3();
  */
 function supportGrip(kind, g) {
   const fam = weaponFamily({ kind: 'melee' }, kind);
-  if (fam === 'spear') return 0.5;
-  if (fam === 'scythe') return 0.42;
   g.updateMatrixWorld(true);
   gripBox.setFromObject(g);
+  if (fam === 'spear') return 0.5;
+  if (fam === 'scythe') return 0.42;
+  if (fam === 'crossbow') return 0.42;
+  if (fam === 'staff') return 0.36;
   return gripBox.min.z < -0.15 ? Math.max(-0.2, gripBox.min.z + 0.09) : 0.19;
 }
 

@@ -22,7 +22,13 @@
  *   hp       head pitch (+ looks down)
  *   rl       0..1 blend toward an edge-leading quarter roll for flat blades
  *   wp/wy/wr extra wrist pitch / yaw / roll on the held weapon (wp + dips the tip)
- *   lv       0..1 blend that keeps the weapon level with the forearm line (thrusts)
+ *   lv       0..1 blend that keeps the weapon aligned with the hunter's facing (thrusts, aiming)
+ *   aim      0..1 blend toward the step's arm aim (bow arm / wand arm straight at the target,
+ *            or the crossbow grip brought to the shoulder)
+ *   two      0..1 support hand pinned to the weapon's second grip
+ *   dw       0..1 draw hand pinned to the bowstring
+ *   pull     0..1 how far the string is drawn
+ *   arw      >0.5 shows a nocked arrow
  *   spin     whole-body turn (radians) for spinning moves
  *
  * Step fields:
@@ -49,7 +55,7 @@ const EASE = {
   hold: () => 0,
 };
 
-const CHANNELS = ['aR', 'aRz', 'aL', 'aLz', 'eR', 'eL', 'ty', 'ln', 'cr', 'tl', 'lL', 'lR', 'hp', 'rl', 'wp', 'wy', 'wr', 'lv', 'spin'];
+const CHANNELS = ['aR', 'aRz', 'aL', 'aLz', 'eR', 'eL', 'ty', 'ln', 'cr', 'tl', 'lL', 'lR', 'hp', 'rl', 'wp', 'wy', 'wr', 'lv', 'spin', 'aim', 'two', 'dw', 'pull', 'arw'];
 
 const ZERO = Object.fromEntries(CHANNELS.map((c) => [c, 0]));
 
@@ -65,6 +71,11 @@ const GUARD = {
   scythe: { aR: -0.66, aRz: 0.06, aL: -0.8, aLz: -0.16, lL: 0.24, lR: -0.2, ty: 0.1 },
   dual: { aR: -0.78, aRz: 0.06, aL: -0.72, aLz: -0.06, lL: 0.22, lR: -0.2, ln: 0.06, cr: 0.02 },
   claws: { aR: -0.95, aRz: 0.1, aL: -0.9, aLz: -0.1, eR: 0.5, eL: 0.5, lL: 0.28, lR: -0.24, ln: 0.12, cr: 0.05 },
+  longbow: { aR: -0.4, aRz: -0.05, aL: -0.25, aLz: 0.05, lL: 0.2, lR: -0.18, ty: -0.12 },
+  shortbow: { aR: -0.45, aRz: -0.05, aL: -0.3, aLz: 0.05, lL: 0.2, lR: -0.18, ty: -0.1, ln: 0.04 },
+  crossbow: { aR: -0.92, aL: -0.38, aLz: -0.12, lL: 0.2, lR: -0.18, two: 1 },
+  staff: { aR: -0.55, aRz: 0.02, aL: -0.2, aLz: 0.05, lL: 0.18, lR: -0.16 },
+  wand: { aR: -0.62, aRz: 0.0, aL: -0.35, aLz: 0.08, lL: 0.18, lR: -0.16 },
 };
 
 /* ------------------------------------------------------------------ */
@@ -348,6 +359,142 @@ const COMBOS = {
 };
 
 /* ------------------------------------------------------------------ */
+/* ranged                                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Ranged steps keep the weapon's base tempo (dur 1) and release near the old
+ * 60% mark, so fire rate and damage are unchanged; only the motion is new.
+ * aimMode 'dir' points the arm straight down the line of fire, 'pt' brings the
+ * weapon hand to aimPt (metres from the right shoulder in body space:
+ * x toward the body's left, y up, z forward).
+ */
+
+const LONGBOW_SHOT = {
+  // Nock, raise, draw to the anchor, hold, release, then reach back to the quiver.
+  dur: 1, hit: 0.64, side: 1, cancel: 0.84, window: 0.5, aimMode: 'dir', drawLen: 0.62,
+  keys: [
+    { t: 0.14, e: 'out', aR: -1.0, aL: -1.25, eL: 1.3, ty: -0.55, lL: 0.34, lR: -0.32, aim: 0.55, lv: 0.85, dw: 0.85, pull: 0.04, arw: 1, hp: 0.02 },
+    { t: 0.46, e: 'io', aR: -1.5, aL: -1.5, eL: 2.0, ty: -1.0, ln: -0.04, tl: -0.05, aim: 1, lv: 1, dw: 1, pull: 1 },
+    { t: 0.63, e: 'io', ty: -1.02, pull: 1.04 },
+    { t: 0.64, e: 'lin', pull: 0, dw: 0, arw: 0, aL: -1.6, aLz: 0.35, eL: 0.6 },
+    { t: 0.74, e: 'out', aL: -1.4, aLz: 0.55, eL: 0.35, ty: -0.95, tl: -0.03, ln: -0.06 },
+    { t: 0.88, e: 'io', aL: -2.75, aLz: 0.1, eL: 1.6, aim: 0.6, ty: -0.6, lv: 0.7 },
+    { t: 1, e: 'io', reset: true },
+  ],
+};
+
+const SHORTBOW_SHOT = {
+  // Snap shot: canted bow, quick partial draw, crisp release.
+  dur: 1, hit: 0.58, side: 1, cancel: 0.8, window: 0.45, aimMode: 'dir', drawLen: 0.48,
+  keys: [
+    { t: 0.16, e: 'out', aR: -1.1, aL: -1.3, eL: 1.4, ty: -0.42, lL: 0.3, lR: -0.28, aim: 0.6, lv: 0.9, wr: 0.32, dw: 0.9, pull: 0.08, arw: 1 },
+    { t: 0.48, e: 'io', aR: -1.5, aL: -1.5, eL: 1.85, ty: -0.72, ln: 0.02, aim: 1, lv: 1, wr: 0.38, dw: 1, pull: 0.88 },
+    { t: 0.57, e: 'io', pull: 0.92 },
+    { t: 0.58, e: 'lin', pull: 0, dw: 0, arw: 0, aL: -1.55, aLz: 0.3, eL: 0.55 },
+    { t: 0.7, e: 'out', aL: -1.35, aLz: 0.5, eL: 0.3, ty: -0.65 },
+    { t: 1, e: 'io', reset: true },
+  ],
+};
+
+const CROSSBOW_SHOT = {
+  // Shoulder, settle, trigger, recoil, then drop the nose to cock and raise again.
+  dur: 1, hit: 0.5, side: 1, cancel: 0.9, window: 0.45, aimMode: 'pt', aimPt: [0.1, 0.04, 0.3],
+  lunge: [-1.6, 0.5, 0.62],
+  keys: [
+    { t: 0.24, e: 'out', aR: -1.3, ty: -0.32, tl: 0.05, hp: 0.06, lL: 0.32, lR: -0.24, aim: 1, lv: 1, wp: 0.02 },
+    { t: 0.48, e: 'io', ty: -0.36, wp: 0.0 },
+    { t: 0.5, e: 'in', wp: 0.0 },
+    { t: 0.58, e: 'out', wp: -0.42, ln: -0.14, ty: -0.24, hp: -0.04, aim: 0.85 },
+    { t: 0.74, e: 'io', aim: 0.15, lv: 0.6, wp: 0.6, ln: 0.08, cr: 0.04, ty: -0.1, two: 0, aL: -0.75, eL: 1.25, aLz: 0.3, hp: 0.12 },
+    { t: 0.84, e: 'io', aL: -0.4, eL: 1.5, aLz: 0.15 },
+    { t: 0.94, e: 'io', two: 1, wp: 0.3, aim: 0.1 },
+    { t: 1, e: 'io', reset: true },
+  ],
+};
+
+const RANGED = {
+  longbow: [LONGBOW_SHOT, LONGBOW_SHOT, LONGBOW_SHOT],
+  shortbow: [SHORTBOW_SHOT, SHORTBOW_SHOT, SHORTBOW_SHOT],
+  crossbow: [CROSSBOW_SHOT, CROSSBOW_SHOT, CROSSBOW_SHOT],
+
+  /* War staff: a two-handed caster's chain of lance, sweep and invocation. */
+  staff: [
+    {
+      // 1. Lance: draw the staff back along the forearm, then drive the head at the target.
+      dur: 1, hit: 0.6, side: 1, cancel: 0.82, window: 0.5, lunge: [2.6, 0.48, 0.64],
+      keys: [
+        { t: 0.3, e: 'out', aR: -0.45, eR: 1.05, aL: -0.9, ty: 0.45, ln: -0.1, lL: 0.34, lR: -0.12, two: 1, lv: 1, wp: -0.25, hp: 0.04 },
+        { t: 0.52, e: 'io', ty: 0.52, wp: -0.3, ln: -0.12 },
+        { t: 0.57, e: 'in', aR: -1.45, eR: -0.05, ty: -0.22, ln: 0.22, cr: 0.04, lL: 0.5, lR: -0.5, wp: 0.04 },
+        { t: 0.74, e: 'out', ln: 0.2, ty: -0.26 },
+        { t: 1, e: 'io', reset: true },
+      ],
+    },
+    {
+      // 2. Sweep: the staff swings out across the body and snaps level at the target.
+      dur: 1, hit: 0.6, side: -1, cancel: 0.82, window: 0.5,
+      keys: [
+        { t: 0.3, e: 'out', aR: -1.05, aRz: 0.55, aL: -1.2, aLz: 0.3, ty: 0.9, ln: -0.04, lL: 0.3, lR: -0.16, two: 1, lv: 0.2 },
+        { t: 0.52, e: 'io', ty: 0.98 },
+        { t: 0.57, e: 'in', aR: -1.35, aRz: -0.12, ty: -0.28, ln: 0.16, lL: 0.42, lR: -0.42, lv: 1, wp: 0.05 },
+        { t: 0.76, e: 'out', ty: -0.34 },
+        { t: 1, e: 'io', reset: true },
+      ],
+    },
+    {
+      // 3. Invocation: raise the staff high in both hands, then bring the head down onto the line.
+      dur: 1, hit: 0.6, side: 1, cancel: 0.84, window: 0.4, lunge: [2.2, 0.5, 0.64],
+      keys: [
+        { t: 0.34, e: 'out', aR: -2.8, aRz: 0.08, aL: -2.6, eR: 0.3, ln: -0.18, hp: -0.22, lL: 0.12, lR: -0.06, two: 1, lv: 0, wp: -0.2 },
+        { t: 0.52, e: 'io', aR: -2.95, aL: -2.75, ln: -0.22, hp: -0.25 },
+        { t: 0.57, e: 'in', aR: -1.35, aL: -1.2, eR: 0, ln: 0.26, cr: 0.08, lL: 0.62, lR: -0.6, hp: 0.06, lv: 1, wp: 0.12 },
+        { t: 0.76, e: 'out', ln: 0.24, cr: 0.09 },
+        { t: 1, e: 'io', reset: true },
+      ],
+    },
+  ],
+
+  /* Wand: wrist-led flicks, the free hand (and any grimoire) held forward. */
+  wand: [
+    {
+      // 1. Cocked flick: wand back by the ear, snapped straight down the line.
+      dur: 1, hit: 0.55, side: 1, cancel: 0.78, window: 0.45, aimMode: 'dir',
+      keys: [
+        { t: 0.3, e: 'out', aR: -2.1, aRz: 0.2, eR: 1.3, aL: -0.9, ty: 0.42, ln: -0.06, lL: 0.28, lR: -0.12, wp: -0.4 },
+        { t: 0.5, e: 'io', aR: -2.2, eR: 1.4, ty: 0.46 },
+        { t: 0.53, e: 'in', aR: -1.5, aRz: 0, eR: 0.02, ty: -0.22, ln: 0.12, lL: 0.4, lR: -0.36, aim: 1, lv: 1, wp: 0 },
+        { t: 0.7, e: 'out', ty: -0.26 },
+        { t: 1, e: 'io', reset: true },
+      ],
+    },
+    {
+      // 2. Backhand cut: from across the body out to the target.
+      dur: 1, hit: 0.55, side: -1, cancel: 0.78, window: 0.45, aimMode: 'dir',
+      keys: [
+        { t: 0.3, e: 'out', aR: -1.15, aRz: -0.95, eR: 0.5, aL: -0.7, ty: -0.62, lL: 0.2, lR: -0.24 },
+        { t: 0.5, e: 'io', aRz: -1.02, ty: -0.68 },
+        { t: 0.53, e: 'in', aR: -1.5, aRz: 0.18, eR: 0, ty: 0.18, ln: 0.1, lL: 0.32, lR: -0.38, aim: 1, lv: 1 },
+        { t: 0.7, e: 'out', ty: 0.22 },
+        { t: 1, e: 'io', reset: true },
+      ],
+    },
+    {
+      // 3. Flourish: a circle overhead, then a full-arm point with a step in.
+      dur: 1, hit: 0.55, side: 1, cancel: 0.8, window: 0.4, aimMode: 'dir', lunge: [2.4, 0.45, 0.6],
+      keys: [
+        { t: 0.24, e: 'out', aR: -2.65, aRz: 0.32, eR: 0.3, aL: -1.2, ln: -0.12, hp: -0.16, lL: 0.2, lR: -0.1 },
+        { t: 0.4, e: 'io', aR: -2.75, aRz: -0.32, ty: 0.25 },
+        { t: 0.5, e: 'io', aR: -2.4, aRz: 0.1, ty: 0.32 },
+        { t: 0.53, e: 'in', aR: -1.5, aRz: 0, eR: 0, ty: -0.2, ln: 0.18, cr: 0.05, hp: 0.02, lL: 0.56, lR: -0.54, aim: 1, lv: 1 },
+        { t: 0.72, e: 'out', ln: 0.16 },
+        { t: 1, e: 'io', reset: true },
+      ],
+    },
+  ],
+};
+
+/* ------------------------------------------------------------------ */
 /* resolution                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -366,7 +513,18 @@ function resolve(style, steps) {
   });
 }
 
-const RESOLVED = Object.fromEntries(Object.entries(COMBOS).map(([k, v]) => [k, resolve(k, v)]));
+const RESOLVED = Object.fromEntries([...Object.entries(COMBOS), ...Object.entries(RANGED)].map(([k, v]) => [k, resolve(k, v)]));
+
+/** Which shooting/casting set a ranged weapon uses. */
+export function rangedStyle(item = {}, heldKind = item.held || '') {
+  const held = String(heldKind || item.held || item.id || '').toLowerCase();
+  const style = String(item.style || '').toLowerCase();
+  if (/crossbow|gun/.test(held) || style === 'crossbow') return 'crossbow';
+  if (/shortbow/.test(held) || style === 'shortbow') return 'shortbow';
+  if (/bow/.test(held) || style.includes('bow')) return 'longbow';
+  if (/staff/.test(held) || style === 'staff') return 'staff';
+  return 'wand';
+}
 
 /** Which combo set a melee weapon uses. */
 export function comboStyle(item = {}, heldKind = item.held || '') {
@@ -383,7 +541,8 @@ export function comboStyle(item = {}, heldKind = item.held || '') {
 
 /** The step of a weapon's combo (0, 1 or 2). */
 export function comboStep(item, heldKind, combo) {
-  const set = RESOLVED[comboStyle(item, heldKind)] || RESOLVED.sword;
+  const style = item?.kind === 'ranged' ? rangedStyle(item, heldKind) : comboStyle(item, heldKind);
+  const set = RESOLVED[style] || RESOLVED.sword;
   return set[((combo % 3) + 3) % 3];
 }
 
@@ -418,4 +577,4 @@ export function stepLunge(step, tt) {
   return speed * Math.sin(Math.PI * u) * 1.25;
 }
 
-export { COMBOS, GUARD };
+export { COMBOS, RANGED, GUARD };

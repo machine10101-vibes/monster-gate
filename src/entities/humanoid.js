@@ -4,7 +4,7 @@ import { toonMaterial } from '../engine/materials.js';
 import { BUDGE } from '../data/budge.js';
 import { painterFor, PAINTER_SETS } from './armorSets.js';
 import { DARK } from '../data/darksycle.js';
-import { buildWeaponVoxels, buildShieldModel, buildBookModel, DUAL_KINDS } from './weaponModels.js';
+import { buildWeaponVoxels, buildShieldModel, buildBookModel, DUAL_KINDS, addBowString } from './weaponModels.js';
 
 const legFlags = (armor, id) => ({ legs: armor?.legs === id, boots: armor?.boots === id });
 
@@ -521,6 +521,7 @@ export function buildHeld(kind) {
   const themed = buildWeaponVoxels(kind);
   if (themed) {
     const g = meshFrom(themed.M, themed.ox, themed.oy, themed.oz, mat, themed.size);
+    if (themed.bowString) addBowString(g, themed.bowString);
     heldCache[kind] = g;
     return cloneHeld(g);
   }

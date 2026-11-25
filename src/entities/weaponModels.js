@@ -844,7 +844,6 @@ function bow(T, o) {
         c.set(x, y, zz, col);
       }
     }
-    c.set(0, y, stringZ, T.glow && style === 'dark' ? (Math.floor(y / 3) % 2 ? T.glow2 : T.glow) : (Math.abs(y) % 4 === 0 ? 0xf4f0dc : T.string), style === 'dark');
   }
   const tipZ = -D + recurve;
   for (const dir of [-1, 1]) {
@@ -863,7 +862,58 @@ function bow(T, o) {
   c.set(0, 0, 3, J(T.guardHi, 0, 0, 3, 97, 0.03));
   for (const y of [-2, 1]) for (let z = 0; z < 2; z++) c.set(-1, y, 2 + z, T.glow, style !== 'wood');
   if (after) after(c);
-  return c.done();
+  const out = c.done();
+  // The string is a separate mesh (see addBowString) so an archer can draw it back.
+  const v = (n) => (n + 0.5) * WEAPON_SIZE;
+  out.bowString = {
+    top: [v(0), v(L), v(stringZ)],
+    bottom: [v(0), v(-L - 1), v(stringZ)],
+    color: style === 'dark' ? T.glow : T.string,
+    glow: style === 'dark',
+  };
+  return out;
+}
+
+const stringA = new THREE.Vector3();
+const stringB = new THREE.Vector3();
+const stringDir = new THREE.Vector3();
+const stringUp = new THREE.Vector3(0, 1, 0);
+
+/** Lay one string segment between two points in the bow's local space. */
+function spanSegment(mesh, a, b) {
+  stringDir.subVectors(b, a);
+  const len = Math.max(1e-4, stringDir.length());
+  mesh.position.addVectors(a, b).multiplyScalar(0.5);
+  mesh.scale.set(1, len, 1);
+  mesh.quaternion.setFromUnitVectors(stringUp, stringDir.multiplyScalar(1 / len));
+}
+
+/** Give a bow model its own string: two thin segments that meet at the nock point. */
+export function addBowString(group, spec) {
+  const w = WEAPON_SIZE * 0.9;
+  const geo = new THREE.BoxGeometry(w, 1, w);
+  const mat = spec.glow ? new THREE.MeshBasicMaterial({ color: spec.color }) : new THREE.MeshLambertMaterial({ color: spec.color });
+  const s = new THREE.Group();
+  s.name = 'bowString';
+  s.userData.top = spec.top;
+  s.userData.bottom = spec.bottom;
+  const a = new THREE.Mesh(geo, mat);
+  const b = new THREE.Mesh(geo, mat);
+  s.add(a, b);
+  group.add(s);
+  bendBowString(s, null);
+  return s;
+}
+
+/** Bend a bow string so it meets `nock` (bow-local), or rest straight when nock is null. */
+export function bendBowString(s, nock) {
+  const [top, bottom] = [s.userData.top, s.userData.bottom];
+  if (!top || s.children.length < 2) return;
+  stringA.set(top[0], top[1], top[2]);
+  stringB.set(bottom[0], bottom[1], bottom[2]);
+  const mid = nock || stringDir.addVectors(stringA, stringB).multiplyScalar(0.5).clone();
+  spanSegment(s.children[0], stringA, mid);
+  spanSegment(s.children[1], mid, stringB);
 }
 
 const BOWS = {
