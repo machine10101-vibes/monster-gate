@@ -1,6 +1,16 @@
 /** 180° of yaw per full-width one-finger swipe on touch / coarse pointers. */
 export const LOOK_SWIPE_RAD = Math.PI;
 export const MOUSE_LOOK_GAIN = 0.006;
+export const STRAFE_STORAGE_KEY = 'mg-strafe';
+
+export function readStrafeSetting(store = typeof localStorage !== 'undefined' ? localStorage : null) {
+  try { return store?.getItem(STRAFE_STORAGE_KEY) === '1'; } catch { return false; }
+}
+
+export function writeStrafeSetting(enabled, store = typeof localStorage !== 'undefined' ? localStorage : null) {
+  try { store?.setItem(STRAFE_STORAGE_KEY, enabled ? '1' : '0'); } catch { /* private mode */ }
+  return !!enabled;
+}
 
 export function lookRadiansPerPixel(width, { touch = false } = {}) {
   const w = Math.max(1, Number(width) || 1);
@@ -34,6 +44,7 @@ export class Input {
     this.btnTouch = {};
     this.slotSelect = -1;
     this.enabled = true;
+    this.strafe = readStrafeSetting();
 
     this.detectTouch();
     this.bind();
