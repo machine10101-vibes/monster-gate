@@ -407,5 +407,42 @@ export function animateKnight(m, dt, ctx) {
     const a = Math.random() * TAU;
     g.fx.emit(m.x + Math.cos(a) * 0.9, m.y + 0.6 + Math.random() * 2.2, m.z + Math.sin(a) * 0.9, 0, 0.6, 0, [0xfff0b0, 0x9fd0ff][(Math.random() * 2) | 0], 0.09, 1.1, -0.2);
   }
-  return { rootY: Math.abs(Math.sin(c)) * 0.04 * gait, rootX: 0 };
+  // Weight into every blow: the knees bend and the body drops as the weapon lands.
+  let crouch = 0;
+  if (st === 'strike') crouch = Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5) * (1 - Math.max(0, u - 0.6) * 1.5);
+  else if (st === 'recover') crouch = Math.max(0, 1 - u * 2) * 0.6;
+  else if (st === 'wind') crouch = 0.2 * u;
+  if (crouch > 0.01) {
+    p.kneeL.rotation.x += crouch * 0.7;
+    p.kneeR.rotation.x += crouch * 0.7;
+    p.legL.rotation.x -= crouch * 0.35;
+    p.legR.rotation.x -= crouch * 0.35;
+  }
+
+  // Glowing emblems, eyes and runes pulse; they blaze while charging a blow.
+  if (!m.glowMats) {
+    m.glowMats = [];
+    m.model.root.traverse((o) => {
+      if (o.isMesh && o.material?.isMeshBasicMaterial && !m.glowMats.includes(o.material)) m.glowMats.push(o.material);
+    });
+  }
+  const charging = st === 'wind' || st === 'strike';
+  const pulse = holy ? 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(t * 2.1)) : 0.72 + 0.18 * Math.abs(Math.sin(t * 7.3)) + 0.1 * Math.random();
+  const level = charging ? 0.92 + Math.random() * 0.08 : Math.min(1, pulse + (m.enraged ? 0.12 : 0));
+  for (const mat of m.glowMats) mat.color.setScalar(level);
+
+  // Power gathers at the weapon's head on the wind-up: light for the hammer, embers for the blade.
+  if (st === 'wind' && p.weapon) {
+    const g = m.game;
+    const head = p.weapon.localToWorld(HEAD_V.set(0, 0, holy ? 1.7 : 1.6));
+    g.vfx.glowNow(head.x, head.y, head.z, holy ? 0x9fd0ff : 0xff3a1a, 0.6 + u * 1.8, 0.85);
+    if (Math.random() < dt * 30 * u) {
+      const col = holy ? GOLD : HELL;
+      g.fx.emit(head.x + (Math.random() - 0.5) * 0.5, head.y + (Math.random() - 0.5) * 0.5, head.z + (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 1.2, holy ? 0.8 : 1.4, (Math.random() - 0.5) * 1.2, col[(Math.random() * col.length) | 0], 0.09, 0.45, holy ? -0.5 : -1.5);
+    }
+  }
+
+  return { rootY: Math.abs(Math.sin(c)) * 0.04 * gait - crouch * 0.12, rootX: 0 };
 }
+
+const HEAD_V = new THREE.Vector3();

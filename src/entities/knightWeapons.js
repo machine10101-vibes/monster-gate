@@ -318,7 +318,7 @@ export function demonShieldVoxels() {
       const rim = ed <= 2;
       const rim2 = ed <= 4 && !rim;
       const top = rim ? 4 : rim2 ? 3 : 2;
-      for (let y = 0; y < top; y++) c.set(x, y, z, y === top - 1 ? (rim ? J(D.spike[2], x, y, z, 93, 0.08) : dark(x, y, z, 1)) : shade(dark(x, y, z, 2), 0.7));
+      for (let y = 0; y < top; y++) c.set(x, y, z, y === top - 1 ? (rim ? J(D.spikeTip, x, y, z, 93, 0.08) : dark(x, y, z, 1)) : shade(dark(x, y, z, 2), 0.7));
       if (!rim && !rim2) {
         const row = Math.floor((z + 40) / 4);
         const off = (row & 1) * 3;

@@ -150,7 +150,29 @@ export function inlay(M, cx, cy, hw, hh, o) {
       if (edge) M.set(x, y, z + zOfs, ((x + y) & 1) === 0 ? J(rimHi, x, y, z, seed + 1, 0.04) : J(rim, x, y, z, seed + 2, 0.04));
       else if (base) M.set(x, y, z, typeof base === 'function' ? base(x, y, z) : base);
     }
-  if (cross) crossAt(M, cx, cy, 0, { ...cross, zOf: (x, y) => zAt(x, y) });
+  if (cross) {
+    crossAt(M, cx, cy, 0, { ...cross, zOf: (x, y) => zAt(x, y) });
+    // A soft halo of light spilling from the cross across the plate inside the rim.
+    if (cross.halo) {
+      for (let y = Math.floor(cy - hh); y <= Math.ceil(cy + hh); y++)
+        for (let x = Math.floor(cx - hw); x <= Math.ceil(cx + hw); x++) {
+          const ux = Math.abs(x + 0.5 - cx) / hw;
+          const uy = Math.abs(y + 0.5 - cy) / hh;
+          if ((shape === 'diamond' ? ux + uy : Math.max(ux, uy)) > 1 - thick * 1.4) continue;
+          const z = zAt(x, y);
+          const GLOW_BIT = 1 << 25;
+          const lit = (gx, gy, gz) => (M.get(gx, gy, gz) & GLOW_BIT) !== 0;
+          if (z < 0 || lit(x, y, z)) continue;
+          let near = false;
+          for (let dy = -1; dy <= 1 && !near; dy++)
+            for (let dx = -1; dx <= 1 && !near; dx++) {
+              const zz = zAt(x + dx, y + dy);
+              if (zz >= 0 && lit(x + dx, y + dy, zz)) near = true;
+            }
+          if (near) M.set(x, y, z, cross.halo, true);
+        }
+    }
+  }
 }
 
 export { shade, mix, clamp };

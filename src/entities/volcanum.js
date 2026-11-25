@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VoxelModel, hash3, jitter, shade, mix, clamp, RNG } from '../engine/voxel.js';
 import { toonMaterial } from '../engine/materials.js';
+import { vnoise } from './monsterKit.js';
 
 /**
  * Volcanum: the dragon of the volcanic wasteland. Obsidian-black plate split
@@ -20,10 +21,10 @@ const C = {
   s3: 0x3c3c46,
   b0: 0x140e0c,
   b1: 0x241610,
-  m0: 0x3a1870,
-  m1: 0x5c28a4,
-  m2: 0x8a46d0,
-  m3: 0xc080f0,
+  m0: 0x220c48,
+  m1: 0x341466,
+  m2: 0x4c2290,
+  m3: 0x6c3cb4,
   c0: 0x4a2ad0,
   c1: 0x6a48ee,
   c2: 0x9470ff,
@@ -125,16 +126,54 @@ function topY(M, x, z) {
   return -1;
 }
 
-/** Crystal shard leaning back and up from a surface point. */
+/**
+ * Faceted crystal spine leaning back and up from a surface point: a diamond
+ * cross-section that tapers to a glowing point, dark violet at the root and
+ * pale blue-lilac at the tip, with a lit face and a shadowed face.
+ */
 function shard(M, x, y, z, h, lean = 0.6, wide = 2, side = 0) {
-  for (let k = 1; k <= h; k++) {
+  const H = Math.round(h * 1.25);
+  const R = wide * 0.95;
+  for (let k = 0; k <= H; k++) {
+    const t = k / H;
     const zz = z - Math.floor(k * lean);
     const xx = x + Math.floor(k * side);
-    const col = cryst(k / h, xx, y + k, zz);
-    const tip = k === h;
-    M.set(xx, y + k, zz, col, tip || k > h - 1);
-    if (k <= Math.ceil(h * 0.55) && wide > 1) M.set(xx - 1, y + k, zz, cryst(k / h, xx - 1, y + k, zz));
+    const r = R * (1 - t) ** 0.85;
+    const n = Math.ceil(r);
+    for (let dz = -n; dz <= n; dz++)
+      for (let dx = -n; dx <= n; dx++) {
+        if (Math.abs(dx) + Math.abs(dz) > r + 0.25) continue;
+        const face = dx > 0 ? 1.12 : dx < 0 ? 0.82 : 1;
+        const edge = Math.abs(dx) + Math.abs(dz) > r - 0.8;
+        const col = shade(cryst(Math.min(0.999, t * 0.9 + (edge ? 0.12 : 0)), xx + dx, y + k, zz + dz), face);
+        M.set(xx + dx, y + k, zz + dz, col, t > 0.86);
+      }
   }
+}
+
+/**
+ * Lava seams: a network of glowing cracks between the obsidian plates, like
+ * the reference where molten light shows at nearly every plate edge. Only
+ * dark plate voxels on the surface crack; crystals, claws and membrane stay.
+ */
+function seams(M, seed, scale = 0.2, width = 0.06) {
+  const dark = (c) => {
+    const r = (c >> 16) & 255;
+    const g = (c >> 8) & 255;
+    const b = c & 255;
+    return r < 80 && g < 80 && b < 90 && Math.abs(r - b) < 40;
+  };
+  for (let z = 0; z < M.sz; z++)
+    for (let y = 0; y < M.sy; y++)
+      for (let x = 0; x < M.sx; x++) {
+        const v = M.get(x, y, z);
+        if (!v || !dark(v & 0xffffff)) continue;
+        const skin = !M.has(x + 1, y, z) || !M.has(x - 1, y, z) || !M.has(x, y + 1, z) || !M.has(x, y - 1, z) || !M.has(x, y, z + 1) || !M.has(x, y, z - 1);
+        if (!skin) continue;
+        // One smooth octave: its 0.5 contour is a long, unbroken crack line.
+        const rr = Math.abs(vnoise(x * scale, y * scale, z * scale, seed) - 0.5);
+        if (rr < width) M.set(x, y, z, rr < width * 0.4 ? C.glowHi : C.glow, true);
+      }
 }
 
 /* -------------------------------- body -------------------------------- */
@@ -215,6 +254,20 @@ function paintBody() {
   stroke(B, cx, 8, 14, cx, 18, 38, 2, (t) => (t > 0.62 ? C.glowHi : C.glow), 0.25, true);
   stroke(B, cx, 11, 16, cx, 22, 34, 1, () => C.glowHi, 0.35, true);
   for (const s of [-1, 1]) stroke(B, cx + s * 2, 9, 18, cx + s * 4, 16, 32, 1, () => C.glow, 0.4, true);
+  // Molten chest: the reference's blazing Y, widened with a white-hot core.
+  for (let y = 5; y <= 16; y++) {
+    paintFront(cx - 1, y, C.glow);
+    paintFront(cx + 1, y, y > 8 && y < 14 ? C.glowHi : C.glow);
+    paintFront(cx, y, 0xfff2c0);
+  }
+  for (let k = 1; k <= 8; k++) {
+    const y = 13 + k * 0.7;
+    for (const sx of [-1, 1]) {
+      paintFront(cx + sx * k * 0.75, y, k < 4 ? C.glowHi : C.glow);
+      paintFront(cx + sx * k * 0.75, y + 1, C.glow);
+    }
+  }
+  seams(B, 301, 0.17, 0.035);
   ignite(B);
   return B;
 }
@@ -251,6 +304,7 @@ function paintNeck() {
       if (N.has(x, y, z + 1)) N.set(x, y, z + 1, C.glow, true);
     }
   }
+  seams(N, 302, 0.19, 0.035);
   return N;
 }
 
@@ -329,6 +383,19 @@ function paintHead() {
     }
   }
   for (let z = 17; z <= 36; z++) for (let x = cx - 3; x <= cx + 2; x++) if (H.has(x, 7, z)) H.set(x, 6, z, J(C.mouth, x, 6, z, 50, 0.03));
+  // Blazing slit eyes set deep under a heavy brow.
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 4; k++) {
+      const x = cx + s * (3 + k) - (s < 0 ? 1 : 0);
+      for (const y of [14, 15]) {
+        const fz = frontZ(H, x, y);
+        if (fz < 0) continue;
+        H.set(x, y, fz, k === 1 || k === 2 ? (y === 15 ? 0xfff2c0 : C.glowHi) : C.glow, true);
+      }
+    }
+    stroke(H, cx + s * 2, 17, 22, cx + s * 7, 16.5, 17, 2, (t, x, y, z) => plate(x, y, z, 47), 0, false);
+  }
+  seams(H, 303, 0.2, 0.028);
   ignite(H);
   return H;
 }
@@ -368,6 +435,7 @@ function paintThigh(w, seed) {
   blob(U, cx, 13, 8, 3.6, 2.6, 4.2, plate, seed + 1, 0.16);
   blob(U, cx, 3.4, 7, 3.2, 2.6, 3.4, plate, seed + 2, 0.12);
   stroke(U, cx, 4.2, 4.5, cx, 3, 0.8, 2, (t, x, y, z) => cryst(0.2 + t * 0.7, x, y, z), 0.5);
+  seams(U, seed + 300, 0.2, 0.035);
   return U;
 }
 
@@ -388,6 +456,7 @@ function paintShin(w, seed) {
     L.set(cxx, 0, 24, C.tooth);
   }
   stroke(L, cx, 5.2, 6, cx, 2.2, 3, 2, (t) => (t > 0.5 ? C.claw : plate(cx, 4, 5, seed + 4)), 0.5);
+  seams(L, seed + 310, 0.22, 0.033);
   return L;
 }
 
@@ -462,6 +531,16 @@ function paintWings() {
       t = clamp(t, 0, 0.999);
       if (dBone < 0.9) {
         put(x, 2, z, dBone < 0.4 ? C.glowHi : C.glow, true);
+        continue;
+      }
+      // The trailing edge smoulders in segments, as in the reference.
+      if (z === zt && x > 3 && Math.floor(x / 3) % 3 !== 0) {
+        put(x, 2, z, (x & 1) ? C.glowHi : C.glow, true);
+        continue;
+      }
+      // Heat bleeds into the membrane right beside each bone.
+      if (dBone < 1.7 && hash3(x, 1, z, 79) < 0.5) {
+        put(x, 2, z, J(0x7a2a40, x, 0, z, 78, 0.04));
         continue;
       }
       const col = [C.m0, C.m1, C.m2, C.m3][Math.floor(t * 4)];
@@ -542,6 +621,7 @@ function tailSeg(w, h, len, seed, spikeH) {
       shard(T, Math.floor(cx) - 1, top, z, Math.max(1, spikeH - 2), 0.8, 1);
     }
   }
+  seams(T, seed + 320, 0.2, 0.035);
   return { model: T, cx, cy, len };
 }
 
@@ -622,6 +702,8 @@ export function buildVolcanumDragon() {
     g.add(og);
     og.rotation.z = side * -0.28;
     g.rotation.z = side * 1.05;
+    // Bigger sails, closer to the reference's span.
+    g.scale.setScalar(1.22);
     bodyG.add(g);
     wings.push(g);
     wingsOuter.push(og);
@@ -668,5 +750,10 @@ export function buildVolcanumDragon() {
     tail.push(g);
   });
 
-  return { root, mat, parts: { body, bodyG, neck, head, jaw, legs, knees, tail, wings, wingsOuter } };
+  // Every emissive (lava) material, so the animation can make the veins pulse.
+  const glowMats = [];
+  root.traverse((o) => {
+    if (o.isMesh && o.material?.isMeshBasicMaterial && !glowMats.includes(o.material)) glowMats.push(o.material);
+  });
+  return { root, mat, parts: { body, bodyG, neck, head, jaw, legs, knees, tail, wings, wingsOuter, glowMats } };
 }
