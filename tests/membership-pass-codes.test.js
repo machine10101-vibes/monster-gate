@@ -38,7 +38,9 @@ test('the Gate Pass window accepts free codes even without a connected Klever wa
   const page = src('../admin.html');
   assert.match(client, /MG-XXXX-XXXX-XXXX-XXXX/);
   assert.match(client, /post\(currentSession, \{ op: 'redeem', code \}\)/);
-  assert.match(client, /paymentPanel\.hidden = !status\.walletAddress/);
+  assert.match(client, /paymentPanel\.hidden = false/);
+  assert.match(client, /Link Klever Wallet/);
+  assert.match(client, /linkKleverWallet\(currentSession\)/);
   assert.match(client, /if \(status\.walletAddress\) loadQuote\(\)/);
   assert.match(adminView, /data-issue-passcode/);
   assert.match(admin, /issuePassCode\(session\)/);

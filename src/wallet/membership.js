@@ -1,6 +1,7 @@
 import './membership.css';
 import { loadCloudConfig } from './cloud.js';
 import { refreshAccountSession, saveAccount } from './account.js';
+import { linkKleverWallet } from './link.js';
 
 async function post(session, body) {
   const cfg = await loadCloudConfig();
@@ -173,7 +174,14 @@ export async function ensureMembership(session, game) {
     codeRow.append(codeInput, redeemButton);
     codePanel.append(codeHeading, codeRow, codeFeedback);
     const paymentPanel = node('div', 'mg-gatepass-payment-panel');
-    paymentPanel.hidden = !status.walletAddress;
+    paymentPanel.hidden = false;
+    const walletLinkNotice = node('div', 'mg-gatepass-wallet-link');
+    const walletLinkTitle = node('strong', '', 'Pay $5/month with Klever Wallet');
+    const walletLinkText = node('p', '', 'Link a Klever wallet to this game account to see your live KLV amount and approve the monthly membership payment securely.');
+    const linkWalletButton = node('button', 'mg-gatepass-link-wallet', 'Link Klever Wallet');
+    linkWalletButton.type = 'button';
+    walletLinkNotice.append(walletLinkTitle, walletLinkText, linkWalletButton);
+    walletLinkNotice.hidden = Boolean(status.walletAddress);
     const priceGrid = node('div', 'mg-gatepass-pricegrid');
     const usdBox = node('div', 'mg-gatepass-pricebox primary');
     usdBox.append(node('span', 'mg-gatepass-label', 'Membership'), node('strong', 'mg-gatepass-usd', '$5.00 USD'));
@@ -407,14 +415,43 @@ export async function ensureMembership(session, game) {
     close.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
 
-    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
+    paymentPanel.append(walletLinkNotice, priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
     card.append(close, head, title, intro, codePanel, paymentPanel);
     overlay.append(card);
     document.body.append(overlay);
     document.addEventListener('keydown', onKeyDown);
     if (status.walletAddress) loadQuote();
     else {
-      setWatch('Redeem a free pass code', 'A free pass code grants 10 days of access and does not require a wallet.');
+      payNow.disabled = true;
+      checkNow.disabled = true;
+      refresh.disabled = true;
+      setWatch('Link your Klever wallet to continue', 'Your $5 monthly subscription is available here. Link the wallet associated with this game account to load the exact KLV amount and pay.');
     }
+    const linkWallet = async () => {
+      if (settled || linkWalletButton.disabled) return;
+      linkWalletButton.disabled = true;
+      linkWalletButton.textContent = 'Connecting Klever…';
+      setWatch('Approve wallet linking', 'Klever Wallet will ask you to approve linking this wallet to your game account.');
+      try {
+        currentSession = await linkKleverWallet(currentSession);
+        const refreshed = await post(currentSession, { op: 'status' });
+        currentSession = refreshed.session;
+        status.walletAddress = refreshed.data.walletAddress || currentSession.kleverAddress || '';
+        if (!status.walletAddress) throw new Error('The wallet was not linked to this game account. Please try again.');
+        currentSession = saveAccount({ ...currentSession, kleverAddress: status.walletAddress });
+        walletLinkNotice.hidden = true;
+        payNow.disabled = false;
+        checkNow.disabled = true;
+        refresh.disabled = false;
+        setWatch('Wallet linked', 'Fetching your live KLV membership quote…');
+        loadQuote();
+      } catch (error) {
+        setWatch('Wallet not linked', error.message || 'Klever Wallet could not be linked. Please try again.', true);
+      } finally {
+        linkWalletButton.disabled = false;
+        linkWalletButton.textContent = 'Link Klever Wallet';
+      }
+    };
+    linkWalletButton.addEventListener('click', linkWallet);
   });
 }
