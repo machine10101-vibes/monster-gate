@@ -551,3 +551,23 @@
   .mg-gatepass-actions { margin-top: 1px; }
   .mg-gatepass-pay, .mg-gatepass-check, .mg-gatepass-refresh { min-height: 32px; padding-block: 6px; }
 }
+
+/* Keep paired field captions and values in the same column. */
+.mg-gatepass-payment-panel > :nth-child(4),
+.mg-gatepass-payment-panel > :nth-child(5) { grid-column: 1; }
+.mg-gatepass-payment-panel > :nth-child(6),
+.mg-gatepass-payment-panel > :nth-child(7) { grid-column: 2; }
+.mg-gatepass-payment-panel > :nth-child(8) { grid-column: 1; }
+.mg-gatepass-payment-panel > :nth-child(9) { grid-column: 2; }
+.mg-gatepass-payment-panel > :nth-child(11) { grid-column: 1; }
+.mg-gatepass-payment-panel > :nth-child(12) { grid-column: 2; }
+@media (max-width: 360px) {
+  .mg-gatepass-payment-panel > :nth-child(4),
+  .mg-gatepass-payment-panel > :nth-child(5),
+  .mg-gatepass-payment-panel > :nth-child(6),
+  .mg-gatepass-payment-panel > :nth-child(7),
+  .mg-gatepass-payment-panel > :nth-child(8),
+  .mg-gatepass-payment-panel > :nth-child(9),
+  .mg-gatepass-payment-panel > :nth-child(11),
+  .mg-gatepass-payment-panel > :nth-child(12) { grid-column: 1; }
+}
