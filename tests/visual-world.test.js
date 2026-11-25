@@ -301,14 +301,10 @@ test('Brookside grass skips per-cell UV spin and dark speckle', () => {
   assert.match(terrain, /grassy \? \[1, 1, 1, 1\]/);
   assert.doesNotMatch(mats, /wrapNoise\(x, y, s \+ 3\) > 0\.93/);
   assert.doesNotMatch(mats, /patch < 0\.32/);
-  assert.match(player, /RingGeometry\(0\.48, 0\.86/);
-  assert.match(player, /color: 0xf4efe0/);
-  assert.match(player, /opacity: 0\.8/);
-  assert.match(player, /depthTest:\s*false/);
-  assert.match(player, /groundRing\.visible = false/);
-  assert.match(player, /_modelReady/);
-  assert.match(player, /heightAt\?\.\(this\.pos\.x, this\.pos\.z\)/);
-  assert.match(player, /\+ 0\.12/);
+  assert.doesNotMatch(player, /RingGeometry\(0\.48, 0\.86/);
+  assert.doesNotMatch(player, /color: 0xf4efe0/);
+  assert.match(player, /this\.groundRing = null/);
+  assert.doesNotMatch(player, /groundRing\.visible/);
   assert.doesNotMatch(player, /opacity: 0\.95/);
   assert.doesNotMatch(player, /wet \? 0\.88 : 0\.8/);
   assert.doesNotMatch(terrain, /skipThinGrassLips/);

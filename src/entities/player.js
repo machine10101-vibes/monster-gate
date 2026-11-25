@@ -35,25 +35,9 @@ export class Player {
     game.scene.add(this.obj);
 
     this.shadowBlob = null;
-    this.groundRing = new THREE.Mesh(
-      new THREE.RingGeometry(0.48, 0.86, 48),
-      new THREE.MeshBasicMaterial({
-        color: 0xf4efe0,
-        transparent: true,
-        opacity: 0.8,
-        depthWrite: false,
-        depthTest: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2,
-        side: THREE.DoubleSide,
-      })
-    );
-    this.groundRing.rotation.x = -Math.PI / 2;
-    this.groundRing.renderOrder = 3;
-    this.groundRing.visible = false;
+    // No selection/ground ring: the hunter's feet and soft shadow define its ground contact.
+    this.groundRing = null;
     this._modelReady = false;
-    game.scene.add(this.groundRing);
 
     this.pos = new THREE.Vector3(72, 3, 72.5);
     this.vel = new THREE.Vector3();
@@ -235,15 +219,7 @@ export class Player {
   syncObj() {
     this.obj.position.copy(this.pos);
     this.obj.rotation.y = this.yaw;
-    if (this.groundRing) {
-      const ground = this.game.world?.heightAt?.(this.pos.x, this.pos.z);
-      const terrainY = Number.isFinite(ground) ? ground : this.pos.y;
-      const y = Math.max(terrainY, this.pos.y, this.wading ? WATER_Y : -Infinity) + 0.12;
-      this.groundRing.material.opacity = 0.8;
-      this.groundRing.position.set(this.pos.x, y, this.pos.z);
-      const modelReady = !!(this.game.started && this.obj.visible && this.model?.root?.parent && this._modelReady);
-      this.groundRing.visible = modelReady;
-    }
+
   }
 
   /** Frost slows the hunter for a few seconds. */
@@ -986,30 +962,47 @@ export class Player {
             armL = family === 'spear' ? lerp(-0.8, pre ? -1.45 : -0.75, q) : lerp(-0.9, pre ? -2.05 : -1.0, q);
             armLz = family === 'spear' ? -0.12 : -0.2 * comboSide;
             if (family === 'spear') {
-              // A polearm is driven from the rear hand with the lead hand guiding the shaft.
-              armR = pre ? lerp(-1.05, -2.0, q) : lerp(-2.0, -0.25, q);
-              armL = pre ? lerp(-0.85, -1.35, q) : lerp(-1.35, -0.65, q);
-              torsoYaw = pre ? lerp(-0.18, -0.42, q) : lerp(-0.42, 0.22, q);
-              lean = pre ? -0.08 * q : 0.13 * (1 - q);
+              // Thrust, lateral butt-to-tip sweep, then rising thrust; both hands stay on the haft.
+              const spearSide = this.combo === 1 ? -1 : 1;
+              const spearStart = this.combo === 0 ? -2.0 : this.combo === 1 ? -1.25 : -2.35;
+              const spearEnd = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.5 : 0.15;
+              armR = pre ? lerp(-1.05, spearStart, q) : lerp(spearStart, spearEnd, q);
+              armL = pre ? lerp(-0.85, this.combo === 1 ? -1.75 : -1.35, q) : lerp(this.combo === 1 ? -1.75 : -1.35, -0.55, q);
+              armRz = this.combo === 0 ? 0 : 0.24 * spearSide;
+              armLz = -0.12 * spearSide;
+              torsoYaw = pre ? lerp(0, (this.combo === 0 ? -0.42 : this.combo === 1 ? 0.72 : -0.58) * spearSide, q) : lerp((this.combo === 0 ? -0.42 : this.combo === 1 ? 0.72 : -0.58) * spearSide, this.combo === 1 ? -0.25 : 0.22, q);
+              lean = pre ? (this.combo === 2 ? 0.04 : -0.08) * q : (this.combo === 2 ? -0.08 : 0.13) * (1 - q);
               legL = lerp(0.12, pre ? 0.35 : -0.05, q);
               legR = lerp(-0.08, pre ? -0.18 : -0.3, q);
             } else if (family === 'scythe') {
-              // Long haft, two hands, and a broad hip-and-shoulder sweep.
-              torsoYaw = pre ? lerp(0, 0.9 * comboSide, q) : lerp(0.9 * comboSide, -1.05 * comboSide, q);
-              lean = pre ? -0.16 * q : 0.22 * (1 - q);
-              armR = pre ? lerp(-1.25, -2.7, q) : lerp(-2.7, -0.45, q);
-              armL = pre ? lerp(-0.95, -2.15, q) : lerp(-2.15, -0.55, q);
+              // Three linked reaping cuts: high-to-low, reverse waist sweep, then rising finish.
+              const scytheSide = this.combo === 1 ? -1 : 1;
+              const startYaw = this.combo === 0 ? 0.92 : this.combo === 1 ? -0.95 : 0.35;
+              const endYaw = this.combo === 0 ? -1.0 : this.combo === 1 ? 0.92 : -0.42;
+              const startArm = this.combo === 2 ? -1.65 : -2.72;
+              const endArm = this.combo === 2 ? -2.9 : -0.42;
+              torsoYaw = pre ? lerp(0, startYaw * scytheSide, q) : lerp(startYaw * scytheSide, endYaw * scytheSide, q);
+              lean = pre ? (this.combo === 2 ? 0.08 : -0.16) * q : (this.combo === 2 ? -0.12 : 0.22) * (1 - q);
+              armR = pre ? lerp(-1.15, startArm, q) : lerp(startArm, endArm, q);
+              armL = pre ? lerp(-0.9, this.combo === 2 ? -2.35 : -2.15, q) : lerp(this.combo === 2 ? -2.35 : -2.15, -0.55, q);
+              armRz = (this.combo === 2 ? -0.32 : 0.28) * scytheSide;
+              armLz = -0.2 * scytheSide;
               legL = lerp(0.2, pre ? 0.5 : 0.72, q);
               legR = lerp(-0.1, pre ? -0.25 : -0.55, q);
             } else {
-              // Heavy heads travel overhead; hips and knees load before the downswing.
-              torsoYaw = pre ? lerp(0, 0.25 * comboSide, q) : lerp(0.25 * comboSide, -0.12 * comboSide, q);
-              lean = pre ? -0.24 * q : 0.32 * (1 - q);
+              // Three weighty linked attacks: overhead chop, horizontal cleave, rising diagonal.
+              const heavySide = this.combo === 1 ? -1 : 1;
+              const heavyWind = this.combo === 0 ? -3.05 : this.combo === 1 ? -2.15 : -1.55;
+              const heavyFinish = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.55 : -2.8;
+              torsoYaw = pre
+                ? lerp(0, (this.combo === 0 ? 0.25 : this.combo === 1 ? -0.82 : 0.72) * heavySide, q)
+                : lerp((this.combo === 0 ? 0.25 : this.combo === 1 ? -0.82 : 0.72) * heavySide, -0.12 * heavySide, q);
+              lean = pre ? (this.combo === 2 ? 0.08 : -0.24) * q : (this.combo === 2 ? -0.08 : 0.32) * (1 - q);
               crouch = pre ? 0.08 * q : 0.12 * (1 - q);
-              armR = pre ? lerp(-1.15, -3.05, q) : lerp(-3.05, -0.25, q);
-              armL = pre ? lerp(-0.9, -2.45, q) : lerp(-2.45, -0.65, q);
-              armRz = pre ? lerp(0, 0.2, q) : lerp(0.2, -0.08, q);
-              legL = lerp(0.1, pre ? 0.48 : 0.85, q);
+              armR = pre ? lerp(-1.15, heavyWind, q) : lerp(heavyWind, heavyFinish, q);
+              armL = pre ? lerp(-0.9, this.combo === 1 ? -2.0 : -2.45, q) : lerp(this.combo === 1 ? -2.0 : -2.45, this.combo === 2 ? -0.35 : -0.65, q);
+              armRz = pre ? lerp(0, this.combo === 2 ? -0.35 : 0.2 * heavySide, q) : lerp(this.combo === 2 ? -0.35 : 0.2 * heavySide, -0.08, q);
+              legL = lerp(0.1, pre ? (this.combo === 2 ? 0.28 : 0.48) : 0.85, q);
               legR = lerp(-0.08, pre ? -0.3 : -0.72, q);
             }
             tilt = lerp(0, (pre ? -0.06 : 0.1) * comboSide, q);
@@ -1017,11 +1010,26 @@ export class Player {
             // Alternating hand cuts; the off-hand follows the combo rather than hanging idle.
             const side = this.combo === 1 ? -1 : 1;
             const p = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : 1 - ease((tt - hitT) / Math.max(0.05, 1 - hitT));
-            armR = lerp(-0.8, -2.25, p);
-            armL = lerp(-0.65, -2.1, p);
-            armRz = 0.48 * side * p;
-            armLz = -0.48 * side * p;
-            torsoYaw = 0.28 * side * p;
+            // Right-hand cut, left-hand return, then a simultaneous crossing finisher.
+            if (this.combo === 0) {
+              armR = lerp(-0.8, -2.35, p);
+              armL = lerp(-0.65, -0.25, p);
+              armRz = 0.55 * p;
+              armLz = -0.08 * p;
+              torsoYaw = 0.34 * p;
+            } else if (this.combo === 1) {
+              armR = lerp(-0.8, -0.3, p);
+              armL = lerp(-0.65, -2.3, p);
+              armRz = 0.08 * p;
+              armLz = -0.55 * p;
+              torsoYaw = -0.36 * p;
+            } else {
+              armR = lerp(-0.8, -2.15, p);
+              armL = lerp(-0.65, -2.2, p);
+              armRz = 0.5 * p;
+              armLz = -0.5 * p;
+              torsoYaw = 0.12 * p;
+            }
             lean = -0.08 * p;
             legL = lerp(legL, 0.28 * p, p);
             legR = lerp(legR, -0.18 * p, p);
