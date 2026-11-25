@@ -571,3 +571,31 @@
   .mg-gatepass-payment-panel > :nth-child(11),
   .mg-gatepass-payment-panel > :nth-child(12) { grid-column: 1; }
 }
+
+
+/* The market rate is informational text, not an input or copyable payment field. */
+.mg-gatepass-tokenline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  margin: 2px 0 5px !important;
+  padding: 4px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.mg-gatepass-tokenline strong {
+  color: #d8f4ed;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .1px;
+}
+.mg-gatepass-tokenline span {
+  color: rgba(207, 216, 235, .68);
+  font-size: 9px;
+}
