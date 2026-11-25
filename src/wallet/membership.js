@@ -142,6 +142,8 @@ export async function ensureMembership(session, game) {
     let settled = false;
     let quote = null;
     let estimatedKlvAmount = '';
+    let liveKlvUsdPrice = 0;
+    let selectedPlanId = 'monthly';
     let pollTimer = null;
     let pollInFlight = false;
     let quoteLoading = false;
@@ -150,6 +152,12 @@ export async function ensureMembership(session, game) {
     let paymentHash = '';
     let pollCount = 0;
     const destination = 'klv1mhrz0thhdsu4rznyfa27c9jr8hwtnf9f4sf8ef2kajgkup4sdhyqfs0wtv';
+    const plans = [
+      { id: 'monthly', days: 30, total: 5, title: '30 days', rate: '$5.00 / month' },
+      { id: 'six-month', days: 180, total: 27, title: '6 months', rate: '$4.50 / month' },
+      { id: 'annual', days: 365, total: 48, title: '12 months', rate: '$4.00 / month' },
+    ];
+    const selectedPlan = () => plans.find((plan) => plan.id === selectedPlanId) || plans[0];
 
     const overlay = node('div', 'mg-gatepass-overlay');
     overlay.setAttribute('role', 'dialog');
@@ -170,7 +178,7 @@ export async function ensureMembership(session, game) {
     head.append(mark, brandcopy);
     const title = node('h2', 'mg-gatepass-title', 'The Gate Pass');
     title.id = 'mg-gatepass-title';
-    const intro = node('p', 'mg-gatepass-lede', 'Your key to the world beyond the Gate. Pay for 30 days or redeem a free 10-day pass code.');
+    const intro = node('p', 'mg-gatepass-lede', 'Your key to the world beyond the Gate. Choose your access term or redeem a free 10-day pass code.');
     const codePanel = node('section', 'mg-gatepass-code-panel');
     const codeHeading = node('span', 'mg-gatepass-sectionlabel', 'Have a 10-day free pass code?');
     const codeRow = node('div', 'mg-gatepass-code-row');
@@ -190,47 +198,45 @@ export async function ensureMembership(session, game) {
     const paymentPanel = node('div', 'mg-gatepass-payment-panel');
     paymentPanel.hidden = false;
     const priceGrid = node('div', 'mg-gatepass-pricegrid');
-    const usdBox = node('div', 'mg-gatepass-pricebox primary');
-    usdBox.append(node('span', 'mg-gatepass-label', 'Membership'), node('strong', 'mg-gatepass-usd', '$5.00 USD'));
-    const daysBox = node('div', 'mg-gatepass-pricebox');
-    daysBox.append(node('span', 'mg-gatepass-label', 'Access period'), node('strong', 'mg-gatepass-days', '30 days'));
-    priceGrid.append(usdBox, daysBox);
+    const planButtons = new Map();
+    const renderPlans = () => plans.forEach((plan) => {
+      const button = planButtons.get(plan.id);
+      const active = plan.id === selectedPlanId;
+      button.classList.toggle('selected', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    for (const plan of plans) {
+      const button = node('button', 'mg-gatepass-plan', '');
+      button.type = 'button';
+      button.append(node('span', 'mg-gatepass-plan-title', plan.title),
+        node('strong', 'mg-gatepass-plan-rate', plan.rate),
+        node('span', 'mg-gatepass-plan-total', `$${plan.total.toFixed(2)} total`));
+      button.setAttribute('aria-label', `${plan.title}, ${plan.rate}, ${plan.total.toFixed(2)} dollars total`);
+      button.addEventListener('click', () => {
+        if (selectedPlanId === plan.id || settled) return;
+        selectedPlanId = plan.id;
+        renderPlans();
+        quote = null;
+        if (liveKlvUsdPrice > 0) {
+          const atomic = Math.ceil((selectedPlan().total / liveKlvUsdPrice) * 1_000_000);
+          estimatedKlvAmount = (atomic / 1_000_000).toFixed(6);
+          amount.textContent = `${estimatedKlvAmount} KLV`;
+          amountLabel.textContent = 'Estimated payment amount';
+        }
+        if (status.walletAddress) loadQuote();
+      });
+      planButtons.set(plan.id, button);
+      priceGrid.append(button);
+    }
+    renderPlans();
     const tokenLine = node('div', 'mg-gatepass-tokenline');
     const livePrice = node('strong', '', 'Fetching live KLV price…');
     const quoteExpiry = node('span', '', 'Swopus live pool · KLV/USDT');
     tokenLine.append(livePrice, quoteExpiry);
-
-    const amountLabel = node('span', 'mg-gatepass-sectionlabel', 'Estimated payment amount');
+    const amountLabel = node('span', 'mg-gatepass-sectionlabel', 'Estimated KLV payment');
     const amountRow = node('div', 'mg-gatepass-amountrow');
     const amount = node('code', 'mg-gatepass-amount', '— KLV');
-    const copyAmount = node('button', 'mg-gatepass-copy', 'Copy');
-    copyAmount.type = 'button';
-    copyAmount.disabled = true;
-    copyAmount.addEventListener('click', async () => {
-      const value = quote?.klvAmount || estimatedKlvAmount;
-      if (!value) return;
-      try { await copyText(value); copyAmount.textContent = 'Copied'; }
-      catch { copyAmount.textContent = 'Select amount'; }
-    });
-    amountRow.append(amount, copyAmount);
-
-    const addressLabel = node('span', 'mg-gatepass-sectionlabel', 'Send KLV to the membership vault');
-    const addressRow = node('div', 'mg-gatepass-addressrow');
-    const address = node('code', 'mg-gatepass-address', destination);
-    const copyAddress = node('button', 'mg-gatepass-copy', 'Copy');
-    copyAddress.type = 'button';
-    copyAddress.addEventListener('click', async () => {
-      try { await copyText(destination); copyAddress.textContent = 'Copied'; }
-      catch { copyAddress.textContent = 'Select address'; }
-    });
-    addressRow.append(address, copyAddress);
-
-    const steps = node('div', 'mg-gatepass-steps');
-    const step1 = node('div', 'mg-gatepass-step');
-    step1.append(node('span', 'mg-gatepass-stepnum', '1'), node('span', '', 'Send the exact KLV amount from the Klever wallet linked to this game account. Keep a little extra KLV for network fees.'));
-    const step2 = node('div', 'mg-gatepass-step');
-    step2.append(node('span', 'mg-gatepass-stepnum', '2'), node('span', '', 'That’s it. We automatically watch the Klever chain and verify your payment. No transaction hash to copy or paste.'));
-    steps.append(step1, step2);
+    amountRow.append(amount);
 
     const watch = node('div', 'mg-gatepass-watch');
     const watchIcon = node('span', 'mg-gatepass-watchicon');
@@ -323,7 +329,7 @@ export async function ensureMembership(session, game) {
         const result = await post(currentSession, { op: 'watch', quoteId: quote.quoteId, txHash: paymentHash || undefined });
         currentSession = result.session;
         if (result.data?.ok && result.data.expiresAt) {
-          setWatch('Gate Pass activated!', `Your 30-day access is active until ${dateLabel(result.data.expiresAt)}.`);
+          setWatch('Gate Pass activated!', `Your membership is active until ${dateLabel(result.data.expiresAt)}.`);
           checkNow.textContent = 'Payment confirmed';
           setTimeout(() => finish(true), 900);
           return;
@@ -366,18 +372,17 @@ export async function ensureMembership(session, game) {
         currentSession = result.session;
         const price = Number(result.data.usdPrice);
         if (!Number.isFinite(price) || price <= 0) throw new Error('Swopus returned an invalid KLV price.');
-        const atomic = Math.ceil((5 / price) * 1_000_000);
+        liveKlvUsdPrice = price;
+        const atomic = Math.ceil((selectedPlan().total / price) * 1_000_000);
         estimatedKlvAmount = (atomic / 1_000_000).toFixed(6);
         livePrice.textContent = `1 KLV = ${price.toFixed(8)} USDT`;
         quoteExpiry.textContent = `Live estimate · ${result.data.priceSource || 'Swopus'} KLV/USDT`;
         amountLabel.textContent = 'Estimated payment amount';
         amount.textContent = `${estimatedKlvAmount} KLV`;
-        copyAmount.disabled = false;
       } catch (error) {
         livePrice.textContent = 'KLV rate temporarily unavailable';
         quoteExpiry.textContent = 'Swopus live pool · retry shortly';
         amount.textContent = 'Rate unavailable';
-        copyAmount.disabled = true;
       } finally {
         rateLoading = false;
       }
@@ -398,14 +403,19 @@ export async function ensureMembership(session, game) {
       amountLabel.textContent = 'Exact payment amount';
       copyAmount.disabled = !estimatedKlvAmount;
       setWatch('Preparing your Gate Pass', 'Getting a fresh KLV/USDT quote before you send anything.');
+      const requestedPlanId = selectedPlanId;
       try {
-        const result = await post(currentSession, { op: 'quote' });
+        const result = await post(currentSession, { op: 'quote', plan: requestedPlanId });
         currentSession = result.session;
+        if (requestedPlanId !== selectedPlanId) {
+          quoteLoading = false;
+          return loadQuote();
+        }
         quote = result.data;
         livePrice.textContent = `1 KLV = $${Number(quote.usdPrice).toFixed(8)} USDT`;
         quoteExpiry.textContent = `${quote.priceSource || 'Swopus'} · Quote valid until ${dateLabel(quote.expiresAt)}`;
         amount.textContent = `${quote.klvAmount} KLV`;
-        copyAmount.disabled = false;
+        amountLabel.textContent = `Exact KLV amount · ${Number(quote.usdAmount).toFixed(2)} total`;
         payNow.disabled = false;
         payNow.textContent = 'Buy Membership';
         payNow.title = 'Approve the exact quoted KLV amount in Klever Wallet.';
@@ -489,7 +499,7 @@ export async function ensureMembership(session, game) {
     close.addEventListener('click', () => finish(false));
     overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(false); });
 
-    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, addressLabel, addressRow, steps, watch, actions, footnote, explorer);
+    paymentPanel.append(priceGrid, tokenLine, amountLabel, amountRow, watch, actions, footnote, explorer);
     card.append(close, head, title, intro, codePanel, paymentPanel);
     overlay.append(card);
     document.body.append(overlay);
