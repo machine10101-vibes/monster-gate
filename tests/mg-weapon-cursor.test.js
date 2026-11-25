@@ -26,7 +26,7 @@ test('weapon cursor uses a cached rendered model image with the SVG family curso
   const catalog = src('src/ui/catalog.js');
   assert.match(cursor, /renderThumbNow\(spec, px\)\.toDataURL\('image\/png'\)/);
   assert.match(cursor, /cursorImageForHeld\(held, 64\)/);
-  assert.ok(cursor.includes("'url(\"' + image + '\") 4 4, '));
+  assert.ok(cursor.includes('canvas.style.cursor = image'));
   assert.match(catalog, /thumbNow\(spec, px = 64\)/);
   assert.match(catalog, /export function renderThumbNow/);
 });
