@@ -50,6 +50,7 @@ function copyText(value) {
 }
 
 let kleverPaymentModules;
+// Payment SDK loading is retried across independent ESM hosts; do not regress to a single CDN import.
 async function loadKleverPaymentModules() {
   if (!kleverPaymentModules) {
     // esm.sh can intermittently fail to serve browser modules. Retry through
