@@ -782,3 +782,14 @@ test('melee attacks animate wrist lag, elbow compression, and planted-foot follo
   assert.match(player, /sp\.step\('legLz'/);
   assert.match(player, /sp\.step\('legRz'/);
 });
+
+
+test('weapon momentum refinement loads support joints and animates weapon recoil', () => {
+  const player = src('src/entities/player.js');
+  assert.match(player, /const windup = 1 - ease/);
+  assert.match(player, /isTwoHandedFamily\(family\)/);
+  assert.match(player, /weaponRollLag/);
+  assert.match(player, /offhandPitch/);
+  assert.match(player, /family === 'crossbow' \? 0\.12 : 0\.075/);
+  assert.match(player, /support elbow engaged throughout/);
+});
