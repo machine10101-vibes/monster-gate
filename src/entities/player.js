@@ -668,6 +668,9 @@ export class Player {
       if (this.state === 'gather') {
         if (this.gatherReady) target = this.gatherFace;
         else if (speed > 0.2) target = Math.atan2(moveDir.x, moveDir.z);
+      } else if (!inp.touch && inp.strafe && !inp.aim?.has) {
+        // Strafe input never changes heading; mouse movement can still aim the hunter.
+        target = this.yaw;
       } else if (!inp.touch && inp.aim?.has && this.aimDir) {
         // Desktop mouse-look continuously controls character facing, including while strafing.
         target = Math.atan2(this.aimDir.x, this.aimDir.z);
