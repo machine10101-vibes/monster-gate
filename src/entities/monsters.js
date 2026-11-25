@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildFowl } from './creatures.js';
 import { buildDarksycleDragon } from './darksycle.js';
 import { buildVolcanumDragon } from './volcanum.js';
-import { volcanumThink } from './volcanumAI.js';
+import { volcanumThink, volcanumPose } from './volcanumAI.js';
 import { buildOrcScout } from './orc.js';
 import { buildSnowYeti } from './yeti.js';
 import { buildHolyKnight, buildDemonKnight } from './knights.js';
@@ -1515,7 +1515,8 @@ export class Monster {
           sweep = 0.3 + dive * 0.45;
           sweepAmp = 0;
         }
-        w.rotation.z = sgn * (base + Math.sin(t * flapRate) * amp);
+        const stroke = lava ? Math.sin(t * flapRate) + 0.3 * Math.sin(2 * t * flapRate) : Math.sin(t * flapRate);
+        w.rotation.z = sgn * (base + stroke * amp);
         w.rotation.y = sgn * (sweep - Math.cos(t * flapRate) * sweepAmp);
         const og = p.wingsOuter[i];
         // Wrist sections lag the shoulder through each power stroke and
@@ -1595,6 +1596,7 @@ export class Monster {
       const breathing = 1 + Math.sin(t * 1.75) * (moving < 0.08 ? 0.012 : 0.006);
       p.body.scale.y += (breathing - p.body.scale.y) * Math.min(1, dt * 3.5);
       p.bodyG.rotation.z = Math.sin(t * 1.3) * 0.04 + this.bank * 0.12;
+      if (lava) volcanumPose(this, p, t, dt, { flying, diving, dive, flapRate, winding });
       o.scale.setScalar(spawnS * this.baseScale);
     } else if (this.type === 'chicken') {
       const b = m.body;
