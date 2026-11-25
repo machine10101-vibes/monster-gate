@@ -494,10 +494,10 @@ export async function ensureMembership(session, game) {
     overlay.append(card);
     document.body.append(overlay);
     document.addEventListener('keydown', onKeyDown);
-    loadRate();
     if (status.walletAddress) {
       loadQuote();
     } else {
+      loadRate();
       payNow.disabled = false;
       payNow.textContent = 'Buy Membership';
       payNow.title = 'View the live KLV estimate above, then select Buy Membership to connect your wallet and pay.';
