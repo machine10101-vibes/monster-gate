@@ -191,6 +191,10 @@ test('menu buttons sit in one right-edge column', () => {
   assert.match(html, /id="hud-corner-right"/);
   assert.match(html, /data-panel="bag"/);
   assert.match(html, /data-panel="settings"/);
+  assert.doesNotMatch(html, /data-panel="menu"/);
+  const hud = src('src/ui/hud.js');
+  assert.match(hud, /else if \(name === 'settings'\)/);
+  assert.doesNotMatch(hud, /name === 'menu'/);
   assert.doesNotMatch(html, /id="menu-buttons"/);
   assert.doesNotMatch(html, /id="menu-col-left"/);
   assert.match(theme, /#menu-col/);

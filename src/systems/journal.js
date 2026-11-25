@@ -35,6 +35,7 @@ function normalize(raw) {
     quests,
     activity,
     challengeNew: Math.max(0, src.challengeNew | 0),
+    tracked: typeof src.tracked === 'string' ? src.tracked : null,
   };
 }
 
@@ -83,6 +84,19 @@ export class Journal {
     if (st?.started) return 'active';
     if (q.requires.every((r) => this.row(r)?.done)) return 'available';
     return 'locked';
+  }
+
+  trackedQuest() {
+    const id = this.state.tracked;
+    return id && this.status(id) === 'active' ? id : null;
+  }
+
+  /** Pin one active story quest to the HUD tracker for this hunter. */
+  track(id) {
+    if (this.status(id) !== 'active') return false;
+    this.state.tracked = id;
+    this.persist();
+    return true;
   }
 
   points() {
@@ -139,11 +153,15 @@ export class Journal {
 
   /** The line under the minimap. The guild board shows when no story step is open. */
   tracker(board) {
-    for (const q of QUESTS) {
+    const pinned = this.trackedQuest();
+    const ordered = pinned
+      ? [questById(pinned), ...QUESTS.filter((q) => q.id !== pinned)]
+      : QUESTS;
+    for (const q of ordered) {
       const obj = this.objective(q.id);
-      if (obj) return { text: obj.text, n: obj.n, total: obj.total };
+      if (obj) return { text: obj.text, n: obj.n, total: obj.total, questId: q.id };
     }
-    return { text: board.text, n: board.n, total: board.total };
+    return { text: board.text, n: board.n, total: board.total, questId: null };
   }
 
   scriptFor(npcId) {
@@ -274,6 +292,7 @@ export class Journal {
     st.unseen = true;
     if (st.step >= q.steps.length) {
       st.done = true;
+      if (this.state.tracked === id) this.state.tracked = null;
       st.step = q.steps.length;
       this.log('Quest complete', `${q.name}. ${q.points} quest point${q.points === 1 ? '' : 's'}.`);
       const started = [];
