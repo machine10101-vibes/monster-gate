@@ -754,42 +754,31 @@ test('map south sea and Hellspire charted edges wander instead of boxing', () =>
 });
 
 
-test('weapon combos use full-body follow-through and a dedicated two-hand staff sequence', () => {
+test('melee combos layer full-body follow-through over each weapon chain', () => {
   const player = src('src/entities/player.js');
   const combat = src('src/entities/weaponCombat.js');
-  assert.match(player, /family === 'staff'/);
-  assert.match(player, /overhead strike, cross-body sweep, rising return/);
   assert.match(player, /Whole-body follow-through/);
   assert.match(player, /impactPulse/);
   assert.match(player, /headYaw -= torsoYaw/);
   assert.match(player, /headPitch -= lean/);
   assert.match(player, /family === 'bow'/);
   assert.match(player, /family === 'crossbow'/);
+  assert.match(player, /sampleStep\(step, tt/);
   for (const family of ['heavy', 'spear', 'scythe', 'dual', 'sword']) {
     assert.match(combat, new RegExp(`return '${family}'`));
   }
 });
 
 
-test('melee attacks animate weapon lag, loaded elbows, and planted-foot follow-through', () => {
+test('melee attacks animate weapon lag, planted feet, offhand recoil and a pinned support hand', () => {
   const player = src('src/entities/player.js');
-  assert.match(player, /weaponPitch = windup/);
-  assert.match(player, /weaponYaw = side/);
   assert.match(player, /sp\.step\('weaponPitch'/);
   assert.match(player, /sp\.step\('weaponYaw'/);
-  assert.match(player, /eR \+= windup/);
-  assert.match(player, /legLz/);
-  assert.match(player, /sp\.step\('legLz'/);
-  assert.match(player, /sp\.step\('legRz'/);
-});
-
-
-test('weapon momentum refinement loads support joints and animates weapon recoil', () => {
-  const player = src('src/entities/player.js');
-  assert.match(player, /const windup = 1 - ease/);
-  assert.match(player, /isTwoHandedFamily\(family\)/);
   assert.match(player, /weaponRollLag/);
   assert.match(player, /offhandPitch/);
   assert.match(player, /family === 'crossbow' \? 0\.12 : 0\.075/);
-  assert.match(player, /support elbow engaged throughout/);
+  assert.match(player, /sp\.step\('legLz'/);
+  assert.match(player, /sp\.step\('legRz'/);
+  assert.match(player, /supportHand\(dt\)/);
+  assert.match(player, /levelWeapon\(\)/);
 });

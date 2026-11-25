@@ -8,6 +8,7 @@ import { SpringSet } from '../engine/motion.js';
 import { skillMods } from '../systems/skillcast.js';
 import { SKILLFX, meleeSwing } from '../systems/skillfx.js';
 import { weaponFamily, isTwoHandedFamily } from './weaponCombat.js';
+import { comboStep, sampleStep, stepLunge } from './attackCombos.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -60,6 +61,10 @@ export class Player {
     this.comboT = 0;
     this.attackHit = false;
     this.attackItem = null;
+    this.attackStep = null;
+    this.attackHitFrac = 0.5;
+    this.bufferedAttack = null;
+    this.atkPose = {};
     this.cycle = 0;
     this.moveAmt = 0;
     this.speed = 0;
@@ -198,6 +203,7 @@ export class Player {
       const g = buildHeld(kind);
       g.traverse((o) => (o.castShadow = true));
       slot.add(g);
+      this.gripZ = supportGrip(kind, g);
     }
     const off = this.model.offhand;
     if (off) {
@@ -312,6 +318,7 @@ export class Player {
     const leavingDrink = this.sipping && !(s === 'use' && this.state !== 'use');
     if (leavingDrink) this.endSip();
     if (leavingDrink || (this.state === 'use' && s !== 'use')) this.potionDone = false;
+    if (s !== 'attack') this.bufferedAttack = null;
     this.state = s;
     this.stateT = 0;
     this.stateDur = dur;
@@ -397,7 +404,7 @@ export class Player {
   tryAttack(item) {
     if (this.state === 'gather') this.game.gather.cancel();
     if (this.dead || this.state === 'roll' || this.state === 'stagger') return false;
-    if (this.state === 'attack') return false;
+    if (this.state === 'attack') return this.bufferAttack(item);
     // A drink plays in the free hand. Swinging still uses the weapon already selected.
     if (this.state === 'use' && !(this.sipping && item.kind !== 'use' && item.kind !== 'light' && item.kind !== 'none')) {
       return false;
@@ -441,28 +448,42 @@ export class Player {
       if (item.kind === 'ranged' && !item.proj && !item.spell && !this.game.progress.drawArrow()) return false;
       const range = item.kind === 'ranged' ? 13 : 4.5;
       if (!this.game.mmo.pvpAttackNearest(range)) return false;
-      this.drawWeapon();
-      this.attackItem = item;
-      this.combo = item.kind === 'melee' && this.comboT > 0 ? (this.combo + 1) % 3 : 0;
-      this.attackHit = true;
-      this.spend(item.stam);
-      this.stamDelay = 0.7;
-      const swing = skillMods(this.game).speed ?? 1;
-      this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
-      this.game.audio.swing(weaponFamily(item, item.held || this.heldKind));
+      this.beginAttack(item, item.kind === 'melee' && this.comboT > 0 ? (this.combo + 1) % 3 : 0, true);
       return true;
     }
     if (this.stamina < 3) return false;
+    this.beginAttack(item, this.comboT > 0 ? (this.combo + 1) % 3 : 0, false);
+    return true;
+  }
+
+  /**
+   * Start one swing. Melee weapons pick the step of their own three-hit
+   * combo; each step carries its own tempo, contact frame and footwork.
+   */
+  beginAttack(item, combo, hitDone) {
     this.drawWeapon();
     this.attackItem = item;
-    this.combo = this.comboT > 0 ? (this.combo + 1) % 3 : 0;
-    this.attackHit = false;
+    this.combo = combo;
+    this.attackHit = hitDone;
+    this.bufferedAttack = null;
     this.spend(item.stam);
     this.stamDelay = 0.7;
     const swing = skillMods(this.game).speed ?? 1;
-    this.setState('attack', item.dur * swing * (this.combo === 2 && item.kind === 'melee' ? 1.2 : 1));
+    const melee = item.kind === 'melee';
+    const step = melee ? comboStep(item, item.held || this.heldKind, combo) : null;
+    this.attackStep = step;
+    this.attackHitFrac = step ? step.hit : clamp((item.hit ?? item.dur * 0.6) / item.dur, 0.05, 0.9);
+    this.setState('attack', item.dur * swing * (step ? step.dur : 1));
     this.game.audio.swing(weaponFamily(item, item.held || this.heldKind));
-    return true;
+  }
+
+  /** A press during a swing's follow-through is held and chains into the next step. */
+  bufferAttack(item) {
+    const cur = this.attackItem;
+    if (!cur || cur.kind !== 'melee' || item.kind !== 'melee') return false;
+    if (this.stateT / Math.max(1e-4, this.stateDur) < this.attackHitFrac * 0.6) return false;
+    this.bufferedAttack = item;
+    return false;
   }
 
   tryRoll(dir) {
@@ -542,20 +563,31 @@ export class Player {
       }
       case 'attack': {
         const it = this.attackItem;
+        const step = this.attackStep;
         const t = this.stateT / this.stateDur;
-        const hitT = (it.hit ?? it.dur * 0.6) / it.dur;
+        const hitT = this.attackHitFrac;
         if (!this.attackHit && t >= hitT) {
           this.attackHit = true;
           this.doAttackHit(it);
         }
-        const lunge = it.kind === 'melee' && t > hitT - 0.15 && t < hitT + 0.1 ? (this.combo === 2 ? 5.2 : 4.4) : 0;
+        // Footwork belongs to the step: jabs skip in, finishers drive through.
+        const lunge = step ? stepLunge(step, t) * (inputMag > 0.1 ? 1.1 : 1) : 0;
         speed = lunge + inputMag * 1.3;
         moveDir.copy(this.facing);
-        if (lunge === 0 && inputMag > 0.1) moveDir.copy(want).normalize();
-        if (lunge === 0 && inputMag > 0.1) speed = inputMag * 1.3;
-        if (this.stateT >= this.stateDur) {
-          this.comboT = 0.45;
+        if (lunge < 0.05 && inputMag > 0.1) {
+          moveDir.copy(want).normalize();
+          speed = inputMag * (t > hitT ? 1.6 : 1.1);
+        }
+        const chain = this.bufferedAttack && this.attackHit && step && t >= step.cancel;
+        if (chain || this.stateT >= this.stateDur) {
+          this.comboT = step ? step.window : 0.45;
+          const next = this.bufferedAttack;
+          this.bufferedAttack = null;
           this.setState('idle');
+          if (next) {
+            this.game.faceForAction?.();
+            this.tryAttack(next);
+          }
         }
         break;
       }
@@ -741,9 +773,12 @@ export class Player {
     const f = this.facing;
     const mods = skillMods(g);
     if (it.kind === 'melee') {
-      const mult = this.combo === 2 ? 1.5 : 1;
-      const reach = it.reach * (this.combo === 2 ? 1.2 : 1);
-      meleeSwing(g, this, it, this.combo, reach);
+      const step = this.attackStep;
+      const mult = step?.dmg ?? (this.combo === 2 ? 1.5 : 1);
+      const knockMult = step?.knock ?? (this.combo === 2 ? 1.5 : 1);
+      const reach = it.reach * (step?.reach ?? (this.combo === 2 ? 1.2 : 1));
+      const around = step?.arc === 'full';
+      meleeSwing(g, this, it, this.combo, reach, step?.fx);
       let hits = 0;
       for (const m of g.monsters) {
         if (m.dead || (m.hover || 0) > 2.5) continue;
@@ -752,10 +787,10 @@ export class Player {
         const d = Math.hypot(dx, dz);
         if (d > reach + m.radius) continue;
         const dot = (dx * f.x + dz * f.z) / (d || 1);
-        if (dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
+        if (!around && dot < Math.cos(it.arc / 2) && d > m.radius + 0.4) continue;
         const crit = Math.random() < 0.12 + (mods.crit || 0);
         const dmgOut = Math.round(it.dmg * mult * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.25) * mods.melee);
-        g.strikeMonster(m, dmgOut, dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * (this.combo === 2 ? 1.5 : 1), crit);
+        g.strikeMonster(m, dmgOut, dx / (d || 1), dz / (d || 1), it.knock * (mods.knock || 1) * knockMult, crit);
         if (!m.serverAuthoritative) g.gather.train('strength', 2 + dmgOut * 0.8);
         if (mods.poison && !m.dead) m.afflict('poison', 4 + (mods.poisonTime || 0), 4 + (mods.poisonBonus || 0));
         hits++;
@@ -847,13 +882,101 @@ export class Player {
     }
   }
 
+  /**
+   * Level-held weapons (spears) point along the hunter's facing in body space,
+   * whatever the torso and arms are doing, so a thrust drives straight down the
+   * line while the arms only supply the reach.
+   */
+  levelWeapon() {
+    const w = this.levelW || 0;
+    if (w < 0.01) return;
+    const m = this.model;
+    this.pivot.updateMatrixWorld(true);
+    const parent = m.hand.getWorldQuaternion(LV_Q1).invert();
+    const want = this.pivot.getWorldQuaternion(LV_Q2).multiply(LV_Q3.setFromEuler(LV_E.set(this.levelPitch || 0, 0, gripRoll(this.heldKind))));
+    m.heldSlot.quaternion.slerp(parent.multiply(want), Math.min(1, w));
+  }
+
+  /**
+   * Two-handed melee weapons keep the support hand on the haft. An analytic
+   * two-bone solve places the left hand on the weapon's grip point after the
+   * rest of the pose is set, blended in and out so it never pops.
+   */
+  supportHand(dt) {
+    const m = this.model;
+    const fam = weaponFamily({ kind: 'melee' }, this.heldKind);
+    const busy = this.state === 'roll' || this.state === 'dead' || this.state === 'stagger' || this.state === 'use' || this.state === 'gather';
+    const want = SUPPORT_FAMILIES.has(fam) && !busy && !this.shielding && !this.sipping && !(this.castT > 0) && !this.leapArm && !(this.leapT > 0) && !(this.hurtT > 0.15) && (this.state !== 'attack' || this.attackItem?.kind === 'melee') ? 1 : 0;
+    this.ikW = (this.ikW || 0) + (want - (this.ikW || 0)) * Math.min(1, dt * 14);
+    if (this.ikW < 0.01) {
+      this.levelWeapon();
+      return;
+    }
+    const grip = this.gripPoint || (this.gripPoint = new THREE.Vector3());
+    const L1 = Math.abs(m.elbowL.position.y);
+    const L2 = Math.abs(m.offhand.position.y);
+    const reach = (L1 + L2) * 0.97;
+    const gz = this.gripZ ?? -0.18;
+    for (const o of [m.heldSlot, m.hand, m.elbowR]) o.updateMatrix();
+    const baseZ = m.armR.rotation.z;
+    const need = (off) => {
+      m.armR.rotation.z = baseZ - off;
+      m.armR.updateMatrix();
+      grip.set(0, 0, gz).applyMatrix4(m.heldSlot.matrix).applyMatrix4(m.hand.matrix).applyMatrix4(m.elbowR.matrix).applyMatrix4(m.armR.matrix);
+      return grip.sub(m.armL.position).length();
+    };
+    // Draw the lead arm across the chest just far enough for the support hand to reach the grip.
+    let off = 0;
+    if (need(0) > reach) {
+      let lo = 0;
+      let hi = 1.1;
+      if (need(hi) > reach) off = hi;
+      else {
+        for (let i = 0; i < 7; i++) {
+          const mid = (lo + hi) / 2;
+          if (need(mid) > reach) lo = mid;
+          else hi = mid;
+        }
+        off = hi;
+      }
+    }
+    need(off * this.ikW);
+    // Level the haft after the lead arm settles, then re-measure the grip for the support hand.
+    if ((this.levelW || 0) > 0.01) {
+      this.levelWeapon();
+      m.heldSlot.updateMatrix();
+      need(off * this.ikW);
+    }
+    const d = clamp(grip.length(), Math.abs(L1 - L2) + 1e-3, L1 + L2 - 1e-4);
+    grip.setLength(d);
+    const e = Math.acos(clamp((d * d - L1 * L1 - L2 * L2) / (2 * L1 * L2), -1, 1));
+    const bend = clamp(e, 0.04, 2.5);
+    // Hand offset in the shoulder frame for this elbow bend (forearm swings forward).
+    const hy = -L1 - L2 * Math.cos(bend);
+    const hz = L2 * Math.sin(bend);
+    const sinC = clamp(grip.x / -hy, -1, 1);
+    const c = Math.asin(sinC);
+    const yc = hy * Math.cos(c);
+    const a = Math.atan2(grip.z, grip.y) - Math.atan2(hz, yc);
+    let ax = m.armL.rotation.x;
+    // Keep the solution in the same turn as the current shoulder angle.
+    let target = a;
+    while (target - ax > Math.PI) target -= TAU;
+    while (target - ax < -Math.PI) target += TAU;
+    const w = this.ikW;
+    m.armL.rotation.x = lerp(ax, target, w);
+    m.armL.rotation.z = lerp(m.armL.rotation.z, c, w);
+    m.elbowL.rotation.x = lerp(m.elbowL.rotation.x, -bend, w);
+  }
+
   updateTrail(dt) {
     const tr = this.trail;
     const it = this.attackItem;
     if (this.state === 'attack' && it && it.kind === 'melee' && !this.dead) {
       const tt = this.stateT / this.stateDur;
-      const hitT = it.hit / it.dur;
-      if (tt > hitT - 0.12 && tt < hitT + (1 - hitT) * 0.55) {
+      const hitT = this.attackHitFrac;
+      const spin = this.attackStep?.fx?.spin;
+      if (tt > hitT - (spin ? 0.2 : 0.1) && tt < hitT + (1 - hitT) * (spin ? 0.4 : 0.3)) {
         const spec = TRAIL_SPEC[this.heldKind] || TRAIL_SPEC.blade;
         tr.setStyle(this.combo === 2 ? spec.hot : spec.col, 0.22);
         this.obj.updateMatrixWorld(true);
@@ -899,7 +1022,15 @@ export class Player {
     let rate = 22;
 
     const idle = 1 - Math.min(1, mv * 2);
-    if (twoHandHeld) {
+    const supportHeld = SUPPORT_FAMILIES.has(heldFamily);
+    let idleElbowR = 0;
+    if (supportHeld) {
+      // Two-handed melee rests in a low middle guard; the support hand is pinned to the grip.
+      armR = heldFamily === 'spear' ? -0.75 : heldFamily === 'scythe' ? -0.66 : -0.58;
+      armL = -0.7;
+      armLz = -0.12;
+      if (heldFamily === 'spear') idleElbowR = 0.55;
+    } else if (twoHandHeld) {
       // Keep both hands on long hafts, stocks and two-handed grips while moving.
       armR = -0.92;
       armL = heldFamily === 'bow' || heldFamily === 'crossbow' ? -0.38 : -0.78;
@@ -912,7 +1043,7 @@ export class Player {
       armL = -0.18;
     }
     armR += walk * 0.55 * mv * (heldBlade ? 0.4 : 1);
-    armL = twoHandHeld ? -0.78 + walk * 0.18 * mv : heldFamily === 'dual' ? -0.68 - walk * 0.28 * mv : -walk * 1.0 * mv;
+    armL = twoHandHeld ? (supportHeld ? -0.7 : -0.78) + walk * 0.18 * mv : heldFamily === 'dual' ? -0.68 - walk * 0.28 * mv : -walk * 1.0 * mv;
     armLz = twoHandHeld ? -0.12 + run * 0.025 : 0.05 + run * 0.1;
     armRz = -0.05 - run * (twoHandHeld ? 0.025 : 0.08);
     let legL = walk * 0.8 * mv;
@@ -946,186 +1077,49 @@ export class Player {
       case 'attack': {
         const it = this.attackItem;
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
-        const hitT = it.hit / it.dur;
-        const dir = this.combo === 1 ? -1 : 1;
+        const hitT = this.attackHitFrac;
         rate = 30;
         const family = weaponFamily(it, it.held || this.heldKind);
-        if (it.kind === 'melee') {
+        const step = this.attackStep;
+        if (it.kind === 'melee' && step) {
+          // Each weapon class plays its own keyed three-step chain (attackCombos.js).
+          const k = sampleStep(step, tt, this.atkPose);
+          rate = 44;
+          armR = k.aR;
+          armRz = k.aRz;
+          armL = k.aL;
+          armLz = k.aLz;
+          torsoYaw = k.ty;
+          lean = k.ln;
+          crouch = k.cr;
+          tilt = k.tl;
+          legL = k.lL;
+          legR = k.lR;
+          headPitch = k.hp;
           legExtraL = 0;
           legExtraR = 0;
           liftL = 0;
           liftR = 0;
-          if (family === 'heavy' || family === 'spear' || family === 'scythe') {
-            const q = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : ease((tt - hitT) / Math.max(0.05, 1 - hitT));
-            const pre = tt < hitT;
-            const comboSide = this.combo === 1 ? -1 : 1;
-            armR = family === 'spear' ? lerp(-1.1, pre ? -1.75 : -0.35, q) : lerp(-1.2, pre ? -2.95 : -0.45, q);
-            armRz = family === 'spear' ? 0.12 : 0.28 * comboSide;
-            armL = family === 'spear' ? lerp(-0.8, pre ? -1.45 : -0.75, q) : lerp(-0.9, pre ? -2.05 : -1.0, q);
-            armLz = family === 'spear' ? -0.12 : -0.2 * comboSide;
-            if (family === 'spear') {
-              // Thrust, lateral butt-to-tip sweep, then rising thrust; both hands stay on the haft.
-              const spearSide = this.combo === 1 ? -1 : 1;
-              const spearStart = this.combo === 0 ? -2.0 : this.combo === 1 ? -1.25 : -2.35;
-              const spearEnd = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.5 : 0.15;
-              armR = pre ? lerp(-1.05, spearStart, q) : lerp(spearStart, spearEnd, q);
-              armL = pre ? lerp(-0.85, this.combo === 1 ? -1.75 : -1.35, q) : lerp(this.combo === 1 ? -1.75 : -1.35, -0.55, q);
-              armRz = this.combo === 0 ? 0 : 0.24 * spearSide;
-              armLz = -0.12 * spearSide;
-              torsoYaw = pre ? lerp(0, (this.combo === 0 ? -0.42 : this.combo === 1 ? 0.72 : -0.58) * spearSide, q) : lerp((this.combo === 0 ? -0.42 : this.combo === 1 ? 0.72 : -0.58) * spearSide, this.combo === 1 ? -0.25 : 0.22, q);
-              lean = pre ? (this.combo === 2 ? 0.04 : -0.08) * q : (this.combo === 2 ? -0.08 : 0.13) * (1 - q);
-              legL = lerp(0.12, pre ? 0.35 : -0.05, q);
-              legR = lerp(-0.08, pre ? -0.18 : -0.3, q);
-            } else if (family === 'scythe') {
-              // Three linked reaping cuts: high-to-low, reverse waist sweep, then rising finish.
-              const scytheSide = this.combo === 1 ? -1 : 1;
-              const startYaw = this.combo === 0 ? 0.92 : this.combo === 1 ? -0.95 : 0.35;
-              const endYaw = this.combo === 0 ? -1.0 : this.combo === 1 ? 0.92 : -0.42;
-              const startArm = this.combo === 2 ? -1.65 : -2.72;
-              const endArm = this.combo === 2 ? -2.9 : -0.42;
-              torsoYaw = pre ? lerp(0, startYaw * scytheSide, q) : lerp(startYaw * scytheSide, endYaw * scytheSide, q);
-              lean = pre ? (this.combo === 2 ? 0.08 : -0.16) * q : (this.combo === 2 ? -0.12 : 0.22) * (1 - q);
-              armR = pre ? lerp(-1.15, startArm, q) : lerp(startArm, endArm, q);
-              armL = pre ? lerp(-0.9, this.combo === 2 ? -2.35 : -2.15, q) : lerp(this.combo === 2 ? -2.35 : -2.15, -0.55, q);
-              armRz = (this.combo === 2 ? -0.32 : 0.28) * scytheSide;
-              armLz = -0.2 * scytheSide;
-              legL = lerp(0.2, pre ? 0.5 : 0.72, q);
-              legR = lerp(-0.1, pre ? -0.25 : -0.55, q);
-            } else {
-              // Three weighty linked attacks: overhead chop, horizontal cleave, rising diagonal.
-              const heavySide = this.combo === 1 ? -1 : 1;
-              const heavyWind = this.combo === 0 ? -3.05 : this.combo === 1 ? -2.15 : -1.55;
-              const heavyFinish = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.55 : -2.8;
-              torsoYaw = pre
-                ? lerp(0, (this.combo === 0 ? 0.25 : this.combo === 1 ? -0.82 : 0.72) * heavySide, q)
-                : lerp((this.combo === 0 ? 0.25 : this.combo === 1 ? -0.82 : 0.72) * heavySide, -0.12 * heavySide, q);
-              lean = pre ? (this.combo === 2 ? 0.08 : -0.24) * q : (this.combo === 2 ? -0.08 : 0.32) * (1 - q);
-              crouch = pre ? 0.08 * q : 0.12 * (1 - q);
-              armR = pre ? lerp(-1.15, heavyWind, q) : lerp(heavyWind, heavyFinish, q);
-              armL = pre ? lerp(-0.9, this.combo === 1 ? -2.0 : -2.45, q) : lerp(this.combo === 1 ? -2.0 : -2.45, this.combo === 2 ? -0.35 : -0.65, q);
-              armRz = pre ? lerp(0, this.combo === 2 ? -0.35 : 0.2 * heavySide, q) : lerp(this.combo === 2 ? -0.35 : 0.2 * heavySide, -0.08, q);
-              legL = lerp(0.1, pre ? (this.combo === 2 ? 0.28 : 0.48) : 0.85, q);
-              legR = lerp(-0.08, pre ? -0.3 : -0.72, q);
-            }
-            tilt = lerp(0, (pre ? -0.06 : 0.1) * comboSide, q);
-          } else if (family === 'dual') {
-            // Alternating hand cuts; the off-hand follows the combo rather than hanging idle.
-            const side = this.combo === 1 ? -1 : 1;
-            const p = tt < hitT ? ease(tt / Math.max(0.05, hitT)) : 1 - ease((tt - hitT) / Math.max(0.05, 1 - hitT));
-            // Right-hand cut, left-hand return, then a simultaneous crossing finisher.
-            if (this.combo === 0) {
-              armR = lerp(-0.8, -2.35, p);
-              armL = lerp(-0.65, -0.25, p);
-              armRz = 0.55 * p;
-              armLz = -0.08 * p;
-              torsoYaw = 0.34 * p;
-            } else if (this.combo === 1) {
-              armR = lerp(-0.8, -0.3, p);
-              armL = lerp(-0.65, -2.3, p);
-              armRz = 0.08 * p;
-              armLz = -0.55 * p;
-              torsoYaw = -0.36 * p;
-            } else {
-              armR = lerp(-0.8, -2.15, p);
-              armL = lerp(-0.65, -2.2, p);
-              armRz = 0.5 * p;
-              armLz = -0.5 * p;
-              torsoYaw = 0.12 * p;
-            }
-            lean = -0.08 * p;
-            legL = lerp(legL, 0.28 * p, p);
-            legR = lerp(legR, -0.18 * p, p);
-          } else if (family === 'staff') {
-            // A staff is driven by both hands: overhead strike, cross-body sweep, rising return.
-            const side = this.combo === 1 ? -1 : 1;
-            const q = tt < hitT
-              ? ease(tt / Math.max(0.05, hitT))
-              : ease((tt - hitT) / Math.max(0.05, 1 - hitT));
-            const pre = tt < hitT;
-            const windR = this.combo === 0 ? -2.8 : this.combo === 1 ? -1.35 : -2.15;
-            const finishR = this.combo === 0 ? -0.25 : this.combo === 1 ? -0.55 : -2.75;
-            const windL = this.combo === 0 ? -2.25 : this.combo === 1 ? -2.05 : -1.55;
-            const finishL = this.combo === 0 ? -0.45 : this.combo === 1 ? -0.35 : -2.5;
-            armR = pre ? lerp(-0.9, windR, q) : lerp(windR, finishR, q);
-            armL = pre ? lerp(-0.75, windL, q) : lerp(windL, finishL, q);
-            armRz = (this.combo === 0 ? 0.12 : 0.28 * side) * (pre ? q : 1 - q);
-            armLz = -armRz * 0.72;
-            torsoYaw = pre
-              ? lerp(0, (this.combo === 0 ? 0.18 : this.combo === 1 ? -0.72 : 0.58) * side, q)
-              : lerp((this.combo === 0 ? 0.18 : this.combo === 1 ? -0.72 : 0.58) * side, -0.16 * side, q);
-            lean = pre ? -0.12 * q : 0.2 * (1 - q);
-            crouch = pre ? 0.035 * q : 0.075 * (1 - q);
-            legL = lerp(0.12, pre ? 0.38 : 0.62, q);
-            legR = lerp(-0.08, pre ? -0.24 : -0.48, q);
-            headPitch = pre ? -0.08 * q : 0.1 * (1 - q);
-          } else {
-          const over = this.combo === 2;
-          if (tt < hitT) {
-            const q = tt / hitT;
-            const p = ease(q);
-            const hold = Math.pow(q, 2.2);
-            armR = lerp(armR, over ? -3.05 : -2.55, p);
-            armRz = lerp(armRz, over ? 0.25 : 0.55 * dir, p);
-            torsoYaw = lerp(0, over ? 0 : 0.7 * dir, p);
-            lean = lerp(lean, over ? -0.3 : -0.16, p);
-            crouch = lerp(0, over ? 0.02 : 0.05, hold);
-            legL = lerp(legL, 0.5, p);
-            legR = lerp(legR, -0.1, p);
-            armL = lerp(armL, over ? -2.4 : 0.5, p);
-            headPitch = over ? -0.15 * p : 0;
-            tilt = lerp(tilt, -0.06 * dir, p);
-          } else {
-            const q = clamp((tt - hitT) / (1 - hitT), 0, 1);
-            const fast = ease(Math.min(1, (tt - hitT) / 0.16));
-            const settle = ease(clamp((q - 0.45) / 0.55, 0, 1));
-            if (over) {
-              armR = lerp(-3.05, 0.35, fast) * (1 - settle) + settle * -0.5;
-              armL = lerp(-2.4, -0.2, fast) * (1 - settle);
-              torsoYaw = 0;
-              lean = lerp(-0.3, 0.55, fast) * (1 - settle * 0.9);
-              crouch = lerp(0.02, 0.14, fast) * (1 - settle);
-              legL = lerp(0.5, 0.9, fast) * (1 - settle);
-              legR = lerp(-0.1, -0.85, fast) * (1 - settle);
-              headPitch = 0.2 * fast * (1 - settle);
-            } else {
-              armR = lerp(-2.55, -0.35, fast) * (1 - settle) + settle * -0.6;
-              armRz = lerp(0.55 * dir, -0.3 * dir, fast) * (1 - settle);
-              torsoYaw = lerp(0.7 * dir, -0.85 * dir, fast) * (1 - settle * 0.8);
-              lean = lerp(-0.16, 0.34, fast) * (1 - settle * 0.9);
-              crouch = lerp(0.05, 0.1, fast) * (1 - settle);
-              legL = lerp(0.5, 0.75, fast) * (1 - settle);
-              legR = lerp(-0.1, -0.75, fast) * (1 - settle);
-              armL = lerp(0.5, -0.5, fast) * (1 - settle);
-              tilt = lerp(-0.06 * dir, 0.1 * dir, fast) * (1 - settle);
-            }
-          }
-          legExtraL = 0;
-          legExtraR = 0;
-          liftL = 0;
-          liftR = 0;
-          }
           // Whole-body follow-through: hips and head counter-rotate, then recover
-          // after the weapon has passed the target. This layers over each weapon's
-          // own path without flattening its distinct three-hit choreography.
-          const bodySide = this.combo === 1 ? -1 : 1;
-          const impactPulse = Math.exp(-Math.pow((tt - hitT) / 0.11, 2));
+          // after the weapon has passed the target.
+          const bodySide = step.side;
+          const impactPulse = Math.exp(-Math.pow((tt - hitT) / 0.09, 2));
           const recovery = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
           const followThrough = Math.sin(Math.PI * clamp(recovery, 0, 1));
-          hipX += bodySide * (0.018 + impactPulse * 0.025) * followThrough;
-          tilt += bodySide * impactPulse * 0.035;
-          headYaw -= torsoYaw * 0.16;
-          headPitch -= lean * 0.12;
-          lean += impactPulse * (this.combo === 2 ? 0.12 : 0.07);
-          if (family !== 'dual') {
-            // The free hand and shoulders absorb momentum instead of staying rigid.
-            armLz += bodySide * impactPulse * 0.08;
-          }
-          legL += (this.combo === 2 ? 0.1 : 0.055) * impactPulse;
-          legR -= (this.combo === 2 ? 0.075 : 0.04) * impactPulse;
-          // Let the stance absorb the cut: the lead foot braces while the rear
-          // foot turns through, then both feet unwind during recovery.
-          legLz = -bodySide * (family === 'dual' ? 0.055 : 0.11) * (0.35 + impactPulse);
-          legRz = bodySide * (family === 'heavy' || family === 'scythe' ? 0.14 : 0.085) * (0.3 + impactPulse);
+          const mass = family === 'heavy' ? 1.3 : family === 'scythe' ? 1.15 : family === 'spear' ? 0.85 : family === 'dual' ? 0.75 : 0.9;
+          hipX += bodySide * (0.016 + impactPulse * 0.025) * followThrough * mass;
+          tilt += bodySide * impactPulse * 0.04 * mass;
+          headYaw -= torsoYaw * 0.18;
+          headPitch -= lean * 0.1;
+          lean += impactPulse * 0.06 * mass;
+          if (family !== 'dual') armLz += bodySide * impactPulse * 0.06;
+          // Plant the lead foot and turn the rear foot through the cut.
+          legLz = -bodySide * (family === 'dual' ? 0.05 : 0.1) * (0.35 + impactPulse);
+          legRz = bodySide * (family === 'heavy' || family === 'scythe' ? 0.13 : 0.08) * (0.3 + impactPulse);
+        } else if (it.kind === 'melee') {
+          const p = tt < hitT ? ease(tt / hitT) : 1 - ease((tt - hitT) / (1 - hitT));
+          armR = lerp(-0.8, -2.5, p);
+          torsoYaw = 0.5 * p;
         } else if (it.kind === 'ranged') {
           const releaseT = Number.isFinite(hitT) ? clamp(hitT, 0.2, 0.85) : 0.68;
           const p = tt < releaseT ? ease(tt / releaseT) : 1 - ease((tt - releaseT) / (1 - releaseT));
@@ -1425,7 +1419,7 @@ export class Player {
     const rangedAim = this.state === 'attack' && this.attackItem?.kind === 'ranged';
 
     const flexOf = (total) => 0.14 + clamp(-total - 0.5, 0, 2.6) * 0.3;
-    let eR = flexOf(armR);
+    let eR = flexOf(armR) + (this.state === 'attack' ? 0 : idleElbowR);
     let eL = flexOf(armL);
     const swingR = Math.max(0, -walk);
     const swingL = Math.max(0, walk);
@@ -1438,26 +1432,14 @@ export class Player {
       const pull = tt < 0.6 ? ease(tt / 0.6) : 1 - ease((tt - 0.6) / 0.4);
       eR = AIMED_KINDS.has(this.heldKind) ? 0.1 : eR;
       eL = 0.3 + 0.8 * pull;
-    } else if (this.state === 'attack' && this.attackItem?.kind === 'melee') {
+    } else if (this.state === 'attack' && this.attackItem?.kind === 'melee' && this.attackStep) {
+      // Elbows come from the step's keys: loaded on the wind-up, snapping
+      // straight through contact, with a brief compression as the blow lands.
+      const k = this.atkPose;
       const tt = clamp(this.stateT / this.stateDur, 0, 1);
-      const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
-      const impact = Math.exp(-Math.pow((tt - hitT) / 0.12, 2));
-      const family = weaponFamily(this.attackItem, this.attackItem.held || this.heldKind);
-      // Elbows compress at contact and extend into recovery; paired weapons
-      // alternate the bend so each hand visibly leads its own cut.
-      eR += impact * (family === 'dual' ? 0.18 : family === 'spear' ? 0.1 : 0.24);
-      eL += impact * (family === 'dual' ? (this.combo === 1 ? 0.2 : 0.08) : isTwoHandedFamily(family) ? 0.12 : 0.04);
-      const recovery = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
-      const windup = 1 - ease(clamp(tt / Math.max(0.05, hitT), 0, 1));
-      const mass = family === 'heavy' ? 1.35 : family === 'scythe' ? 1.2 : family === 'spear' ? 0.82 : family === 'staff' ? 1.05 : family === 'dual' ? 0.72 : 0.9;
-      // Load the joints before the strike, then let the arms lengthen through
-      // contact. Two-handed families keep the support elbow engaged throughout.
-      eR += windup * (0.08 + mass * 0.08) + recovery * (family === 'heavy' || family === 'scythe' ? 0.14 : 0.07);
-      if (isTwoHandedFamily(family)) {
-        eL += windup * 0.12 + recovery * (family === 'staff' ? 0.16 : 0.1);
-      } else if (family === 'dual') {
-        eL += (this.combo === 1 ? 0.12 : 0.03) * recovery;
-      }
+      const impact = Math.exp(-Math.pow((tt - this.attackHitFrac) / 0.08, 2));
+      eR = Math.max(0.04, eR + (k.eR || 0) + impact * 0.1);
+      eL = Math.max(0.04, eL + (k.eL || 0) + impact * 0.06);
     }
     if (this.state === 'roll') {
       eR = 1.6;
@@ -1535,21 +1517,23 @@ export class Player {
     let weaponPitch = 0;
     let weaponYaw = 0;
     let weaponRollLag = 0;
-    if (this.state === 'attack' && this.attackItem?.kind === 'melee') {
+    // A spear rests level along the forearm with its point slightly raised.
+    let level = heldFamily === 'spear' && this.state !== 'roll' && this.state !== 'dead' ? 1 : 0;
+    if (level) weaponPitch = -0.4;
+    if (this.state === 'attack' && this.attackItem?.kind === 'melee' && this.attackStep) {
+      const k = this.atkPose;
+      level = k.lv || 0;
       const tt = clamp(this.stateT / this.stateDur, 0, 1);
-      const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
-      const impact = Math.exp(-Math.pow((tt - hitT) / 0.12, 2));
+      const hitT = this.attackHitFrac;
+      const impact = Math.exp(-Math.pow((tt - hitT) / 0.08, 2));
       const recover = ease(clamp((tt - hitT) / Math.max(0.08, 1 - hitT), 0, 1));
-      const windup = 1 - ease(clamp(tt / hitT, 0, 1));
+      const side = this.attackStep.side;
       const family = weaponFamily(this.attackItem, this.attackItem.held || this.heldKind);
-      const side = this.combo === 1 ? -1 : 1;
-      const weight = family === 'heavy' ? 1.35 : family === 'scythe' ? 1.2 : family === 'spear' ? 0.82 : family === 'staff' ? 1.05 : family === 'dual' ? 0.72 : 0.62;
-      // The wrist trails the forearm on acceleration, then catches up after contact.
-      weaponPitch = windup * -0.055 * weight
-        + impact * (this.combo === 0 ? -0.19 : this.combo === 2 ? 0.23 : -0.1) * weight
-        + Math.sin(recover * Math.PI) * 0.12 * side * weight;
-      weaponYaw = side * (windup * -0.035 + impact * 0.1 + Math.sin(recover * Math.PI) * 0.15) * weight;
-      weaponRollLag = side * (windup * 0.035 + impact * 0.075 + Math.sin(recover * Math.PI) * 0.11) * weight;
+      const weight = family === 'heavy' ? 1.3 : family === 'scythe' ? 1.15 : family === 'spear' ? 0.6 : family === 'dual' ? 0.75 : 0.7;
+      // The wrist is keyed per step and trails the forearm a little after contact.
+      weaponPitch = (k.wp || 0) + impact * 0.06 * weight;
+      weaponYaw = (k.wy || 0) + side * (impact * 0.08 + Math.sin(recover * Math.PI) * 0.1) * weight;
+      weaponRollLag = (k.wr || 0) + side * (impact * 0.06 + Math.sin(recover * Math.PI) * 0.08) * weight;
     } else if (this.state === 'attack' && this.attackItem?.kind === 'ranged') {
       const tt = clamp(this.stateT / this.stateDur, 0, 1);
       const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
@@ -1560,14 +1544,14 @@ export class Player {
       weaponYaw = release * (family === 'bow' ? 0.045 : 0.025);
       weaponRollLag = -release * (family === 'crossbow' ? 0.035 : 0.06);
     }
+    this.levelW = sp.step('weaponLevel', level, dt, rate * 0.8, 0.9);
+    this.levelPitch = weaponPitch;
     m.heldSlot.rotation.x = aimed ? -(m.armR.rotation.x + m.elbowR.rotation.x) : sp.step('weaponPitch', weaponPitch, dt, rate * 0.72, 0.8);
     m.heldSlot.rotation.y = sp.step('weaponYaw', weaponYaw, dt, rate * 0.68, 0.8);
     let roll = gripRoll(this.heldKind);
-    if (swingRoll(this.heldKind) && !aimed && this.state === 'attack' && this.attackItem?.kind === 'melee' && this.combo !== 2) {
-      const tt = clamp(this.stateT / Math.max(0.0001, this.stateDur), 0, 1);
-      const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
-      const cut = tt < hitT ? ease(tt / hitT) : 1 - ease(clamp((tt - hitT) / (1 - hitT), 0, 1));
-      roll = lerp(roll, roll - Math.PI / 2, cut);
+    if (swingRoll(this.heldKind) && !aimed && this.state === 'attack' && this.attackItem?.kind === 'melee' && this.attackStep) {
+      // Flat blades roll edge-first for side cuts; the step keys say how far.
+      roll = lerp(roll, roll - Math.PI / 2, clamp(this.atkPose.rl || 0, 0, 1));
     }
     m.heldSlot.rotation.z = roll + sp.step('weaponRollLag', weaponRollLag, dt, rate * 0.62, 0.78);
     if (m.offhand) {
@@ -1577,9 +1561,9 @@ export class Player {
       let offRoll = 0;
       if (dual && this.state === 'attack' && this.attackItem?.kind === 'melee') {
         const tt = clamp(this.stateT / this.stateDur, 0, 1);
-        const hitT = clamp(this.attackItem.hit / this.attackItem.dur, 0.05, 0.9);
-        const pulse = Math.exp(-Math.pow((tt - hitT) / 0.13, 2));
-        const lead = this.combo === 1 ? -1 : 1;
+        const hitT = this.attackHitFrac;
+        const pulse = Math.exp(-Math.pow((tt - hitT) / 0.1, 2));
+        const lead = this.attackStep?.side ?? (this.combo === 1 ? -1 : 1);
         offPitch = pulse * (this.combo === 2 ? -0.13 : 0.08);
         offYaw = -lead * pulse * 0.12;
         offRoll = -lead * pulse * 0.07;
@@ -1601,8 +1585,9 @@ export class Player {
 
     m.hip.rotation.y = sp.step('pelvis', pelvis, dt, 18, 0.8);
     m.upper.rotation.y = sp.step('torsoY', torsoYaw - pelvis, dt, rate * 0.75, 0.7);
-    m.upper.rotation.x = sp.step('lean', lean, dt, 16, 0.7);
-    m.upper.rotation.z = sp.step('tiltZ', tilt * 0.6, dt, 12, 0.9);
+    const meleeSwingOn = this.state === 'attack' && this.attackItem?.kind === 'melee';
+    m.upper.rotation.x = sp.step('lean', lean, dt, meleeSwingOn ? 24 : 16, 0.7);
+    m.upper.rotation.z = sp.step('tiltZ', tilt * 0.6, dt, meleeSwingOn ? 18 : 12, 0.9);
     m.head.rotation.x = sp.step('headX', headPitch, dt, 14, 0.65);
     const torsoWorld = m.hip.rotation.y + m.upper.rotation.y;
     m.head.rotation.y = sp.step('headY', -torsoWorld * 0.55 + headYaw - m.hip.rotation.y * 0, dt, 12, 0.75);
@@ -1617,10 +1602,36 @@ export class Player {
       m.hip.position.y = d + bobExtra;
     }
     m.hip.position.x += (hipX - m.hip.position.x) * Math.min(1, dt * 14);
+    this.supportHand(dt);
     this.pivot.rotation.x = pivotX;
+    // Spinning steps turn the whole body; the turn ends on a full circle so it hands back cleanly.
+    this.pivot.rotation.y = this.state === 'attack' && this.attackStep ? this.atkPose.spin || 0 : 0;
     this.pivot.rotation.z += (tilt * 0.4 - this.pivot.rotation.z) * Math.min(1, dt * 10);
     this.pivot.position.y = pivotY;
   }
+}
+
+const LV_Q1 = new THREE.Quaternion();
+const LV_Q2 = new THREE.Quaternion();
+const LV_Q3 = new THREE.Quaternion();
+const LV_E = new THREE.Euler();
+
+/** Melee families held with both hands on the haft. */
+const SUPPORT_FAMILIES = new Set(['heavy', 'spear', 'scythe']);
+const gripBox = new THREE.Box3();
+
+/**
+ * Where the support hand sits along a two-handed weapon (heldSlot +z runs
+ * toward the head). Swords and mauls take it below the lead hand on the
+ * pommel; spears and scythes reach up the shaft; short hafts stack it above.
+ */
+function supportGrip(kind, g) {
+  const fam = weaponFamily({ kind: 'melee' }, kind);
+  if (fam === 'spear') return 0.5;
+  if (fam === 'scythe') return 0.42;
+  g.updateMatrixWorld(true);
+  gripBox.setFromObject(g);
+  return gripBox.min.z < -0.15 ? Math.max(-0.2, gripBox.min.z + 0.09) : 0.19;
 }
 
 /** Bows and crossbows keep their frame level with the body while the arm raises them to aim. */
