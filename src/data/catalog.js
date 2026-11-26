@@ -653,6 +653,16 @@ foundSet(HOLY_K, 'holyset', [
   ['boots', 'holyboots', 'Radiant Sabatons', 3, 'Large white sabatons with gold bands.'],
 ]);
 
+// Knight and orc hammer patterns are forgeable as well as obtainable from existing loot tables.
+for (const g of GEAR) {
+  if (g.wtype !== 'hammer' || !g.found) continue;
+  const recipes = { orcwarhammer: { iron_bar: 3 }, demonhammer: { steel_bar: 5 }, wardenhammer: { steel_bar: 6 }, holyhammer: { steel_bar: 6 } };
+  if (!recipes[g.id]) continue;
+  g.found = false;
+  g.recipe = recipes[g.id];
+  g.reqSmith = g.id === 'orcwarhammer' ? 15 : 30;
+  g.forgeXp = 40;
+}
 for (const metal of METALS) {
   for (const w of metalWeapons(metal)) {
     GEAR.push(weapon(
