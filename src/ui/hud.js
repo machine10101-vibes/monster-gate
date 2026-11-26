@@ -747,10 +747,6 @@ export class HUD {
         ctx.fillStyle = '#ffd23f';
         ctx.fillRect((GUILD.x - ox) * mapScale - 3, (GUILD.z - oz) * mapScale - 3, 6, 6);
       }
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(mx - 2, mz - 2, 4, 4);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(mx - 1, mz - 1, 2, 2);
       const frame = document.createElement('div');
       frame.className = 'playmap' + (!this.mapLabels ? ' labels-off' : '');
       frame.style.setProperty('--map-w', String(c.width));
@@ -758,6 +754,13 @@ export class HUD {
       const fit = document.createElement('div');
       fit.className = 'playmap-fit';
       fit.appendChild(c);
+      const playerPin = document.createElement('i');
+      playerPin.className = 'playmap-player-pin';
+      playerPin.title = 'Your position';
+      playerPin.setAttribute('aria-label', 'Your position');
+      playerPin.style.left = (mx / c.width * 100).toFixed(3) + '%';
+      playerPin.style.top = (mz / c.height * 100).toFixed(3) + '%';
+      fit.appendChild(playerPin);
       const mapPxX = mapScale * (c.width / src.width);
       const mapPxZ = mapScale * (c.height / src.height);
       for (const gate of visibleMonsterGates(game.world)) {
@@ -779,15 +782,6 @@ export class HUD {
         ny: ((label.z - oz) * mapScale / src.height) * 100,
       }));
       const placed = layoutPlaymapLabels(pins);
-      for (const label of placed) {
-        if (!label.visible) continue;
-        if (!(label.city || label.kind === 'city' || label.kind === 'landmark' || label.landmark)) continue;
-        const pinEl = document.createElement('i');
-        pinEl.className = 'playmap-pin' + (label.city || label.kind === 'city' ? ' city' : '');
-        pinEl.style.left = Number(label.ax).toFixed(2) + '%';
-        pinEl.style.top = Number(label.ay).toFixed(2) + '%';
-        fit.appendChild(pinEl);
-      }
       const leads = document.createElement('canvas');
       leads.className = 'playmap-leads';
       leads.width = 720;
@@ -876,6 +870,7 @@ export class HUD {
       });
       frame.addEventListener('pointerdown', (event) => {
         if (event.target.closest('.playmap-zoom-controls')) return;
+        if (event.pointerType === 'touch') return;
         pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
         try { frame.setPointerCapture(event.pointerId); } catch { /* capture is optional */ }
         const pair = pointPair();
@@ -884,6 +879,7 @@ export class HUD {
         event.preventDefault();
       });
       frame.addEventListener('pointermove', (event) => {
+        if (event.pointerType === 'touch') return;
         const previous = pointers.get(event.pointerId);
         if (!previous) return;
         pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -926,6 +922,62 @@ export class HUD {
       frame.addEventListener('pointerup', endMapPointer);
       frame.addEventListener('pointercancel', endMapPointer);
       frame.addEventListener('lostpointercapture', endMapPointer);
+      let touchCenter = null;
+      let touchDistance = 0;
+      const touchPair = (touches) => {
+        if (touches.length < 2) return null;
+        const a = touches[0];
+        const b = touches[1];
+        return {
+          x: (a.clientX + b.clientX) / 2,
+          y: (a.clientY + b.clientY) / 2,
+          distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        };
+      };
+      frame.addEventListener('touchstart', (event) => {
+        if (event.target.closest('.playmap-zoom-controls')) return;
+        const pair = touchPair(event.touches);
+        touchCenter = pair
+          ? { x: pair.x, y: pair.y }
+          : event.touches[0] ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+        touchDistance = pair?.distance || 0;
+        event.preventDefault();
+      }, { passive: false });
+      frame.addEventListener('touchmove', (event) => {
+        const pair = touchPair(event.touches);
+        if (pair) {
+          if (touchDistance > 0) {
+            zoomMap(
+              view.scale * (pair.distance / touchDistance),
+              touchCenter?.x ?? pair.x,
+              touchCenter?.y ?? pair.y,
+            );
+          }
+          if (touchCenter) {
+            view.x += pair.x - touchCenter.x;
+            view.y += pair.y - touchCenter.y;
+          }
+          touchCenter = { x: pair.x, y: pair.y };
+          touchDistance = pair.distance;
+          applyMapView();
+        } else if (event.touches.length === 1 && touchCenter && view.scale > 1.001) {
+          const next = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+          view.x += next.x - touchCenter.x;
+          view.y += next.y - touchCenter.y;
+          touchCenter = next;
+          applyMapView();
+        }
+        event.preventDefault();
+      }, { passive: false });
+      const endMapTouch = (event) => {
+        const pair = touchPair(event.touches);
+        touchCenter = pair
+          ? { x: pair.x, y: pair.y }
+          : event.touches[0] ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+        touchDistance = pair?.distance || 0;
+      };
+      frame.addEventListener('touchend', endMapTouch, { passive: false });
+      frame.addEventListener('touchcancel', endMapTouch, { passive: false });
       zoomOut.addEventListener('click', () => zoomMap(view.scale / 1.5));
       zoomIn.addEventListener('click', () => zoomMap(view.scale * 1.5));
       applyMapView();
@@ -952,10 +1004,10 @@ export class HUD {
         ctx.fillRect(LAKE.x - ox - 2, LAKE.z - oz - 2, 5, 5);
       }
       add(inCave
-        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
+        ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. Green pulse: you.</p>'
         : inRift
-          ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
-          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Wheel or pinch to zoom; drag to move. Gold names are towns and cities. Gold square: Hunter Guild. Red pulse: Monster Gate. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you. L hides names.</p>');
+          ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. Green pulse: you.</p>'
+          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Wheel or pinch to zoom; drag to move. Green pulse: you. Gold names are towns and cities. Gold square: Hunter Guild. Red pulse: Monster Gate. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. L hides names.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);
