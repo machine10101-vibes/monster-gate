@@ -54,7 +54,8 @@ export function cursorSpecForHeld(held) {
   if (!held) return null;
   const id = String(held);
   const gear = gearForHeld(id);
-  if (gear?.type === 'weapon') return { kind: 'weapon', id: gear.id };
+  // Issued starter gear reuses base held models; render those directly.
+  if (gear?.type === 'weapon' && (!gear.starter || gear.id === id)) return { kind: 'weapon', id: gear.id };
   return { kind: 'held', id };
 }
 
