@@ -9,6 +9,14 @@
     <style>html,body{background:#070308}</style>
     <script>
       (function () {
+        // Mobile back gestures can restore an entire obsolete document from
+        // the browser's back/forward cache without executing startup scripts.
+        // Reload restored title/login documents, but never interrupt a hunt.
+        window.addEventListener('pageshow', function (event) {
+          if (!event.persisted) return;
+          if (window.__mgHuntStarted || (document.body && document.body.classList.contains('hunting'))) return;
+          location.reload();
+        });
         var meta = document.querySelector('meta[name="mg-build"]');
         var mine = meta && meta.getAttribute('content');
         // Split so Vite's meta stamp cannot rewrite this into `mine === '<sha>'`
@@ -27,7 +35,7 @@
           var u = new URL(location.href);
           // Fastly ignores ?t= and ?mgb=, so a second replace can land on the
           // same stale index. One shot only; then a title-screen notice (MG-SYS-11).
-          if (u.searchParams.has('mgb')) {
+          if (u.searchParams.get('mgb') === build) {
             notice();
             return;
           }
