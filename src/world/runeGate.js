@@ -37,7 +37,6 @@ export function buildRuneGate() {
   };
   const cut = (x, y, z) => shade(stone(x, y, z), 0.74);
   const gold = (x, y, z) => J((x + y) % 3 === 0 ? 0xd4a944 : 0x9a7428, x, y, z, 23, 0.05);
-  const deep = (x, y, z) => J(0x1a1216, x, y, z, 24, 0.05);
 
   // Plinth: three stepped courses with a gold band between.
   M.box(0, 0, 0, W, 2, D - 1, cut);
@@ -106,8 +105,7 @@ export function buildRuneGate() {
     }
   }
 
-  // Dark backing and a glowing threshold rune line.
-  M.box(11, 5, 0, 36, SPRING, 2, deep);
+  // A glowing threshold rune line. The opening itself stays empty so the plasma shows from both sides.
   M.box(11, 5, 11, 36, 6, 12, RED, true);
   for (let x = 13; x < 34; x += 4) M.set(x, 6, 12, gold(x, 6, 12));
 
@@ -238,8 +236,11 @@ function updateSmoke(sys, t) {
 export function placeRuneGate(world, spec) {
   const built = buildRuneGate();
   let y = 0;
-  for (let dz = -1.8; dz <= 1.8; dz += 0.4) {
-    for (let dx = -2.4; dx <= 2.4; dx += 0.4) y = Math.max(y, world.heightAt(spec.x + dx, spec.z + dz));
+  if (spec.y != null) y = spec.y;
+  else {
+    for (let dz = -3.6; dz <= 3.6; dz += 0.6) {
+      for (let dx = -1.6; dx <= 1.6; dx += 0.4) y = Math.max(y, world.heightAt(spec.x + dx, spec.z + dz));
+    }
   }
   const group = new THREE.Group();
   group.name = spec.name || 'rune-gate';
@@ -273,6 +274,10 @@ export function placeRuneGate(world, spec) {
     group.add(mesh);
     return mat;
   };
+  // A dark backdrop behind the plasma, drawn from the front only so the back still shows the swirl.
+  const backdrop = new THREE.Mesh(openingShape(), new THREE.MeshBasicMaterial({ color: 0x0a0305 }));
+  backdrop.position.set(0, 0, -0.5);
+  group.add(backdrop);
   // Two counter-turning layers give the plasma depth.
   const plasmaMats = [makeLayer(1, 1.0, 0), makeLayer(-1, 0.55, 0.04)];
 
@@ -302,12 +307,14 @@ export function placeRuneGate(world, spec) {
   light.position.set(0, 1.8, 1.2);
   group.add(light);
 
-  world.group.add(group);
+  (spec.parent || world.group).add(group);
 
   // Pillar bases block walking; the gap between them is the opening.
   const yaw = spec.yaw || 0;
-  for (const lx of [-3.3, 3.3]) {
-    world.circle(spec.x + Math.cos(yaw) * lx, spec.z - Math.sin(yaw) * lx, 0.9);
+  if (spec.collide !== false) {
+    for (const lx of [-3.3, 3.3]) {
+      world.circle(spec.x + Math.cos(yaw) * lx, spec.z - Math.sin(yaw) * lx, 0.9);
+    }
   }
 
   const site = {
