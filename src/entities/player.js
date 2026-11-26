@@ -9,6 +9,7 @@ import { skillMods } from '../systems/skillcast.js';
 import { SKILLFX, meleeSwing } from '../systems/skillfx.js';
 import { weaponFamily, isTwoHandedFamily } from './weaponCombat.js';
 import { comboStep, sampleStep, stepLunge } from './attackCombos.js';
+import { SKILL_POSES, samplePose } from './skillPoses.js';
 
 const R = 0.32;
 const TAU = Math.PI * 2;
@@ -930,6 +931,13 @@ export class Player {
     this.drawWeapon();
     this.castAnim = kind || 'cast';
     this.castT = dur;
+    // A class skill plays its own keyed body animation; gameplay timing below is unchanged.
+    const keyed = this.castSkillId && SKILL_POSES[this.castSkillId];
+    if (keyed) {
+      this.castAnim = this.castSkillId;
+      this.castT = keyed.dur;
+    }
+    this.castDur = this.castT;
     if (this.state !== 'roll' && this.state !== 'attack' && this.state !== 'dead' && this.state !== 'stagger') {
       this.setState('use', Math.max(0.24, Math.min(0.4, dur)));
       this.potionDone = true;
@@ -1603,6 +1611,25 @@ export class Player {
       legR = rising ? 0.2 : 0.7;
       lean = rising ? 0.45 : 0.15;
       torsoYaw = 0;
+    } else if (this.castT > 0 && SKILL_POSES[this.castAnim]) {
+      const { v, w } = samplePose(SKILL_POSES[this.castAnim], clamp(1 - this.castT / (this.castDur || 1), 0, 1));
+      // Walking keeps the legs; the upper body still plays the skill.
+      const legW = w * (1 - Math.min(1, mv * 1.5));
+      const mix = (cur, key, k) => (key === undefined ? cur : lerp(cur, key, k));
+      armR = mix(armR, v.armR, w);
+      armL = mix(armL, v.armL, w);
+      armRz = mix(armRz, v.armRz, w);
+      armLz = mix(armLz, v.armLz, w);
+      lean = mix(lean, v.lean, w);
+      torsoYaw = mix(torsoYaw, v.yaw, w);
+      tilt = mix(tilt, v.tilt, w);
+      headPitch = mix(headPitch, v.head, w);
+      headYaw = mix(headYaw, v.headYaw, w);
+      crouch = mix(crouch, v.crouch, legW);
+      legL = mix(legL, v.legL, legW);
+      legR = mix(legR, v.legR, legW);
+      pivotY += (v.hop || 0) * legW;
+      this.castPose = { eR: v.eR, eL: v.eL, w, spin: v.spin };
     } else if (this.castT > 0) {
       if (this.castAnim === 'spin') {
         armR = -1.6;
@@ -1689,6 +1716,11 @@ export class Player {
     const flexOf = (total) => 0.14 + clamp(-total - 0.5, 0, 2.6) * 0.3;
     let eR = flexOf(armR) + (this.state === 'attack' ? 0 : idleElbowR);
     let eL = flexOf(armL);
+    const cp = this.castT > 0 && SKILL_POSES[this.castAnim] ? this.castPose : null;
+    if (cp) {
+      if (cp.eR !== undefined) eR = lerp(eR, cp.eR, cp.w);
+      if (cp.eL !== undefined) eL = lerp(eL, cp.eL, cp.w);
+    }
     const swingR = Math.max(0, -walk);
     const swingL = Math.max(0, walk);
     if (locomoting) {
@@ -1878,7 +1910,7 @@ export class Player {
     m.hip.position.x += (hipX - m.hip.position.x) * Math.min(1, dt * 14);
     this.pivot.rotation.x = pivotX;
     // Spinning steps turn the whole body; the turn ends on a full circle so it hands back cleanly.
-    this.pivot.rotation.y = this.state === 'attack' && this.attackStep ? this.atkPose.spin || 0 : 0;
+    this.pivot.rotation.y = this.state === 'attack' && this.attackStep ? this.atkPose.spin || 0 : cp?.spin || 0;
     this.pivot.rotation.z += (tilt * 0.4 - this.pivot.rotation.z) * Math.min(1, dt * 10);
     this.pivot.position.y = pivotY;
     this.armRig(dt);

@@ -433,7 +433,118 @@ export function meleeSwing(game, p, it, combo, reach, shape = null) {
 /* skills                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Colour and casting hand(s) per skill for the cast flourish: a charge burst
+ * at the hand, then a glowing trail that follows the hand through the body
+ * animation. R right, L left, B both.
+ */
+const FLOURISH = {
+  shieldbash: [0x9fd8ff, 'L'], bulwark: [0x9fd8ff, 'L'], ironcitadel: [0xffd98a, 'B'],
+  whirlwind: [0xffb347, 'B'], bloodstorm: [0xff3a3a, 'B'], execute: [0xff5a3a, 'B'],
+  earthquake: [0xffc070, 'B'], warcry: [0xffd27a, 'B'],
+  callwolf: [0xffd27a, 'L'], packtactics: [0xffd27a, 'L'], howl: [0xffe0a0, 'B'],
+  poisonvolley: [0x8fe35a, 'R'], toxiccloud: [0x8fe35a, 'R'], plaguearrow: [0x9a5ae0, 'R'],
+  aimedshot: [0xfff2c0, 'R'], snipe: [0xfff2c0, 'R'], markedprey: [0xff5a5a, 'L'],
+  fireball: [0xff8a1e, 'R'], flamewave: [0xff7a1e, 'B'], meteor: [0xff5a1a, 'B'],
+  frostbolt: [0x9fe0ff, 'L'], icenova: [0xbfeaff, 'B'], glacier: [0x9fe0ff, 'B'],
+  spark: [0x8fe8ff, 'R'], chainlightning: [0x8fe8ff, 'R'], thunderclap: [0xb5ecff, 'B'],
+  layhands: [0xffe08a, 'B'], smite: [0xfff2c0, 'R'], consecration: [0xffe08a, 'B'],
+  crusader: [0xffd27a, 'R'], judgment: [0xfff2c0, 'B'], divinestorm: [0xffe08a, 'B'],
+  faithshield: [0x9fd8ff, 'L'], avengershield: [0xffe08a, 'L'], divineprotection: [0xfff6c4, 'B'],
+};
+
+/** World position of a hand: the right grip, or the left wrist. */
+function handWorld(p, side) {
+  const m = p.model;
+  const node = side === 'L' ? m?.wristL || m?.offhand : m?.heldSlot;
+  if (!node) return handPos(p);
+  node.getWorldPosition(tmpV);
+  return { x: tmpV.x, y: tmpV.y, z: tmpV.z };
+}
+
+/**
+ * Shared launch layer for shots, bolts and commands: a sigil at the caster's
+ * feet, staggered muzzle rings down the line of fire, a forward cone of sparks
+ * and a flash, plus an elemental extra.
+ */
+function launch(game, p, color, kind) {
+  const v = game.vfx;
+  const f = p.facing;
+  const h = handPos(p);
+  const gy = p.pos.y + 0.08;
+  v.ring(p.pos.x, gy, p.pos.z, { color, r0: 0.3, r1: 1.7, life: 0.45, thick: 0.08, fill: 0.18 });
+  v.ring(p.pos.x, gy + 0.02, p.pos.z, { color: 0xffffff, r0: 0.2, r1: 1.1, life: 0.3, thick: 0.12, delay: 0.05 });
+  for (let i = 0; i < 3; i++) {
+    const d = 0.5 + i * 0.45;
+    v.ring(h.x + f.x * d, h.y, h.z + f.z * d, { axis: f, color: i ? color : 0xffffff, r0: 0.1, r1: 0.55 + i * 0.25, life: 0.2 + i * 0.05, thick: 0.16, delay: i * 0.035 });
+  }
+  for (let i = 0; i < v.n(12); i++) {
+    const a = R(-0.35, 0.35);
+    const sp = R(5, 10);
+    const dx = f.x * Math.cos(a) - f.z * Math.sin(a);
+    const dz = f.x * Math.sin(a) + f.z * Math.cos(a);
+    v.spark(h.x, h.y + R(-0.1, 0.1), h.z, dx * sp, R(-0.5, 1.5), dz * sp, i % 3 ? color : 0xffffff, 0.05, 0.3, 2, 1);
+  }
+  v.flash(h.x, h.y, h.z, color, 2.6, 0.18);
+  if (kind === 'fire') {
+    v.prism(h.x, h.y - 0.3, h.z, { w: 0.22, h: 0.9, segs: 4, color: 0xff6a1a, core: 0xffd070, rise: 0.06, hold: 0.06, fall: 0.22, flicker: true });
+    for (let i = 0; i < v.n(8); i++) v.spark(h.x + R(-0.2, 0.2), h.y, h.z + R(-0.2, 0.2), R(-0.6, 0.6), R(1.5, 3.2), R(-0.6, 0.6), i % 2 ? 0xffb040 : 0xff5a1a, 0.04, R(0.6, 1.1), -1.5, 0.6);
+  } else if (kind === 'ice') {
+    for (let i = 0; i < v.n(6); i++) game.fx.emit(h.x + f.x * R(0.2, 1.2), h.y + R(-0.2, 0.2), h.z + f.z * R(0.2, 1.2), R(-0.4, 0.4), R(0.2, 0.7), R(-0.4, 0.4), 0xdff6ff, R(0.12, 0.22), R(0.5, 0.9), -0.4);
+  } else if (kind === 'zap') {
+    for (let i = 0; i < 2; i++) {
+      const a = R(-0.9, 0.9);
+      const dx = f.x * Math.cos(a) - f.z * Math.sin(a);
+      const dz = f.x * Math.sin(a) + f.z * Math.cos(a);
+      v.bolt(h, { x: h.x + dx * R(0.9, 1.6), y: h.y + R(-0.4, 0.4), z: h.z + dz * R(0.9, 1.6) }, { seg: 4, width: 0.06, jag: 0.25, life: 0.14, branches: 1, color: 0xb5ecff });
+    }
+  } else if (kind === 'toxin') {
+    toxinPuff(game, h.x + f.x * 0.6, h.y, h.z + f.z * 0.6, 0.55);
+  } else if (kind === 'wind') {
+    for (const off of [-0.35, 0.35]) {
+      const ox = -f.z * off;
+      const oz = f.x * off;
+      v.streak({ x: h.x + ox, y: h.y + off * 0.3, z: h.z + oz }, { x: h.x + ox + f.x * 3.2, y: h.y + off * 0.3, z: h.z + oz + f.z * 3.2 }, { color: 0xfff6e0, width: 0.05, life: 0.18 });
+    }
+  }
+}
+
 export const SKILLFX = {
+  /** Charge burst at the casting hand, then a trail that follows the hand through the skill's body animation. */
+  castFlourish(game, p, id) {
+    const spec = FLOURISH[id];
+    if (!spec || !p?.model) return;
+    const [color, hands] = spec;
+    const v = game.vfx;
+    const dur = Math.max(0.3, (p.castDur || 0.5) * 0.8);
+    p.obj?.updateMatrixWorld(true);
+    const sides = hands === 'B' ? ['R', 'L'] : [hands];
+    const trails = sides.map((side) => {
+      const h = handWorld(p, side);
+      v.glow(h.x, h.y, h.z, 0xffffff, 0.9, 0.12, { grow: 0.6 });
+      v.glow(h.x, h.y, h.z, color, 1.8, 0.28, { grow: 0.7 });
+      v.ring(h.x, h.y, h.z, { axis: 'cam', color, r0: 0.05, r1: 0.7, life: 0.22, thick: 0.18 });
+      v.sparks(h.x, h.y, h.z, [0xffffff, color], 8, 3, 0.05, 0.35, 2);
+      return { side, tr: v.trail(color, { width: 0.3, life: 0.3, pts: 22, white: 0.45 }) };
+    });
+    v.add({
+      update: (dt, self) => {
+        if (self.t > dur || p.dead) {
+          for (const t of trails) t.tr.end();
+          return false;
+        }
+        p.obj?.updateMatrixWorld(true);
+        for (const t of trails) {
+          const h = handWorld(p, t.side);
+          t.tr.add(h.x, h.y, h.z);
+          v.glowNow(h.x, h.y, h.z, color, 0.75, 0.75);
+          if (Math.random() < dt * 28 * v.density) v.spark(h.x, h.y, h.z, R(-0.8, 0.8), R(0.4, 1.6), R(-0.8, 0.8), Math.random() < 0.4 ? 0xffffff : color, 0.045, 0.4, -0.5, 0.3);
+        }
+        return true;
+      },
+    });
+  },
+
   shieldbash(game, p, hits, reach) {
     const v = game.vfx;
     const f = p.facing;
@@ -675,6 +786,7 @@ export const SKILLFX = {
     v.glow(h.x, h.y, h.z, 0x8fe35a, 2.2, 0.2, { grow: 0.6 });
     v.ring(h.x + p.facing.x * 0.4, h.y, h.z + p.facing.z * 0.4, { axis: p.facing, color: 0x8fe35a, r0: 0.1, r1: 1.0, life: 0.22, thick: 0.2 });
     v.sparks(h.x, h.y, h.z, TOXIN, 8, 3, 0.07, 0.5, 2);
+    launch(game, p, 0x8fe35a, 'toxin');
   },
 
   aimedshot(game, p) {
@@ -685,6 +797,7 @@ export const SKILLFX = {
     v.ring(h.x + f.x * 0.5, h.y, h.z + f.z * 0.5, { axis: f, color: 0xffffff, r0: 0.1, r1: 1.4, life: 0.25, thick: 0.15, delay: 0.1 });
     v.glow(h.x, h.y, h.z, 0xffd23f, 2.4, 0.22, { grow: 0.6 });
     v.sparks(h.x, h.y, h.z, [0xffffff, 0xffd23f], 8, 5, 0.06, 0.4, 3);
+    launch(game, p, 0xffd23f, 'wind');
   },
 
   snipe(game, p) {
@@ -697,6 +810,7 @@ export const SKILLFX = {
     v.glow(h.x, h.y, h.z, 0x8fe4ff, 3.4, 0.3, { grow: 0.6 });
     v.streak({ x: h.x, y: h.y, z: h.z }, { x: h.x + f.x * 16, y: h.y, z: h.z + f.z * 16 }, { color: 0xaee9ff, width: 0.18, life: 0.25 });
     v.sparks(h.x, h.y, h.z, [0xffffff, 0x8fe4ff], 10, 6, 0.06, 0.4, 3);
+    launch(game, p, 0x8fe4ff, 'wind');
   },
 
   plaguearrow(game, p) {
@@ -705,6 +819,7 @@ export const SKILLFX = {
     v.glow(h.x, h.y, h.z, 0x9a5ae0, 2.6, 0.26, { grow: 0.6 });
     v.glow(h.x, h.y, h.z, 0x8fe35a, 1.6, 0.2, { grow: 0.5 });
     v.sparks(h.x, h.y, h.z, [0xd7ffb0, 0x9a5ae0, 0x6dce4a], 10, 3, 0.07, 0.6, -1);
+    launch(game, p, 0x9a5ae0, 'toxin');
   },
 
   markedprey(game, p, mon) {
@@ -725,6 +840,7 @@ export const SKILLFX = {
     v.ring(h.x + p.facing.x * 0.4, h.y, h.z + p.facing.z * 0.4, { axis: p.facing, color: 0xff9a3a, r0: 0.1, r1: 1.0, life: 0.22, thick: 0.22 });
     v.sparks(h.x, h.y, h.z, FIRE, 12, 4, 0.08, 0.45, 5);
     v.flash(h.x, h.y, h.z, 0xff8a2a, 3, 0.2);
+    launch(game, p, 0xff8a1e, 'fire');
   },
 
   flamewave(game, p, reach) {
@@ -760,6 +876,7 @@ export const SKILLFX = {
     v.glow(h.x, h.y, h.z, 0x7fd0ff, 2.8, 0.3, { grow: 0.6 });
     v.ring(h.x + p.facing.x * 0.4, h.y, h.z + p.facing.z * 0.4, { axis: p.facing, color: 0x9fdcff, r0: 0.1, r1: 0.9, life: 0.22, thick: 0.22 });
     v.sparks(h.x, h.y, h.z, ICE, 10, 3.5, 0.07, 0.5, 4);
+    launch(game, p, 0x9fe0ff, 'ice');
   },
 
   icenova(game, p, radius) {
@@ -819,6 +936,7 @@ export const SKILLFX = {
     v.glow(h.x, h.y, h.z, 0x4ad0ff, 2.2, 0.2, { grow: 0.6 });
     v.bolt(h, { x: h.x + p.facing.x * 1.3, y: h.y + 0.05, z: h.z + p.facing.z * 1.3 }, { seg: 4, width: 0.1, jag: 0.2, life: 0.12, branches: 0, color: 0xc5f0ff });
     v.sparks(h.x, h.y, h.z, ZAP, 6, 4, 0.06, 0.3, 0);
+    launch(game, p, 0x4ad0ff, 'zap');
   },
 
   thunderclap(game, p, radius) {

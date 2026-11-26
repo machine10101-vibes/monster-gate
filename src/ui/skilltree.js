@@ -1,6 +1,7 @@
 import { CLASS_LIST, CLASSES, RESOURCE_NAME, SKILLS } from '../data/skills.js';
 import { SKILL_POINT_PER_KILLS } from '../systems/progress.js';
 import { resourceCost } from '../systems/skillcast.js';
+import { paintSkillArt } from './skillIcons.js';
 
 const SHAPES = {
   shield: [[5, 1, 6, 1], [3, 2, 10, 2], [3, 4, 10, 4], [4, 8, 8, 1], [5, 9, 6, 1], [6, 10, 4, 1], [7, 11, 2, 1]],
@@ -45,7 +46,10 @@ const ACCENT = {
   ring: [[7, 7, 2, 2]],
 };
 
-export function paintSkillIcon(canvas, shape, tint) {
+export function paintSkillIcon(canvas, shape, tint, skill = null) {
+  // Class skills have their own painted art; attributes and masteries keep the glyph.
+  if (skill && paintSkillArt(canvas, skill)) return;
+  canvas.style.imageRendering = '';
   const ctx = canvas.getContext('2d');
   canvas.width = 16;
   canvas.height = 16;
@@ -93,7 +97,7 @@ function equippedBubbles(game) {
     const b = document.createElement('div');
     b.className = 'sk-bubble' + (skill ? ' on' : '');
     const cv = document.createElement('canvas');
-    if (skill) paintSkillIcon(cv, skill.shape, skill.color);
+    if (skill) paintSkillIcon(cv, skill.shape, skill.color, skill);
     const num = document.createElement('b');
     num.textContent = String(i + 1);
     const name = document.createElement('span');
@@ -221,7 +225,7 @@ export function mountSkillTree(body, game) {
       top.className = 'tt-head';
       const hico = document.createElement('canvas');
       hico.className = 'tt-hico';
-      paintSkillIcon(hico, SKILLS[path.skills[0].id].shape, path.color);
+      paintSkillIcon(hico, SKILLS[path.skills[0].id].shape, path.color, SKILLS[path.skills[0].id]);
       const pip = document.createElement('i');
       pip.textContent = String(spent);
       const name = document.createElement('b');
@@ -272,7 +276,7 @@ export function mountSkillTree(body, game) {
         node.style.top = y + 'px';
         node.title = s.name;
         const cv = document.createElement('canvas');
-        paintSkillIcon(cv, s.shape, path.color);
+        paintSkillIcon(cv, s.shape, path.color, SKILLS[s.id]);
         node.appendChild(cv);
         const rank = document.createElement('em');
         rank.textContent = pr.hasSkill(s.id) ? '1' : '0';
@@ -352,7 +356,7 @@ export function mountSkillTree(body, game) {
         const s = SKILLS[sel.id];
         const st = state(s);
         box.style.setProperty('--pc', s.color);
-        paintSkillIcon(cv, s.shape, s.color);
+        paintSkillIcon(cv, s.shape, s.color, SKILLS[s.id] || s);
         title.textContent = s.name;
         const bits = [KIND_LABEL[s.kind], `${s.cost} point${s.cost > 1 ? 's' : ''}`];
         if (s.resource) bits.push(`${resourceCost(game, s)} ${RESOURCE_NAME[s.res]}`, `${s.cd}s cooldown`);

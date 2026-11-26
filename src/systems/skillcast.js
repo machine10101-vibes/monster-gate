@@ -229,7 +229,15 @@ export function castSkill(game, id) {
     poorToast(game, skill);
     return false;
   }
-  if (!effect(game, skill)) return false;
+  p.castSkillId = id;
+  let ok = false;
+  try {
+    ok = effect(game, skill);
+  } finally {
+    p.castSkillId = null;
+  }
+  if (!ok) return false;
+  SKILLFX.castFlourish?.(game, p, id);
   pay(game, skill);
   const haste = skillMods(game).haste || 0;
   p.cds[id] = (skill.cd || 1) * Math.max(0.7, 1 - haste);

@@ -12,7 +12,7 @@ function icon(skill) {
   const cv = document.createElement('canvas');
   cv.width = 16;
   cv.height = 16;
-  paintSkillIcon(cv, skill.shape, skill.color);
+  paintSkillIcon(cv, skill.shape, skill.color, skill);
   return cv;
 }
 
