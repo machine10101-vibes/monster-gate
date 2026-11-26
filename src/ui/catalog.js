@@ -488,6 +488,10 @@ export class Catalog {
         grid.appendChild(card);
       }
     } else if (this.tab === 'weapons') {
+      if (this.forge) {
+        grid.appendChild(this.heading('Monster single-handed hammers'));
+        for (const g of weapons().filter(g => g.wtype === 'hammer' && g.monster !== 'smith' && !g.starter)) grid.appendChild(this.gearCard(g));
+      }
       const smithW = weapons('smith');
       for (const metal of METALS) {
         const list = smithW.filter((g) => g.metal === metal.id);
@@ -496,7 +500,7 @@ export class Catalog {
         for (const g of list) grid.appendChild(this.gearCard(g));
       }
       for (const m of MONSTERS) {
-        const list = weapons(m.id);
+        const list = weapons(m.id).filter(g => !this.forge || g.wtype !== 'hammer');
         if (!list.length) continue;
         grid.appendChild(this.heading(pr.seen(m.id) ? m.name : '???'));
         for (const g of list) grid.appendChild(this.gearCard(g));
@@ -539,7 +543,7 @@ export class Catalog {
 
   gearCard(g) {
     const pr = this.progress;
-    const known = pr.gearSeen(g);
+    const known = pr.gearSeen(g) || (this.forge && g.wtype === 'hammer');
     const crafted = pr.crafted(g.id);
     let badge = '';
     let cls = known ? '' : 'locked';
@@ -592,7 +596,7 @@ export class Catalog {
       this.fillSet(info, set, known);
     } else {
       const g = gearById(view.id);
-      known = pr.gearSeen(g);
+      known = pr.gearSeen(g) || (this.forge && g.wtype === 'hammer');
       spec = { kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id };
       this.fillGear(info, g, known);
     }
@@ -844,7 +848,7 @@ export class Catalog {
         this.queueSmithing(actions, `Forging ${g.name}`, 1, bars, [b], () => pr.craft(g.id), (done) => {
           if (!done) return;
           this.game.applyGear();
-          if (g.type === 'weapon') this.game.selectSlot(0, true);
+          if (g.type === 'weapon') this.game.selectSlot(this.game.sel, true);
           this.game.audio.quest();
           this.game.hud.toast(`Forged ${g.name}`, 1800);
           const after = pr.level('smithing');
