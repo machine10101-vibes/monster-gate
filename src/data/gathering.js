@@ -8,7 +8,8 @@ const XP_AT = [0];
   let points = 0;
   for (let l = 1; l < MAX_LEVEL; l++) {
     points += Math.floor(l + 300 * Math.pow(2, l / 7));
-    XP_AT[l] = Math.floor(points / 4);
+    // A modest 15% increase applies uniformly to every skill's level thresholds.
+    XP_AT[l] = Math.ceil(Math.floor(points / 4) * 1.15);
   }
 }
 
