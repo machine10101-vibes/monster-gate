@@ -59,3 +59,15 @@ test('monster bows carry a drawable string', () => {
     }
   }
 });
+
+
+test('all single-handed hammer catalog entries build valid voxel models', async () => {
+  const { GEAR } = await import('../src/data/catalog.js');
+  for (const g of GEAR.filter(g => g.wtype === 'hammer')) {
+    const v = buildWeaponVoxels(g.held);
+    assert.ok(v?.M?.data?.some(Boolean), g.id);
+    assert.ok(v.size > 0, g.id);
+    assert.equal(g.item.style, 'swordshield', g.id);
+    if (!g.starter) assert.ok(Object.keys(g.recipe).length > 0 && !g.found, g.id);
+  }
+});
