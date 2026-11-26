@@ -37,3 +37,11 @@ test('starter pieces are issued gear with a painter, and the preview matches', (
     }
   }
 });
+
+test('new characters receive their class weapon and ranger ammunition', () => {
+  const r = new Roster('starter-weapons-test', 'tester');
+  for (const [classId, held] of Object.entries({ paladin: 'ironhammer', mage: 'wand', ranger: 'bow', warrior: 'blade' })) {
+    const c = r.create({ name: 'New ' + classId, look: {}, classId });
+    assert.equal(r.summary(c.id).held, held);
+  }
+});
