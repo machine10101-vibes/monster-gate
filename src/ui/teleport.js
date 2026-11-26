@@ -19,6 +19,19 @@ export function mountTeleport(body, game) {
       return { ...p, x: at.x, z: at.z };
     }),
   ];
+  let selected = null;
+  const confirm = document.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'tome-go';
+  confirm.textContent = 'Select a destination first';
+  confirm.disabled = true;
+  confirm.onclick = () => {
+    if (!selected) return;
+    const dest = selected;
+    selected = null;
+    confirm.disabled = true;
+    game.travelTo(dest);
+  };
   for (const dest of destinations) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -28,10 +41,17 @@ export function mountTeleport(body, game) {
     const place = document.createElement('small');
     place.textContent = dest.place;
     b.append(name, place);
-    b.onclick = () => game.travelTo(dest);
+    b.setAttribute('aria-pressed', 'false');
+    b.onclick = () => {
+      selected = dest;
+      for (const other of list.querySelectorAll('button')) other.setAttribute('aria-pressed', String(other === b));
+      confirm.textContent = `Teleport to ${dest.name}`;
+      confirm.disabled = false;
+    };
     list.appendChild(b);
   }
   root.appendChild(list);
+  root.appendChild(confirm);
 
   const left = PORTALS.filter((p) => !known.has(p.id)).length;
   if (left) {
