@@ -1243,6 +1243,33 @@ class Game {
     this.signOut(false);
   }
 
+  /** Save the active hunter and return to camp without signing out. */
+  returnToCharacterSelect() {
+    if (!this.started || !this.character || !this.wallet?.address || !this.roster) return false;
+    this.captureHunter();
+    this.progress?.save?.();
+    this.roster.touch(Date.now());
+    this.roster.save();
+    // Local progress is already safe; finish the cloud push in the background.
+    Promise.resolve(flushCloud()).catch(() => {});
+    this.leaveOnlineInPlace();
+    rememberWorldMode('offline');
+    this.net?.leave?.();
+    this.started = false;
+    if (typeof window !== 'undefined') window.__mgHuntStarted = false;
+    document.body.classList.remove('hunting', 'landscape-full');
+    document.documentElement.classList.remove('landscape-full');
+    this.hud?.closePanel?.();
+    this.hud?.hideDialog?.();
+    this.hud?.closeSkillPicker?.();
+    document.getElementById('hud')?.classList.add('hidden');
+    this.hideWorldPicker();
+    this.hideWorldAuth();
+    this.character = null;
+    this.charSelect?.open?.();
+    return !!this.charSelect?.active;
+  }
+
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
   async enterWorld(char) {
     if (this.started || !this.roster?.get(char.id) || this.membershipChecking) return;

@@ -231,7 +231,7 @@ export class CharacterSelect {
       ? 'Account sync is unavailable. Retry account sync before changing characters.'
       : (this.roster.full ? `This account holds ${MAX_CHARACTERS} characters.` : '');
     $('cs-rotate').classList.toggle('hidden', !c && listMode);
-    for (const [id, p] of this.plates) p.classList.toggle('selected', id === this.selectedId);
+    for (const [id, p] of this.plates) p.classList.toggle('selected', id === this.selectedId || id === 'preview');
   }
 
   renderList(scroll = false) {
@@ -490,7 +490,7 @@ export class CharacterSelect {
     $('cs-enter-wrap').classList.add('hidden');
     $('cs-toggle').classList.add('hidden');
     this.clearPlates();
-    this.draft = { look: { ...DEFAULT_LOOK }, classId: CLASS_LIST[0].id };
+    this.draft = { look: { ...DEFAULT_LOOK }, classId: null };
     this.setTab('class');
     this.frameAt = 0;
     $('cs-name-input').value = '';
@@ -501,7 +501,7 @@ export class CharacterSelect {
     const p = el('button', 'cs-plate selected');
     p.type = 'button';
     p.tabIndex = -1;
-    p.append(el('b', null, 'New Hunter'), el('span', null, `Level 1 ${CLASSES[this.draft.classId].name}`));
+    p.append(el('b', null, 'New Hunter'), el('span', null, 'Level 1'));
     host.append(p);
     this.plates.set('preview', p);
     this.buildClasses();
@@ -523,10 +523,9 @@ export class CharacterSelect {
     for (const def of CLASS_LIST) {
       const on = def.id === this.draft.classId;
       const b = el('button', 'cs-class' + (on ? ' on' : ''));
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
       b.type = 'button';
       b.dataset.id = def.id;
-      b.setAttribute('role', 'radio');
-      b.setAttribute('aria-checked', String(on));
       b.style.setProperty('--c', def.color);
       const paths = def.paths.map((p) => p.name);
       const text = el('span', 'cs-class-text');
@@ -543,11 +542,11 @@ export class CharacterSelect {
     }
     const def = CLASSES[this.draft.classId];
     const blurb = $('cs-class-blurb');
-    blurb.textContent = def.blurb;
-    blurb.style.setProperty('--c', def.color);
+    blurb.textContent = def?.blurb || 'Choose a class to determine this hunter’s starting path.';
+    blurb.style.setProperty('--c', def?.color || 'var(--rs-gold)');
     this.paintClassDetail(def);
     const plate = this.plates.get('preview');
-    if (plate) plate.querySelector('span').textContent = `Level 1 ${def.name}`;
+    if (plate) plate.querySelector('span').textContent = def ? `Level 1 ${def.name}` : 'Level 1';
   }
 
   /** What the chosen class plays like: its resource, weapon masteries, and each path's signature skills. */
@@ -555,6 +554,7 @@ export class CharacterSelect {
     const host = $('cs-class-detail');
     if (!host) return;
     host.replaceChildren();
+    if (!def) return;
     host.style.setProperty('--c', def.color);
     const facts = el('dl', 'cs-class-facts');
     const fact = (label, text) => {
@@ -687,6 +687,12 @@ export class CharacterSelect {
     event.preventDefault();
     if (!canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState })) {
       $('cs-form-error').textContent = 'Account sync is unavailable. Your characters are safe; retry sync before creating.';
+      return;
+    }
+    if (!this.draft?.classId || !CLASSES[this.draft.classId]) {
+      $('cs-form-error').textContent = 'Choose a class before creating your character.';
+      this.setTab('class');
+      $('cs-classes')?.querySelector('.cs-class')?.focus();
       return;
     }
     const name = $('cs-name-input').value;

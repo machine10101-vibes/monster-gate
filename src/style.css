@@ -1322,10 +1322,43 @@ body.touch #top-right {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.panel-row.account button {
+.panel-row.account .account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.panel-row.account .account-actions button:first-child {
+  background: #28504a;
+  border-color: #6ab6a5;
+  color: #e4fff8;
+}
+.panel-row.account .account-actions button:last-child {
   background: #6e322c;
   border-color: #d37a62;
   color: #ffe8df;
+}
+.set-hotbar-controls {
+  margin: 0 0 12px;
+  padding: 10px;
+  background: linear-gradient(135deg, rgba(91, 72, 34, 0.28), rgba(25, 29, 35, 0.9));
+  border: 1px solid rgba(255, 210, 63, 0.42);
+  border-radius: 8px;
+}
+.set-hotbar-controls h3 {
+  margin: 0 0 4px;
+  color: #ffe7a0;
+  font-family: var(--font-px);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+.set-hotbar-controls > p {
+  margin: 0 0 8px;
+  color: #b7c0b4;
+  font-size: 12px;
+}
+.set-hotbar-controls .panel-row:last-child {
+  margin-bottom: 0;
 }
 #panel.map-open .panel-card {
   display: flex;
