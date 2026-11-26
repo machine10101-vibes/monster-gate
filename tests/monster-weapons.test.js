@@ -71,3 +71,16 @@ test('all single-handed hammer catalog entries build valid voxel models', async 
     if (!g.starter) assert.ok(Object.keys(g.recipe).length > 0 && !g.found, g.id);
   }
 });
+
+
+test('monster hammer families coexist with separate recipes and models', async () => {
+  const { GEAR } = await import('../src/data/catalog.js');
+  for (const g of GEAR.filter(g => g.wtype === 'hammer' && !g.starter && g.monster !== 'smith')) {
+    const heavy = GEAR.find(x => x.id === `${g.id}_twohand`);
+    assert.ok(heavy, g.id);
+    assert.equal(heavy.item.style, 'twohand');
+    assert.equal(g.item.style, 'swordshield');
+    assert.ok(Object.keys(heavy.recipe).length);
+    assert.ok(buildWeaponVoxels(heavy.held)?.M?.data?.some(Boolean), heavy.id);
+  }
+});
