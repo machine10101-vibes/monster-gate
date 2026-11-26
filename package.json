@@ -17,7 +17,8 @@
     "test": "node --test tests/*.js server/tests/*.test.js",
     "test:shaders": "node tools/shader-compile-test.mjs",
     "test:server": "node --test server/tests/*.test.js",
-    "test:persistence": "node --test server/persistence/tests/*.test.js"
+    "test:persistence": "node --test server/persistence/tests/*.test.js",
+    "test:smoke": "node server/scripts/smoke.mjs"
   },
   "repository": {
     "type": "git",
