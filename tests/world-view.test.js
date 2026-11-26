@@ -495,6 +495,9 @@ test('World 1 connection startup reads the current URL, not the boot-time search
   const main = src('../src/main.js');
   assert.match(main, /const search = typeof location !== 'undefined' \? location\.search : liveSearch/);
   assert.match(main, /attachMmo\(game, ready\.view, \{ search \}\)/);
+  assert.match(main, /onPushed\(result, session = this\.wallet\)/);
+  assert.match(main, /this\.cloudState = 'on';\s*this\.cloudReachable = true;/);
+  assert.match(main, /onPushed\(result, session\)/);
 });
 
 test('name_taken error is final, prompts for another hunter name, and does not reconnect', () => {
