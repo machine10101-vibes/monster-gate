@@ -1187,7 +1187,7 @@ export class HUD {
       const canvas = document.createElement('canvas');
       canvas.width = 32;
       canvas.height = 32;
-      paintSkillIcon(canvas, skill.shape, skill.color);
+      paintSkillIcon(canvas, skill.shape, skill.color, skill);
       const copy = document.createElement('span');
       const name = document.createElement('b');
       name.textContent = skill.name;
@@ -1327,10 +1327,11 @@ export class HUD {
       const id = eq[i] || '';
       if (canvas.dataset.sid === id) return;
       canvas.dataset.sid = id;
-      if (skill) paintSkillIcon(canvas, skill.shape, skill.color);
+      if (skill) paintSkillIcon(canvas, skill.shape, skill.color, skill);
       else {
         canvas.width = 16;
         canvas.height = 16;
+        canvas.style.imageRendering = '';
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, 16, 16);
         const fb = i === 0 ? 'bolt' : i === 2 ? 'fury' : '';
