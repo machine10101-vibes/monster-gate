@@ -134,7 +134,7 @@ export class Monster {
     this.obj.add(built.root);
     game.scene.add(this.obj);
     this.obj.position.set(x, this.y, z);
-    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'trex' ? 3 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
+    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'trex' ? 3 : type === 'sandworm' ? 2.6 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
     this.air = false;
     this.attacking = false;
     this.chargeDir = new THREE.Vector3();
@@ -1631,7 +1631,7 @@ export class Monster {
     m.root.position.y = rootY;
     m.root.scale.set(rootSXY, rootSXY, rootSZ);
     if (this.flash > 0) this.model.mat.emissive.setRGB(0.38, 0.32, 0.22);
-    else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'scorpion' && this.state === 'stingwind') && !(this.type === 'darksycledragon' && this.airCharge) && !(this.type === 'volcanum' && (this.state === 'breath' || this.state === 'air' || this.state === 'ascend')) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
+    else if (!(this.type !== 'slime' && this.type !== 'voidslime' && this.state === 'windup') && !(this.type === 'scorpion' && this.state === 'stingwind') && !(this.type === 'sandworm' && this.state.endsWith('wind')) && !(this.type === 'darksycledragon' && this.airCharge) && !(this.type === 'volcanum' && (this.state === 'breath' || this.state === 'air' || this.state === 'ascend')) && !(yeti && (this.state === 'hurlwind' || this.state === 'breathwind'))) this.model.mat.emissive.setRGB(0, 0, 0);
 
     if ((this.debugTank && !this.dead) || (dist < 14 && this.hp < this.maxHp)) {
       const [sx2, sy2, vis] = g.screenOf(this.x, this.y + this.hover + (this.type === 'chicken' ? 0.9 : this.type === 'boar' ? 1.5 : this.type === 'wraith' ? 2.5 : this.type === 'budgedragon' ? 2.1 : this.type === 'darksycledragon' || this.type === 'volcanum' ? 7.2 : this.type === 'orcscout' ? 2.55 : fam ? fam.FX[this.type].plateY : yeti ? 8.8 : knight ? 3.9 : 1.25), this.z, true);
@@ -1889,7 +1889,7 @@ export class Monster {
 }
 
 const JUNGLE_QUOTA = { tiger: 5, raptor: 7, cursedpirate: 6, pirate: 7 };
-const DESERT_QUOTA = { sandworm: 4, scorpion: 6 };
+const DESERT_QUOTA = { sandworm: 2, scorpion: 6 };
 
 export class Spawner {
   constructor(game) {

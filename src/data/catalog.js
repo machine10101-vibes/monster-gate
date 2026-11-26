@@ -193,8 +193,8 @@ export const MONSTERS = [
     desc: 'A cutthroat in a navy coat, tricorn hat and red bandana. It swings a curved cutlass and lunges when you are out of reach.',
   },
   {
-    id: 'sandworm', name: 'Sand Spine Worm', level: 8, temper: 'Patient', style: 'Ambusher', habitat: 'The desert oasis south of Southford, tiles 74, 75, 84 and 85',
-    desc: 'A long sand-coloured worm with a ridge of pale bone spines. It travels under the dune, the spines cutting a wake, then breaches where you stand and bites. The ridge thrashes before it sinks again.',
+    id: 'sandworm', name: 'Sand Spine Worm', level: 125, temper: 'Ravenous', style: 'Burrowing Ambusher', habitat: 'The desert oasis south of Southford, tiles 74, 75, 84 and 85',
+    desc: 'A colossal ringed worm of mottled tan hide banded in dark brown, its whole head one round gaping maw: a red ribbed throat, three rings of inward-raking fangs and a fat tongue. Curved horn-tusks sprout from iron-grey sockets along its body. It hunts under the sand with only its horn tips showing, then bursts up beneath you. Reared, it slams its maw down in a line, spins its horns in a wide circle and blasts scouring sand; from below it drives a chain of sand geysers at you. Watch the ground tremble.',
   },
   {
     id: 'scorpion', name: 'Desert Scorpion', level: 6, temper: 'Wary', style: 'Skirmisher', habitat: 'The dunes around the oasis south of Southford',

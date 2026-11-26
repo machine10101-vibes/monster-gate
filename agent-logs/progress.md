@@ -28,3 +28,9 @@ No task entries yet.
 - Commit/deployment: not committed, not pushed, not published. Human approval required before release.
 - Reflection proposal: keep a browser-check hook behind a test flag so gameplay checks can read player state without editing src/main.js.
 
+
+### 2026-11-26 — Sand Spine Worm rebuilt to the reference photo, level 125
+- Iteration: 1/6. Objective (user request): match the photo, travel underground and surface to attack, its own attack set, level 125.
+- Changes: new `src/entities/sandwormModel.js` (round maw, ribbed throat, 3 tooth rings, tongue, socketed horn-tusks, banded mottled hide); `sandwormAI.js` rewritten (burrow, Erupting Maw, Maw Slam, Tusk Cyclone, Sand Torrent, Dune Rupture, dive, enrage); hp 1500, scale 2.6, level 125 in the catalog; desert worm quota 4 → 2; wind-up glow kept in `monsters.js`.
+- Checks: build pass; smoke pass; npm test 496 pass / 3 fail (same three guest-button failures as clean origin/main); standalone pose renders reviewed; live game: spawned worm burrowed and reached eruptwind with 0 page errors. Full in-game attack cycle: run in progress, not yet verified.
+- Commit/deployment: committed to ccr-81a4e261-p4hmfr; not published (needs approval).
