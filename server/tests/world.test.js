@@ -339,7 +339,7 @@ test('selected saved roster determines remote weapon model and armor', async () 
   const armor = Object.fromEntries(CLASS_STARTER_ARMOR.paladin.map(id => [gearById(id).slot, id]));
   const roster = { chars: [{ name: 'Other', hunt: { weapon: null } }, { name: 'Enforcer', look: { skin: 2, hair: 1 }, hunt: { weapon: 'squirehammer', armor } }] };
   const visual = rosterAppearance(roster, 'Enforcer');
-  assert.equal(visual.held, 'ironhammer');
+  assert.equal(visual.held, 'irononehammer');
   assert.equal(visual.look.skin, 2);
   for (const [slot, id] of Object.entries(armor)) if (slot !== 'quiver') assert.equal(visual.armor[slot], gearById(id).set);
   assert.equal(rosterAppearance(roster, 'Missing'), null);
