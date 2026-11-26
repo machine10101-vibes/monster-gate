@@ -667,8 +667,8 @@ class Game {
     this.refreshHud(true);
   }
 
-  onPushed(result) {
-    if (!result) return;
+  onPushed(result, session = this.wallet) {
+    if (!result || (session && this.wallet !== session)) return;
     if (result.taken) {
       this.dropTakenAccount(result.message);
       return;
@@ -680,6 +680,9 @@ class Game {
       return;
     }
     if (result.revision && this.roster) this.roster.revision = result.revision;
+    // A confirmed account-save response is stronger evidence than a previous
+    // transient sync failure; keep the account-save indicator in sync.
+    this.cloudState = 'on';
     this.cloudReachable = true;
     this.cloudSavedAt = Number(result.savedAt) || Date.now();
     if (result.progress && this.roster?.mergeFrom) {
@@ -688,7 +691,8 @@ class Game {
       if (activeReplaced && this.started) this.adoptActiveHunt();
       else if (this.charSelect?.active) this.charSelect.refresh();
       if (outcome.push && !result.retried && this.wallet && this.cloudState === 'on' && !activeReplaced) {
-        schedulePush(this.wallet, this.roster.data, (next) => this.onPushed({ ...next, retried: true }));
+        const session = this.wallet;
+        schedulePush(session, this.roster.data, (next) => this.onPushed({ ...next, retried: true }, session));
         flushCloud();
       }
     }
@@ -740,8 +744,9 @@ class Game {
     }
     this.progress.onCloud = (data) => {
       if (!this.roster || !this.wallet) return;
+      const session = this.wallet;
       this.roster.touch(data.savedAt);
-      schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
+      schedulePush(session, this.roster.data, (result) => this.onPushed(result, session));
     };
     this.startAutosave();
   }
@@ -801,7 +806,8 @@ class Game {
     }
     if (this.cloudState !== 'on') return;
     if (this.started) this.captureHunter();
-    schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
+    const session = this.wallet;
+    schedulePush(session, this.roster.data, (result) => this.onPushed(result, session));
     flushCloud();
   }
 
@@ -1062,6 +1068,9 @@ class Game {
       return;
     }
     rememberWorldMode('online');
+    // Character Select's World 1 shortcut enters in-place (unlike the title
+    // picker, which navigates). Mark the URL first so the MMO client is mounted
+    // by both start() and ensureOnlineClient().
     if (!isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
       try { history.replaceState({}, '', hrefWithSearch(onlineSearch(search), location)); } catch { /* ignore */ }
     }
@@ -1769,16 +1778,35 @@ class Game {
   /* ------------------------- landscape fullscreen ------------------------- */
   bindImmersive() {
     if (isTablet()) document.body.classList.add('tablet');
-    const sync = () => this.syncImmersive();
+    // Keep the login and account forms sized to the actually visible phone
+    // viewport, including rotations and the on-screen keyboard, before a hunt
+    // has started (syncImmersive intentionally only manages active gameplay).
+    const syncViewport = () => {
+      const root = document.documentElement;
+      const viewport = window.visualViewport;
+      const height = Math.max(1, viewport?.height || window.innerHeight || 1);
+      const width = Math.max(1, viewport?.width || window.innerWidth || 1);
+      root.style.setProperty('--mg-viewport-height', `${height}px`);
+      root.style.setProperty('--mg-viewport-width', `${width}px`);
+    };
+    const sync = () => {
+      syncViewport();
+      this.syncImmersive();
+    };
+    syncViewport();
     window.addEventListener('resize', sync);
     window.addEventListener('orientationchange', () => {
       this.tucked = false;
+      syncViewport();
       setTimeout(sync, 120);
+      setTimeout(syncViewport, 320);
     });
     screen.orientation?.addEventListener?.('change', () => {
       this.tucked = false;
       sync();
+      setTimeout(syncViewport, 320);
     });
+    window.visualViewport?.addEventListener?.('resize', syncViewport);
     const onViewport = () => {
       // A Klever confirm sheet resizes the page. Resizing back dismisses that sheet.
       if (!this.started || this.walletBusy) return;
@@ -4404,12 +4432,13 @@ async function startGame() {
         return null;
       });
       game.ensureWorldConnection = async () => {
-        if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search: liveSearch })) return;
+        const search = typeof location !== 'undefined' ? location.search : liveSearch;
+        if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search })) return;
         try {
           const ready = await game.worldViewReady;
           if (!ready || ready.flags.mock || ready.flags.mockwake) return;
           const { attachMmo } = await import('./net/mmo.js');
-          attachMmo(game, ready.view, { search: liveSearch });
+          attachMmo(game, ready.view, { search });
         } catch (err) {
           console.warn('world connection', err);
         }
