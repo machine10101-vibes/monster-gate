@@ -5,8 +5,8 @@ import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, WATER_SURFACE, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
-import { STARTER, TILES, TILE_SIZE, originOf } from './tiles.js';
-import { chartedAnchor, rasterPlaymap } from './playmap.js';
+import { STARTER, TILES, originOf } from './tiles.js';
+import { rasterPlaymap } from './playmap.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
@@ -29,21 +29,9 @@ import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 const CH = 16;
 export const MAP_PX = 1;
 const GRASS_MAP = [105, 175, 75];
-const TOWN_KINDS = new Set(['oakhollow', 'southford', 'hellspire', 'dawnspire']);
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 const _sphereC = new THREE.Vector3();
 const _sphereE = new THREE.Vector3();
-
-function stampTownIcon(ctx, x, y) {
-  const ix = Math.round(x);
-  const iy = Math.round(y);
-  ctx.fillStyle = '#5a3a18';
-  ctx.fillRect(ix - 9, iy - 9, 18, 18);
-  ctx.fillStyle = '#f0a030';
-  ctx.fillRect(ix - 7, iy - 7, 14, 14);
-  ctx.fillStyle = '#5a3a18';
-  ctx.fillRect(ix - 3, iy - 3, 6, 6);
-}
 
 /** World-space footprint. Instanced props keep their bounds on the mesh, not the shared geometry. */
 function meshSphere(obj) {
@@ -1596,34 +1584,6 @@ export class World {
     const img = mctx.createImageData(map.width, map.height);
     img.data.set(rgba);
     mctx.putImageData(img, 0, 0);
-    let gx = 0;
-    let gz = 0;
-    let gn = 0;
-    for (const tile of TILES) {
-      const o = originOf(tile);
-      if (String(tile.kind).startsWith('gilantre')) {
-        gx += o.x + TILE_SIZE / 2;
-        gz += o.z + TILE_SIZE / 2;
-        gn += 1;
-        continue;
-      }
-      if (!TOWN_KINDS.has(tile.kind)) continue;
-      let cx = tile.kind === 'oakhollow' ? TOWN.x - 10 : o.x + TILE_SIZE / 2;
-      let cz = tile.kind === 'oakhollow' ? TOWN.z + 18 : o.z + TILE_SIZE / 2;
-      if (tile.kind === 'dawnspire' && this.holyKeep) {
-        cx = this.holyKeep.x;
-        cz = this.holyKeep.z;
-      } else if (tile.kind === 'hellspire' && this.demonKeep) {
-        cx = this.demonKeep.x;
-        cz = this.demonKeep.z;
-      }
-      const pin = chartedAnchor(cx, cz) || { x: cx, z: cz };
-      stampTownIcon(mctx, (pin.x - minX) * px, (pin.z - minZ) * px);
-    }
-    if (gn) {
-      const pin = chartedAnchor(gx / gn, gz / gn) || { x: gx / gn, z: gz / gn };
-      stampTownIcon(mctx, (pin.x - minX) * px, (pin.z - minZ) * px);
-    }
     this.minimapCanvas = map;
     this.minimapOrigin = { x: minX, z: minZ };
     this.minimapScale = px;

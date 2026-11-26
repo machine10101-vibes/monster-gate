@@ -814,6 +814,121 @@ export class HUD {
         fit.appendChild(b);
       }
       frame.appendChild(fit);
+      const zoomControls = document.createElement('div');
+      zoomControls.className = 'playmap-zoom-controls';
+      zoomControls.setAttribute('aria-label', 'Map zoom controls');
+      const zoomOut = document.createElement('button');
+      zoomOut.type = 'button';
+      zoomOut.textContent = '\u2212';
+      zoomOut.setAttribute('aria-label', 'Zoom map out');
+      const zoomIn = document.createElement('button');
+      zoomIn.type = 'button';
+      zoomIn.textContent = '+';
+      zoomIn.setAttribute('aria-label', 'Zoom map in');
+      zoomControls.append(zoomOut, zoomIn);
+      frame.appendChild(zoomControls);
+
+      const view = { scale: 1, x: 0, y: 0 };
+      const pointers = new Map();
+      let gestureCenter = null;
+      let gestureDistance = 0;
+      const applyMapView = () => {
+        const maxX = Math.max(0, fit.offsetWidth * (view.scale - 1) / 2);
+        const maxY = Math.max(0, fit.offsetHeight * (view.scale - 1) / 2);
+        view.x = clamp(view.x, -maxX, maxX);
+        view.y = clamp(view.y, -maxY, maxY);
+        fit.style.transform = `translate3d(${view.x.toFixed(1)}px, ${view.y.toFixed(1)}px, 0) scale(${view.scale.toFixed(3)})`;
+        frame.classList.toggle('is-zoomed', view.scale > 1.001);
+        zoomOut.disabled = view.scale <= 1.001;
+        zoomIn.disabled = view.scale >= 4.999;
+      };
+      const zoomMap = (nextScale, clientX = null, clientY = null) => {
+        const previous = view.scale;
+        const next = clamp(nextScale, 1, 5);
+        if (Math.abs(next - previous) < 0.0001) return;
+        if (clientX != null && clientY != null) {
+          const rect = frame.getBoundingClientRect();
+          const px = clientX - (rect.left + rect.width / 2) - view.x;
+          const py = clientY - (rect.top + rect.height / 2) - view.y;
+          const ratio = next / previous;
+          view.x -= px * (ratio - 1);
+          view.y -= py * (ratio - 1);
+        }
+        view.scale = next;
+        applyMapView();
+      };
+      const pointPair = () => {
+        const [a, b] = [...pointers.values()];
+        if (!a || !b) return null;
+        return {
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+          distance: Math.hypot(a.x - b.x, a.y - b.y),
+        };
+      };
+      frame.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        zoomMap(view.scale * Math.exp(-event.deltaY * 0.0018), event.clientX, event.clientY);
+      }, { passive: false });
+      frame.addEventListener('dblclick', (event) => {
+        if (event.target.closest('.playmap-zoom-controls')) return;
+        zoomMap(view.scale > 2.5 ? 1 : Math.min(5, view.scale * 1.8), event.clientX, event.clientY);
+      });
+      frame.addEventListener('pointerdown', (event) => {
+        if (event.target.closest('.playmap-zoom-controls')) return;
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        try { frame.setPointerCapture(event.pointerId); } catch { /* capture is optional */ }
+        const pair = pointPair();
+        gestureCenter = pair ? { x: pair.x, y: pair.y } : { x: event.clientX, y: event.clientY };
+        gestureDistance = pair?.distance || 0;
+        event.preventDefault();
+      });
+      frame.addEventListener('pointermove', (event) => {
+        const previous = pointers.get(event.pointerId);
+        if (!previous) return;
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        const pair = pointPair();
+        if (pair) {
+          if (gestureDistance > 0) {
+            zoomMap(
+              view.scale * (pair.distance / gestureDistance),
+              gestureCenter?.x ?? pair.x,
+              gestureCenter?.y ?? pair.y,
+            );
+          }
+          if (gestureCenter) {
+            view.x += pair.x - gestureCenter.x;
+            view.y += pair.y - gestureCenter.y;
+          }
+          gestureCenter = { x: pair.x, y: pair.y };
+          gestureDistance = pair.distance;
+          applyMapView();
+        } else if (view.scale > 1.001) {
+          view.x += event.clientX - previous.x;
+          view.y += event.clientY - previous.y;
+          gestureCenter = { x: event.clientX, y: event.clientY };
+          applyMapView();
+        }
+        event.preventDefault();
+      });
+      const endMapPointer = (event) => {
+        pointers.delete(event.pointerId);
+        const pair = pointPair();
+        if (pair) {
+          gestureCenter = { x: pair.x, y: pair.y };
+          gestureDistance = pair.distance;
+        } else {
+          const remaining = [...pointers.values()][0];
+          gestureCenter = remaining ? { ...remaining } : null;
+          gestureDistance = 0;
+        }
+      };
+      frame.addEventListener('pointerup', endMapPointer);
+      frame.addEventListener('pointercancel', endMapPointer);
+      frame.addEventListener('lostpointercapture', endMapPointer);
+      zoomOut.addEventListener('click', () => zoomMap(view.scale / 1.5));
+      zoomIn.addEventListener('click', () => zoomMap(view.scale * 1.5));
+      applyMapView();
       body.appendChild(frame);
       if (!instanced) {
         if (game.world.waygate) {
@@ -840,7 +955,7 @@ export class HUD {
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
         : inRift
           ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
-          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Red pulse: Monster Gate. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you. L hides names.</p>');
+          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Wheel or pinch to zoom; drag to move. Gold names are towns and cities. Gold square: Hunter Guild. Red pulse: Monster Gate. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you. L hides names.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);

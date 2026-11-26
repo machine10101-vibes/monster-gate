@@ -260,9 +260,13 @@ test('world map raster is one resolution with a 16-24px warped border, not a glo
   assert.doesNotMatch(tiles, /const band = 0\.44/);
   assert.doesNotMatch(world, /function blurMinimap/);
   assert.match(world, /MAP_PX = 1/);
-  assert.match(world, /stampTownIcon/);
+  assert.doesNotMatch(world, /stampTownIcon/);
   assert.match(world, /rasterPlaymap/);
   assert.match(hud, /imageSmoothingEnabled = false/);
+  assert.match(hud, /Wheel or pinch to zoom/);
+  assert.match(hud, /frame\.addEventListener\('wheel'/);
+  assert.match(hud, /frame\.addEventListener\('pointermove'/);
+  assert.match(style, /\.playmap-zoom-controls/);
   assert.match(style, /\.bigmap \{[\s\S]*image-rendering:\s*auto/);
   assert.match(style, /font-size: 13px/);
   assert.match(play, /applyFrame/);
