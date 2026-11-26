@@ -77,6 +77,8 @@ export class CharacterSelect {
     this.root.classList.remove('hidden');
     document.body.classList.add('selecting');
     this.active = true;
+    this.mode = 'list';
+    this.draft = null;
     g.hud?.clearPlates?.();
     if (this.hourWas == null) this.hourWas = g.sky.hour;
     g.sky.setHour(16.7);
@@ -170,6 +172,11 @@ export class CharacterSelect {
     const canEdit = canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState });
     const syncError = $('cs-sync-error');
     if (syncError) syncError.hidden = canEdit;
+    // Background account saves must not dismiss or reset an open creation draft.
+    if (selectId == null && this.mode === 'create' && this.draft) {
+      this.syncChrome();
+      return;
+    }
     if (!roster.chars.length) {
       this.root?.classList.remove('single-character');
       if (!canEdit) {
@@ -549,6 +556,8 @@ export class CharacterSelect {
   }
 
   hideForm() {
+    this.mode = 'list';
+    this.draft = null;
     this.stage.frame = null;
     this.stage.endPreview();
     this.refresh();
@@ -744,6 +753,8 @@ export class CharacterSelect {
     }
     try {
       const c = this.roster.create({ name, look: this.draft.look, classId: this.draft.classId });
+      this.mode = 'list';
+      this.draft = null;
       this.stage.endPreview();
       this.game.pushRoster();
       this.refresh(c.id);
