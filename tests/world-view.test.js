@@ -735,10 +735,24 @@ test('social client actions wait for server confirmation', async () => {
 
 test('welcome starts a keepalive ping so an idle signed-in hunter stays online', () => {
   const game = stubGame();
+  const applied = [];
+  game.player.syncObj = () => applied.push('sync');
+  game.snapCamera = () => applied.push('camera');
   const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
   const client = new MmoClient(game, view, { url: 'ws://127.0.0.1:9' });
-  client.onFrame(JSON.stringify({ v: 1, type: 'welcome', you: { id: 'you' }, online: 1 }));
+  client.onFrame(JSON.stringify({
+    v: 1,
+    type: 'welcome',
+    you: { id: 'you' },
+    online: 1,
+    pose: { x: -230, y: 8, z: -500, yaw: 1.2, zone: 'Cinderfall' },
+  }));
   assert.equal(view.status, STATUS.online);
+  assert.equal(game.player.pos.x, -230);
+  assert.equal(game.player.pos.z, -500);
+  assert.equal(game.player.yaw, 1.2);
+  assert.equal(game.zone, 'Cinderfall');
+  assert.deepEqual(applied, ['sync', 'camera']);
   assert.ok(client.pingTimer);
   client.dispose();
   assert.equal(client.pingTimer, 0);

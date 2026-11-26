@@ -643,6 +643,7 @@ export class MmoClient {
       this.syncAuthoritativeMonsters();
       if (msg.resumeToken) this.resumeToken = msg.resumeToken;
       this.setStatus('online', { online: msg.online });
+      this.view?.applySavedPose?.(msg.pose);
     } else if (msg.type === TYPES.snapshot) {
       this.nearby = new Map();
       for (const p of msg.players || []) if (p?.id) this.nearby.set(p.id, { ...p });

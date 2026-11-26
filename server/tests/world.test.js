@@ -131,6 +131,13 @@ test('disconnect saves the hunter through openPersistence()', async () => {
   assert.equal(row.name, 'Ann');
   assert.ok(row.state.hunter.x >= 74);
   assert.equal(row.state.hunter.realm, 'over');
+
+  const again = await open(srv.url);
+  const restored = await hello(again, 'ann', { name: 'Ann' });
+  assert.ok(restored.pose.x >= 74, 'the next login receives the persisted x position');
+  assert.ok(restored.pose.z >= 73, 'the next login receives the persisted z position');
+  assert.equal(restored.pose.yaw, 1);
+  again.close();
   await srv.close();
 });
 

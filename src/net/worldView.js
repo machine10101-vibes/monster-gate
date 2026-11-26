@@ -484,6 +484,7 @@ export class WorldView {
     this.wrapped = null;
     this.live = false;
     this.spawnSnapped = false;
+    this.savedPose = null;
     this.collapsed = false;
     this.localHeld = null;
     this.localSay = '';
@@ -1243,12 +1244,49 @@ export class WorldView {
   }
 
   /**
-   * World 1 persist is a different record than the solo hunt. A hunter who
-   * joins from the cave (or anywhere past 40u) gets `teleport` on every move
-   * until they stand at the world spawn. Drop them at Oakhollow once.
+   * Restore the authoritative World 1 position sent in `welcome`. Applying it
+   * before the first movement frame prevents a valid saved position from being
+   * rejected as a teleport and incorrectly replaced by the default spawn.
    */
+  applySavedPose(pose) {
+    const x = Number(pose?.x);
+    const z = Number(pose?.z);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+    const g = this.game;
+    const p = g?.player;
+    if (!p?.pos) return false;
+    const world = g.world;
+    const zone = String(pose?.zone || 'Oakhollow');
+    const cave = zone === 'cave';
+    const yRaw = Number(pose?.y);
+    const ground = world?.heightAt?.(x, z);
+    const y = Number.isFinite(yRaw) ? yRaw : Number.isFinite(ground) ? ground : WORLD_SPAWN.y;
+    const yaw = Number.isFinite(Number(pose?.yaw)) ? Number(pose.yaw) : 0;
+    this.savedPose = { x, y, z, yaw, zone };
+    if (typeof p.pos.set === 'function') p.pos.set(x, y, z);
+    else Object.assign(p.pos, { x, y, z });
+    p.yaw = yaw;
+    if (world) {
+      world.realm = cave ? 'cave' : 'over';
+      if (world.group) world.group.visible = !cave;
+      if (world.cave?.group) world.cave.group.visible = cave;
+      if (world.rift?.group) world.rift.group.visible = false;
+    }
+    if (g.sky) g.sky.indoors = cave;
+    g.zone = zone;
+    p.syncObj?.();
+    g.cam && (g.cam.targetYaw = yaw);
+    g.hud?.setArea?.(cave ? 'Darksycle Den' : zone);
+    g.snapCamera?.();
+    g.captureHunter?.();
+    this.spawnSnapped = true;
+    return true;
+  }
+
+  /** Fall back only when the server could not provide a usable saved pose. */
   snapToWorldSpawn() {
     if (this.spawnSnapped || !this.live) return;
+    if (this.savedPose && this.applySavedPose(this.savedPose)) return;
     const p = this.game?.player;
     if (!p?.pos) return;
     const dist = Math.hypot(p.pos.x - WORLD_SPAWN.x, p.pos.z - WORLD_SPAWN.z);
