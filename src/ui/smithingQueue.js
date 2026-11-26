@@ -50,7 +50,7 @@ export function startSmithingQueue({
   const paint = (fraction = 0) => {
     const pct = Math.max(0, Math.min(1, fraction));
     fill.style.width = `${pct * 100}%`;
-    track.setAttribute('aria-valuenow', String(completed));
+    track.setAttribute('aria-valuenow', String(Math.min(total, completed + pct)));
     caption.textContent = `${label} · ${completed}/${total}`;
   };
 
