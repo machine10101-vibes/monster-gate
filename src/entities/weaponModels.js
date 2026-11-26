@@ -7,6 +7,7 @@ import { YETI } from '../data/yeti.js';
 import { holyHammerVoxels, demonSwordVoxels, demonShieldVoxels } from './knightWeapons.js';
 import { jungleWeapons, jungleShield, jungleBook, JUNGLE_DUAL, JUNGLE_TALL, JUNGLE_EDGE, JUNGLE_SHIELD_SETS, JUNGLE_BOOK_SETS } from './weaponsJungle.js';
 import { METALS, METAL_SET_IDS } from '../data/metals.js';
+import { GEAR } from '../data/catalog.js';
 import { budgeWeapons } from './weaponsBudge.js';
 import { duskWeapons } from './weaponsDusk.js';
 import { frostWeapons } from './weaponsFrost.js';
@@ -43,6 +44,9 @@ const EDGE_HOLD = new Set([
   ...JUNGLE_EDGE,
 ]);
 
+/** Catalog weapon types choose the carry location, including older saved gear IDs. */
+export const SIDE_SWORDS = new Set(['blade', ...GEAR.filter(g => g.wtype === 'onesword').map(g => g.held)]);
+
 /**
  * Maul heads are widest across the grip, so the striking bar lies flat.
  * The same quarter roll that stands a sword on its edge stands that bar
@@ -77,6 +81,13 @@ const sheathRoll = new THREE.Quaternion();
  * right shoulder and the blade angles down toward the left hip.
  */
 export function placeSheath(group, kind) {
+  if (SIDE_SWORDS.has(kind)) {
+    // Hilt at the left hip, blade down the outside of the thigh.
+    group.position.set(0, 0.07, 0);
+    group.quaternion.setFromUnitVectors(sheathZ, sheathTip.set(-0.12, -0.99, 0.06).normalize());
+    group.scale.setScalar(0.68);
+    return;
+  }
   if (TALL_KINDS.has(kind)) {
     group.position.set(-0.08, 0.56, -0.02);
     group.rotation.set(0.08, -0.15, 0.48);
