@@ -555,7 +555,7 @@ export function buildHumanoid(o = {}) {
   hipSlot.position.set(-0.34, -0.08, 0.04);
   hip.add(hipSlot);
   const shieldBack = new THREE.Group();
-  shieldBack.position.set(0, 0.24, -0.32);
+  shieldBack.position.set(0, 0.32, -0.32);
   shieldBack.rotation.x = -Math.PI / 2;
   upper.add(shieldBack);
   if (c.armor?.shield) shieldBack.add(buildThemedShield(c.armor.shield, mat));
