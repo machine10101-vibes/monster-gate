@@ -5335,3 +5335,17 @@ html:has(#panel:not(.hidden)) #debug-badge {
   line-height: 1.55;
 }
 .cs-sync-error .cs-btn { justify-self: start; }
+
+/* Account sign-in progress/status text must stay white on the dark login scene.
+   Keep this late and explicit so generic paragraph/status rules cannot dim it. */
+#title #wallet-status,
+#title .wallet-status,
+#title .account-panel .wg-label,
+#title .account-panel .account-hint,
+#title .wallet-help,
+#title .wallet-help p,
+#title .wallet-unlinked,
+#title .wallet-unlinked p {
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
