@@ -75,6 +75,7 @@ import { Bounties } from './systems/bounties.js';
 import { Roster, lookOptions } from './systems/roster.js';
 import { CharacterSelect } from './ui/charselect.js';
 import { CLASSES, SKILLS, attrDef, weaponDef } from './data/skills.js';
+import { readHotbarLocked } from './ui/skillHotbar.js';
 import { buildProjectileMesh, endProjectile, initProjectile, tickProjectile } from './systems/skillfx.js';
 import { castSkill, clearSkillWorld, noteProjectileEnd, scaleDmg, skillMods, skillOnHit, updateSkillWorld } from './systems/skillcast.js';
 import { Catalog } from './ui/catalog.js';
@@ -2248,6 +2249,10 @@ class Game {
   }
 
   equipSkill(slot, id) {
+    if (readHotbarLocked()) {
+      this.hud.toast('Skill buttons are locked in Settings.', 1400);
+      return false;
+    }
     const ok = this.progress.equip(slot, id);
     if (ok) this.hud.updateSkillbar(this);
     return ok;
