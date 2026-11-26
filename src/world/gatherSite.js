@@ -9,32 +9,32 @@ import { goodsVoxels } from './gatherModels.js';
 import { meshFrom } from '../entities/humanoid.js';
 import { toonMaterial } from '../engine/materials.js';
 
-/** Rocks around the pit floor: angle from +x in degrees, ore type. */
+/** Irregular ore seams around the Greyrock floor; offsets form natural clusters. */
 export const ROCK_SPOTS = [
-  { type: 'copper', a: -62, r: 3.7 },
-  { type: 'copper', a: 4, r: 3.9 },
-  { type: 'copper', a: 66, r: 3.7 },
-  { type: 'copper', a: -124, r: 3.5 },
-  { type: 'copper', a: 126, r: 3.5 },
-  { type: 'iron', a: 180, r: 2.4 },
+  { type: 'copper', dx: -4.4, dz: -2.6 },
+  { type: 'copper', dx: -2.2, dz: -3.5 },
+  { type: 'copper', dx: -3.2, dz: -0.6 },
+  { type: 'copper', dx: 3.1, dz: -3.8 },
+  { type: 'copper', dx: 4.5, dz: -1.7 },
+  { type: 'iron', dx: -0.8, dz: 4.4 },
 ];
 
 /** Deepwell pit floor, world offsets from SAND_MINE. */
 export const DEEPWELL_SPOTS = [
-  { type: 'iron', dx: -7, dz: 5 },
-  { type: 'iron', dx: 8, dz: -4 },
-  { type: 'coal', dx: -10, dz: -6 },
-  { type: 'coal', dx: 6, dz: 9 },
-  { type: 'mithril', dx: 1, dz: -9 },
-  { type: 'mithril', dx: -5, dz: 11 },
-  { type: 'adamite', dx: 11, dz: 2 },
-  { type: 'adamite', dx: -12, dz: 8 },
+  { type: 'iron', dx: -6.2, dz: 3.1 },
+  { type: 'iron', dx: -4.1, dz: 4.4 },
+  { type: 'coal', dx: 5.4, dz: -4.2 },
+  { type: 'coal', dx: 7.1, dz: -2.3 },
+  { type: 'mithril', dx: -1.8, dz: -8.2 },
+  { type: 'mithril', dx: 0.4, dz: -9.4 },
+  { type: 'adamite', dx: 9.1, dz: 4.8 },
+  { type: 'adamite', dx: 11.2, dz: 6.1 },
 ];
 
 /** Higher-tier seams on later tiles, local tile coords. */
 export const ZONE_MINES = [
-  { kind: 'cinderfall', type: 'titanium', spots: [[108, 96], [118, 72], [92, 110]] },
-  { kind: 'glimmerfrost', type: 'platinum', spots: [[112, 36], [46, 104], [120, 92]] },
+  { kind: 'cinderfall', type: 'titanium', spots: [[106, 96], [109, 99], [112, 95]] },
+  { kind: 'glimmerfrost', type: 'platinum', spots: [[112, 36], [115, 39], [110, 41]] },
 ];
 
 export const FISH_SPOTS = [
@@ -145,9 +145,8 @@ function buildMine(world) {
   const y = MINE.floorH;
   const nodes = [];
   ROCK_SPOTS.forEach((spot, i) => {
-    const ang = (spot.a * Math.PI) / 180;
-    const x = MINE.x + Math.cos(ang) * spot.r;
-    const z = MINE.z + Math.sin(ang) * spot.r;
+    const x = MINE.x + spot.dx;
+    const z = MINE.z + spot.dz;
     nodes.push(addRock(world, spot.type, x, z, i, MINE.x, MINE.z));
   });
   world.rockNodes = nodes;
