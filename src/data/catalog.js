@@ -210,9 +210,9 @@ export const MONSTERS = [
 export const CORE_SLOTS = ['helm', 'chest', 'arms', 'legs', 'boots'];
 export const ARMOR_SLOTS = [...CORE_SLOTS, 'shield', 'book', 'quiver'];
 export const SLOT_LABEL = { helm: 'Helm', chest: 'Chest', arms: 'Gloves', legs: 'Legs', boots: 'Boots', shield: 'Shield', book: 'Spell Book', quiver: 'Quiver', ammo: 'Arrows' };
-export const WEAPON_ORDER = ['onesword', 'twosword', 'dual', 'hammer', 'spear', 'staff', 'wand', 'shortbow', 'longbow', 'crossbow', 'scythe'];
+export const WEAPON_ORDER = ['onesword', 'twosword', 'dual', 'hammer', 'twohammer', 'spear', 'staff', 'wand', 'shortbow', 'longbow', 'crossbow', 'scythe'];
 export const WEAPON_LABEL = {
-  onesword: 'One-Hand Sword', twosword: 'Two-Hand Sword', dual: 'Dual Swords', hammer: 'One-Handed Hammer', spear: 'Spear', staff: 'War Staff', wand: 'Wand',
+  onesword: 'One-Hand Sword', twosword: 'Two-Hand Sword', dual: 'Dual Swords', hammer: 'One-Handed Hammer', twohammer: 'Two-Handed Hammer', spear: 'Spear', staff: 'War Staff', wand: 'Wand',
   shortbow: 'Short Bow', longbow: 'Long Bow', crossbow: 'Crossbow', scythe: 'Scythe',
 };
 export const TIER_LABEL = { metal: 'Metal', leather: 'Leather', cloth: 'Cloth' };
@@ -676,7 +676,7 @@ GEAR.push(
 export const STARTER = 'starter';
 export const CLASS_STARTER_WEAPON = { paladin: 'squirehammer', mage: 'apprenticewand', ranger: 'hunterbow' };
 for (const [id, type, name, held, item] of [
-  ['squirehammer', 'hammer', 'Squire War Hammer', 'ironhammer', M('swordshield', 9, 2.4, 2.0, 0.5, 0.22, 9, 5, 'A basic one-handed war hammer, balanced for a shield.')],
+  ['squirehammer', 'hammer', 'Squire War Hammer', 'irononehammer', M('swordshield', 9, 2.4, 2.0, 0.5, 0.22, 9, 5, 'A basic one-handed war hammer, balanced for a shield.')],
   ['apprenticewand', 'wand', 'Apprentice Wand', 'wand', R('wand', 6, 0.38, 4, 'A basic magic wand.', { spell: true, proj: 'orb' })],
   ['hunterbow', 'shortbow', 'Hunter Bow', 'bow', R('shortbow', 7, 0.42, 5, 'A basic hunting bow.')],
 ]) {
