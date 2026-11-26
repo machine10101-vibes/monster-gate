@@ -1737,7 +1737,6 @@ class Game {
       this.start();
     });
     sign.addEventListener('click', () => this.onWallet());
-    document.getElementById('btn-guest')?.addEventListener('click', () => this.playAsGuest());
     document.getElementById('pick-world1')?.addEventListener('click', () => this.pickWorldOnline());
     document.getElementById('pick-solo')?.addEventListener('click', () => this.pickWorldSolo());
     document.getElementById('world-auth-signin')?.addEventListener('click', () => this.onWorldAuthSignIn());
