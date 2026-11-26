@@ -233,11 +233,11 @@ export const GEAR = [
     stats: [['Damage', 16], ['Reach', '2.5'], ['Style', 'Sword & Shield']],
   },
   {
-    id: 'budgemaul', type: 'weapon', wtype: 'hammer', name: 'Horn Maul', monster: 'budgedragon', held: 'budgemaul',
+    id: 'budgemaul', type: 'weapon', wtype: 'hammer', name: 'Horn War Hammer', monster: 'budgedragon', held: 'budgemaul',
     desc: 'Scale-banded head, a tusk of budge horn on each side and a spike up front. It hits like a tantrum.',
     recipe: { budgehorn: 2, budgescale: 4, budgehide: 1 },
-    item: { id: 'budgemaul', icon: 'budgemaul', name: 'Horn Maul', kind: 'melee', style: 'twohand', dmg: 22, reach: 2.5, arc: 2.4, dur: 0.72, hit: 0.34, stam: 16, knock: 9, held: 'budgemaul', desc: 'Two-handed. Slow, brutal, and tusked.' },
-    stats: [['Damage', 22], ['Reach', '2.5'], ['Style', 'Two-Handed']],
+    item: { id: 'budgemaul', icon: 'budgemaul', name: 'Horn War Hammer', kind: 'melee', style: 'swordshield', dmg: 19, reach: 2.4, arc: 2.0, dur: 0.5, hit: 0.22, stam: 10, knock: 6, held: 'budgemaul', desc: 'One-handed. A scale-banded horn hammer made for shield fighting.' },
+    stats: [['Damage', 19], ['Reach', '2.4'], ['Style', 'Sword & Shield']],
   },
   {
     id: 'budgebow', type: 'weapon', wtype: 'longbow', name: 'Wyrmhorn Bow', monster: 'budgedragon', held: 'budgebow',
@@ -355,7 +355,7 @@ GEAR.push(
   weapon('darksword', 'onesword', 'Duskblade Saber', 'darksycledragon', 'A swept saber of scythe horn with a violet rune burning along the spine and wing-shaped guards.', { scythehorn: 2, duskscale: 2, duskclaw: 1 }, M('swordshield', 32, 2.6, 2.1, 0.36, 0.15, 9, 5, 'Sword and shield. Curved dusk steel.'), { reqLevel: 16 }),
   weapon('darkgreatsword', 'twosword', 'Gloomreaver Greatsword', 'darksycledragon', 'A sickle-curved greatsword with a glowing notch where the blade begins to bend.', { scythehorn: 4, duskscale: 3, gloommembrane: 1 }, M('twohand', 48, 3.0, 2.6, 0.6, 0.27, 14, 8, 'Two-handed. A curved greatsword of dusk.'), { reqLevel: 18 }),
   weapon('darkdual', 'dual', 'Twin Crescents', 'darksycledragon', 'Two hooked crescent blades that sing as they cut. Their edges drink the light.', { scythehorn: 3, duskscale: 1, duskclaw: 2 }, M('dual', 22, 2.3, 1.9, 0.27, 0.11, 6, 3, 'Dual swords. Hooked crescent blades.'), { reqLevel: 16 }),
-  weapon('darkhammer', 'hammer', 'Duskbreaker War Hammer', 'darksycledragon', 'A dusk-scale head with a blade spike on both faces and a gloom core humming at its centre.', { scythehorn: 1, duskscale: 5, gloomcore: 1 }, M('twohand', 42, 2.6, 2.4, 0.76, 0.36, 17, 11, 'Two-handed. Shatters armor and bone.'), { reqLevel: 20 }),
+  weapon('darkhammer', 'hammer', 'Duskbreaker War Hammer', 'darksycledragon', 'A compact dusk-scale hammer with twin blade-spikes and a humming gloom core, balanced for one-handed strikes.', { scythehorn: 1, duskscale: 5, gloomcore: 1 }, M('swordshield', 36, 2.5, 2.0, 0.52, 0.23, 11, 7, 'One-handed. Gloom core balance for hammer and shield.'), { reqLevel: 20 }),
   weapon('darkspear', 'spear', 'Scytheleaf Spear', 'darksycledragon', 'A double-bladed horn head with a trailing membrane pennant. It strikes before the target sees it.', { scythehorn: 2, duskscale: 2, gloommembrane: 1, duskclaw: 1 }, M('twohand', 36, 3.5, 1.0, 0.44, 0.19, 10, 4, 'Two-handed. Longest reach of any blade.'), { reqLevel: 16 }),
   weapon('darkwand', 'wand', 'Gloomshard Wand', 'darksycledragon', 'A scale-wrapped grip holding a shard of gloom core that spits violet orbs.', { gloomcore: 1, duskclaw: 1, gloommembrane: 1 }, R('wand', 18, 0.32, 4, 'A wand. Rapid gloom orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' }), { reqLevel: 16 }),
   weapon('darkshortbow', 'shortbow', 'Crescent Shortbow', 'darksycledragon', 'A compact horn bow that throws small piercing crescents in quick succession.', { gloommembrane: 2, duskclaw: 1, duskscale: 1 }, R('shortbow', 20, 0.36, 5, 'A short bow. Piercing crescents.', { proj: 'crescent', shotLabel: 'Piercing' }), { reqLevel: 16 }),
@@ -364,7 +364,7 @@ GEAR.push(
   weapon('yetisword', 'onesword', 'Frostfang Saber', 'snowyeti', 'A curved saber of yeti fang, rimed white along the spine, with a claw-hooked guard and a fur-wrapped grip.', { yetifang: 3, rimefur: 2, glacierclaw: 1 }, M('swordshield', 19, 2.6, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. Frostbitten fang steel.')),
   weapon('yetigreatsword', 'twosword', 'Glacierfall Greatsword', 'snowyeti', 'A slab of blue ice-steel with a serrated fang edge and a pair of claw quillons. It leaves a trail of frost.', { yetifang: 4, frostshard: 2, rimefur: 3, yetihide: 1 }, M('twohand', 27, 3.0, 2.6, 0.6, 0.27, 14, 9, 'Two-handed. A glacier of a blade.')),
   weapon('yetidual', 'dual', 'Twin Icefangs', 'snowyeti', 'Two hooked fang blades crusted with frost. Each swing sheds a spray of ice crystals.', { yetifang: 3, glacierclaw: 2, rimefur: 1 }, M('dual', 12, 2.3, 1.9, 0.27, 0.11, 6, 4, 'Dual swords. Hooked icefang blades.')),
-  weapon('yetihammer', 'hammer', 'Avalanche Maul', 'snowyeti', 'A lump of packed rime fur and ice with frost spikes on every face. It lands like a falling slope.', { frostshard: 3, rimefur: 5, frostheart: 1 }, M('twohand', 30, 2.6, 2.4, 0.76, 0.36, 17, 12, 'Two-handed. Buries what it hits.')),
+  weapon('yetihammer', 'hammer', 'Avalanche War Hammer', 'snowyeti', 'A dense glacier-shard hammer wrapped in rime fur, with frost spikes and a caged frostheart, balanced for one-handed combat.', { frostshard: 3, rimefur: 5, frostheart: 1 }, M('swordshield', 26, 2.5, 2.0, 0.52, 0.23, 11, 7, 'One-handed. Frost-weighted hammer and shield.')),
   weapon('yetispear', 'spear', 'Icicle Lance', 'snowyeti', 'A long frost-shard head with fang barbs and a tuft of rime fur at the collar.', { frostshard: 2, yetifang: 1, rimefur: 2, yetihide: 1 }, M('twohand', 20, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, cold reach.')),
   weapon('yetistaff', 'staff', 'Frostheart War Staff', 'snowyeti', 'Claws cradle a frostheart crystal ringed by floating ice shards. It fires chilling bolts that slow what they hit.', { frostheart: 1, frostshard: 2, rimefur: 3, glacierclaw: 1 }, R('staff', 12, 0.6, 6, 'A war staff. Chilling frost bolts.', { spell: true, proj: 'frost', shotLabel: 'Frost' })),
   weapon('yetiwand', 'wand', 'Rimeshard Wand', 'snowyeti', 'A fur-wrapped grip holding a shard of frost that spits ice bolts.', { frostshard: 2, glacierclaw: 1, rimefur: 1 }, R('wand', 10, 0.32, 4, 'A wand. Rapid frost bolts.', { spell: true, proj: 'frost', shotLabel: 'Frost' })),
@@ -379,7 +379,7 @@ GEAR.push(
   weapon('volcsword', 'onesword', 'Hearthsaber', VOLC, 'An obsidian saber with a lava fuller and a horn guard the colour of cooling magma.', { spirehorn: 2, cinderscale: 2, obsidianclaw: 1 }, M('swordshield', 52, 2.6, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. Obsidian with a lava edge.'), { reqLevel: 42 }),
   weapon('volcgreatsword', 'twosword', 'Volcanum\'s Greatsword', VOLC, 'A slab of cinder scale and spire horn. The fuller runs with liquid lava.', { spirehorn: 4, cinderscale: 4, lavavein: 1, hearthcore: 1 }, M('twohand', 78, 3.0, 2.6, 0.6, 0.27, 14, 10, 'Two-handed. The mountain, forged into a blade.'), { reqLevel: 48 }),
   weapon('volcdual', 'dual', 'Twin Embers', VOLC, 'Two hooked talon blades. Each edge weeps a thread of lava.', { spirehorn: 3, cinderscale: 2, obsidianclaw: 2 }, M('dual', 36, 2.3, 1.9, 0.27, 0.11, 6, 4, 'Dual swords. Hooked obsidian blades.'), { reqLevel: 42 }),
-  weapon('volchammer', 'hammer', 'Caldera Maul', VOLC, 'A hearth core set in a cinder-scale head. It lands like a vent opening.', { cinderscale: 6, lavavein: 2, hearthcore: 1 }, M('twohand', 70, 2.6, 2.4, 0.76, 0.36, 17, 14, 'Two-handed. Splits stone and plate.'), { reqLevel: 48 }),
+  weapon('volchammer', 'hammer', 'Caldera War Hammer', VOLC, 'A compact cinder-scale head frames a blazing hearth core, with molten seams and a counterweighted haft for a one-handed swing.', { cinderscale: 6, lavavein: 2, hearthcore: 1 }, M('swordshield', 60, 2.5, 2.0, 0.54, 0.24, 12, 9, 'One-handed. Hearth-core impact with shield-ready balance.'), { reqLevel: 48 }),
   weapon('volcspear', 'spear', 'Spire Lance', VOLC, 'A spire horn head on a lava-veined shaft. It reaches across a moat.', { spirehorn: 2, cinderscale: 2, lavavein: 1, obsidianclaw: 1 }, M('twohand', 58, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, burning reach.'), { reqLevel: 42 }),
   weapon('volcscythe', 'scythe', 'Ashfall Scythe', VOLC, 'A great talon blade on a horn haft, with lava where the blade meets the shaft.', { obsidianclaw: 3, spirehorn: 2, ashmembrane: 1, lavavein: 1 }, M('twohand', 56, 2.9, 2.7, 0.56, 0.24, 12, 8, 'Two-handed. Long reach, wide sweep.'), { reqLevel: 44 }),
   weapon('volcstaff', 'staff', 'Hearthcore Staff', VOLC, 'Horns cradle a hearth core. It throws gobs of liquid lava.', { hearthcore: 1, spirehorn: 2, lavavein: 2, ashmembrane: 1 }, R('staff', 38, 0.62, 6, 'A war staff. Lobbed lava.', { spell: true, proj: 'lavabolt', shotLabel: 'Lava' }), { reqLevel: 42 }),
@@ -510,6 +510,19 @@ GEAR.push(
   weapon('bonestaff', 'staff', 'Deadman\'s Staff', CURSED, 'A skull and crossbones atop a shaft of bone, ringed in gold and trailing a green wisp. It throws spectral orbs.', { piratebone: 4, pirategold: 2 }, R('staff', 12, 0.56, 6, 'A war staff. Spectral orbs.', { spell: true, proj: 'orb', shotLabel: 'Orb' })),
 );
 
+
+GEAR.push(
+  weapon('tigerhammer', 'hammer', 'Stripeclaw Crusher', TIGER, 'A bronze-faced compact hammer with paired tiger-claw hooks and a striped hide grip, shaped for pouncing blows with a shield.', { tigerclaw: 3, tigerskin: 3 }, M('swordshield', 15, 2.4, 2.0, 0.5, 0.22, 9, 5, 'One-handed. Tiger-claw hooks and a striped hide haft.')),
+  weapon('raptorhammer', 'hammer', 'Talonfall Hammer', RAPTOR, 'A narrow, angled chitin head with hooked raptor talons, mosaic scale inlays, and a quick counterweighted grip.', { raptorclaw: 3, raptorskin: 3 }, M('swordshield', 18, 2.4, 2.0, 0.48, 0.21, 10, 6, 'One-handed. A fast talon-headed hammer.')),
+  weapon('piratehammer', 'hammer', 'Quartermaster\'s Goldbreaker', PIRATE, 'A brass-capped shipwright hammer with a coin-bright boss, iron rims, and salt-dark wood wrapped in red leather.', { scimitar: 1, pirategold: 3, piratebone: 1 }, M('swordshield', 18, 2.4, 2.0, 0.5, 0.22, 10, 6, 'One-handed. Brass, iron, and hard ship timber.')),
+  weapon('cursedhammer', 'hammer', 'Deadman\'s Grudge', CURSED, 'A yellowed skull is bolted into a rusted iron striking head, with crossed bones, grave-green fire, and a ragged bone haft.', { piratebone: 4, pirategold: 2, scimitar: 1 }, M('swordshield', 21, 2.5, 2.0, 0.52, 0.23, 11, 7, 'One-handed. Gravefire burns through the bone head.'), { reqLevel: 7 }),
+  weapon('sandwormhammer', 'hammer', 'Dunebreaker', 'sandworm', 'A layered worm-plate head ridged like a dune, with a sand-spine breaker point and a hide-lashed haft.', { wormplate: 4, sandspine: 3 }, M('swordshield', 16, 2.4, 2.0, 0.5, 0.22, 9, 5, 'One-handed. Layered dune plate drives through armor.')),
+  weapon('scorpionhammer', 'hammer', 'Stingtail Mauler', 'scorpion', 'A bronze-gold chitin head with hooked pincers and a raised scorpion sting, balanced on a segmented grip.', { scorpchitin: 4, scorpsting: 2 }, M('swordshield', 19, 2.4, 2.0, 0.51, 0.23, 10, 6, 'One-handed. Chitin plates and a venom-point spike.')),
+  weapon('orcwarhammer', 'hammer', 'Orc Breaker', 'orcscout', 'A rough iron hammer head with a chipped wedge face, riveted spikes, and a crude hide-wrapped handle.', {}, M('swordshield', 13, 2.4, 2.0, 0.5, 0.22, 9, 5, 'One-handed. Crude iron, heavy enough to stagger.'), { found: true }),
+  weapon('demonhammer', 'hammer', 'Hellforged Ruin', 'demonknight', 'A jagged black plate hammer with red hellfire fissures, a horned striking face, and a reinforced demon-forged haft.', {}, M('swordshield', 28, 2.6, 2.0, 0.54, 0.24, 12, 8, 'One-handed. Hellfire-forged plate breaker.'), { found: true, reqLevel: 11 }),
+  weapon('wardenhammer', 'hammer', 'Fieldwarden Balance', 'keepwarden', 'A black-and-white split-face hammer, one side wreathed in ember-red and the other marked with a pale blue cross.', {}, M('swordshield', 30, 2.6, 2.0, 0.54, 0.24, 12, 8, 'One-handed. A balanced relic of both keep armies.'), { found: true, reqLevel: 12 }),
+);
+
 GEAR.push(
   { id: 'pirateshield', type: 'armor', slot: 'shield', name: 'Buccaneer Buckler', monster: PIRATE, set: 'pirateset', def: 2, desc: 'A round buckler of planked wood in an iron rim, with a gold skull riveted to the boss.', recipe: { scimitar: 3, pirategold: 2, piratebone: 1 } },
 );
@@ -550,7 +563,7 @@ const REX = 'trex';
 GEAR.push(
   weapon('rexblade', 'onesword', 'Fangsplitter', REX, 'A single serrated rex fang, set red root and all into a claw guard and a striped-hide grip.', { rexfang: 3, rexhide: 2, rexclaw: 1 }, M('swordshield', 44, 2.7, 2.1, 0.36, 0.15, 9, 6, 'Sword and shield. One great serrated fang.'), { reqLevel: 34 }),
   weapon('rexgreatsword', 'twosword', 'Tyrant\'s Jaw', REX, 'A whole lower jawbone, ground into a cleaver. The teeth are still in it, all along the edge.', { rexbone: 2, rexfang: 4, rexhide: 2 }, M('twohand', 66, 3.1, 2.6, 0.62, 0.28, 14, 10, 'Two-handed. Bites as it cuts.'), { reqLevel: 38 }),
-  weapon('rexhammer', 'hammer', 'Skullcrusher Maul', REX, 'A knuckle of rex bone the size of a barrel, ringed with toe claws, on a bone haft.', { rexbone: 3, rexclaw: 3, rexhide: 1 }, M('twohand', 60, 2.7, 2.4, 0.76, 0.36, 17, 13, 'Two-handed. Lands like a footfall.'), { reqLevel: 38 }),
+  weapon('rexhammer', 'hammer', 'Skullcrusher War Hammer', REX, 'A dense rex-bone striking head ringed with toe claws, mounted on a striped-hide haft balanced for one-handed combat.', { rexbone: 3, rexclaw: 3, rexhide: 1 }, M('swordshield', 52, 2.5, 2.0, 0.53, 0.24, 12, 8, 'One-handed. Bone-heavy hammer built for shield fighting.'), { reqLevel: 38 }),
   weapon('rexspear', 'spear', 'Fang Lance', REX, 'A long rex fang lashed to a bone shaft, with a collar of red-striped hide.', { rexfang: 2, rexbone: 1, rexhide: 2 }, M('twohand', 50, 3.5, 1.0, 0.44, 0.19, 10, 5, 'Two-handed. Long, serrated reach.'), { reqLevel: 34 }),
   weapon('rexbow', 'longbow', 'Jawbone Longbow', REX, 'Two curved jawbones joined at a hide grip, still lined with teeth along the belly.', { rexbone: 2, rexhide: 2, rexfang: 1 }, R('longbow', 40, 0.5, 7, 'A longbow. Heavy, bone-backed draw.'), { reqLevel: 34 }),
   weapon('rexcrossbow', 'crossbow', 'Tyrantlock Crossbow', REX, 'A bone stock wrapped in striped hide and a prod of two toe claws. The bolt leaves like a bite.', { rexbone: 1, rexclaw: 2, rexhide: 3 }, R('crossbow', 46, 0.64, 8, 'A crossbow. Slow and crushing.'), { reqLevel: 36 }),
@@ -613,8 +626,8 @@ GEAR.push(
     id: 'holyhammer', type: 'weapon', wtype: 'hammer', name: 'Smiterfall War Hammer', monster: HOLY_K, held: 'holyhammer', found: true,
     desc: 'A block of runed stone in a gold frame on a ribbed haft, lit by glowing blue crosses. It lands like a verdict.',
     recipe: {},
-    item: { id: 'holyhammer', icon: 'holyhammer', name: 'Smiterfall War Hammer', kind: 'melee', style: 'twohand', dmg: 36, reach: 2.8, arc: 2.5, dur: 0.78, hit: 0.36, stam: 18, knock: 12, held: 'holyhammer', desc: 'Two-handed. A holy stone hammer.' },
-    stats: [['Damage', 36], ['Reach', '2.8'], ['Style', 'Two-Handed']],
+    item: { id: 'holyhammer', icon: 'holyhammer', name: 'Smiterfall War Hammer', kind: 'melee', style: 'swordshield', dmg: 32, reach: 2.7, arc: 2.0, dur: 0.54, hit: 0.24, stam: 12, knock: 8, held: 'holyhammer', desc: 'One-handed. A rune-lit holy stone hammer.' },
+    stats: [['Damage', 32], ['Reach', '2.7'], ['Style', 'Sword & Shield']],
   },
   {
     id: 'ashenbrand', type: 'weapon', wtype: 'onesword', name: 'Ashen Brand', monster: 'keepwarden', held: 'ironsword', found: true, reqLevel: 12,
@@ -663,7 +676,7 @@ GEAR.push(
 export const STARTER = 'starter';
 export const CLASS_STARTER_WEAPON = { paladin: 'squirehammer', mage: 'apprenticewand', ranger: 'hunterbow' };
 for (const [id, type, name, held, item] of [
-  ['squirehammer', 'hammer', 'Squire War Hammer', 'ironhammer', M('twohand', 10, 2.5, 2.2, 0.72, 0.34, 10, 6, 'A basic war hammer.')],
+  ['squirehammer', 'hammer', 'Squire War Hammer', 'ironhammer', M('swordshield', 9, 2.4, 2.0, 0.5, 0.22, 9, 5, 'A basic one-handed war hammer, balanced for a shield.')],
   ['apprenticewand', 'wand', 'Apprentice Wand', 'wand', R('wand', 6, 0.38, 4, 'A basic magic wand.', { spell: true, proj: 'orb' })],
   ['hunterbow', 'shortbow', 'Hunter Bow', 'bow', R('shortbow', 7, 0.42, 5, 'A basic hunting bow.')],
 ]) {

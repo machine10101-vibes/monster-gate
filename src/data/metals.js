@@ -27,7 +27,7 @@ const WEAPON_KINDS = [
   { kind: 'sword', wtype: 'onesword', noun: 'Sword', bars: 'swordBars', smithOff: 0, style: 'swordshield', reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.16, stam: 8, knock: 4 },
   { kind: 'greatsword', wtype: 'twosword', noun: 'Greatsword', bars: 'greatBars', smithOff: 4, style: 'twohand', reach: 2.7, arc: 2.4, dur: 0.58, hit: 0.26, stam: 13, knock: 7 },
   { kind: 'spear', wtype: 'spear', noun: 'Spear', bars: 'spearBars', smithOff: 2, style: 'twohand', reach: 3.1, arc: 1.0, dur: 0.46, hit: 0.2, stam: 10, knock: 4 },
-  { kind: 'hammer', wtype: 'hammer', noun: 'Hammer', bars: 'hammerBars', smithOff: 5, style: 'twohand', reach: 2.5, arc: 2.3, dur: 0.7, hit: 0.32, stam: 15, knock: 9 },
+  { kind: 'hammer', wtype: 'hammer', noun: 'War Hammer', bars: 'hammerBars', smithOff: 5, style: 'swordshield', reach: 2.4, arc: 2.0, dur: 0.5, hit: 0.22, stam: 10, knock: 6 },
 ];
 
 function cap99(n) {

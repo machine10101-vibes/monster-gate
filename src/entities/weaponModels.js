@@ -47,7 +47,7 @@ const EDGE_HOLD = new Set([
  * The same quarter roll that stands a sword on its edge stands that bar
  * up and down. The iron mallet's face is already taller than it is wide.
  */
-const HAMMER_HOLD = new Set(['rexhammer', 'budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer']);
+const HAMMER_HOLD = new Set(['rexhammer', 'budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer', 'tigerhammer', 'raptorhammer', 'piratehammer', 'cursedhammer', 'sandwormhammer', 'scorpionhammer', 'orcwarhammer', 'demonhammer', 'wardenhammer']);
 
 /**
  * Resting roll of a weapon in the hand, around the grip.
@@ -462,8 +462,83 @@ function metalHammer(T = THEMES.iron) {
   ringAt(c, 18, 2.2, T.guard, 1);
   ringAt(c, 56, 2.4, T.guard, 2);
   blockHead(c, T, { z0: 50, z1: 76, hx: 7, hy: 9, bands: [[50, 52], [74, 76]], scale: false, fill: T.dark });
-  for (let z = 53; z < 74; z++) for (const [x, y] of [[-7, 0], [6, 0]]) c.set(x, y, z, J(shade(T.dark, 1.1), x, y, z, 36, 0.05));
-  for (const x of [-4, 3]) for (const z of [51, 75]) c.set(x, 8, z, T.edge);
+  // Raised beveled rails, recessed flutes, and bright pin-rivets give the
+  // head real depth while the same sculpt takes each metal tier's own palette.
+  for (let z = 53; z < 74; z++) for (const x of [-7, 6]) {
+    c.set(x, 0, z, J(shade(T.dark, z % 5 === 0 ? 1.2 : 0.88), x, 0, z, 36, 0.04));
+    if (z % 5 === 0) c.set(x, 1, z, T.edge);
+  }
+  for (const x of [-5, 4]) for (const z of [51, 75]) {
+    c.set(x, 8, z, T.edge); c.set(x, 7, z, T.guardHi);
+  }
+  for (const y of [-6, 5]) for (const z of [54, 72]) {
+    c.set(-7, y, z, T.guardHi); c.set(6, y, z, T.guardHi);
+  }
+  // End plates and a small maker's mark repeat on both striking faces.
+  for (const z of [50, 76]) {
+    for (let x = -5; x <= 4; x++) for (const y of [-7, 6]) c.set(x, y, z, x % 3 ? T.edge : T.guard);
+    for (const x of [-3, -1, 1, 3]) c.set(x, 0, z, T.edge);
+    for (const y of [-3, -1, 1, 3]) c.set(0, y, z, T.guardHi);
+  }
+  return c.done();
+}
+
+/** Bespoke compact hammers for additional monster and knight sets. */
+function wildHammer(kind) {
+  const palettes = { tiger: THEMES.budge, raptor: THEMES.frost, pirate: THEMES.iron, cursed: THEMES.dark, sandworm: THEMES.iron, scorpion: THEMES.volcanum, orc: THEMES.iron, demon: THEMES.dark, warden: THEMES.dark };
+  const base = palettes[kind];
+  const T = { ...base };
+  if (kind === 'tiger') Object.assign(T,{wood:0x60331c,wrap:0xc75a20,wrapLo:0x241b17,wrapHi:0xf0b46b,blade:0xc77b38,edge:0xf4d7a2,dark:0x713b20,guard:0x24201c,guardHi:0xe7a54a,glow:0xffb44d,glow2:0xffe0a0,horn:0xd7a761,hornDark:0x4b2918,claw:0xe8d3ad});
+  if (kind === 'raptor') Object.assign(T,{wood:0x54422b,wrap:0x777447,wrapLo:0x4d5135,wrapHi:0xa79a63,blade:0x8e8b63,edge:0xd1c89b,dark:0x535441,guard:0x454331,guardHi:0xb6a45d,glow:0xc5aa60,glow2:0xe8d797,horn:0xc9bd87,hornDark:0x474637,claw:0xe1d1a1});
+  if (kind === 'pirate') Object.assign(T,{wood:0x704622,wrap:0x742f22,wrapLo:0x40231b,wrapHi:0xad6942,blade:0x777977,edge:0xd6d0ba,dark:0x41454a,guard:0x8e5e22,guardHi:0xe5bc59,glow:0xffd769,glow2:0xffefab,horn:0xd1bd96,hornDark:0x504332,claw:0xd1bd96});
+  if (kind === 'cursed') Object.assign(T,{wood:0x5b4938,wrap:0x5e3326,wrapLo:0x2b2625,wrapHi:0x92704f,blade:0x686052,edge:0xc8b99c,dark:0x373331,guard:0x62512d,guardHi:0xb5964c,glow:0x55dd73,glow2:0xa8ff80,horn:0xd7c49c,hornDark:0x63543e,claw:0xe1d3b5});
+  if (kind === 'sandworm') Object.assign(T,{wood:0x735736,wrap:0x9b7a48,wrapLo:0x5b4930,wrapHi:0xc7a66d,blade:0xb7985f,edge:0xe3d1a0,dark:0x746042,guard:0x725936,guardHi:0xd1ae68,glow:0xddbd78,glow2:0xf6e4ad,horn:0xd8c28f,hornDark:0x756043});
+  if (kind === 'scorpion') Object.assign(T,{wood:0x55402c,wrap:0x93713b,wrapLo:0x4b3826,wrapHi:0xc7a654,blade:0xa77932,edge:0xe4c56d,dark:0x51412c,guard:0x65502a,guardHi:0xe0b949,glow:0xf5d55f,glow2:0xfff0a0,horn:0xd3ad55,hornDark:0x513c25});
+  if (kind === 'orc') Object.assign(T,{wood:0x493522,wrap:0x66543a,wrapLo:0x2c2821,wrapHi:0x96815b,blade:0x62666a,edge:0xb6b7ad,dark:0x35383c,guard:0x545045,guardHi:0x92805e,glow:0xb54436,glow2:0xe06a4e,horn:0xc7b58c,hornDark:0x514634});
+  if (kind === 'demon') Object.assign(T,{wood:0x38221b,wrap:0x461d1b,wrapLo:0x211c20,wrapHi:0x762622,blade:0x29272d,edge:0x8c4541,dark:0x17171d,guard:0x46201f,guardHi:0xa33c32,glow:0xff392a,glow2:0xff9a37,horn:0x7f302b,hornDark:0x241b20,claw:0xb84a36});
+  if (kind === 'warden') Object.assign(T,{wood:0x493523,wrap:0x555457,wrapLo:0x27282d,wrapHi:0x9b8c64,blade:0xa6a9ad,edge:0xe5e2d7,dark:0x25272e,guard:0x78633d,guardHi:0xd2b66b,glow:0x5eb9ff,glow2:0xff6548,horn:0xe1d8c1,hornDark:0x3a3531,claw:0xe6decd});
+  const c=ctx(); haft(c,T,-10,85,2.2,T.wood,0); wrapRod(c,T,-7,28,2.3);
+  for(const z of [-5,19,43,53,76,84]) ringAt(c,z,z>48?2.7:2.3,T.guard,z&3);
+  pommelAt(c,T,-10,kind==='pirate'||kind==='cursed'?'ball':'horn',T.glow);
+  const [hx,hy]=kind==='raptor'?[7,10]:kind==='sandworm'?[11,8]:kind==='warden'?[10,11]:[9,10];
+  blockHead(c,T,{z0:52,z1:78,hx,hy,bands:[[52,55],[74,78]],scale:false,fill:T.blade,glow:kind==='cursed'||kind==='demon'});
+  if(kind==='tiger'){
+    for(const x of [-hx,hx-1])for(let z=58;z<74;z+=5)for(let y=-7;y<=7;y++)c.set(x,y,z,z%2?T.dark:T.guard);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,15,66,3.4,.4,d*3,k=>k>12?T.claw:k%3?T.horn:T.hornDark);
+    for(const x of [-3,2])c.set(x,hy,65,T.glow,true);
+  } else if(kind==='raptor'){
+    for(let z=57;z<74;z+=4)for(let y=-8;y<=8;y+=4)for(const x of [-hx,hx-1])c.set(x,y,z,(z+y)%3?T.wrap:T.wrapHi);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,13,d<0?62:69,3.5,.35,d*6,k=>k>10?T.claw:T.hornDark);
+    spike(c,'z',1,78,12,0,2.8,.25,0,k=>k>8?T.claw:T.edge);
+  } else if(kind==='pirate'){
+    ball(c,0,0,65,5,T.guardHi,false,.85,.85); ball(c,0,0,66,2.6,T.glow2,true);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,9,65,2.5,.6,0,k=>k<3?T.guardHi:T.edge);
+    for(const x of [-3,3])c.set(x,-5,65,T.dark); for(const z of [59,72])ringAt(c,z,hx+1,T.guardHi,1);
+  } else if(kind==='cursed'){
+    ball(c,0,0,65,6,T.horn,false,1,.9); ball(c,0,1,66,2.5,T.glow,true);
+    for(const x of [-4,3]){c.set(x,4,64,T.dark);c.set(x,4,65,T.dark);}
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,11,65,2.2,.25,d*2,k=>k>8?T.horn:T.hornDark);
+    c.set(0,-9,65,T.edge,true);c.set(0,9,65,T.edge,true);
+  } else if(kind==='sandworm'){
+    for(let z=57;z<=73;z+=4)for(let x=-hx+1;x<hx-1;x++)for(const y of [-hy,hy-1])c.set(x,y,z,z%8?T.guard:T.edge);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,10,65,2.4,.4,d*4,k=>k>7?T.edge:T.hornDark);
+    spike(c,'z',1,78,14,0,3,.2,0,k=>k>10?T.edge:T.horn);
+  } else if(kind==='scorpion'){
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,11,63,3.6,.8,d*2,k=>k>8?T.claw:T.guardHi);
+    spike(c,'z',1,78,15,0,3.6,.25,0,k=>k>11?T.claw:T.horn);
+    for(const z of [59,64,69])ringAt(c,z,4.5,T.guardHi,1); ball(c,0,0,65,3,T.glow,true);
+  } else if(kind==='orc'){
+    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,8,d<0?58:72,3.8,.4,d*2,k=>k>6?T.edge:T.dark);
+    for(let z=57;z<75;z+=7)ringAt(c,z,hx+1,T.guardHi,1);
+    for(const x of [-5,4])c.set(x,0,65,T.glow,true);
+  } else if(kind==='demon'){
+    for(const d of [-1,1]){spike(c,'x',d,d<0?-hx:hx-1,14,66,4,.4,d*5,k=>k>10?T.horn:T.dark);spike(c,'z',d,d<0?51:78,11,0,3.1,.3,0,k=>k>8?T.edge:T.hornDark);}
+    for(let z=58;z<74;z+=4)c.set(0,0,z,T.glow,true);
+  } else if(kind==='warden'){
+    for(let z=57;z<74;z++)for(let y=-8;y<8;y++)c.set(0,y,z,z%2?T.dark:T.guardHi);
+    ball(c,0,0,65,4,T.glow,true); ball(c,0,0,71,3,T.glow2,true);
+    for(const x of [-hx,hx-1])for(let z=58;z<74;z+=4)for(let y=-8;y<8;y+=3)c.set(x,y,z,x<0?T.dark:T.edge);
+  }
   return c.done();
 }
 
@@ -1105,6 +1180,15 @@ const BUILDERS = {
   ...frostWeapons(KIT),
   ...volcWeapons(KIT),
   ...rexWeapons(KIT),
+  tigerhammer: () => wildHammer('tiger'),
+  raptorhammer: () => wildHammer('raptor'),
+  piratehammer: () => wildHammer('pirate'),
+  cursedhammer: () => wildHammer('cursed'),
+  sandwormhammer: () => wildHammer('sandworm'),
+  scorpionhammer: () => wildHammer('scorpion'),
+  orcwarhammer: () => wildHammer('orc'),
+  demonhammer: () => wildHammer('demon'),
+  wardenhammer: () => wildHammer('warden'),
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */
