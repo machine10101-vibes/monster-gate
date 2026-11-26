@@ -76,6 +76,31 @@ function surfaceFront(M, x, y) {
   return -1;
 }
 
+/** Raised, blocky ice scales that break up the coat into layered crystal armor. */
+function crystalScaleField(M, { x0, x1, y0, y1, seed, count, exclude = () => false }) {
+  const rng = new RNG(seed);
+  for (let i = 0; i < count; i++) {
+    const cx = rng.int(x0, x1), cy = rng.int(y0, y1);
+    if (exclude(cx, cy)) continue;
+    const rx = rng.int(1, 2), ry = rng.int(1, 2);
+    const depth = rng.int(1, 2);
+    const tone = rng.range(0, 1);
+    for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) {
+      if ((dx * dx) / (rx * rx + 0.1) + (dy * dy) / (ry * ry + 0.1) > 1.15) continue;
+      const x = cx + dx, y = cy + dy;
+      if (exclude(x, y)) continue;
+      const z = surfaceFront(M, x, y);
+      if (z < 0 || z + 1 >= M.sz) continue;
+      const edge = Math.abs(dx) === rx || Math.abs(dy) === ry;
+      const color = jitter(edge ? YETI.ice : tone > 0.72 ? YETI.iceHi : tone < 0.2 ? YETI.iceDeep : YETI.furWhite, 0.035, hash3(x, y, seed, i));
+      M.set(x, y, z + 1, color);
+      if (!edge && depth > 1 && z + 2 < M.sz && hash3(x, y, seed + 17, i) > 0.42) {
+        M.set(x, y, z + 2, shade(color, 1.1));
+      }
+    }
+  }
+}
+
 export function detailYetiTorso(M) {
   const C = 34, Z = 22;
   for (const s of [-1, 1]) {
@@ -103,6 +128,14 @@ export function detailYetiTorso(M) {
     const a = i * TAU / 18;
     crystal(M, C + Math.cos(a) * 12, 12, Z + Math.sin(a) * 10, Math.cos(a) * 0.2, -1, Math.sin(a) * 0.3, 3 + i * 7 % 5, 1.1);
   }
+  const onHarness = (x, y) => {
+    const t = (y - 41) / (11 - 41);
+    const a = C - 15 + (C + 12 - (C - 15)) * t;
+    const b = C + 15 + (C - 12 - (C + 15)) * t;
+    return Math.abs(x - a) < 3.4 || Math.abs(x - b) < 3.4 ||
+      (Math.abs(x - C) < 4 && Math.abs(y - 22) < 4);
+  };
+  crystalScaleField(M, { x0: 5, x1: 62, y0: 14, y1: 46, seed: 860, count: 150, exclude: onHarness });
 }
 
 export function detailYetiHead(M) {
@@ -120,6 +153,10 @@ export function detailYetiHead(M) {
   }
   for (const x of [C - 8, C - 4, C, C + 3, C + 7])
     talon(M, x, 10, 30, 0, -1, 0.12, x === C ? 3 : 4, 1.15, 825 + x, true);
+  crystalScaleField(M, {
+    x0: 6, x1: 38, y0: 24, y1: 32, seed: 870, count: 42,
+    exclude: (x, y) => y < 25 && Math.abs(x - C) < 7,
+  });
 }
 
 export function detailYetiJaw(M) {
@@ -136,6 +173,7 @@ export function detailYetiArm(M, seed) {
   iceFlakes(M, C, 23, Z, 8, 8, 8, seed + 430, 52);
   for (let i = 0; i < 4; i++)
     talon(M, C - 5.4 + i * 3.6, 3.3, Z + 11, (i - 1.5) * 0.1, -0.2, 1, 9 + i % 2, 1.75, seed + i);
+  crystalScaleField(M, { x0: 6, x1: 28, y0: 18, y1: 55, seed: seed + 540, count: 54 });
 }
 
 export function detailYetiLeg(M, seed) {
@@ -145,4 +183,5 @@ export function detailYetiLeg(M, seed) {
   iceFlakes(M, C, 29, Z, 9.1, 8.3, 8.3, seed + 500, 38);
   for (let i = 0; i < 4; i++)
     talon(M, C - 5.6 + i * 3.8, 2.1, Z + 16.7, (i - 1.5) * 0.1, -0.04, 1, 8, 1.8, seed + i);
+  crystalScaleField(M, { x0: 5, x1: 27, y0: 11, y1: 38, seed: seed + 570, count: 46 });
 }

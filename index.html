@@ -14,7 +14,9 @@
         // Reload restored title/login documents, but never interrupt a hunt.
         window.addEventListener('pageshow', function (event) {
           if (!event.persisted) return;
-          if (window.__mgHuntStarted || (document.body && document.body.classList.contains('hunting'))) return;
+          // The global hunt marker can survive a return to login in a restored
+          // document. The body class reflects the screen the player is actually on.
+          if (document.body && document.body.classList.contains('hunting')) return;
           location.reload();
         });
         var meta = document.querySelector('meta[name="mg-build"]');
