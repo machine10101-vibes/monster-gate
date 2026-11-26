@@ -5877,3 +5877,15 @@ html:has(#panel:not(.hidden)) #debug-badge {
     letter-spacing: 1px;
   }
 }
+
+#charselect form.cs-form.minimized {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 560px);
+  height: auto;
+  display: flex;
+  pointer-events: auto;
+}
