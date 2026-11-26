@@ -23,6 +23,7 @@ import { buildSmithy as makeSmithy } from './smithy.js';
 import { buildKeepModels } from './keeps.js';
 import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { placeTeleportPortals } from './teleport.js';
+import { placeRuneGate } from './runeGate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
 const CH = 16;
@@ -442,6 +443,7 @@ export class World {
     placeTeleportPortals(this);
     dressSouthford(this);
     dressRing(this);
+    this.placeRuneGates();
     this.cave = buildCave(this);
     this.rift = buildRift(this);
     this.colosseum = buildColosseum(this);
@@ -1644,6 +1646,7 @@ export class World {
     this.haloMat.uniforms.uTime.value = t;
     if (this.lavaHaloMat) this.lavaHaloMat.uniforms.uTime.value = t;
     this.waygate?.tick(t);
+    for (const g of this.runeGates || []) g.tick(t);
     const gate = this.teleportFx;
     if (gate) {
       gate.curtainMat.uniforms.uTime.value = t;
@@ -1654,6 +1657,14 @@ export class World {
         site.light.color.setHex(beat > 0.72 ? 0xffffff : 0xd6f3ff);
       }
     }
+  }
+
+  /** Dark rune gates beside Volcanum's lair and on the yeti peak. */
+  placeRuneGates() {
+    const L = this.volcanumLair;
+    if (L) placeRuneGate(this, { name: 'volcanum-gate', x: L.x - 9, z: L.z, yaw: Math.PI / 2 });
+    const P = this.yetiPeak;
+    if (P) placeRuneGate(this, { name: 'yeti-gate', x: P.x, z: P.z + P.r * 0.55, yaw: Math.PI });
   }
 
   placeWaygate() {
