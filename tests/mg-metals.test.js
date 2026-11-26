@@ -147,9 +147,15 @@ test('smithing: smelt bars then forge a full set and weapons per tier', () => {
       assert.equal(g.recipe[m.barId] > 0, true);
       assert.ok(g.item.dmg > 0);
     }
+    const one = gearById(`${m.id}onehammer`);
+    const two = gearById(`${m.id}hammer`);
+    assert.ok(one.recipe[m.barId] > 0);
+    assert.equal(one.item.style, 'swordshield');
+    assert.equal(two.item.style, 'twohand');
+    assert.notEqual(one.held, two.held);
     const pieces = armorPieces(m.setId).filter((g) => SLOTS.includes(g.slot));
     assert.equal(pieces.length, 6);
-    assert.equal(weapons('smith').filter((g) => g.metal === m.id).length, 4);
+    assert.equal(weapons('smith').filter((g) => g.metal === m.id).length, 5);
   }
   const ids = GEAR.map((g) => g.id);
   assert.equal(ids.length, new Set(ids).size);
