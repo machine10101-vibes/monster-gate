@@ -12,6 +12,7 @@ import {
   canEditRoster,
 } from '../systems/roster.js';
 import { CampStage } from '../world/camp.js';
+import { starterLook } from '../data/catalog.js';
 import { shortAddress } from '../wallet/klever.js';
 import { readAccount } from '../wallet/account.js';
 import { linkKleverWallet, linkedWalletStatus } from '../wallet/link.js';
@@ -573,6 +574,7 @@ export class CharacterSelect {
       b.addEventListener('click', () => {
         this.draft.classId = def.id;
         this.buildClasses();
+        this.redraw();
       });
       host.append(b);
     }
@@ -709,7 +711,8 @@ export class CharacterSelect {
   }
 
   redraw() {
-    this.stage.setPreview(this.draft.look, {}, 'blade');
+    // The preview wears the outfit the chosen class starts in.
+    this.stage.setPreview(this.draft.look, starterLook(this.draft.classId), 'blade');
   }
 
   onName() {

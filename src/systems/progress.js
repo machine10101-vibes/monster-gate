@@ -221,7 +221,7 @@ export class Progress {
   }
 
   gearSeen(gear) {
-    if (gear.monster === 'smith') return true;
+    if (gear.monster === 'smith' || gear.starter) return true;
     return this.seen(gear.monster);
   }
 

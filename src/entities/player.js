@@ -26,7 +26,7 @@ function ease(t) {
 export class Player {
   constructor(game) {
     this.game = game;
-    this.model = buildHumanoid();
+    this.model = buildHumanoid({ hd: true });
     this.obj = new THREE.Group();
     this.pivot = new THREE.Group();
     this.pivot.position.y = 0.55;
@@ -131,7 +131,7 @@ export class Player {
     if (this.armorKey === key) return;
     this.armorKey = key;
     const old = this.model;
-    const next = buildHumanoid({ ...(this.lookOpts || {}), armor: look || {} });
+    const next = buildHumanoid({ ...(this.lookOpts || {}), armor: look || {}, hd: true });
     next.root.position.copy(old.root.position);
     this.pivot.remove(old.root);
     old.root.traverse((o) => {
@@ -978,6 +978,54 @@ export class Player {
    * and an archer's draw hand is pinned to the string. Every solve is blended
    * by a weight so it eases in and out without popping.
    */
+  /**
+   * Wrists and ankles. A planted foot stays flat, the toe lifts as the heel
+   * strikes and points through the swing. The weapon hand turns with the grip;
+   * a free hand trails the arm swing a beat late and settles when still.
+   */
+  poseHandsAndFeet(dt, moving) {
+    const m = this.model;
+    if (!m.wristR || !m.ankleL) return;
+    const sp = this.sp;
+    const busy = this.state === 'roll' || this.state === 'dead';
+    const foot = (leg, knee, key) => {
+      if (busy) return sp.step(key, this.state === 'roll' ? 0.45 : 0.2, dt, 18, 0.8);
+      const flat = -(leg.rotation.x + knee.rotation.x);
+      const lift = Math.max(0, knee.rotation.x - 0.25);
+      const reach = moving ? Math.max(0, -leg.rotation.x) : 0;
+      return sp.step(key, clamp(flat + lift * 0.45 - reach * 0.35, -0.75, 0.9), dt, 26, 0.8);
+    };
+    m.ankleL.rotation.x = foot(m.legL, m.kneeL, 'ankleL');
+    m.ankleR.rotation.x = foot(m.legR, m.kneeR, 'ankleR');
+
+    const t = this.game?.time ?? performance.now() / 1000;
+    const free = (arm, elbow, key, phase) => {
+      const trail = -arm.rotation.x * 0.3 + elbow.rotation.x * 0.12 + Math.sin(t * 1.6 + phase) * 0.04;
+      return sp.step(key, clamp(trail, -0.6, 0.6), dt, 9, 0.7);
+    };
+    if (m.heldSlot.children.length) {
+      // The fist follows the grip: pitch, a little yaw, and whatever roll the swing adds.
+      m.wristR.rotation.x = sp.step('wristRx', clamp(m.heldSlot.rotation.x * 0.55, -0.7, 0.7), dt, 30, 0.85);
+      m.wristR.rotation.y = sp.step('wristRy', clamp(m.heldSlot.rotation.y * 0.4, -0.5, 0.5), dt, 30, 0.85);
+      m.wristR.rotation.z = sp.step('wristRz', clamp((m.heldSlot.rotation.z - gripRoll(this.heldKind)) * 0.3, -0.4, 0.4), dt, 30, 0.85);
+    } else {
+      m.wristR.rotation.x = free(m.armR, m.elbowR, 'wristRx', 0);
+      m.wristR.rotation.y = sp.step('wristRy', 0, dt, 12, 0.8);
+      m.wristR.rotation.z = sp.step('wristRz', 0.08, dt, 12, 0.8);
+    }
+    const offBusy = (m.shieldG?.visible && m.shieldG.children.length) || (m.bookG?.children.length && m.bookG.visible);
+    if (m.offhand?.children.length) {
+      m.wristL.rotation.x = sp.step('wristLx', clamp(m.offhand.rotation.x * 0.55, -0.7, 0.7), dt, 30, 0.85);
+      m.wristL.rotation.z = sp.step('wristLz', 0, dt, 20, 0.8);
+    } else if (offBusy) {
+      m.wristL.rotation.x = sp.step('wristLx', 0, dt, 20, 0.8);
+      m.wristL.rotation.z = sp.step('wristLz', 0, dt, 20, 0.8);
+    } else {
+      m.wristL.rotation.x = free(m.armL, m.elbowL, 'wristLx', 1.7);
+      m.wristL.rotation.z = sp.step('wristLz', -0.08, dt, 12, 0.8);
+    }
+  }
+
   armRig(dt) {
     const m = this.model;
     const fam = weaponFamily({ kind: 'melee' }, this.heldKind);
@@ -1807,6 +1855,7 @@ export class Player {
     m.legR.rotation.z = sp.step('legRz', legRz, dt, legW * 0.7, 0.8);
     m.legL.position.y = 0;
     m.legR.position.y = 0;
+    this.poseHandsAndFeet(dt, locomoting);
 
     m.hip.rotation.y = sp.step('pelvis', pelvis, dt, 18, 0.8);
     m.upper.rotation.y = sp.step('torsoY', torsoYaw - pelvis, dt, rate * 0.75, 0.7);

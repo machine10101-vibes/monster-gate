@@ -793,7 +793,7 @@ export class Catalog {
     }
     const smith = g.monster === 'smith';
     const metalName = g.metal ? `${g.metal} bars` : 'bars';
-    const m = smith ? { name: metalName } : monsterById(g.monster);
+    const m = smith ? { name: metalName } : g.starter ? { name: 'the Hunter Guild' } : monsterById(g.monster);
     const set = g.set ? setById(g.set) : null;
     const stats =
       g.type === 'weapon'
@@ -808,7 +808,7 @@ export class Catalog {
       <div class="cat-tags"><span>${kindTag}</span><span>From ${esc(m.name)}</span>${reqTag}</div>
       <p>${esc(g.desc)}</p>
       <div class="cat-stats">${stats}</div>`;
-    if (g.found) info.appendChild(el('p', 'cat-muted', g.monster === 'orcscout' ? 'Orc Scouts drop this. It is not forged at the smithy.' : `${m.name}s drop this whole, and only rarely (1 to 2%). It cannot be forged.`));
+    if (g.found) info.appendChild(el('p', 'cat-muted', g.starter ? 'Issued by the Hunter Guild to new hunters of this class. It is not forged at the smithy.' : g.monster === 'orcscout' ? 'Orc Scouts drop this. It is not forged at the smithy.' : `${m.name}s drop this whole, and only rarely (1 to 2%). It cannot be forged.`));
     else {
       info.appendChild(el('h4', null, 'Parts needed'));
       info.appendChild(this.recipeChips(g));

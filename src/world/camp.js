@@ -132,8 +132,9 @@ function turn(from, to) {
 
 /** One hunter standing in the camp. Holds the model, the weapon on the back or in hand, and an idle pose. */
 class CampFigure {
-  constructor(id, look, armor, held) {
+  constructor(id, look, armor, held, hd = true) {
     this.id = id;
+    this.hd = hd;
     this.obj = new THREE.Group();
     this.pivot = new THREE.Group();
     this.pivot.position.y = 0.55;
@@ -163,7 +164,7 @@ class CampFigure {
       });
     }
     this.held = held || 'blade';
-    this.model = buildHumanoid({ ...lookOptions(look), armor: armor || {} });
+    this.model = buildHumanoid({ ...lookOptions(look), armor: armor || {}, hd: this.hd });
     this.model.root.position.y = -0.55;
     this.model.root.traverse((o) => {
       if (o.isMesh) {
@@ -219,6 +220,12 @@ class CampFigure {
     m.armL.rotation.x += (armL - m.armL.rotation.x) * ease(10, dt);
     m.legL.rotation.x += (0 - m.legL.rotation.x) * ease(10, dt);
     m.legR.rotation.x += (0 - m.legR.rotation.x) * ease(10, dt);
+    // A relaxed stance: the free hand breathes with the body, the weapon hand settles on the grip.
+    if (m.wristL) {
+      m.wristL.rotation.x = Math.sin(t * 1.3 + this.phase) * 0.07 - 0.05;
+      m.wristL.rotation.z = -0.1;
+      m.wristR.rotation.x = this.drawn ? -0.1 + s * 0.03 : Math.sin(t * 1.3 + this.phase + 1) * 0.07;
+    }
   }
 
   dispose() {
@@ -285,6 +292,7 @@ export class CampStage {
     const M = this.game.world.models;
     const rand = rng(7041);
     const phone = !!(this.game.input?.touch || this.game.quality?.id === 'low');
+    this.phone = phone;
     this.shadows = !phone;
     const grassCount = phone ? 120 : 520;
     const treeCount = phone ? 16 : 46;
@@ -543,7 +551,8 @@ export class CampStage {
     for (const e of entries) {
       let f = this.figures.get(e.char.id);
       if (!f) {
-        f = new CampFigure(e.char.id, e.char.look, e.info.armor, e.info.held);
+        // Phones keep the lineup light; the hunter being made is always shown in full detail.
+        f = new CampFigure(e.char.id, e.char.look, e.info.armor, e.info.held, !this.phone);
         this.group.add(f.obj);
         this.figures.set(e.char.id, f);
         fresh.push(f);

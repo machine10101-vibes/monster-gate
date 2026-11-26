@@ -68,7 +68,7 @@ export class RemoteHunter {
     this.heldKind = null;
     this.sheathKind = null;
     this.look = lookFrom(id, null);
-    this.model = buildHumanoid({ ...this.look, hero: true });
+    this.model = buildHumanoid({ ...this.look, hero: true, hd: false });
     this.obj = new THREE.Group();
     this.pivot = new THREE.Group();
     this.pivot.position.y = 0.55;
@@ -92,7 +92,7 @@ export class RemoteHunter {
       this.appearKey = lookKey;
       this.look = nextLook;
       const old = this.model;
-      const next = buildHumanoid({ ...nextLook, armor: armor || {} });
+      const next = buildHumanoid({ ...nextLook, armor: armor || {}, hd: false });
       next.root.position.copy(old.root.position);
       this.pivot.remove(old.root);
       disposeModel(old);
@@ -218,6 +218,19 @@ export class RemoteHunter {
     m.armL.rotation.x += (armL - m.armL.rotation.x) * s;
     m.legL.rotation.x += (leg - m.legL.rotation.x) * s;
     m.legR.rotation.x += (-leg - m.legR.rotation.x) * s;
+    // Knees bend through the forward swing, feet stay flat, elbows and hands follow the arms.
+    const knL = Math.max(0, -Math.cos(this.cycle)) * 0.9 * mv;
+    const knR = Math.max(0, Math.cos(this.cycle)) * 0.9 * mv;
+    if (m.kneeL) {
+      m.kneeL.rotation.x += (knL - m.kneeL.rotation.x) * s;
+      m.kneeR.rotation.x += (knR - m.kneeR.rotation.x) * s;
+    }
+    if (m.ankleL) {
+      m.ankleL.rotation.x = -(m.legL.rotation.x + m.kneeL.rotation.x) + m.kneeL.rotation.x * 0.45;
+      m.ankleR.rotation.x = -(m.legR.rotation.x + m.kneeR.rotation.x) + m.kneeR.rotation.x * 0.45;
+    }
+    if (m.elbowL) m.elbowL.rotation.x += (-(0.2 + Math.max(0, -walk) * 0.35) * mv - m.elbowL.rotation.x) * s;
+    if (m.wristL) m.wristL.rotation.x += (-m.armL.rotation.x * 0.3 - m.wristL.rotation.x) * Math.min(1, dt * 8);
     m.hip.position.y = 24 * S + Math.abs(Math.sin(this.cycle)) * 0.03 * mv;
     if (this.driven) return;
     const [sx, sy, vis] = this.game.screenOf(this.x, this.y + 2.15, this.z, true);

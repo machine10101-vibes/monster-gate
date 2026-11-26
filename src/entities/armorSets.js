@@ -7,6 +7,7 @@ import { makeSoftArmor } from './armorSoft.js';
 import { withDetail } from './armorDetail.js';
 import { demonPlate, holyPlate } from './armorKnights.js';
 import { JUNGLE_SETS, makeJungleArmor } from './armorJungle.js';
+import { STARTER_SETS, makeStarterArmor } from './armorStarter.js';
 import { METALS } from '../data/metals.js';
 
 const CACHE = {};
@@ -29,6 +30,7 @@ const BUILD = {
   yetileather: () => makeSoftArmor('yetileather'),
   yeticloth: () => makeSoftArmor('yeticloth'),
   ...Object.fromEntries(JUNGLE_SETS.map((id) => [id, () => makeJungleArmor(id)])),
+  ...Object.fromEntries(STARTER_SETS.map((id) => [id, () => makeStarterArmor(id)])),
 };
 
 /** Painter module {paintHelm, paintChest, paintArm, paintLeg} for a set id. */
