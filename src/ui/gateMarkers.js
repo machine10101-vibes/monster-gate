@@ -21,12 +21,12 @@ export function paintMonsterGateMarker(ctx, x, y, radius, time = 0) {
   ctx.globalAlpha = 0.2 + beat * 0.16;
   ctx.fillStyle = '#ff1728';
   ctx.shadowColor = '#ff2638';
-  ctx.shadowBlur = radius * 2.4;
+  ctx.shadowBlur = radius * 0.8;
   ctx.beginPath();
   ctx.arc(x, y, outer, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 0.9;
-  ctx.lineWidth = Math.max(1, radius * 0.32);
+  ctx.lineWidth = Math.max(0.4, radius * 0.32);
   ctx.strokeStyle = '#ff6670';
   ctx.beginPath();
   ctx.arc(x, y, outer * 0.76, 0, Math.PI * 2);
@@ -39,7 +39,7 @@ export function paintMonsterGateMarker(ctx, x, y, radius, time = 0) {
   ctx.fill();
   ctx.fillStyle = '#fff0f0';
   ctx.beginPath();
-  ctx.arc(x, y, Math.max(0.8, radius * 0.18), 0, Math.PI * 2);
+  ctx.arc(x, y, Math.max(0.25, radius * 0.18), 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
