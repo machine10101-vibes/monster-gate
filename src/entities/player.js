@@ -1287,8 +1287,8 @@ export class Player {
 
     const flinch = this.hurtT > 0 ? Math.min(1, this.hurtT / 0.4) : 0;
     if (this.shielding && this.state !== 'attack') {
-      armL = -1.42;
-      armLz = 0.12;
+      armL = -1.15;
+      armLz = 0.34;
       armR = heldBlade ? -1.05 : armR;
       torsoYaw = -0.2;
       crouch += 0.025;
@@ -1753,6 +1753,7 @@ export class Player {
       eR = this.vy > 0 ? 0.3 : 0.7;
       eL = eR;
     }
+    if (this.shielding && this.state !== 'attack') eL = 0.72;
 
     const swL = Math.pow(Math.max(0, -cs), 0.85);
     const swR = Math.pow(Math.max(0, cs), 0.85);
@@ -1888,6 +1889,12 @@ export class Player {
     m.legL.position.y = 0;
     m.legR.position.y = 0;
     this.poseHandsAndFeet(dt, locomoting);
+    if (m.shieldG?.visible) {
+      // The wrist carries the shield while the face remains upright and aimed
+      // forward. Compensate for the shoulder and elbow bending into the block.
+      m.shieldG.rotation.x = Math.PI / 2 - m.armL.rotation.x - m.elbowL.rotation.x - m.wristL.rotation.x;
+      m.shieldG.rotation.z = -m.armL.rotation.z - m.elbowL.rotation.z - m.wristL.rotation.z;
+    }
 
     m.hip.rotation.y = sp.step('pelvis', pelvis, dt, 18, 0.8);
     m.upper.rotation.y = sp.step('torsoY', torsoYaw - pelvis, dt, rate * 0.75, 0.7);
