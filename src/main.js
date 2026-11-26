@@ -3372,6 +3372,7 @@ class Game {
   }
 
   openTome() {
+    if (this.hud.panelId === 'tome') return;
     this.hud.openPanel('tome', this);
     this.hud.panelId = 'tome';
     this.audio.select();
