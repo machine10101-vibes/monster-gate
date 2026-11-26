@@ -26,7 +26,7 @@ test('Monster Gate canvas marker is red, layered, and pulses with time', () => {
   paintMonsterGateMarker(ctx, 12, 18, 3, 0);
   const first = [...arcs];
   arcs.length = 0;
-  paintMonsterGateMarker(ctx, 12, 18, 3, Math.PI / 4.2);
+  paintMonsterGateMarker(ctx, 12, 18, 3, Math.PI / 8.4);
   assert.equal(first.length, 4);
   assert.equal(arcs.length, 4);
   assert.notEqual(first[0], arcs[0], 'outer beacon radius should pulse');
