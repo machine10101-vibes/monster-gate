@@ -8,16 +8,6 @@ const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
 
 /** Colour sets for the soft armor families. `glow` is optional emissive trim. */
 export const SOFT_PALETTES = {
-  // Starter leathers: weathered brown hide with forest-green trim.
-  noviceleather: {
-    main: 0x6b4a2e, lo: 0x4e3420, hi: 0x8a6540, strap: 0x3b2a1c, strapHi: 0x5a4230, trim: 0x3f6b35, trimLo: 0x2c4d26,
-    bone: 0xd8c9a0, boneLo: 0xa8987a, scale: 0x5c7a3c, scaleLo: 0x3e5628, glow: null, accent: 0x9ccf5a,
-  },
-  // Starter robe: deep blue cloth with gold thread and a pale rune glow.
-  novicecloth: {
-    main: 0x2f4a8a, lo: 0x22366a, hi: 0x4f6cb8, strap: 0xd9b65a, strapHi: 0xf2d68a, trim: 0xe8e2d0, trimLo: 0xb8b09a,
-    bone: 0xd8d2c0, boneLo: 0xa8a290, scale: 0x6a86c8, scaleLo: 0x3e5a9a, glow: 0x66c8ff, accent: 0x9ee6ff,
-  },
   budgeleather: {
     main: 0x4f8f3c, lo: 0x376b2b, hi: 0x72b255, strap: 0x6b4a2a, strapHi: 0x8c6336, trim: BUDGE.belly, trimLo: BUDGE.bellyDark,
     bone: BUDGE.horn, boneLo: BUDGE.hornDark, scale: BUDGE.scale, scaleLo: BUDGE.scaleLo, glow: null, accent: BUDGE.ember,

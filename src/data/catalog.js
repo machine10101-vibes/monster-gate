@@ -655,38 +655,46 @@ GEAR.push(
 );
 
 /**
- * Starting outfits the Hunter Guild issues with a class: leathers for a
- * ranger, a robe for a mage, plate for a paladin. Warriors keep the fighting
- * tunic. Issued, not forged, so they carry no recipe.
+ * Starting outfits the Hunter Guild issues with a class: dented iron for a
+ * warrior, plain mail for a paladin, simple leather for a ranger, a patched
+ * wool robe for a mage. Worn, cheap kit to be replaced by what a hunter earns.
+ * Issued, not forged, so they carry no recipe.
  */
 export const STARTER = 'starter';
 function starterSet(set, defs) {
   for (const [slot, id, name, def, desc] of defs) GEAR.push({ id, type: 'armor', slot, name, monster: STARTER, set, def, desc, recipe: {}, found: true, starter: true });
 }
+starterSet('recruitplate', [
+  ['chest', 'recruitbreastplate', 'Recruit\'s Breastplate', 2, 'A dented iron breastplate on leather straps. It has seen other owners.'],
+  ['arms', 'recruitbracers', 'Recruit\'s Bracers', 1, 'Plain iron bracers bound with leather.'],
+  ['legs', 'recruitkneeguards', 'Recruit\'s Kneeguards', 1, 'Iron knee guards strapped over work trousers.'],
+  ['boots', 'recruitboots', 'Recruit\'s Boots', 0, 'Scuffed leather boots.'],
+]);
+starterSet('squiremail', [
+  ['chest', 'squiremail', 'Squire\'s Mail', 2, 'Plain chainmail under a faded linen tabard, tied with rope.'],
+  ['arms', 'squiregloves', 'Squire\'s Gloves', 1, 'Mail sleeves and worn leather gloves.'],
+  ['legs', 'squirechausses', 'Squire\'s Chausses', 1, 'Mail leggings, a little rusted at the links.'],
+  ['boots', 'squireboots', 'Squire\'s Boots', 0, 'Scuffed leather boots.'],
+]);
 starterSet('noviceleather', [
-  ['chest', 'rangerjerkin', 'Ranger\'s Jerkin', 1, 'Oiled brown leather laced up the front, with a green-edged collar.'],
-  ['arms', 'rangerbracers', 'Ranger\'s Bracers', 1, 'Leather bracers that keep a bowstring off the wrist.'],
-  ['legs', 'rangerleggings', 'Ranger\'s Leggings', 1, 'Strapped leather leggings, quiet in the brush.'],
-  ['boots', 'rangerboots', 'Ranger\'s Boots', 0, 'Soft-soled leather boots for a long walk.'],
+  ['chest', 'rangerjerkin', 'Ranger\'s Jerkin', 1, 'A plain brown leather jerkin, laced up the front.'],
+  ['arms', 'rangerbracers', 'Ranger\'s Bracers', 1, 'Simple leather bracers that keep a bowstring off the wrist.'],
+  ['legs', 'rangerleggings', 'Ranger\'s Leggings', 1, 'Worn brown leggings.'],
+  ['boots', 'rangerboots', 'Ranger\'s Boots', 0, 'Soft leather boots with wrapped laces.'],
 ]);
 starterSet('novicecloth', [
-  ['chest', 'apprenticerobe', 'Apprentice Robe', 1, 'A deep blue robe with gold thread at the hem and a rune at the clasp.'],
-  ['arms', 'apprenticegloves', 'Apprentice Gloves', 0, 'Thin cloth gloves under wide blue cuffs.'],
-  ['legs', 'apprenticetrousers', 'Apprentice Trousers', 0, 'Light blue trousers tied at the knee.'],
-  ['boots', 'apprenticeslippers', 'Apprentice Slippers', 0, 'Quiet cloth slippers with a gold-stitched toe.'],
-]);
-starterSet('noviceplate', [
-  ['chest', 'squirebreastplate', 'Squire\'s Breastplate', 2, 'Polished steel with gold trim and a blue stone over the heart.'],
-  ['arms', 'squiregauntlets', 'Squire\'s Gauntlets', 1, 'Steel gauntlets with gold-rimmed cuffs.'],
-  ['legs', 'squiregreaves', 'Squire\'s Greaves', 1, 'Steel greaves over padded trousers.'],
-  ['boots', 'squiresabatons', 'Squire\'s Sabatons', 1, 'Plated steel boots with a gold toe cap.'],
+  ['chest', 'apprenticerobe', 'Apprentice Robe', 1, 'A rough wool robe, patched at the side and tied with rope.'],
+  ['arms', 'apprenticesleeves', 'Apprentice Sleeves', 0, 'Wide wool sleeves with a darker cuff.'],
+  ['legs', 'apprenticeskirt', 'Apprentice Robe Skirt', 0, 'The long hem of the robe, frayed at the bottom.'],
+  ['boots', 'apprenticeshoes', 'Apprentice Shoes', 0, 'Simple cloth shoes.'],
 ]);
 
 /** Starting armor ids by class. */
 export const CLASS_STARTER_ARMOR = {
+  warrior: ['recruitbreastplate', 'recruitbracers', 'recruitkneeguards', 'recruitboots'],
+  paladin: ['squiremail', 'squiregloves', 'squirechausses', 'squireboots'],
   ranger: ['rangerjerkin', 'rangerbracers', 'rangerleggings', 'rangerboots'],
-  mage: ['apprenticerobe', 'apprenticegloves', 'apprenticetrousers', 'apprenticeslippers'],
-  paladin: ['squirebreastplate', 'squiregauntlets', 'squiregreaves', 'squiresabatons'],
+  mage: ['apprenticerobe', 'apprenticesleeves', 'apprenticeskirt', 'apprenticeshoes'],
 };
 
 /** The look (slot to set id) a class starts in, for previews. */

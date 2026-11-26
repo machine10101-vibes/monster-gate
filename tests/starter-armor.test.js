@@ -16,16 +16,14 @@ const { Roster } = await import('../src/systems/roster.js');
 const { CLASS_STARTER_ARMOR, starterLook, GEAR } = await import('../src/data/catalog.js');
 const { painterFor } = await import('../src/entities/armorSets.js');
 
-test('each non-warrior class starts dressed for its role', () => {
+test('each class starts dressed for its role', () => {
   const r = new Roster('starter-test', 'tester');
-  const want = { ranger: 'noviceleather', mage: 'novicecloth', paladin: 'noviceplate' };
+  const want = { warrior: 'recruitplate', paladin: 'squiremail', ranger: 'noviceleather', mage: 'novicecloth' };
   for (const [classId, set] of Object.entries(want)) {
     const c = r.create({ name: `Hunter ${classId}`, look: {}, classId });
     const armor = r.summary(c.id).armor;
     for (const slot of ['chest', 'arms', 'legs', 'boots']) assert.equal(armor[slot], set, `${classId} ${slot}`);
   }
-  const w = r.create({ name: 'Hunter Warrior', look: {}, classId: 'warrior' });
-  assert.deepEqual(Object.values(r.summary(w.id).armor || {}).filter(Boolean), [], 'warriors keep the fighting tunic');
 });
 
 test('starter pieces are issued gear with a painter, and the preview matches', () => {
