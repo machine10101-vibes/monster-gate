@@ -2443,6 +2443,8 @@ class Game {
       m.position.z += p.vz * dt;
       if (p.kind === 'bolt' || p.kind === 'orb' || p.kind === 'ember' || p.kind === 'frost') m.rotation.x += dt * 8;
       if (p.kind === 'crescent') m.rotation.y += dt * 16;
+      if (p.kind === 'holybolt') m.rotation.y += dt * 9;
+      if (p.kind === 'holyshield') m.rotation.z += dt * 11;
       if (p.kind === 'gloom') m.rotation.y += dt * 5;
       if (p.kind === 'lavabolt') m.rotation.x += dt * 6;
       if (p.homing && p.age > 0.25) this.steerProjectile(p, dt);
