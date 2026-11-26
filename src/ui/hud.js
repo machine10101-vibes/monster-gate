@@ -57,6 +57,7 @@ export const POTION_SHOP = {
 
 const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire', 'Gilantre']);
 const ITEM_HOTBAR_LOCK_KEY = 'mg-hotbar-items-locked';
+const PLAYMAP_MAX_ZOOM = 10;
 function readItemHotbarLocked() {
   try { return globalThis.localStorage?.getItem(ITEM_HOTBAR_LOCK_KEY) === '1'; }
   catch { return false; }
@@ -832,13 +833,14 @@ export class HUD {
         view.x = clamp(view.x, -maxX, maxX);
         view.y = clamp(view.y, -maxY, maxY);
         fit.style.transform = `translate3d(${view.x.toFixed(1)}px, ${view.y.toFixed(1)}px, 0) scale(${view.scale.toFixed(3)})`;
+        fit.style.setProperty('--map-marker-scale', (1 / view.scale).toFixed(4));
         frame.classList.toggle('is-zoomed', view.scale > 1.001);
         zoomOut.disabled = view.scale <= 1.001;
-        zoomIn.disabled = view.scale >= 4.999;
+        zoomIn.disabled = view.scale >= PLAYMAP_MAX_ZOOM - 0.001;
       };
       const zoomMap = (nextScale, clientX = null, clientY = null) => {
         const previous = view.scale;
-        const next = clamp(nextScale, 1, 5);
+        const next = clamp(nextScale, 1, PLAYMAP_MAX_ZOOM);
         if (Math.abs(next - previous) < 0.0001) return;
         if (clientX != null && clientY != null) {
           const rect = frame.getBoundingClientRect();
@@ -866,7 +868,7 @@ export class HUD {
       }, { passive: false });
       frame.addEventListener('dblclick', (event) => {
         if (event.target.closest('.playmap-zoom-controls')) return;
-        zoomMap(view.scale > 2.5 ? 1 : Math.min(5, view.scale * 1.8), event.clientX, event.clientY);
+        zoomMap(view.scale >= 8 ? 1 : view.scale * 2, event.clientX, event.clientY);
       });
       frame.addEventListener('pointerdown', (event) => {
         if (event.target.closest('.playmap-zoom-controls')) return;
@@ -978,8 +980,8 @@ export class HUD {
       };
       frame.addEventListener('touchend', endMapTouch, { passive: false });
       frame.addEventListener('touchcancel', endMapTouch, { passive: false });
-      zoomOut.addEventListener('click', () => zoomMap(view.scale / 1.5));
-      zoomIn.addEventListener('click', () => zoomMap(view.scale * 1.5));
+      zoomOut.addEventListener('click', () => zoomMap(view.scale / 1.6));
+      zoomIn.addEventListener('click', () => zoomMap(view.scale * 1.6));
       applyMapView();
       body.appendChild(frame);
       if (!instanced) {
