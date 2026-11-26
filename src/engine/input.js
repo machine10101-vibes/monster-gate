@@ -280,7 +280,7 @@ export class Input {
         b.classList.remove('active');
         if (act === 'shield') this.shieldBtn = false;
         if (act === 'attack') this.attackHeld = false;
-        else if (['bolt', 'skill', 'fury'].includes(act) && b.dataset.skillPickerConsumed !== '1') this.press(act);
+        else if (e.type === 'pointerup' && ['bolt', 'skill', 'fury'].includes(act) && b.dataset.skillPickerConsumed !== '1') this.press(act);
       };
       b.addEventListener('pointerdown', down);
       b.addEventListener('pointerup', up);
