@@ -488,10 +488,6 @@ export class Catalog {
         grid.appendChild(card);
       }
     } else if (this.tab === 'weapons') {
-      if (this.forge) {
-        grid.appendChild(this.heading('Monster single-handed hammers'));
-        for (const g of weapons().filter(g => g.wtype === 'hammer' && g.monster !== 'smith' && !g.starter)) grid.appendChild(this.gearCard(g));
-      }
       const smithW = weapons('smith');
       for (const metal of METALS) {
         const list = smithW.filter((g) => g.metal === metal.id);
@@ -500,7 +496,7 @@ export class Catalog {
         for (const g of list) grid.appendChild(this.gearCard(g));
       }
       for (const m of MONSTERS) {
-        const list = weapons(m.id).filter(g => !this.forge || g.wtype !== 'hammer');
+        const list = weapons(m.id);
         if (!list.length) continue;
         grid.appendChild(this.heading(pr.seen(m.id) ? m.name : '???'));
         for (const g of list) grid.appendChild(this.gearCard(g));
