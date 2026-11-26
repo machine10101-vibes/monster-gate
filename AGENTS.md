@@ -26,3 +26,27 @@
 ## Self-improvement
 - When you fail, write the exact failure + root cause to `agent-logs/failures.md`
 - Propose one concrete improvement to this file or a skill after 3 similar failures
+
+## Required agent execution loop
+
+Task: [specific task, e.g. "Implement X feature" or "Fix bug Y"]
+
+You are working on the monster-gate repo for monstergate.online.
+
+Loop until done:
+1. Observe current state (code, tests, logs).
+2. Plan the smallest change.
+3. Make the change.
+4. Verify: build + relevant tests/smoke check pass + no obvious regressions.
+5. If fail: diagnose, log to `agent-logs/failures.md`, try a different approach.
+6. Max 6 iterations, then stop and escalate with clear status.
+
+Done only when verification passes. Commit when done. Record progress, verification evidence, commit and deployment status in `agent-logs/progress.md`. Never claim an unrun check passed.
+
+### Verification commands
+- `npm run build`
+- `npm test`
+- `npm run test:persistence` (when persistence is affected; install its dependencies first)
+- `node server/scripts/smoke.mjs`
+
+Manually smoke-check movement, attack, evade, quest progress and village interactions when relevant; the server smoke script does not cover all browser gameplay. If a check cannot run, record the blocker and do not mark the task done.
