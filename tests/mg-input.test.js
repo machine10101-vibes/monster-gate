@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
+import { Input, LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -65,4 +65,30 @@ test('teleport interaction waits for release and requires explicit destination c
   assert.match(tome, /confirm\.disabled = true/);
   assert.match(tome, /if \(!selected\) return/);
   assert.match(tome, /selected = dest/);
+});
+
+
+test('focus loss releases movement, combat and queued actions', () => {
+  const input = Object.assign(Object.create(Input.prototype), {
+    keys: new Set(['KeyW', 'ShiftLeft']), pressed: new Set(['attack', 'evade']),
+    attackHeld: true, shieldBtn: true, drag: true,
+    stick: { id: 1, x: 1, y: -1 }, look: { id: 2 },
+    moveX: 1, moveY: -1, rotateDelta: 2, zoomDelta: 3, slotSelect: 4,
+    resetStick() { this.reset = true; },
+  });
+  input.releaseControls();
+  input.update();
+  assert.equal(input.keys.size, 0);
+  assert.equal(input.pressed.size, 0);
+  assert.equal(input.attackHeld, false);
+  assert.equal(input.shieldHeld, false);
+  assert.equal(input.drag, false);
+  assert.equal(input.stick.id, null);
+  assert.equal(input.look.id, null);
+  assert.equal(input.moveX, 0);
+  assert.equal(input.moveY, 0);
+  assert.equal(input.rotateDelta, 0);
+  assert.equal(input.zoomDelta, 0);
+  assert.equal(input.slotSelect, -1);
+  assert.equal(input.reset, true);
 });
