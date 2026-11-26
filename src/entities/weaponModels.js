@@ -11,6 +11,7 @@ import { budgeWeapons } from './weaponsBudge.js';
 import { duskWeapons } from './weaponsDusk.js';
 import { frostWeapons } from './weaponsFrost.js';
 import { volcWeapons } from './weaponsVolc.js';
+import { metalHandHammer, monsterHandHammers } from './handHammers.js';
 import { rexWeapons } from './weaponsRex.js';
 
 /** Weapons, shields and books are sculpted at half the character voxel size for finer detail. */
@@ -483,9 +484,8 @@ function metalHammer(T = THEMES.iron) {
   return c.done();
 }
 
-/** Bespoke compact hammers for additional monster and knight sets. */
-/** Independent one-hand sculpts for every monster hammer. */
-function customMonsterHammer(kind) {
+/** Original heavy monster hammer meshes, retained for existing two-handed items. */
+function heavyMonsterHammer(kind) {
   const base={budge:THEMES.budge,dusk:THEMES.dark,yeti:THEMES.frost,volc:THEMES.volcanum,rex:THEMES.iron,holy:THEMES.iron,tiger:THEMES.budge,raptor:THEMES.frost,pirate:THEMES.iron,cursed:THEMES.dark,sandworm:THEMES.iron,scorpion:THEMES.volcanum,orc:THEMES.iron,demon:THEMES.dark,warden:THEMES.dark};
   const T={...base[kind]},c=ctx();
   const accents={tiger:[0xc75a20,0xf4d7a2,0x241b17,0xe7a54a,0xe8d3ad],raptor:[0x777447,0xd1c89b,0x4d5135,0xb6a45d,0xe1d1a1],pirate:[0x777979,0xd6d0ba,0x41454a,0xe5bc59,0xd1bd96],cursed:[0x686052,0xc8b99c,0x373331,0xb5964c,0xd7c49c],sandworm:[0xb7985f,0xe3d1a0,0x746042,0xd1ae68,0xd8c28f],scorpion:[0xa77932,0xe4c56d,0x51412c,0xe0b949,0xd3ad55],orc:[0x62666a,0xb6b7ad,0x35383c,0x92805e,0xc7b58c],demon:[0x29272d,0x8c4541,0x17171d,0xa33c32,0x7f302b],warden:[0xa6a9ad,0xe5e2d7,0x25272e,0xd2b66b,0xe1d8c1]};
@@ -540,30 +540,8 @@ function customMonsterHammer(kind) {
     head(47,69,10,10,T.blade); for(let z=51;z<66;z++)for(let y=-8;y<8;y++)c.set(0,y,z,z%2?T.dark:T.guardHi);
     ball(c,0,0,57,4,T.glow,true); ball(c,0,0,63,3,T.glow2,true);
   }
-  return c.done();
+  return { ...c.done(), size: WEAPON_SIZE * 1.25 };
 }
-function metalOneHammer(T = THEMES.iron) {
-  const c=ctx(); haft(c,T,-6,62,2.2,T.wood,0); wrapRod(c,T,-5,25,2.5);
-  for(const z of [6,20,27,42,62]) ringAt(c,z,z===27?3.4:2.7,T.guard,1);
-  pommelAt(c,T,-6,'ball',T.guardHi);
-  for(let z=45;z<=69;z++){
-    const t=Math.abs((z-57)/12),r=Math.max(1,Math.round(10*Math.sqrt(Math.max(0,1-t*t))));
-    for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){
-      if(Math.hypot(x+.5,y+.5)>r)continue;
-      const bevel=t>.76||Math.abs(x)>r-2||Math.abs(y)>r-2;
-      c.set(x,y,z,J(bevel?T.edge:((x+y+z)%4===0?T.blade:T.dark),x,y,z,122,.035));
-    }
-  }
-  for(const z of [46,47,68,69])ringAt(c,z,7.5,T.guardHi,1);
-  for(const z of [45,69]){
-    ball(c,0,0,z,4.2,T.dark,false);
-    for(const [x,y] of [[-3,-3],[-3,2],[2,-3],[2,2]])c.set(x,y,z,T.guardHi);
-    c.set(0,0,z,T.edge);
-  }
-  for(const x of [-8,7])for(let z=51;z<=63;z+=3){c.set(x,0,z,T.guardHi);c.set(x,1,z,T.edge);}
-  return c.done();
-}
-
 function ironHammer() {
   return metalHammer(THEMES.iron);
 }
@@ -1157,7 +1135,7 @@ const BUILDERS = {
       [`${m.id}greatsword`, () => sword(T, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } })],
       [`${m.id}spear`, () => spear(T, false)],
       [`${m.id}hammer`, () => metalHammer(T)],
-      [`${m.id}onehammer`, () => metalOneHammer(T)],
+      [`${m.id}onehammer`, () => metalHandHammer(KIT, T)],
     ];
   })),
   ironsword: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } }),
@@ -1203,29 +1181,26 @@ const BUILDERS = {
   ...frostWeapons(KIT),
   ...volcWeapons(KIT),
   ...rexWeapons(KIT),
-  budgemaul: () => customMonsterHammer('budge'),
-  darkhammer: () => customMonsterHammer('dusk'),
-  yetihammer: () => customMonsterHammer('yeti'),
-  volchammer: () => customMonsterHammer('volc'),
-  rexhammer: () => customMonsterHammer('rex'),
-  holyhammer: () => customMonsterHammer('holy'),
-  tigerhammer: () => customMonsterHammer('tiger'),
-  raptorhammer: () => customMonsterHammer('raptor'),
-  piratehammer: () => customMonsterHammer('pirate'),
-  cursedhammer: () => customMonsterHammer('cursed'),
-  sandwormhammer: () => customMonsterHammer('sandworm'),
-  scorpionhammer: () => customMonsterHammer('scorpion'),
-  orcwarhammer: () => customMonsterHammer('orc'),
-  demonhammer: () => customMonsterHammer('demon'),
-  wardenhammer: () => customMonsterHammer('warden'),
+  ...monsterHandHammers(KIT),
+  budgemaul_twohand: () => heavyMonsterHammer('budge'),
+  darkhammer_twohand: () => heavyMonsterHammer('dusk'),
+  yetihammer_twohand: () => heavyMonsterHammer('yeti'),
+  volchammer_twohand: () => heavyMonsterHammer('volc'),
+  rexhammer_twohand: () => heavyMonsterHammer('rex'),
+  holyhammer_twohand: () => heavyMonsterHammer('holy'),
+  tigerhammer_twohand: () => heavyMonsterHammer('tiger'),
+  raptorhammer_twohand: () => heavyMonsterHammer('raptor'),
+  piratehammer_twohand: () => heavyMonsterHammer('pirate'),
+  cursedhammer_twohand: () => heavyMonsterHammer('cursed'),
+  sandwormhammer_twohand: () => heavyMonsterHammer('sandworm'),
+  scorpionhammer_twohand: () => heavyMonsterHammer('scorpion'),
+  orcwarhammer_twohand: () => heavyMonsterHammer('orc'),
+  demonhammer_twohand: () => heavyMonsterHammer('demon'),
+  wardenhammer_twohand: () => heavyMonsterHammer('warden'),
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */
 export function buildWeaponVoxels(kind) {
-  if (kind?.endsWith('_twohand')) {
-    const base = BUILDERS[kind.slice(0, -8)]?.();
-    return base ? { ...base, size: base.size * 1.25 } : null;
-  }
   return BUILDERS[kind] ? BUILDERS[kind]() : null;
 }
 
