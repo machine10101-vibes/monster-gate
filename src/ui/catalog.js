@@ -8,6 +8,7 @@ import { buildMaterialModel } from '../entities/gearModels.js';
 import { goodsVoxels } from '../world/gatherModels.js';
 import { GOODS, HEADS_PER_BAR, SHAFT_IDS, isFishGood } from '../data/gathering.js';
 import { METALS, setBlurb } from '../data/metals.js';
+import { startSmithingQueue, smithingDurationMs } from './smithingQueue.js';
 
 /* ------------------------------------------------------------------ */
 /* Offscreen 3D stage: renders the same in-game models to 2D canvases   */
@@ -705,7 +706,10 @@ export class Catalog {
       onDone: (done) => {
         this.smithingCancel = null;
         if (done) onDone?.(done);
-        else this.render();
+        else {
+          this.game.hud.toast('Forging could not finish. Check materials, Smithing level and inventory space.', 3200);
+          this.render();
+        }
       },
     });
   }
