@@ -195,6 +195,7 @@ export class HUD {
     this.plates = new Map();
     this.sunKind = '';
     this.mapLabels = true;
+    this.hotbarLocked = readHotbarLocked();
 
     document.querySelectorAll('.mbtn .ico').forEach((n) => {
       const cls = [...n.classList].find((c) => c !== 'ico');
@@ -248,7 +249,9 @@ export class HUD {
   syncWindows() {
     const panel = this.panelOpen;
     const dialog = this.dialogOpen;
-    const open = panel || dialog;
+    const picker = !!this.skillPicker;
+    const open = panel || dialog || picker;
+    document.documentElement.classList.toggle('skill-picker-open', picker);
     document.documentElement.classList.toggle('windows-open', !!open);
     document.documentElement.classList.toggle('panel-open', !!panel);
     document.documentElement.classList.toggle('dialog-open', !!dialog);
@@ -985,7 +988,8 @@ export class HUD {
       if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
       const skillLock = document.getElementById('set-skill-lock');
       if (skillLock) skillLock.onclick = () => {
-        const locked = !readHotbarLocked();
+        const locked = !this.hotbarLocked;
+        this.hotbarLocked = locked;
         writeHotbarLocked(locked);
         skillLock.textContent = locked ? 'Locked' : 'Unlocked';
         skillLock.setAttribute('aria-pressed', locked ? 'true' : 'false');
@@ -1074,7 +1078,7 @@ export class HUD {
   }
 
   openSkillPicker(game, slot) {
-    if (readHotbarLocked() || !game?.progress) return false;
+    if (this.hotbarLocked || !game?.progress) return false;
     this.closeSkillPicker();
     const skills = availableHotbarSkills(game.progress);
     const overlay = document.createElement('div');
@@ -1152,6 +1156,7 @@ export class HUD {
   updateSkillbar(game) {
     if (!game?.progress || !game.player) return;
     const eq = game.progress.equipped();
+    const locked = this.hotbarLocked;
     const keys = ['Z', 'X', 'V'];
     const fallback = ['Spirit Bolt', 'Empty', 'Fury'];
     const rightIds = ['tb-bolt', 'tb-skill', 'tb-fury'];
@@ -1168,7 +1173,7 @@ export class HUD {
         };
         el.addEventListener('pointerdown', (event) => {
           if (event.button !== undefined && event.button !== 0) return;
-          if (readHotbarLocked()) return;
+          if (this.hotbarLocked) return;
           held = false;
           el.classList.add('hold-arming');
           el.style.setProperty('--hold-ms', `${HOTBAR_HOLD_MS}ms`);
@@ -1236,7 +1241,7 @@ export class HUD {
       const title = skill ? `${skill.name} (${keys[i]})` : `${fallback[i]} (${keys[i]})`;
       const cast = casts[i];
       if (cast) {
-        cast.classList.toggle('skill-locked', readHotbarLocked());
+        cast.classList.toggle('skill-locked', locked);
         paintCanvas(cast.querySelector('canvas'), skill, i);
         cast.classList.toggle('on', !!skill);
         cast.classList.toggle('cd', frac > 0);
@@ -1248,7 +1253,7 @@ export class HUD {
       }
       const touch = document.getElementById(rightIds[i]);
       if (touch) {
-        touch.classList.toggle('skill-locked', readHotbarLocked());
+        touch.classList.toggle('skill-locked', locked);
         let cv = touch.querySelector('canvas');
         if (!cv) {
           cv = document.createElement('canvas');
