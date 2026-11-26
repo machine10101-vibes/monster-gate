@@ -46,6 +46,12 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
       return { granted: !!row?.granted, version: Number(row?.version) || undefined };
     },
 
+    async loadRoster(userId) {
+      const { data, error } = await db.from('hunter_accounts').select('progress').eq('user_id', requireUserId(userId)).maybeSingle();
+      if (error) throw wrap(error);
+      return data?.progress?.roster || null;
+    },
+
     async load(userId) {
       const id = requireUserId(userId);
       const { data, error } = await db.from('characters').select('*').eq('user_id', id).maybeSingle();
