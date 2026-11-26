@@ -2030,6 +2030,100 @@ body.touch .how {
   }
 }
 
+/* Login stays usable when a phone is rotated before entering the game.
+   Keep the form scrollable and compact on short landscape viewports. */
+@media (orientation: landscape) and (max-height: 600px) and (max-width: 1100px) {
+  #title {
+    align-items: flex-start;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #title .title-inner {
+    width: min(760px, 100%);
+    max-width: 100%;
+    max-height: var(--mg-viewport-height, 100dvh);
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: max(8px, var(--safe-t)) max(16px, var(--safe-r)) max(8px, var(--safe-b)) max(16px, var(--safe-l));
+  }
+  body.touch #title h1 {
+    margin: 3px 0 7px;
+    font-size: clamp(18px, 5vh, 30px);
+    letter-spacing: 2px;
+  }
+  body.touch #title .title-inner > small {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+  body.touch #title .wallet-status {
+    min-height: 0;
+    margin: 0 auto 7px;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  body.touch #title .account-choices,
+  body.touch #title .world-picker {
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+  body.touch #title .account-choices .start,
+  body.touch #title .world-picker .start,
+  body.touch #title .start {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 10px;
+  }
+  body.touch #title .world-guest-note {
+    margin: 0;
+    font-size: 12px;
+  }
+  body.touch #title .account-panel {
+    max-width: min(420px, 100%);
+    margin: 0 auto 6px;
+    padding: 7px 10px 5px;
+  }
+  body.touch #title .wg-label {
+    margin: 6px 0 3px;
+  }
+  body.touch #title .account-input {
+    min-height: 38px;
+    margin-bottom: 5px;
+    padding: 7px 9px;
+  }
+  body.touch #title .account-hint,
+  body.touch #title .account-error {
+    margin-bottom: 5px;
+    font-size: 12px;
+  }
+  body.touch #title .wallet-link {
+    margin-top: 6px;
+  }
+  #world-auth {
+    align-items: flex-start;
+    padding-top: max(8px, var(--safe-t));
+    padding-bottom: max(8px, var(--safe-b));
+    overflow-y: auto;
+  }
+  #world-auth .wa-card {
+    margin: auto;
+    padding: 12px 16px 10px;
+  }
+  #world-auth .wa-title {
+    margin: 6px 0;
+    font-size: 16px;
+  }
+  #world-auth .wa-msg {
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  #world-auth .start {
+    min-height: 40px;
+    margin-bottom: 5px;
+  }
+}
+
 /* hunter catalog -------------------------------------------------------- */
 .panel-card.wide {
   width: min(900px, 96vw);
