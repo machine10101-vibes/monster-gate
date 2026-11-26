@@ -996,6 +996,12 @@ export class HUD {
         jumps.appendChild(b);
       }
       body.appendChild(jumps);
+      add(`<section class="set-hotbar-controls" aria-label="Hotbar controls">
+        <h3>Hotbar controls</h3>
+        <p>Lock a bar to prevent accidental long-press assignment or changes.</p>
+        <div class="panel-row"><span>Lock skill hot buttons</span><button id="set-skill-lock" type="button" aria-pressed="${readHotbarLocked() ? 'true' : 'false'}">${readHotbarLocked() ? 'Locked' : 'Unlocked'}</button></div>
+        <div class="panel-row"><span>Lock item hotbar</span><button id="set-item-hotbar-lock" type="button" aria-pressed="${readItemHotbarLocked() ? 'true' : 'false'}">${readItemHotbarLocked() ? 'Locked' : 'Unlocked'}</button></div>
+      </section>`);
       const q = game.quality;
       const liveSearch = typeof location !== 'undefined' ? location.search : '';
       const rows = [
@@ -1015,8 +1021,6 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
         ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Strafing', `<button id="set-strafe" aria-pressed="${game.input.strafe ? 'true' : 'false'}">${game.input.strafe ? 'On' : 'Off'}</button>`],
-        ['Lock skill buttons', `<button id="set-skill-lock" aria-pressed="${readHotbarLocked() ? 'true' : 'false'}">${readHotbarLocked() ? 'Locked' : 'Unlocked'}</button>`],
-        ['Lock item hotbar', `<button id="set-item-hotbar-lock" aria-pressed="${readItemHotbarLocked() ? 'true' : 'false'}">${readItemHotbarLocked() ? 'Locked' : 'Unlocked'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -1034,7 +1038,15 @@ export class HUD {
         out.type = 'button';
         out.textContent = 'Log out';
         out.onclick = () => game.signOut(false);
-        row.append(label, out);
+        const actions = document.createElement('div');
+        actions.className = 'account-actions';
+        const select = document.createElement('button');
+        select.id = 'set-character-select';
+        select.type = 'button';
+        select.textContent = 'Return to character selection';
+        select.onclick = () => game.returnToCharacterSelect?.();
+        actions.append(select, out);
+        row.append(label, actions);
         body.appendChild(row);
       }
       add('<p class="panel-help">WASD move · Click attack · Shift shield · Space or right-click evade · Round buttons 1 2 3 (Z X V). An empty 1 is Spirit Bolt and an empty 3 is Fury. Skills you place on 1, 2, or 3 show on those buttons. E character · B inventory · G skill book · K skill tree · H stats · P friends · T settings · 1-9 and 0 items · F talk, mine, fish, or chop · C catalog · [ ] or R rotate · wheel zoom.</p>');
@@ -1050,7 +1062,7 @@ export class HUD {
         skillLock.textContent = locked ? 'Locked' : 'Unlocked';
         skillLock.setAttribute('aria-pressed', locked ? 'true' : 'false');
         this.updateSkillbar(game);
-        this.toast(locked ? 'Skill buttons locked.' : 'Skill buttons unlocked.', 1400);
+        this.toast(locked ? 'Skill hot buttons locked.' : 'Skill hot buttons unlocked.', 1400);
       };
       const itemHotbarLock = document.getElementById('set-item-hotbar-lock');
       if (itemHotbarLock) itemHotbarLock.onclick = () => {
@@ -1059,7 +1071,7 @@ export class HUD {
         itemHotbarLock.textContent = this.itemHotbarLocked ? 'Locked' : 'Unlocked';
         itemHotbarLock.setAttribute('aria-pressed', this.itemHotbarLocked ? 'true' : 'false');
         this.slots.forEach(({ b }) => b.classList.toggle('hotbar-locked', this.itemHotbarLocked));
-        this.toast(this.itemHotbarLocked ? 'Item hotbar locked.' : 'Item hotbar unlocked.');
+        this.toast(this.itemHotbarLocked ? 'Item hotbar locked.' : 'Item hotbar unlocked.', 1400);
       };
       const skillBtn = document.getElementById('set-skills');
       if (skillBtn) skillBtn.onclick = () => this.openPanel('skills', game);
