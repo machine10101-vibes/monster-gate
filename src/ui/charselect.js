@@ -829,7 +829,8 @@ export class CharacterSelect {
         e.preventDefault();
         return;
       }
-      if (!pointers.has(e.pointerId) || !drag || pointers.size !== 1) return;
+      if (!drag || pointers.size !== 1) return;
+      if (!pointers.has(e.pointerId)) return;
       const dx = e.clientX - drag.last;
       drag.last = e.clientX;
       drag.moved += Math.abs(dx);
