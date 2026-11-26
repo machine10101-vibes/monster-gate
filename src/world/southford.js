@@ -8,6 +8,8 @@ export const SOUTH_Z = W;
 
 /** Walk-in point, at the foot of the eastern bluff. The cave realm starts here. */
 export const CAVE_MOUTH = { x: 104, z: SOUTH_Z + 44 };
+/** The mouth is cut to the valley floor; sampling the surrounding bluff lifts the entrance gate above the approach. */
+export const CAVE_MOUTH_Y = 3.2;
 /** Where the hunter stands again after leaving the den. */
 export const CAVE_OUTSIDE = { x: 96, z: SOUTH_Z + 44 };
 
@@ -313,7 +315,7 @@ export function dressSouthford(world) {
   world.putAt(m.logs[0], 38, fordZ, Math.PI / 2, 0.7, { y: 1.15 });
   world.putAt(m.logs[1], 38, fordZ + 1.1, Math.PI / 2, 0.65, { y: 1.2 });
 
-  placeRuneGate(world, { name: 'darksycle-gate', x: CAVE_MOUTH.x, z: CAVE_MOUTH.z, yaw: -Math.PI / 2 });
+  placeRuneGate(world, { name: 'darksycle-gate', x: CAVE_MOUTH.x, y: CAVE_MOUTH_Y, z: CAVE_MOUTH.z, yaw: -Math.PI / 2 });
   world.torch(CAVE_MOUTH.x - 2.8, CAVE_MOUTH.z - 4.6, 0xb25cff, m.torchPurple);
   world.torch(CAVE_MOUTH.x - 2.8, CAVE_MOUTH.z + 4.6, 0xb25cff, m.torchPurple);
   world.putAt(m.crystals[0], CAVE_MOUTH.x + 3.2, CAVE_MOUTH.z - 3.4, 0.4, 1.1);
