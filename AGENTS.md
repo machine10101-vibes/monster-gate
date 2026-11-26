@@ -50,3 +50,6 @@ Done only when verification passes. Commit when done. Record progress, verificat
 - `node server/scripts/smoke.mjs`
 
 Manually smoke-check movement, attack, evade, quest progress and village interactions when relevant; the server smoke script does not cover all browser gameplay. If a check cannot run, record the blocker and do not mark the task done.
+
+## Specialized team and reflection
+Follow `agent-logs/team-workflow.md` for role routing, prioritized tasks, handoffs, approval gates and reflection. Use `agent-logs/handoff-template.md` for sequential agent sessions. Every failure entry must include timestamp, task, iteration, attempted approach, exact error, root cause (or unknown), retry reason and outcome. Review the latest 10–20 failures and propose one concrete improvement after three similar failures or at task completion. Human approval is required before changing rules or skills through reflection.
