@@ -10,15 +10,16 @@ export function availableHotbarSkills(progress) {
   );
 }
 
-export function readHotbarLocked(storage = globalThis.localStorage) {
-  try { return storage?.getItem('mg-hotbar-skills-locked') === '1'; }
+export function readHotbarLocked(storage) {
+  try { return (storage || globalThis.localStorage)?.getItem('mg-hotbar-skills-locked') === '1'; }
   catch { return false; }
 }
 
-export function writeHotbarLocked(locked, storage = globalThis.localStorage) {
+export function writeHotbarLocked(locked, storage) {
   try {
-    if (locked) storage?.setItem('mg-hotbar-skills-locked', '1');
-    else storage?.removeItem('mg-hotbar-skills-locked');
+    const target = storage || globalThis.localStorage;
+    if (locked) target?.setItem('mg-hotbar-skills-locked', '1');
+    else target?.removeItem('mg-hotbar-skills-locked');
     return true;
   } catch { return false; }
 }
