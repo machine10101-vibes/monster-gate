@@ -29,6 +29,11 @@ const BOOT = 0x4a3624;
 const LINEN = 0xcfc6b0;
 const FADED_BLUE = 0x4d6386;
 const ROPE = 0x9a8458;
+const LINEN_DK = 0xa89e86;
+const GAMBESON = 0xb39d74;
+const WOOL = 0x52607a;
+const WOOL_LO = 0x47546c;
+const WOOL_EDGE = 0x343e50;
 
 function fill(set, x0, y0, z0, x1, y1, z1, fn) {
   for (let z = z0; z < z1; z++)
@@ -43,7 +48,14 @@ const iron = (x, y, z, s = 0) => {
   const h = hash3(x, y, z, 910 + s);
   return J(h > 0.95 ? RUST : h > 0.86 ? IRON_DENT : IRON, x, y, z, 911 + s, 0.05);
 };
-const mail = (x, y, z) => J((x + y) % 2 ? 0x8d9096 : 0x5c5f65, x, y, z, 920, 0.05);
+/** Mail rings: rows offset every other line, a lit top on each ring, low contrast so it reads as links, not a board. */
+const mail = (x, y, z) => {
+  const ring = (x + (y & 1)) % 2 === 0;
+  const row = y % 3 === 0 ? 0.9 : 1;
+  const h = hash3(x, y, z, 921);
+  const base = h > 0.95 ? RUST : ring ? 0x8e9197 : 0x7c7f85;
+  return J(shade(base, row), x, y, z, 920, 0.035);
+};
 const leather = (x, y, z, s = 0) => worn(LEATHER, x, y, z, 930 + s);
 
 /** Plain leather boots with a lighter cuff. */
@@ -87,27 +99,54 @@ const STARTERS = {
     paintHelm: noHelm,
     paintChest(T, ty) {
       const set = (x, y, z, c) => T.set(x, ty(y), z, c);
-      // Chainmail all round, a faded linen tabard over it, a rope belt.
-      fill(set, 5, 1, 13, 21, 19, 14, mail);
-      fill(set, 5, 1, 4, 21, 19, 5, mail);
-      for (const x of [4, 21]) fill(set, x, 1, 5, x + 1, 19, 13, mail);
-      fill(set, 9, 0, 14, 17, 18, 15, (x, y, z) => worn(LINEN, x, y, z, 960));
-      fill(set, 9, 0, 3, 17, 18, 4, (x, y, z) => worn(LINEN, x, y, z, 961));
-      for (let y = 9; y <= 14; y++) for (const x of [12, 13]) set(x, y, 15, J(FADED_BLUE, x, y, 15, 962, 0.06));
-      for (let x = 10; x <= 15; x++) for (const y of [12, 13]) set(x, y, 15, J(FADED_BLUE, x, y, 15, 963, 0.06));
+      // A hauberk of plain rings.
+      fill(set, 5, 0, 13, 21, 19, 14, mail);
+      fill(set, 5, 0, 4, 21, 19, 5, mail);
+      for (const x of [4, 21]) fill(set, x, 0, 5, x + 1, 19, 13, mail);
+      // The padded gambeson shows as a quilted collar at the neck.
+      for (let x = 6; x <= 19; x++)
+        for (const z of [4, 13, 14]) {
+          set(x, 18, z, J((x % 3 === 0) ? 0x9c8862 : GAMBESON, x, 18, z, 966, 0.05));
+          set(x, 19, z, J(GAMBESON, x, 19, z, 967, 0.05));
+        }
+      // A linen tabard front and back, with a stitched border and a small faded cross.
+      const tab = (x, y, z, seed) => {
+        const edge = x === 9 || x === 16 || y === 17;
+        if (edge) return (y + x) % 2 ? J(LINEN_DK, x, y, z, seed + 1, 0.05) : J(shade(LINEN_DK, 0.9), x, y, z, seed + 2, 0.05);
+        const fold = x === 11 || x === 14 ? 0.94 : 1;
+        return shade(worn(LINEN, x, y, z, seed), fold);
+      };
+      fill(set, 9, 0, 14, 17, 18, 15, (x, y, z) => tab(x, y, z, 960));
+      fill(set, 9, 0, 3, 17, 18, 4, (x, y, z) => tab(x, y, z, 961));
+      for (let y = 9; y <= 15; y++) for (const x of [12, 13]) set(x, y, 15, J(FADED_BLUE, x, y, 15, 962, 0.05));
+      for (let x = 10; x <= 15; x++) for (const y of [12, 13]) set(x, y, 15, J(FADED_BLUE, x, y, 15, 963, 0.05));
+      // A plain leather belt with an iron buckle, cinching the tabard.
       for (let x = 4; x <= 21; x++) {
-        set(x, 3, 15, J(ROPE, x, 3, 15, 964, 0.08));
-        set(x, 3, 3, J(ROPE, x, 3, 3, 965, 0.08));
+        set(x, 3, 15, leather(x, 3, 15, 20));
+        set(x, 3, 3, leather(x, 3, 3, 21));
+        set(x, 2, 15, J(LEATHER_DK, x, 2, 15, 968, 0.05));
       }
+      for (const [x, y] of [[12, 2], [13, 2], [12, 3], [13, 3], [11, 3], [14, 3], [11, 2], [14, 2]]) set(x, y, 16, J(x === 12 || x === 13 ? 0x3a3c40 : IRON, x, y, 16, 969, 0.04));
     },
     paintArm(A, set) {
-      // Mail sleeves to the elbow, plain leather gloves.
+      // Mail sleeves to the elbow over a quilted sleeve, a strap at the elbow, worn leather gloves.
       fill(set, 3, 14, 3, 10, 22, 11, mail);
+      // The mail runs up over the shoulder, hiding the tunic's pad.
+      fill(set, 2, 21, 2, 13, 27, 12, mail);
+      fill(set, 3, 13, 3, 10, 14, 11, (x, y, z) => J(GAMBESON, x, y, z, 990, 0.05));
+      fill(set, 3, 15, 3, 10, 16, 11, (x, y, z) => leather(x, y, z, 22));
       fill(set, 3, 3, 3, 10, 7, 11, (x, y, z) => leather(x, y, z, 6));
-      fill(set, 3, 7, 3, 10, 9, 11, (x, y, z) => leather(x, y, z, 7));
+      fill(set, 3, 7, 3, 10, 10, 11, (x, y, z) => (y === 9 ? J(LEATHER_DK, x, y, z, 991, 0.05) : leather(x, y, z, 7)));
     },
     paintLeg(set, flags) {
-      if (flags.legs) fill(set, 3, 14, 10, 10, 24, 11, mail);
+      if (flags.legs) {
+        fill(set, 3, 11, 3, 10, 24, 10, mail);
+        // The tabard's skirt hangs to mid-thigh, front and back.
+        fill(set, 3, 16, 10, 10, 24, 11, (x, y, z) => (y === 16 ? J(LINEN_DK, x, y, z, 992, 0.05) : worn(LINEN, x, y, z, 993)));
+        fill(set, 3, 16, 2, 10, 24, 3, (x, y, z) => (y === 16 ? J(LINEN_DK, x, y, z, 994, 0.05) : worn(LINEN, x, y, z, 995)));
+        // A strap below the knee.
+        for (let x = 3; x <= 9; x++) set(x, 11, 10, leather(x, 11, 10, 23));
+      }
       if (flags.boots) boots(set);
     },
   },
@@ -140,36 +179,59 @@ const STARTERS = {
     paintHelm: noHelm,
     paintChest(T, ty) {
       const set = (x, y, z, c) => T.set(x, ty(y), z, c);
-      const wool = (x, y, z) => worn((y + (x >> 1)) % 3 === 0 ? 0x47546c : 0x52607a, x, y, z, 980);
-      // Rough wool robe, a darker seam down the front, a mismatched patch, a rope belt with a knot.
+      // Rough wool with vertical folds that catch the light.
+      const wool = (x, y, z) => {
+        const fold = x % 4 === 0 ? 0.88 : x % 4 === 1 ? 1.06 : 1;
+        return shade(worn((y + (x >> 1)) % 3 === 0 ? WOOL_LO : WOOL, x, y, z, 980), fold);
+      };
       fill(set, 5, 0, 14, 21, 19, 15, wool);
       fill(set, 5, 0, 3, 21, 19, 4, wool);
       for (const x of [4, 21]) fill(set, x, 0, 4, x + 1, 19, 14, wool);
-      for (let y = 0; y <= 18; y++) set(13, y, 15, J(0x3c4658, 13, y, 15, 981, 0.05));
-      fill(set, 16, 10, 15, 19, 13, 16, (x, y, z) => worn(0x6a5a48, x, y, z, 982));
+      // A V neck shows a linen undershirt; the edge of the V is a darker band.
+      for (let y = 12; y <= 18; y++) {
+        const half = Math.floor((y - 12) / 2) + 1;
+        for (let x = 13 - half; x <= 12 + half; x++) set(x, y, 15, worn(LINEN, x, y, 15, 978));
+        for (const x of [13 - half - 1, 12 + half + 1]) set(x, y, 15, J(WOOL_EDGE, x, y, 15, 979, 0.05));
+      }
+      // The hood lies down behind the neck.
+      fill(set, 7, 16, 2, 19, 20, 4, (x, y, z) => (y === 19 || x === 7 || x === 18 ? J(WOOL_EDGE, x, y, z, 977, 0.05) : wool(x, y, z)));
+      // A satchel strap across the chest, left shoulder to right hip.
+      for (let k = 0; k <= 14; k++) {
+        const x = 7 + k;
+        const y = 18 - k;
+        if (y < 4) break;
+        set(x, y, 15, leather(x, y, 15, 30));
+        set(x, y, 16, J(LEATHER_DK, x, y, 16, 976, 0.05));
+      }
+      // A rope belt with a hanging knot, and a small cloth pouch on it.
       for (let x = 4; x <= 21; x++) {
         set(x, 3, 15, J(ROPE, x, 3, 15, 983, 0.08));
         set(x, 3, 3, J(ROPE, x, 3, 3, 984, 0.08));
       }
       for (let y = 0; y <= 2; y++) set(15, y, 16, J(ROPE, 15, y, 16, 985, 0.08));
+      fill(set, 7, 0, 15, 10, 3, 16, (x, y, z) => worn(0x6a5a48, x, y, z, 975));
+      set(8, 2, 16, J(LEATHER_DK, 8, 2, 16, 974, 0.05));
+      // A mismatched patch, stitched on.
+      fill(set, 16, 9, 15, 19, 12, 16, (x, y, z) => ((x + y) % 2 && (x === 16 || x === 18 || y === 9 || y === 11) ? J(ROPE, x, y, z, 973, 0.06) : worn(0x6a5a48, x, y, z, 982)));
     },
     paintArm(A, set) {
-      // A wide wool sleeve ending at a darker cuff; hands bare.
-      fill(set, 2, 8, 2, 11, 22, 12, (x, y, z) => worn(0x52607a, x, y, z, 986));
-      // The robe runs over the shoulder, covering the tunic's pad.
-      fill(set, 2, 21, 2, 13, 27, 12, (x, y, z) => worn(0x52607a, x, y, z, 992));
-      fill(set, 2, 8, 2, 11, 9, 12, (x, y, z) => J(0x3c4658, x, y, z, 987, 0.05));
+      // Loose wool sleeves with folds, over the shoulder, ending in a wide bell cuff.
+      const sleeve = (x, y, z) => shade(worn(WOOL, x, y, z, 986), y % 4 === 0 ? 0.88 : 1);
+      fill(set, 2, 10, 2, 11, 22, 12, sleeve);
+      fill(set, 2, 21, 2, 13, 27, 12, (x, y, z) => worn(WOOL, x, y, z, 992));
+      fill(set, 1, 7, 1, 12, 10, 13, (x, y, z) => (y === 7 ? J(WOOL_EDGE, x, y, z, 987, 0.05) : worn(WOOL_LO, x, y, z, 988)));
     },
     paintLeg(set, flags) {
       if (flags.legs) {
-        // The robe's skirt to the shin, with a frayed hem.
-        fill(set, 2, 11, 2, 12, 24, 12, (x, y, z) => worn(0x52607a, x, y, z, 988));
-        for (let x = 2; x < 12; x++) for (let z = 2; z < 12; z++) if ((x + z) % 2 === 0) set(x, 11, z, J(0x3c4658, x, 11, z, 989, 0.05));
+        // The robe's skirt to the shin: folds, a darker hem band, and a flare at the bottom.
+        fill(set, 2, 12, 2, 12, 24, 12, (x, y, z) => shade(worn(WOOL, x, y, z, 993), x % 3 === 0 ? 0.88 : 1));
+        fill(set, 1, 10, 1, 13, 13, 13, (x, y, z) => (y === 10 ? J(WOOL_EDGE, x, y, z, 994, 0.05) : worn(WOOL_LO, x, y, z, 995)));
       }
       if (flags.boots) {
-        // Simple cloth shoes.
+        // Cloth shoes bound with cord.
         fill(set, 3, 0, 3, 10, 5, 13, (x, y, z) => worn(0x5a4a3a, x, y, z, 990));
         fill(set, 3, 0, 3, 10, 1, 13, (x, y, z) => J(0x2a2018, x, y, z, 991, 0.04));
+        for (const y of [2, 4]) for (let x = 3; x <= 9; x++) set(x, y, 13, J(ROPE, x, y, 13, 996, 0.06));
       }
     },
   },
