@@ -486,7 +486,8 @@ export class CharacterSelect {
     this.mode = 'create';
     this.root.classList.add('creating');
     $('cs-panel').classList.add('hidden');
-    $('cs-form').classList.remove('hidden');
+    $('cs-form').classList.remove('hidden', 'minimized');
+    this.toggleFormMinimized(false);
     $('cs-enter-wrap').classList.add('hidden');
     $('cs-toggle').classList.add('hidden');
     this.clearPlates();
@@ -509,6 +510,19 @@ export class CharacterSelect {
     $('cs-rotate').classList.remove('hidden');
     this.syncChrome();
     if (!matchMedia('(pointer: coarse)').matches) $('cs-name-input').focus();
+  }
+
+  toggleFormMinimized(force) {
+    const form = $('cs-form');
+    if (!form || this.mode !== 'create') return;
+    const minimized = typeof force === 'boolean' ? force : !form.classList.contains('minimized');
+    form.classList.toggle('minimized', minimized);
+    const button = $('cs-form-minimize');
+    if (button) {
+      button.setAttribute('aria-expanded', String(!minimized));
+      button.setAttribute('aria-label', minimized ? 'Expand character creation' : 'Minimize character creation');
+      button.textContent = minimized ? '＋' : '−';
+    }
   }
 
   hideForm() {
@@ -732,6 +746,7 @@ export class CharacterSelect {
     $('cs-restore').addEventListener('click', () => this.doRestore());
     $('cs-confirm-no').addEventListener('click', () => $('cs-confirm').classList.add('hidden'));
     $('cs-confirm-yes').addEventListener('click', () => this.doDelete());
+    $('cs-form-minimize')?.addEventListener('click', () => this.toggleFormMinimized());
     $('cs-form').addEventListener('submit', (e) => this.submitForm(e));
     $('cs-form-cancel').addEventListener('click', () => this.back());
     $('cs-name-input').addEventListener('input', () => this.onName());
@@ -759,6 +774,31 @@ export class CharacterSelect {
       b.addEventListener('lostpointercapture', stop);
     }
 
+    const zoomRoot = this.root;
+    let pinchStart = null;
+    let pinching = false;
+    const touchDistance = (touches) => {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    };
+    zoomRoot.addEventListener('touchstart', (e) => {
+      if (!this.active || this.mode !== 'create' || e.touches.length !== 2) return;
+      e.preventDefault();
+      pinchStart = { distance: touchDistance(e.touches), zoom: this.stage?.createZoom || 1 };
+      pinching = true;
+      drag = null;
+    }, { passive: false });
+    zoomRoot.addEventListener('touchmove', (e) => {
+      if (!pinchStart || e.touches.length !== 2 || this.mode !== 'create') return;
+      e.preventDefault();
+      const distance = touchDistance(e.touches);
+      if (distance > 0) this.stage.setCreateZoom(pinchStart.zoom * pinchStart.distance / distance);
+    }, { passive: false });
+    const endPinch = () => { pinchStart = null; pinching = false; drag = null; };
+    zoomRoot.addEventListener('touchend', endPinch, { passive: true });
+    zoomRoot.addEventListener('touchcancel', endPinch, { passive: true });
+
     const stage = $('cs-stage');
     let drag = null;
     stage.addEventListener('pointerdown', (e) => {
@@ -766,7 +806,7 @@ export class CharacterSelect {
       stage.setPointerCapture?.(e.pointerId);
     });
     stage.addEventListener('pointermove', (e) => {
-      if (!drag) return;
+      if (!drag || pinching) return;
       const dx = e.clientX - drag.last;
       drag.last = e.clientX;
       drag.moved += Math.abs(dx);

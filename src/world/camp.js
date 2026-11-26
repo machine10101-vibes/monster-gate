@@ -253,6 +253,7 @@ export class CampStage {
     this.fireT = 0;
     this.spark = 0;
     this.focusShift = 0;
+    this.createZoom = 1;
     game.scene.add(this.group);
   }
 
@@ -604,6 +605,7 @@ export class CampStage {
   setPreview(look, armor, held) {
     for (const f of this.figures.values()) f.obj.visible = false;
     this.mode = 'create';
+    this.createZoom = 1;
     if (!this.preview) {
       this.preview = new CampFigure('preview', look, armor, held);
       this.group.add(this.preview.obj);
@@ -616,6 +618,10 @@ export class CampStage {
     } else {
       this.preview.rebuild(look, armor, held);
     }
+  }
+
+  setCreateZoom(value) {
+    this.createZoom = Math.max(0.72, Math.min(2.25, Number(value) || 1));
   }
 
   endPreview() {
@@ -678,7 +684,8 @@ export class CampStage {
       const body = 2.15 * s;
       const needH = ((body + 0.7) / 0.82) * (H / fh);
       const needW = ((1.7 * s) / 0.7) * (W / fw);
-      const dist = Math.max(4.5, Math.min(18, Math.max(needH / (2 * tanV), needW / (2 * tanH))));
+      const baseDist = Math.max(4.5, Math.min(18, Math.max(needH / (2 * tanV), needW / (2 * tanH))));
+      const dist = Math.max(4.5, Math.min(36, baseDist * this.createZoom));
       const visH = 2 * tanV * dist;
       const visW = 2 * tanH * dist;
       const cx = (f.l + f.r) / 2;
