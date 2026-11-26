@@ -79,6 +79,7 @@ test('smithy bars and forge arrowheads use timed single-item processing', () => 
   assert.match(smithy, /startSmithingQueue/);
   assert.match(smithy, /smelt\(rec\.id, false\)/);
   assert.doesNotMatch(smithy, /smelt\(rec\.id, true\)/);
+  assert.match(catalog, /import \{ startSmithingQueue, smithingDurationMs \} from '\.\/smithingQueue\.js'/);
   assert.match(catalog, /queueSmithing\(container, 'Forging arrowheads'/);
   assert.match(catalog, /pr\.forgeHeads\(false\)/);
   assert.match(catalog, /Forging \$\{g\.name\}/);
