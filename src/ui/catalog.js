@@ -492,7 +492,7 @@ export class Catalog {
       for (const metal of METALS) {
         const list = smithW.filter((g) => g.metal === metal.id);
         if (!list.length) continue;
-        grid.appendChild(this.heading(`${metal.name} smithing`));
+        grid.appendChild(this.heading(`${metal.name} smithing — one- and two-handed weapons`));
         for (const g of list) grid.appendChild(this.gearCard(g));
       }
       for (const m of MONSTERS) {
