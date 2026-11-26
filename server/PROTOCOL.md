@@ -155,10 +155,20 @@ Rate: 2/s, 6 per 10 s. Excess is dropped with `error` `rate`.
 
 ### gather
 
-Attempt to deplete a shared node. Inventory credit is not applied yet (TODO).
+Attempt to deplete a shared node. The server derives the reward from the
+server-owned node definition, persists the item and skill XP atomically before
+depletion, then sends one `reward_update` for each granted item and skill XP.
+If persistence fails, the node remains ready and the client receives an error.
 
 ```json
 { "v": 1, "type": "gather", "id": "ore_copper_0" }
+```
+
+Reward example:
+
+```json
+{ "v": 1, "type": "reward_update", "kind": "good", "id": "copper_ore", "amount": 1, "source": "gather", "node_id": "ore_copper_0" }
+{ "v": 1, "type": "reward_update", "kind": "xp", "id": "mining", "amount": 17.5, "source": "gather", "node_id": "ore_copper_0" }
 ```
 
 ### leave
