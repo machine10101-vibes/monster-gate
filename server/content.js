@@ -6,7 +6,8 @@
  * mine, fish, and boss posts match the client.
  */
 
-import { cleanZone } from './protocol.js';
+import { cleanZone, cleanLook } from './protocol.js';
+import { gearById } from '../src/data/catalog.js';
 
 export const TILE_SIZE = 144;
 export const STARTER_TX = 4;
@@ -89,6 +90,19 @@ export function appearanceFromState(state = {}) {
     weapon,
     held: weapon || 'blade',
   };
+}
+
+// The account roster is the source of truth for the selected hunter's visuals.
+export function rosterAppearance(roster, name) {
+  const char = roster?.chars?.find(c => String(c.name).toLowerCase() === String(name).toLowerCase());
+  if (!char?.hunt) return null;
+  const armor = {};
+  for (const slot of ['helm','chest','arms','legs','boots','shield','book']) {
+    const gear = gearById(char.hunt.armor?.[slot]);
+    if (gear?.type === 'armor' && gear.slot === slot && gear.set) armor[slot] = gear.set;
+  }
+  const weapon = gearById(char.hunt.weapon);
+  return { look: cleanLook(char.look), armor, held: weapon?.type === 'weapon' ? weapon.held : 'blade' };
 }
 
 export function spawnPoseFromRow(row, hello = {}) {
