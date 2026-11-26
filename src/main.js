@@ -1778,16 +1778,35 @@ class Game {
   /* ------------------------- landscape fullscreen ------------------------- */
   bindImmersive() {
     if (isTablet()) document.body.classList.add('tablet');
-    const sync = () => this.syncImmersive();
+    // Keep the login and account forms sized to the actually visible phone
+    // viewport, including rotations and the on-screen keyboard, before a hunt
+    // has started (syncImmersive intentionally only manages active gameplay).
+    const syncViewport = () => {
+      const root = document.documentElement;
+      const viewport = window.visualViewport;
+      const height = Math.max(1, viewport?.height || window.innerHeight || 1);
+      const width = Math.max(1, viewport?.width || window.innerWidth || 1);
+      root.style.setProperty('--mg-viewport-height', `${height}px`);
+      root.style.setProperty('--mg-viewport-width', `${width}px`);
+    };
+    const sync = () => {
+      syncViewport();
+      this.syncImmersive();
+    };
+    syncViewport();
     window.addEventListener('resize', sync);
     window.addEventListener('orientationchange', () => {
       this.tucked = false;
+      syncViewport();
       setTimeout(sync, 120);
+      setTimeout(syncViewport, 320);
     });
     screen.orientation?.addEventListener?.('change', () => {
       this.tucked = false;
       sync();
+      setTimeout(syncViewport, 320);
     });
+    window.visualViewport?.addEventListener?.('resize', syncViewport);
     const onViewport = () => {
       // A Klever confirm sheet resizes the page. Resizing back dismisses that sheet.
       if (!this.started || this.walletBusy) return;
