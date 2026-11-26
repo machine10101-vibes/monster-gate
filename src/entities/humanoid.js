@@ -585,8 +585,11 @@ export function buildHumanoid(o = {}) {
   hand.add(heldSlot);
 
   const shieldG = new THREE.Group();
-  shieldG.position.y = (22 - ELBOW_Y) * S;
-  elbowL.add(shieldG);
+  // The fist sits behind the shield's central grip, with the forearm bracing
+  // its back. Keep the shield on the wrist so it follows the blocking hand.
+  shieldG.position.set(0, -0.07, 0.09);
+  shieldG.rotation.x = Math.PI / 2;
+  wristL.add(shieldG);
   const offhand = new THREE.Group();
   offhand.position.set(0, handY, 0);
   elbowL.add(offhand);
@@ -614,7 +617,6 @@ export function buildHumanoid(o = {}) {
 function buildThemedShield(setId, mat) {
   const sm = buildShieldModel(setId);
   const g = meshFrom(sm.M, sm.ox, sm.oy, sm.oz, mat, sm.size);
-  g.position.set(0, -13.5 * S, 0);
   g.traverse((o) => (o.castShadow = true));
   return g;
 }
