@@ -279,7 +279,8 @@ export function placeRuneGate(world, spec) {
   backdrop.position.set(0, 0, -0.5);
   group.add(backdrop);
   // Two counter-turning layers give the plasma depth.
-  const plasmaMats = [makeLayer(1, 1.0, 0), makeLayer(-1, 0.55, 0.04)];
+  const glow = spec.glow ?? 1;
+  const plasmaMats = [makeLayer(1, 1.0 * glow, 0), makeLayer(-1, 0.55 * glow, 0.04)];
 
   const ringGeo = new THREE.PlaneGeometry(4.2, 4.2);
   const ringMats = [0, 1].map((i) => new THREE.ShaderMaterial({
