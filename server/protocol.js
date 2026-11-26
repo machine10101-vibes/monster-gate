@@ -6,7 +6,7 @@ export const CHAT_MAX = 120;
 export const NAME_MAX = 16;
 export const MAX_PAYLOAD = 8192;
 export const HELLO_MS = 5000;
-export const IDLE_MS = 30_000;
+export const IDLE_MS = 90_000;
 export const PING_MS = 15_000;
 export const RESUME_MS = 60_000;
 
