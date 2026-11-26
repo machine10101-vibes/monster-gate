@@ -23,7 +23,7 @@ function isAccountId(value) {
 }
 
 const BACKOFF = [1000, 2000, 4000, 8000, 15000];
-const PING_MS = 15_000;
+const PING_MS = 5_000;
 const TOKEN_WATCH_MS = 400;
 export const WAKE_ETA_SEC = 60;
 export const WAKE_GIVE_UP_SEC = 75;
@@ -353,6 +353,10 @@ export class MmoClient {
   connect() {
     this.maybeClearAuthRejection();
     if (this.closed || this.fatal || this.authHold || !this.url || !this.Socket) return;
+    // Repeated token refreshes or connect requests must not replace a healthy socket.
+    if (this.ws && (this.ws.readyState === 0 || this.ws.readyState === 1)) return;
+    clearTimeout(this.timer);
+    this.timer = 0;
     this.bind();
     void this.wakeThenOpen();
   }
@@ -430,10 +434,11 @@ export class MmoClient {
       if (this.resumeToken) payload.resume = this.resumeToken;
       ws.send(encode(TYPES.hello, payload));
     };
-    const onMessage = (ev) => this.onFrame(ev?.data ?? ev);
-    const onClose = () => {
-      this.stopPing();
+    const onMessage = (ev) => { if (this.ws === ws) this.onFrame(ev?.data ?? ev); };
+    const onClose = (event) => {
       if (this.ws !== ws) return;
+      this.stopPing();
+      console.info('World socket closed', event?.code, event?.reason || '');
       this.ws = null;
       if (!this.closed && !this.fatal && !this.authHold) this.schedule();
     };
