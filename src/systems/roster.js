@@ -1,6 +1,6 @@
 import { Progress, saveKey } from './progress.js';
 import { CLASSES } from '../data/skills.js';
-import { CLASS_STARTER_ARMOR } from '../data/catalog.js';
+import { CLASS_STARTER_ARMOR, CLASS_STARTER_WEAPON } from '../data/catalog.js';
 import { SKILL_ORDER } from '../data/gathering.js';
 import { dropKey, readJson as readStored, writeJson } from './saveio.js';
 
@@ -250,6 +250,12 @@ export class Roster {
     p.address = this.charKey(c.id);
     p.setClass(classId);
     for (const id of CLASS_STARTER_ARMOR[classId] || []) p.grantFound(id);
+    const weapon = CLASS_STARTER_WEAPON[classId];
+    if (weapon) p.grantFound(weapon);
+    if (classId === 'ranger') {
+      p.grantFound('quiver');
+      p.addGood('iron_arrow', 99);
+    }
     p.save();
     this.chars.push(c);
     this.last = c.id;
