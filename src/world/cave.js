@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TILE } from '../engine/materials.js';
 import { buildTerrainMeshes } from './terrain.js';
 import { CAVE_MOUTH, CAVE_OUTSIDE } from './southford.js';
+import { placeRuneGate } from './runeGate.js';
 
 const CW = 40;
 const CD = 32;
@@ -99,6 +100,14 @@ export function buildCave(world) {
     world.circle(x, z, 0.5);
   }
 
+  // The way out is a rune gate across the hall. Walk into its opening to leave.
+  const gateX = OX + 20;
+  const gateZ = OZ + 28.4;
+  placeRuneGate(world, { name: 'darksycle-den-gate', parent: group, x: gateX, z: gateZ, y: FLOOR, yaw: Math.PI, collide: false });
+  for (const lx of [-3.3, 3.3]) world.circle(gateX + lx, gateZ, 0.9);
+  // Close the hall on either side of the gate so the opening is the only way out.
+  for (const wx of [814.4, 815.4, 824.6, 825.6, 826.6]) world.circle(wx, gateZ, 1);
+
   const minimap = paintCaveMap(H);
 
   function sample(x, z) {
@@ -118,6 +127,7 @@ export function buildCave(world) {
     nest: { x: OX + 20, z: OZ + 10 },
     spawn: { x: OX + 20, z: OZ + 24 },
     exitZ: OZ + 28.4,
+    gateX: OX + 20,
     mouth: CAVE_MOUTH,
     outside: { x: CAVE_OUTSIDE.x, y: 3, z: CAVE_OUTSIDE.z },
     cool: 0,
@@ -169,13 +179,15 @@ export function updateCaveTravel(game, dt) {
   const P = game.player.pos;
   if (w.realm !== 'cave') {
     const m = c.mouth;
-    const near = Math.hypot(P.x - m.x, P.z - m.z) < 3.1 && P.x > m.x - 5;
-    if (near && w.heightAt(P.x, P.z) < 5) enterCave(game);
-    else if (!c.hinted && Math.hypot(P.x - m.x, P.z - m.z) < 9 && w.heightAt(P.x, P.z) < 6) {
+    // The gate faces west and its opening is about 4.8 wide. Walk into it to go in.
+    const dx = P.x - m.x;
+    const dz = P.z - m.z;
+    if (Math.abs(dz) < 2.3 && dx > -0.6 && dx < 2 && w.heightAt(P.x, P.z) < 6) enterCave(game);
+    else if (!c.hinted && Math.hypot(dx, dz) < 12 && w.heightAt(P.x, P.z) < 6) {
       c.hinted = true;
-      game.hud.toast('Darksycle Cave — walk into the mouth', 2800);
+      game.hud.toast('Darksycle Cave — walk into the gate', 2800);
     }
-  } else if (P.z > c.exitZ && P.x > c.origin.x + 14 && P.x < c.origin.x + 26) {
+  } else if (P.z > c.exitZ && Math.abs(P.x - c.gateX) < 2.3) {
     leaveCave(game);
   }
 }
