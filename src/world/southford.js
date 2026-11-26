@@ -1,8 +1,7 @@
-import * as THREE from 'three';
-import { VoxelModel, fbm, hash2, lerp, clamp, smoothstep } from '../engine/voxel.js';
+import { placeRuneGate } from './runeGate.js';
+import { fbm, hash2, lerp, clamp, smoothstep } from '../engine/voxel.js';
 import { TILE } from '../engine/materials.js';
 import { W, ZONE } from './terrain.js';
-import { bundle } from './models.js';
 
 /** Southford sits on the south edge of Oakhollow. World z = local z + SOUTH_Z. */
 export const SOUTH_Z = W;
@@ -246,20 +245,6 @@ function kindFromEdge(h, want) {
   return 'grass';
 }
 
-function buildArch() {
-  const m = new VoxelModel(16, 14, 4);
-  const stone = (x, y, z) => {
-    const band = y === 10 || y === 11 ? 0x6e675c : 0x534c44;
-    const moss = y < 2 ? 0x3f5a34 : band;
-    return hash2(x, y + z * 3, 4) > 0.82 ? 0x6a6258 : moss;
-  };
-  m.box(0, 0, 0, 3, 11, 4, stone);
-  m.box(13, 0, 0, 16, 11, 4, stone);
-  m.box(0, 10, 0, 16, 14, 4, stone);
-  m.box(3, 10, 0, 13, 12, 4, (x, y, z) => (hash2(x, z, 6) > 0.7 ? 0x2a2438 : 0x3a342c));
-  return bundle([[m, 0.26, 8, 0, 2]]);
-}
-
 function onSouthPath(world, x, z) {
   const lx = clamp(Math.floor(x), 0, W - 1);
   const lz = Math.floor(z - SOUTH_Z);
@@ -328,22 +313,11 @@ export function dressSouthford(world) {
   world.putAt(m.logs[0], 38, fordZ, Math.PI / 2, 0.7, { y: 1.15 });
   world.putAt(m.logs[1], 38, fordZ + 1.1, Math.PI / 2, 0.65, { y: 1.2 });
 
-  const y = world.heightAt(CAVE_MOUTH.x, CAVE_MOUTH.z);
-  world.putAt(buildArch(), CAVE_MOUTH.x, CAVE_MOUTH.z, Math.PI / 2, 1, { y });
-  world.circle(CAVE_MOUTH.x, CAVE_MOUTH.z - 1.75, 0.85);
-  world.circle(CAVE_MOUTH.x, CAVE_MOUTH.z + 1.75, 0.85);
-  world.torch(CAVE_MOUTH.x - 1.2, CAVE_MOUTH.z - 2.4, 0xb25cff, m.torchPurple);
-  world.torch(CAVE_MOUTH.x - 1.2, CAVE_MOUTH.z + 2.4, 0xb25cff, m.torchPurple);
+  placeRuneGate(world, { name: 'darksycle-gate', x: CAVE_MOUTH.x, z: CAVE_MOUTH.z, yaw: Math.PI / 2 });
+  world.torch(CAVE_MOUTH.x - 2.8, CAVE_MOUTH.z - 4.6, 0xb25cff, m.torchPurple);
+  world.torch(CAVE_MOUTH.x - 2.8, CAVE_MOUTH.z + 4.6, 0xb25cff, m.torchPurple);
   world.putAt(m.crystals[0], CAVE_MOUTH.x + 3.2, CAVE_MOUTH.z - 3.4, 0.4, 1.1);
   world.putAt(m.crystals[1], CAVE_MOUTH.x + 2.4, CAVE_MOUTH.z + 3.6, 1.2, 0.9);
   world.circle(CAVE_MOUTH.x + 3.2, CAVE_MOUTH.z - 3.4, 0.45);
   world.circle(CAVE_MOUTH.x + 2.4, CAVE_MOUTH.z + 3.6, 0.4);
-
-  const hole = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.3, 2.5),
-    new THREE.MeshBasicMaterial({ color: 0x07060c })
-  );
-  hole.rotation.y = -Math.PI / 2;
-  hole.position.set(CAVE_MOUTH.x + 0.85, y + 1.35, CAVE_MOUTH.z);
-  world.group.add(hole);
 }
