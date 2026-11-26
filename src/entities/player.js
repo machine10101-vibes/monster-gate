@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, TALL_KINDS, SIDE_SWORDS, gripRoll, placeSheath, swingRoll, bendBowString } from './weaponModels.js';
+import { DUAL_KINDS, TALL_KINDS, HIP_WEAPONS, gripRoll, placeSheath, swingRoll, bendBowString } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -158,7 +158,7 @@ export class Player {
     }
     const kind = this.sheathKind;
     if (!kind || kind === this.heldKind) return;
-    const slot = SIDE_SWORDS.has(kind) ? this.model.hipSlot : this.model.backSlot;
+    const slot = HIP_WEAPONS.has(kind) ? this.model.hipSlot : this.model.backSlot;
     const g = buildHeld(kind);
     g.traverse((o) => (o.castShadow = true));
     placeSheath(g, kind);
