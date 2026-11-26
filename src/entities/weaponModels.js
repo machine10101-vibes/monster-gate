@@ -1222,6 +1222,10 @@ const BUILDERS = {
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */
 export function buildWeaponVoxels(kind) {
+  if (kind?.endsWith('_twohand')) {
+    const base = BUILDERS[kind.slice(0, -8)]?.();
+    return base ? { ...base, size: base.size * 1.25 } : null;
+  }
   return BUILDERS[kind] ? BUILDERS[kind]() : null;
 }
 
