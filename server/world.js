@@ -2,7 +2,7 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify, originAllowed, parseOrigins } from './auth.js';
-import { rosterAppearance, appearanceFromState, createMonsters, createNodes, createRiftMonster, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
+import { rosterAppearance, appearanceFromState, createMonsters, createNodes, createRiftMonster, gatherYield, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
 import { applyMove, createBucket, createLimiter } from './limits.js';
 import {
   AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, CLOSE_POLICY, CLOSE_TOO_LARGE,
@@ -213,7 +213,7 @@ export class World {
       else if (msg.type === TYPES.chat) this.chat(session, msg);
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
-      else if (msg.type === TYPES.gather) this.gather(session, msg);
+      else if (msg.type === TYPES.gather) await this.gather(session, msg);
       else if (msg.type === 'attack') this.combatAction(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'monster_move') this.moveMonster(session, msg);
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
@@ -716,19 +716,40 @@ export class World {
   }
 
   /**
-   * Shared-node deplete. Inventory credit is TODO (persistence already
-   * stores goods; the gather loop is not wired yet).
+   * Authoritative shared-node gather. The inventory write completes before
+   * the node is depleted, so a persistence outage cannot destroy a resource
+   * without granting its reward.
    */
-  gather(session, msg) {
+  async gather(session, msg) {
     const { id } = readGather(msg);
     const node = this.byNode.get(id);
     if (!node) throw new ProtocolError('gather', 'No such node.');
-    if (!node.ready) throw new ProtocolError('gather', 'That node is not ready.');
+    if (!node.ready || node.busy) throw new ProtocolError('gather', 'That node is not ready.');
     if (!inAoi(session, node, 8)) throw new ProtocolError('gather', 'Too far from that node.');
-    node.ready = false;
-    node.respawnAt = this.now() + (node.respawn || 12) * 1000;
-    this.dirtyNodes.add(node.id);
-    // TODO: credit the gather yield on the character and persist it.
+    const reward = gatherYield(node);
+    if (!reward) throw new ProtocolError('gather', 'That node has no valid yield.');
+    if (!this.persist || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to gather online.');
+    }
+    // Lock before the await: two same-frame requests must never double grant.
+    node.busy = true;
+    try {
+      await this.persist.saveCharacter(session.userId, {
+        goods: { [reward.id]: reward.amount },
+        xp: { [reward.skill]: reward.xp },
+      }, { immediate: true });
+      node.ready = false;
+      node.respawnAt = this.now() + (node.respawn || 12) * 1000;
+      this.dirtyNodes.add(node.id);
+    } finally {
+      node.busy = false;
+    }
+    send(session.ws, 'reward_update', {
+      kind: 'good', id: reward.id, amount: reward.amount, source: 'gather', node_id: node.id,
+    });
+    if (reward.xp > 0) send(session.ws, 'reward_update', {
+      kind: 'xp', id: reward.skill, amount: reward.xp, source: 'gather', node_id: node.id,
+    });
   }
 
   persistPose(session, immediate = false) {
