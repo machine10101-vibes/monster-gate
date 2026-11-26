@@ -482,6 +482,21 @@ test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () =>
   assert.equal(attachMmo(game, view, { search: '?mmo=1&mock=1' }), null);
 });
 
+test('Character Select World 1 entry sets the MMO URL flag before starting the hunt', () => {
+  const main = src('../src/main.js');
+  const entry = main.slice(main.indexOf('async enterWorldOneHunt'), main.indexOf('async pickWorldOnline'));
+  assert.match(entry, /rememberWorldMode\('online'\)/);
+  assert.match(entry, /hrefWithSearch\(onlineSearch\(search\), location\)/);
+  assert.ok(entry.indexOf('onlineSearch(search)') < entry.indexOf('await this.enterWorld(char)'));
+  assert.match(entry, /await this\.ensureOnlineClient\(\)/);
+});
+
+test('World 1 connection startup reads the current URL, not the boot-time search string', () => {
+  const main = src('../src/main.js');
+  assert.match(main, /const search = typeof location !== 'undefined' \? location\.search : liveSearch/);
+  assert.match(main, /attachMmo\(game, ready\.view, \{ search \}\)/);
+});
+
 test('name_taken error is final, prompts for another hunter name, and does not reconnect', () => {
   const game = stubGame();
   const view = new WorldView(game, { spawnRemote: stubRemote, search: '?mmo=1' });
