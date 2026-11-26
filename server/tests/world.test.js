@@ -332,3 +332,15 @@ test('a single hello still authenticates after pre-auth caps', async () => {
   ws.close();
   await srv.close();
 });
+
+test('selected saved roster determines remote weapon model and armor', async () => {
+  const { rosterAppearance } = await import('../content.js');
+  const { gearById, CLASS_STARTER_ARMOR } = await import('../../src/data/catalog.js');
+  const armor = Object.fromEntries(CLASS_STARTER_ARMOR.paladin.map(id => [gearById(id).slot, id]));
+  const roster = { chars: [{ name: 'Other', hunt: { weapon: null } }, { name: 'Enforcer', look: { skin: 2, hair: 1 }, hunt: { weapon: 'squirehammer', armor } }] };
+  const visual = rosterAppearance(roster, 'Enforcer');
+  assert.equal(visual.held, 'ironhammer');
+  assert.equal(visual.look.skin, 2);
+  for (const [slot, id] of Object.entries(armor)) if (slot !== 'quiver') assert.equal(visual.armor[slot], gearById(id).set);
+  assert.equal(rosterAppearance(roster, 'Missing'), null);
+});
