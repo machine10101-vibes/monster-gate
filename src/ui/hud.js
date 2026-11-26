@@ -5,6 +5,7 @@ import { mountStats } from './stats.js';
 import { mountWorldMap } from './worldmap.js';
 import { clamp } from '../engine/voxel.js';
 import { FARM, GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
+import { CAVE_MOUTH } from '../world/southford.js';
 import { TILE_SIZE, TILES, originOf } from '../world/tiles.js';
 import { chartedAnchor, chartedWeight } from '../world/playmap.js';
 import { SKILLS } from '../data/skills.js';
