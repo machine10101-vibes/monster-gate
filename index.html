@@ -347,18 +347,33 @@
           </div>
         </aside>
 
-        <form id="cs-form" class="cs-panel cs-form mg-frame hidden" novalidate>
-          <h2 class="cs-form-title">Create Character</h2>
-          <div class="cs-label">Class</div>
-          <div id="cs-classes" class="cs-classes"></div>
-          <div id="cs-class-blurb" class="cs-blurb"></div>
-          <label class="cs-label" for="cs-name-input">Name</label>
-          <input id="cs-name-input" class="cs-input" type="text" maxlength="14" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Choose a name" />
-          <div id="cs-looks" class="cs-looks"></div>
-          <p id="cs-form-error" class="cs-error" role="alert"></p>
+        <form id="cs-form" class="cs-form hidden" data-tab="class" novalidate>
+          <h2 class="cs-form-title">Create Hunter</h2>
+          <div class="cs-tabs" role="tablist" aria-label="Character options">
+            <button id="cs-tab-class" class="cs-tab on" type="button" role="tab" data-tab="class" aria-selected="true">Class</button>
+            <button id="cs-tab-look" class="cs-tab" type="button" role="tab" data-tab="look" aria-selected="false">Look</button>
+          </div>
+          <section class="cs-sec cs-sec-class mg-frame" data-sec="class" aria-labelledby="cs-tab-class">
+            <div class="cs-label">Class</div>
+            <div id="cs-classes" class="cs-classes"></div>
+            <div id="cs-class-blurb" class="cs-blurb"></div>
+            <div id="cs-class-detail" class="cs-class-detail"></div>
+          </section>
+          <section class="cs-sec cs-sec-look mg-frame" data-sec="look" aria-labelledby="cs-tab-look">
+            <div class="cs-label">Appearance</div>
+            <div id="cs-looks" class="cs-looks"></div>
+          </section>
+          <div class="cs-name-block mg-frame">
+            <label class="cs-label" for="cs-name-input">Name</label>
+            <div class="cs-name-row">
+              <input id="cs-name-input" class="cs-input" type="text" maxlength="14" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Choose a name" />
+              <button id="cs-name-roll" class="cs-roll" type="button" title="Suggest a name" aria-label="Suggest a name"></button>
+            </div>
+            <p id="cs-form-error" class="cs-error" role="alert"></p>
+          </div>
           <div class="cs-form-foot">
             <button id="cs-form-cancel" class="cs-btn quiet" type="button">Cancel</button>
-            <button id="cs-form-submit" class="cs-btn" type="submit">Create</button>
+            <button id="cs-form-submit" class="cs-btn primary" type="submit">Create Hunter</button>
           </div>
         </form>
 

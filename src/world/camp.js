@@ -5,8 +5,12 @@ import { buildTent } from './models.js';
 import { buildCampfire } from './gatherModels.js';
 import { toonMaterial } from '../engine/materials.js';
 import { lookOptions } from '../systems/roster.js';
+import { placeRuneGate } from './runeGate.js';
 
 const SPACING = 2.1;
+/** Where the new hunter stands while being made: in front of the fire, so the flames light them from behind. */
+const PREVIEW_Z = 2.9;
+const GATE_Z = -26;
 const FIRE_COLORS = [0xfff2a0, 0xff8a22, 0xfff6e0];
 
 function rng(seed) {
@@ -18,6 +22,101 @@ function rng(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+const fireflyVert = `
+attribute float phase;
+uniform float uTime;
+uniform float uScale;
+varying float vA;
+void main(){
+  vec3 p = position;
+  p.x += sin(uTime * 0.55 + phase * 6.0) * 0.9;
+  p.y += sin(uTime * 0.8 + phase * 3.0) * 0.45;
+  p.z += cos(uTime * 0.45 + phase * 4.0) * 0.9;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  float blink = 0.5 + 0.5 * sin(uTime * 2.1 + phase * 12.0);
+  vA = smoothstep(0.25, 1.0, blink);
+  gl_PointSize = (2.5 + 3.5 * vA) * uScale / -mv.z;
+  gl_Position = projectionMatrix * mv;
+}`;
+const fireflyFrag = `
+varying float vA;
+void main(){
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  float a = pow(max(0.0, 1.0 - d), 1.8) * vA;
+  gl_FragColor = vec4(vec3(0.86, 1.0, 0.48) * a, a);
+}`;
+const smokeVert = `
+attribute float phase;
+uniform float uTime;
+uniform float uScale;
+varying float vA;
+void main(){
+  float life = fract(uTime * 0.11 + phase);
+  vec3 p = position;
+  p.x += sin(phase * 20.0 + uTime * 0.6) * 0.35 * life + life * life * 1.6;
+  p.y += life * 7.0;
+  p.z += cos(phase * 13.0) * 0.35 * life;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vA = (1.0 - life) * smoothstep(0.0, 0.12, life) * 0.2;
+  gl_PointSize = (0.35 + 1.5 * life) * uScale / -mv.z;
+  gl_Position = projectionMatrix * mv;
+}`;
+const smokeFrag = `
+varying float vA;
+void main(){
+  float d = length(gl_PointCoord - 0.5) * 2.0;
+  float a = smoothstep(1.0, 0.2, d) * vA;
+  gl_FragColor = vec4(0.52, 0.5, 0.56, a);
+}`;
+const petalVert = `
+attribute float phase;
+attribute vec3 color;
+uniform float uTime;
+uniform float uScale;
+varying vec3 vCol;
+varying float vA;
+void main(){
+  float fall = fract(uTime * 0.045 + phase);
+  vec3 p = position;
+  p.y = 9.0 - fall * 9.0;
+  p.x += sin(uTime * 0.8 + phase * 7.0) * 0.9 + fall * 2.5;
+  p.z += cos(uTime * 0.6 + phase * 5.0) * 0.6;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vCol = color;
+  vA = smoothstep(0.0, 0.08, fall) * smoothstep(1.0, 0.9, fall);
+  gl_PointSize = 0.11 * uScale / -mv.z;
+  gl_Position = projectionMatrix * mv;
+}`;
+const petalFrag = `
+varying vec3 vCol;
+varying float vA;
+void main(){
+  if (vA < 0.05) discard;
+  gl_FragColor = vec4(vCol, vA);
+}`;
+
+function points(count, fill, vert, frag, opts = {}) {
+  const pos = new Float32Array(count * 3);
+  const phase = new Float32Array(count);
+  const col = opts.colors ? new Float32Array(count * 3) : null;
+  for (let i = 0; i < count; i++) fill(i, pos, phase, col);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('phase', new THREE.BufferAttribute(phase, 1));
+  if (col) g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: opts.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    uniforms: { uTime: { value: 0 }, uScale: { value: 600 } },
+    vertexShader: vert,
+    fragmentShader: frag,
+  });
+  const pts = new THREE.Points(g, mat);
+  pts.frustumCulled = false;
+  return pts;
 }
 
 function ease(k, dt) {
@@ -246,7 +345,7 @@ export class CampStage {
       const a = (i / 12) * Math.PI * 2;
       mtx.compose(new THREE.Vector3(Math.cos(a) * 1.55, 0.2, Math.sin(a) * 1.55), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a + rand() * 0.5), new THREE.Vector3(1, 0.8 + rand() * 0.5, 1));
       stones.setMatrixAt(i, mtx);
-      stones.setColorAt(i, col.setHex(i % 3 === 0 ? 0x9a9da4 : 0x7c7f86));
+      stones.setColorAt(i, col.setHex(i % 3 === 0 ? 0x6c6f76 : 0x56595f));
     }
     stones.castShadow = this.shadows;
     this.group.add(stones);
@@ -254,6 +353,9 @@ export class CampStage {
     const fire = buildCampfire('oak');
     this.logs = this.mesh(fire.logs, 0, 0, 0.5, 1.25);
     this.flame = this.mesh(fire.flame, 0, 0, 0.5, 1.25);
+    this.keyLight = new THREE.PointLight(0xfff0dc, 2.2, 26, 1.2);
+    this.keyLight.position.set(2.5, 4.2, 10.5);
+    this.group.add(this.keyLight);
     this.fireLight = new THREE.PointLight(0xff8a30, 5.5, 20, 1.5);
     this.fireLight.position.set(0, 1.3, 0);
     this.group.add(this.fireLight);
@@ -278,6 +380,7 @@ export class CampStage {
       const x = Math.cos(a) * r;
       const z = -Math.abs(Math.sin(a)) * r - 2 + (rand() - 0.5) * 3;
       if (Math.hypot(x + 13.5, z + 8.5) < 6 || Math.hypot(x - 14.5, z + 10) < 6) continue;
+      if (Math.abs(x) < 9 && z < -8 && z > GATE_Z - 8) continue;
       const kind = rand();
       const pool = kind < 0.55 ? M.oaks : kind < 0.78 ? M.teal : kind < 0.9 ? M.blossoms : M.pines;
       const scale = (kind < 0.78 ? 1.35 : 1.05) + rand() * 0.55;
@@ -306,6 +409,97 @@ export class CampStage {
     this.ring = ring;
     ring.visible = false;
     this.group.add(ring);
+
+    this.buildBackdrop(rand, phone);
+  }
+
+  /** The gate, distant peaks, lanterns, and the drifting life around the fire. */
+  buildBackdrop(rand, phone) {
+    const world = this.game.world;
+    if (world) {
+      this.gate = placeRuneGate(world, { name: 'camp-gate', parent: this.group, x: 0, z: GATE_Z, y: 0, yaw: 0, collide: false, glow: 0.6 });
+      this.gate.group.scale.setScalar(1.35);
+    }
+
+    // A ring of far peaks gives the clearing depth through the gaps in the trees.
+    const peakMat = toonMaterial({ color: 0x40586c });
+    const snowMat = toonMaterial({ color: 0xe6eef4 });
+    for (let i = 0; i < 11; i++) {
+      const a = Math.PI * (1.08 + (i / 10) * 0.84);
+      const r = 46 + rand() * 10;
+      const h = 16 + rand() * 14;
+      const w = 9 + rand() * 7;
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(w, h, 6), peakMat);
+      peak.position.set(Math.cos(a) * r, h / 2 - 1.5, Math.sin(a) * r);
+      peak.rotation.y = rand() * 3;
+      this.group.add(peak);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(w * 0.34, h * 0.34, 6), snowMat);
+      cap.position.set(peak.position.x, h - 1.5 - h * 0.17 + 0.05, peak.position.z);
+      cap.rotation.y = peak.rotation.y;
+      this.group.add(cap);
+    }
+
+    // A string of lanterns between two posts behind the lineup, swaying in the breeze.
+    const wood = toonMaterial({ color: 0x4a3322 });
+    const capMat = toonMaterial({ color: 0x2a2018 });
+    const glow = new THREE.MeshBasicMaterial({ color: 0xff9a2a });
+    const ends = [[-10, -12], [10, -12]];
+    for (const [x, z] of ends) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.6, 0.3), wood);
+      post.position.set(x, 2.3, z);
+      post.castShadow = this.shadows;
+      this.group.add(post);
+    }
+    const ropePts = [];
+    const sag = (k) => 4.5 - Math.sin(k * Math.PI) * 1.1;
+    for (let i = 0; i <= 24; i++) {
+      const k = i / 24;
+      ropePts.push(new THREE.Vector3(-10 + k * 20, sag(k), -12));
+    }
+    this.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ropePts), new THREE.LineBasicMaterial({ color: 0x2a1e14 })));
+    this.lanterns = [];
+    const lanternBody = new THREE.BoxGeometry(0.22, 0.3, 0.22);
+    const lanternCap = new THREE.BoxGeometry(0.3, 0.07, 0.3);
+    for (let i = 1; i <= 7; i++) {
+      const k = i / 8;
+      const pivot = new THREE.Group();
+      pivot.position.set(-10 + k * 20, sag(k), -12);
+      const body = new THREE.Mesh(lanternBody, glow);
+      body.position.y = -0.36;
+      const top = new THREE.Mesh(lanternCap, capMat);
+      top.position.y = -0.19;
+      const base = new THREE.Mesh(lanternCap, capMat);
+      base.position.y = -0.53;
+      pivot.add(body, top, base);
+      this.group.add(pivot);
+      this.lanterns.push({ pivot, phase: rand() * 6 });
+    }
+
+    // Fireflies over the grass, smoke from the fire, and petals drifting down from the trees.
+    const flies = phone ? 50 : 140;
+    this.fireflies = points(flies, (i, pos, phase) => {
+      const a = rand() * Math.PI * 2;
+      const r = 4 + rand() * 18;
+      pos.set([Math.cos(a) * r, 0.5 + rand() * 3, Math.sin(a) * r - 2], i * 3);
+      phase[i] = rand();
+    }, fireflyVert, fireflyFrag, { additive: true });
+    this.group.add(this.fireflies);
+
+    this.smoke = points(phone ? 18 : 36, (i, pos, phase) => {
+      pos.set([(rand() - 0.5) * 0.5, 1.4, (rand() - 0.5) * 0.5], i * 3);
+      phase[i] = i / (phone ? 18 : 36);
+    }, smokeVert, smokeFrag);
+    this.group.add(this.smoke);
+
+    const petalTones = [[0.94, 0.62, 0.78], [0.98, 0.78, 0.86], [0.55, 0.78, 0.36], [0.92, 0.78, 0.36]];
+    this.petals = points(phone ? 40 : 110, (i, pos, phase, col) => {
+      const a = rand() * Math.PI * 2;
+      const r = 3 + rand() * 20;
+      pos.set([Math.cos(a) * r, 0, Math.sin(a) * r - 3], i * 3);
+      phase[i] = rand();
+      col.set(petalTones[Math.floor(rand() * petalTones.length)], i * 3);
+    }, petalVert, petalFrag, { colors: true });
+    this.group.add(this.petals);
   }
 
   show() {
@@ -414,7 +608,7 @@ export class CampStage {
       this.preview = new CampFigure('preview', look, armor, held);
       this.group.add(this.preview.obj);
       this.preview.x = this.preview.tx = 0;
-      this.preview.z = this.preview.tz = -1.4;
+      this.preview.z = this.preview.tz = PREVIEW_Z;
       this.preview.tyaw = this.preview.yaw = 0;
       this.preview.tscale = 1.28;
       this.preview.scale = 1.28;
@@ -474,13 +668,26 @@ export class CampStage {
     let ly;
     let lz;
     if (this.mode === 'create') {
-      const wide = asp > 1.05;
-      const dist = wide ? 7.6 : 12.6;
-      lx = wide ? 0.14 * 2 * tanH * dist : 0;
-      ly = wide ? 1.15 : -0.85;
-      lz = -1.4;
+      // Stand the hunter in the middle of the screen space the panels leave open.
+      const W = window.innerWidth;
+      const H = Math.max(1, window.innerHeight);
+      const f = this.frame || { l: 0, t: 0, r: W, b: H };
+      const fw = Math.max(80, f.r - f.l);
+      const fh = Math.max(80, f.b - f.t);
+      const s = this.preview?.scale || 1.28;
+      const body = 2.15 * s;
+      const needH = ((body + 0.7) / 0.82) * (H / fh);
+      const needW = ((1.7 * s) / 0.7) * (W / fw);
+      const dist = Math.max(4.5, Math.min(18, Math.max(needH / (2 * tanV), needW / (2 * tanH))));
+      const visH = 2 * tanV * dist;
+      const visW = 2 * tanH * dist;
+      const cx = (f.l + f.r) / 2;
+      const cy = (f.t + f.b) / 2;
+      lz = PREVIEW_Z;
+      lx = -((cx - W / 2) / W) * visW;
+      ly = body * 0.55 + ((cy - H / 2) / H) * visH;
       tx = lx;
-      ty = wide ? 1.7 : 1.5;
+      ty = ly + 0.55;
       tz = lz + dist;
     } else {
       const n = Math.max(1, this.order.length);
@@ -528,6 +735,14 @@ export class CampStage {
       this.spark = 0.07 + Math.random() * 0.08;
       const o = this.origin;
       this.game.fx.burst(o.x + (Math.random() - 0.5) * 0.5, 1.1, o.z + (Math.random() - 0.5) * 0.5, FIRE_COLORS, 1, 0.8, 0.05, 1.1, -1.4, 1.4);
+    }
+    for (const pts of [this.fireflies, this.smoke, this.petals]) if (pts) pts.material.uniforms.uTime.value = t;
+    this.gate?.tick(t);
+    if (this.lanterns) {
+      for (const l of this.lanterns) {
+        l.pivot.rotation.z = Math.sin(t * 1.1 + l.phase) * 0.12;
+        l.pivot.rotation.x = Math.sin(t * 0.8 + l.phase * 1.7) * 0.06;
+      }
     }
     for (const [id, f] of this.figures) f.update(dt, t, id === this.selectedId);
     this.preview?.update(dt, t, true);

@@ -5515,3 +5515,311 @@ html:has(#panel:not(.hidden)) #debug-badge {
 .skill-hotbar-choice span { display: flex; flex-direction: column; gap: 3px; }
 .skill-hotbar-choice small { color: #9eafc3; font-size: 11px; }
 .skill-hotbar-clear { flex: none; }
+
+/* ---------------------------------------------------------------------------
+   Character creation. One form, three layouts:
+   - wide screens: class list on the left, look and name on the right, the
+     hunter standing in the open middle with the Create button under them;
+   - phones in portrait: a bottom sheet with Class / Look tabs;
+   - phones in landscape: the same sheet docked on the right.
+   The camera reads the open space from the DOM and stands the hunter in it.
+   ------------------------------------------------------------------------- */
+#charselect form.cs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  top: auto;
+  left: max(8px, var(--safe-l));
+  right: max(8px, var(--safe-r));
+  bottom: max(8px, var(--safe-b));
+  width: auto;
+  max-width: none;
+  height: min(56dvh, 540px);
+  padding: 4px 4px 0;
+  overflow: hidden;
+  pointer-events: auto;
+  background: var(--rs-panel-bg);
+  border: 12px solid transparent;
+  border-image: var(--rs-frame) 16 / 12px / 3px stretch;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+  color: var(--rs-text);
+}
+#charselect form.cs-form.hidden { display: none !important; }
+#charselect form.cs-form > * { flex-shrink: 0; }
+#charselect .cs-form-title { display: none; margin: 0; }
+
+/* Sections sit flat inside the sheet; on wide screens each becomes its own framed panel. */
+#charselect form.cs-form .cs-sec,
+#charselect form.cs-form .cs-name-block {
+  border: 0;
+  border-image: none;
+  background: none;
+  box-shadow: none;
+  padding: 0 2px;
+}
+#charselect form.cs-form .cs-sec {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+#charselect form.cs-form[data-tab='class'] .cs-sec-look,
+#charselect form.cs-form[data-tab='look'] .cs-sec-class { display: none; }
+#charselect form.cs-form .cs-label { margin: 2px 0 6px; font-size: 8px; color: var(--rs-gold); }
+
+.cs-tabs { display: flex; gap: 6px; }
+.cs-tab {
+  flex: 1;
+  min-height: 38px;
+  font-family: var(--font-px);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--rs-muted);
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 fill / 6px stretch;
+  cursor: pointer;
+}
+.cs-tab.on {
+  color: var(--rs-bone);
+  border-image-source: var(--rs-plate-on);
+}
+
+/* Class cards: emblem, name, and the three paths as tags. */
+#charselect .cs-class {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  text-align: left;
+  color: var(--rs-text);
+  background: linear-gradient(180deg, rgba(42, 35, 45, 0.9), rgba(21, 17, 26, 0.9));
+  border: 2px solid var(--rs-stone-4);
+  border-radius: 2px;
+  transition: border-color 0.12s, background 0.12s, transform 0.08s;
+}
+#charselect .cs-class:hover { border-color: color-mix(in srgb, var(--c) 60%, var(--rs-stone-4)); }
+#charselect .cs-class.on {
+  color: #fff;
+  border-color: var(--c);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 26%, #1e1922), color-mix(in srgb, var(--c) 10%, #120e15));
+  box-shadow: 0 0 0 1px #000, 0 0 14px color-mix(in srgb, var(--c) 45%, transparent);
+}
+#charselect .cs-class .cs-emblem { flex: 0 0 auto; width: 34px; height: 34px; font-size: 13px; }
+.cs-class-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#charselect .cs-class b { font-size: 10px; text-align: left; color: inherit; }
+.cs-class-paths { display: flex; flex-wrap: wrap; gap: 3px; }
+.cs-class-paths i {
+  font-style: normal;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  color: color-mix(in srgb, var(--c) 55%, #ddd3c4);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+}
+#charselect .cs-blurb {
+  min-height: 0;
+  margin: 8px 0 4px;
+  padding: 6px 8px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--rs-text);
+  background: rgba(0, 0, 0, 0.28);
+  border-left: 3px solid var(--c, var(--rs-gold));
+}
+
+/* Look: one tap per choice. */
+#charselect .cs-looks { gap: 10px; margin: 0; }
+#charselect .cs-opt {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.cs-opt-label { font-size: 13px; color: var(--rs-muted); }
+.cs-swatches, .cs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-sw {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: var(--sw);
+  border: 2px solid #0b090c;
+  outline: 2px solid var(--rs-stone-4);
+  cursor: pointer;
+  transition: transform 0.08s, outline-color 0.12s;
+}
+.cs-sw:hover { transform: translateY(-1px); outline-color: var(--rs-bronze); }
+.cs-sw.on {
+  outline: 3px solid var(--rs-gold);
+  box-shadow: 0 0 10px rgba(237, 200, 116, 0.65);
+}
+.cs-chip {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-family: var(--font-px);
+  font-size: 9px;
+  color: var(--rs-text);
+  background: rgba(0, 0, 0, 0.32);
+  border: 2px solid var(--rs-stone-4);
+  cursor: pointer;
+}
+.cs-chip.on {
+  color: #fff;
+  border-color: var(--rs-gold);
+  background: rgba(237, 200, 116, 0.16);
+}
+#charselect .cs-random {
+  align-self: flex-start;
+  margin: 2px 0 0;
+  padding: 8px 12px;
+  font-size: 9px;
+}
+
+/* Name with a dice button that suggests one. */
+.cs-name-row { display: flex; gap: 6px; }
+.cs-name-row .cs-input { flex: 1; min-width: 0; padding: 9px 11px; font-size: 16px; }
+.cs-roll {
+  flex: 0 0 44px;
+  padding: 0;
+  background: none;
+  border: 6px solid transparent;
+  border-image: var(--rs-plate) 6 fill / 6px stretch;
+  cursor: pointer;
+}
+.cs-roll::before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: auto;
+  background:
+    radial-gradient(circle at 28% 28%, #3a0a10 0 2.2px, transparent 2.6px),
+    radial-gradient(circle at 72% 72%, #3a0a10 0 2.2px, transparent 2.6px),
+    radial-gradient(circle at 50% 50%, #3a0a10 0 2.2px, transparent 2.6px),
+    radial-gradient(circle at 72% 28%, #3a0a10 0 2.2px, transparent 2.6px),
+    radial-gradient(circle at 28% 72%, #3a0a10 0 2.2px, transparent 2.6px),
+    var(--rs-bone);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+}
+.cs-roll:hover::before { background-color: #fff; }
+#charselect .cs-name-block .cs-error { min-height: 1.1em; margin: 4px 0 0; font-size: 13px; }
+
+#charselect .cs-form-foot {
+  position: static;
+  display: flex;
+  gap: 8px;
+  margin: 0 -4px;
+  padding: 8px 4px 10px;
+  background: none;
+}
+#charselect .cs-form-foot .cs-btn { flex: 1; min-height: 44px; }
+#charselect .cs-form-foot .cs-btn.primary { flex: 1.6; }
+
+/* Phones and small tablets in landscape: dock the sheet on the right. */
+@media (min-aspect-ratio: 1/1) {
+  #charselect form.cs-form {
+    top: max(8px, var(--safe-t));
+    left: auto;
+    width: min(380px, 46vw);
+    height: auto;
+  }
+}
+
+/* Wide screens: three columns, the middle one left open for the hunter. */
+@media (min-width: 900px) and (min-height: 560px) and (min-aspect-ratio: 21/20) {
+  #charselect form.cs-form {
+    top: 70px;
+    left: max(16px, var(--safe-l));
+    right: max(16px, var(--safe-r));
+    bottom: max(16px, var(--safe-b));
+    width: auto;
+    height: auto;
+    display: grid;
+    grid-template-columns: clamp(280px, 24vw, 340px) minmax(0, 1fr) clamp(300px, 27vw, 380px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 14px;
+    padding: 0;
+    overflow: visible;
+    background: none;
+    border: 0;
+    border-image: none;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  #charselect form.cs-form > * { pointer-events: auto; }
+  #charselect .cs-tabs { display: none; }
+  #charselect .cs-form-title {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: center;
+    font-size: 18px;
+    letter-spacing: 3px;
+    text-shadow: 0 2px 0 #000, 0 0 14px rgba(255, 59, 59, 0.45);
+    pointer-events: none;
+  }
+  #charselect form.cs-form .cs-sec,
+  #charselect form.cs-form .cs-name-block {
+    background: var(--rs-panel-bg);
+    border: 12px solid transparent;
+    border-image: var(--rs-frame) 16 / 12px / 3px stretch;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+    padding: 4px 6px 8px;
+  }
+  #charselect form.cs-form[data-tab] .cs-sec-class,
+  #charselect form.cs-form[data-tab] .cs-sec-look { display: block; }
+  #charselect .cs-sec-class { grid-column: 1; grid-row: 1 / 4; }
+  #charselect .cs-sec-look { grid-column: 3; grid-row: 1 / 3; }
+  #charselect .cs-name-block { grid-column: 3; grid-row: 3; }
+  #charselect form.cs-form .cs-label { font-size: 9px; margin: 4px 0 10px; }
+  #charselect .cs-classes { grid-template-columns: 1fr; gap: 8px; }
+  #charselect .cs-class { padding: 10px; }
+  #charselect .cs-class .cs-emblem { width: 40px; height: 40px; font-size: 15px; }
+  #charselect .cs-class b { font-size: 12px; }
+  #charselect .cs-blurb { margin-top: 12px; font-size: 15px; }
+  #charselect .cs-looks { gap: 14px; }
+  .cs-sw { width: 32px; height: 32px; }
+  #charselect .cs-form-foot {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: center;
+    align-self: end;
+    width: min(460px, 100%);
+    margin: 0;
+    padding: 0;
+  }
+  #charselect .cs-form-foot .cs-btn { min-height: 52px; font-size: 13px; }
+
+  /* The character list only needs to be as tall as its hunters. */
+  #charselect .cs-panel { bottom: auto; max-height: calc(100% - 160px); }
+}
+
+/* Class detail: resource, masteries, and each path's signature skills. */
+.cs-class-detail { margin-top: 8px; font-size: 13px; color: var(--rs-text); }
+.cs-class-facts { margin: 0 0 8px; display: grid; gap: 4px; }
+.cs-class-facts div { display: grid; grid-template-columns: 82px 1fr; gap: 6px; }
+.cs-class-facts dt { font-family: var(--font-px); font-size: 8px; line-height: 16px; color: var(--rs-muted); }
+.cs-class-facts dd { margin: 0; line-height: 1.3; }
+.cs-path-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.cs-path-list li {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 6px;
+  align-items: baseline;
+  padding: 5px 6px;
+  background: rgba(0, 0, 0, 0.26);
+  border-left: 2px solid color-mix(in srgb, var(--c) 60%, transparent);
+}
+.cs-path-list b { font-family: var(--font-px); font-weight: normal; font-size: 9px; }
+.cs-path-list span { line-height: 1.3; color: var(--rs-muted); }
+
+/* While making a hunter on a phone, the hunter gets the room the header used. */
+@media not all and (min-width: 900px) and (min-height: 560px) and (min-aspect-ratio: 21/20) {
+  #charselect.creating .cs-top { display: none; }
+}
+@media (min-width: 900px) and (min-height: 560px) and (min-aspect-ratio: 21/20) {
+  #charselect form.cs-form .cs-opt { grid-template-columns: 1fr; gap: 6px; }
+  .cs-class-detail { font-size: 14px; }
+}

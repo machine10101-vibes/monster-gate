@@ -27,6 +27,14 @@ const LOOK_ROWS = [
   { key: 'beard', label: 'Beard', toggle: true },
 ];
 
+/** Suggested names for the dice button. Each passes the roster's name rules. */
+const NAME_IDEAS = [
+  'Aldric', 'Brynn', 'Corvin', 'Dagny', 'Edrin', 'Fenna', 'Garrick', 'Hilde', 'Ivo', 'Jora',
+  'Kael', 'Liora', 'Magnus', 'Nyra', 'Orin', 'Petra', 'Quill', 'Rowan', 'Sable', 'Torvin',
+  'Ulla', 'Varek', 'Wren', 'Yara', 'Zane', 'Bram', 'Elka', 'Thane', 'Mira', 'Rook',
+  'Astrid', 'Cassian', 'Dorin', 'Isolde', 'Lucan', 'Maren', 'Osric', 'Rhea', 'Soren', 'Talia',
+];
+
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -223,7 +231,7 @@ export class CharacterSelect {
       ? 'Account sync is unavailable. Retry account sync before changing characters.'
       : (this.roster.full ? `This account holds ${MAX_CHARACTERS} characters.` : '');
     $('cs-rotate').classList.toggle('hidden', !c && listMode);
-    for (const [id, p] of this.plates) p.classList.toggle('selected', id === this.selectedId);
+    for (const [id, p] of this.plates) p.classList.toggle('selected', id === this.selectedId || id === 'preview');
   }
 
   renderList(scroll = false) {
@@ -337,6 +345,11 @@ export class CharacterSelect {
       for (const [id, p] of this.plates) this.place(p, this.stage.screenAt(id, 2.3));
       this.place($('cs-rotate'), this.stage.screenAt(this.selectedId, 0.05));
     } else if (this.stage.preview) {
+      this.frameAt = (this.frameAt || 0) - dt;
+      if (this.frameAt <= 0) {
+        this.frameAt = 0.25;
+        this.stage.frame = this.measureFrame();
+      }
       const p = this.plates.get('preview');
       if (p) this.place(p, this.stage.screenAt('preview', 2.45));
       this.place($('cs-rotate'), this.stage.screenAt('preview', 0.05));
@@ -478,11 +491,11 @@ export class CharacterSelect {
     $('cs-toggle').classList.add('hidden');
     this.clearPlates();
     this.draft = { look: { ...DEFAULT_LOOK }, classId: null };
+    this.setTab('class');
+    this.frameAt = 0;
     $('cs-name-input').value = '';
     $('cs-form-error').textContent = '';
     $('cs-form-cancel').textContent = this.roster.chars.length ? 'Cancel' : 'Back';
-    this.buildClasses();
-    this.buildLooks();
     this.stage.setPreview(this.draft.look, {}, 'blade');
     const host = $('cs-plates');
     const p = el('button', 'cs-plate selected');
@@ -491,12 +504,15 @@ export class CharacterSelect {
     p.append(el('b', null, 'New Hunter'), el('span', null, 'Level 1'));
     host.append(p);
     this.plates.set('preview', p);
+    this.buildClasses();
+    this.buildLooks();
     $('cs-rotate').classList.remove('hidden');
     this.syncChrome();
     if (!matchMedia('(pointer: coarse)').matches) $('cs-name-input').focus();
   }
 
   hideForm() {
+    this.stage.frame = null;
     this.stage.endPreview();
     this.refresh();
   }
@@ -505,15 +521,19 @@ export class CharacterSelect {
     const host = $('cs-classes');
     host.replaceChildren();
     for (const def of CLASS_LIST) {
-      const selected = def.id === this.draft.classId;
-      const b = el('button', 'cs-class' + (selected ? ' on' : ''));
-      b.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      const on = def.id === this.draft.classId;
+      const b = el('button', 'cs-class' + (on ? ' on' : ''));
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
       b.type = 'button';
       b.dataset.id = def.id;
       b.style.setProperty('--c', def.color);
-      const paths = def.paths.map((p) => p.name).join(', ');
-      b.append(el('span', 'cs-emblem', def.name.charAt(0)), el('b', null, def.name), el('small', null, paths));
-      b.title = `${def.name}. ${paths}.`;
+      const paths = def.paths.map((p) => p.name);
+      const text = el('span', 'cs-class-text');
+      const tags = el('span', 'cs-class-paths');
+      for (const name of paths) tags.append(el('i', null, name));
+      text.append(el('b', null, def.name), tags);
+      b.append(el('span', 'cs-emblem', def.name.charAt(0)), text);
+      b.title = `${def.name}. ${paths.join(', ')}.`;
       b.addEventListener('click', () => {
         this.draft.classId = def.id;
         this.buildClasses();
@@ -521,13 +541,47 @@ export class CharacterSelect {
       host.append(b);
     }
     const def = CLASSES[this.draft.classId];
-    $('cs-class-blurb').textContent = def?.blurb || 'Choose a class to determine this hunter’s starting path.';
+    const blurb = $('cs-class-blurb');
+    blurb.textContent = def?.blurb || 'Choose a class to determine this hunter’s starting path.';
+    blurb.style.setProperty('--c', def?.color || 'var(--rs-gold)');
+    this.paintClassDetail(def);
+    const plate = this.plates.get('preview');
+    if (plate) plate.querySelector('span').textContent = def ? `Level 1 ${def.name}` : 'Level 1';
+  }
+
+  /** What the chosen class plays like: its resource, weapon masteries, and each path's signature skills. */
+  paintClassDetail(def) {
+    const host = $('cs-class-detail');
+    if (!host) return;
+    host.replaceChildren();
+    if (!def) return;
+    host.style.setProperty('--c', def.color);
+    const facts = el('dl', 'cs-class-facts');
+    const fact = (label, text) => {
+      const row = el('div');
+      row.append(el('dt', null, label), el('dd', null, text));
+      facts.append(row);
+    };
+    const res = String(def.resource || '');
+    if (res) fact('Resource', res.charAt(0).toUpperCase() + res.slice(1));
+    if (def.weapons?.length) fact('Masteries', def.weapons.map((w) => w.name).join(' · '));
+    host.append(facts);
+    const list = el('ul', 'cs-path-list');
+    for (const path of def.paths) {
+      const li = el('li');
+      const name = el('b', null, path.name);
+      if (path.color) name.style.color = path.color;
+      const skills = (path.skills || []).slice(0, 2).map((k) => k.name).join(', ');
+      li.append(name, el('span', null, skills));
+      list.append(li);
+    }
+    host.append(list);
   }
 
   buildLooks() {
     const host = $('cs-looks');
     host.replaceChildren();
-    const rnd = el('button', 'cs-random', 'Randomize');
+    const rnd = el('button', 'cs-random', 'Randomize look');
     rnd.type = 'button';
     rnd.addEventListener('click', () => {
       const pick = (n) => Math.floor(Math.random() * n);
@@ -535,38 +589,86 @@ export class CharacterSelect {
       this.buildLooks();
       this.redraw();
     });
-    host.append(rnd);
     for (const row of LOOK_ROWS) {
       const line = el('div', 'cs-opt');
-      line.append(el('span', null, row.label));
-      const prev = el('button', 'cs-step', '‹');
-      const next = el('button', 'cs-step', '›');
-      prev.type = next.type = 'button';
-      prev.setAttribute('aria-label', `Previous ${row.label}`);
-      next.setAttribute('aria-label', `Next ${row.label}`);
-      const value = el('i', 'cs-val');
+      line.append(el('span', 'cs-opt-label', row.label));
+      const picks = el('div', row.swatch ? 'cs-swatches' : 'cs-chips');
+      picks.setAttribute('role', 'radiogroup');
+      picks.setAttribute('aria-label', row.label);
+      const choices = row.toggle
+        ? [{ value: false, label: 'None' }, { value: true, label: 'Beard' }]
+        : row.list.map((v, i) => ({ value: i, label: row.swatch ? `${row.label} ${i + 1}` : row.text(v), color: row.swatch ? hex(v) : null }));
+      const buttons = [];
       const paint = () => {
-        const v = this.draft.look[row.key];
-        if (row.toggle) value.textContent = v ? 'Yes' : 'None';
-        else if (row.swatch) {
-          value.textContent = '';
-          value.style.background = hex(row.list[v]);
-          value.classList.add('swatch');
-        } else value.textContent = row.text(row.list[v]);
+        const cur = this.draft.look[row.key];
+        for (const { b, value } of buttons) {
+          const on = row.toggle ? !!cur === value : cur === value;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-checked', String(on));
+        }
       };
-      const step = (d) => {
-        const look = this.draft.look;
-        if (row.toggle) look.beard = !look.beard;
-        else look[row.key] = (look[row.key] + d + row.list.length) % row.list.length;
-        paint();
-        this.redraw();
-      };
-      prev.addEventListener('click', () => step(-1));
-      next.addEventListener('click', () => step(1));
+      for (const c of choices) {
+        const b = el('button', row.swatch ? 'cs-sw' : 'cs-chip', row.swatch ? null : c.label);
+        b.type = 'button';
+        b.setAttribute('role', 'radio');
+        b.setAttribute('aria-label', c.label);
+        if (c.color) b.style.setProperty('--sw', c.color);
+        b.addEventListener('click', () => {
+          this.draft.look[row.key] = c.value;
+          paint();
+          this.redraw();
+        });
+        buttons.push({ b, value: c.value });
+        picks.append(b);
+      }
       paint();
-      line.append(prev, value, next);
+      line.append(picks);
       host.append(line);
     }
+    host.append(rnd);
+  }
+
+  setTab(tab) {
+    const form = $('cs-form');
+    if (!form) return;
+    form.dataset.tab = tab;
+    for (const b of form.querySelectorAll('.cs-tab')) {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    }
+  }
+
+  rollName() {
+    const input = $('cs-name-input');
+    const taken = (n) => !!nameProblem(n, this.roster);
+    const open = NAME_IDEAS.filter((n) => !taken(n) && n !== input.value);
+    if (!open.length) return;
+    input.value = open[Math.floor(Math.random() * open.length)];
+    this.onName();
+  }
+
+  /** The part of the screen the panels leave open, so the camera can stand the hunter there. */
+  measureFrame() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const f = { l: 0, t: 0, r: W, b: H, W, H };
+    const top = this.root.querySelector('.cs-top');
+    const blocks = [top, ...this.root.querySelectorAll('#cs-form .cs-sec, #cs-form .cs-name-block, #cs-form .cs-form-foot, #cs-form .cs-form-title, #cs-form .cs-tabs')];
+    const form = $('cs-form');
+    if (form && getComputedStyle(form).display !== 'grid') blocks.push(form);
+    for (const node of blocks) {
+      if (!node || node.offsetParent === null) continue;
+      const r = node.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      const cx = (r.left + r.right) / 2;
+      if (r.width < W * 0.6 && cx < W / 3) f.l = Math.max(f.l, r.right);
+      else if (r.width < W * 0.6 && cx > (W * 2) / 3) f.r = Math.min(f.r, r.left);
+      else if (r.bottom <= H * 0.35) f.t = Math.max(f.t, r.bottom);
+      else f.b = Math.min(f.b, r.top);
+    }
+    if (f.r - f.l < 120 || f.b - f.t < 120) return { l: 0, t: 0, r: W, b: H, W, H };
+    return f;
   }
 
   redraw() {
@@ -589,6 +691,7 @@ export class CharacterSelect {
     }
     if (!this.draft?.classId || !CLASSES[this.draft.classId]) {
       $('cs-form-error').textContent = 'Choose a class before creating your character.';
+      this.setTab('class');
       $('cs-classes')?.querySelector('.cs-class')?.focus();
       return;
     }
@@ -632,6 +735,8 @@ export class CharacterSelect {
     $('cs-form').addEventListener('submit', (e) => this.submitForm(e));
     $('cs-form-cancel').addEventListener('click', () => this.back());
     $('cs-name-input').addEventListener('input', () => this.onName());
+    $('cs-name-roll')?.addEventListener('click', () => this.rollName());
+    for (const b of this.root.querySelectorAll('#cs-form .cs-tab')) b.addEventListener('click', () => this.setTab(b.dataset.tab));
     $('cs-search').addEventListener('input', (e) => {
       this.filter = e.target.value;
       this.renderList();
