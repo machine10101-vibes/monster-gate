@@ -2248,6 +2248,10 @@ class Game {
   }
 
   equipSkill(slot, id) {
+    if (this.hud?.hotbarLocked) {
+      this.hud.toast('Skill buttons are locked in Settings.', 1400);
+      return false;
+    }
     const ok = this.progress.equip(slot, id);
     if (ok) this.hud.updateSkillbar(this);
     return ok;

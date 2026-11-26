@@ -9,6 +9,7 @@ import { TILE_SIZE, TILES, originOf } from '../world/tiles.js';
 import { chartedAnchor, chartedWeight } from '../world/playmap.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
+import { HOTBAR_HOLD_MS, availableHotbarSkills, readHotbarLocked, writeHotbarLocked } from './skillHotbar.js';
 import { mountGear } from './gear.js';
 import { mountBag } from './bag.js';
 import { mountStorage } from './storage.js';
@@ -194,6 +195,7 @@ export class HUD {
     this.plates = new Map();
     this.sunKind = '';
     this.mapLabels = true;
+    this.hotbarLocked = readHotbarLocked();
 
     document.querySelectorAll('.mbtn .ico').forEach((n) => {
       const cls = [...n.classList].find((c) => c !== 'ico');
@@ -247,7 +249,9 @@ export class HUD {
   syncWindows() {
     const panel = this.panelOpen;
     const dialog = this.dialogOpen;
-    const open = panel || dialog;
+    const picker = !!this.skillPicker;
+    const open = panel || dialog || picker;
+    document.documentElement.classList.toggle('skill-picker-open', picker);
     document.documentElement.classList.toggle('windows-open', !!open);
     document.documentElement.classList.toggle('panel-open', !!panel);
     document.documentElement.classList.toggle('dialog-open', !!dialog);
@@ -956,6 +960,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
         ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Strafing', `<button id="set-strafe" aria-pressed="${game.input.strafe ? 'true' : 'false'}">${game.input.strafe ? 'On' : 'Off'}</button>`],
+        ['Lock skill buttons', `<button id="set-skill-lock" aria-pressed="${readHotbarLocked() ? 'true' : 'false'}">${readHotbarLocked() ? 'Locked' : 'Unlocked'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -981,6 +986,16 @@ export class HUD {
       if (statsBtn) statsBtn.onclick = () => this.openPanel('stats', game);
       const catBtn = document.getElementById('set-cat');
       if (catBtn) catBtn.onclick = () => this.openPanel('catalog', game);
+      const skillLock = document.getElementById('set-skill-lock');
+      if (skillLock) skillLock.onclick = () => {
+        const locked = !this.hotbarLocked;
+        this.hotbarLocked = locked;
+        writeHotbarLocked(locked);
+        skillLock.textContent = locked ? 'Locked' : 'Unlocked';
+        skillLock.setAttribute('aria-pressed', locked ? 'true' : 'false');
+        this.updateSkillbar(game);
+        this.toast(locked ? 'Skill buttons locked.' : 'Skill buttons unlocked.', 1400);
+      };
       const skillBtn = document.getElementById('set-skills');
       if (skillBtn) skillBtn.onclick = () => this.openPanel('skills', game);
       const gearBtn = document.getElementById('set-gear');
@@ -1062,15 +1077,128 @@ export class HUD {
     document.body.classList.toggle('map-labels-off', !this.mapLabels);
   }
 
+  openSkillPicker(game, slot) {
+    if (this.hotbarLocked || !game?.progress) return false;
+    this.closeSkillPicker();
+    const skills = availableHotbarSkills(game.progress);
+    const overlay = document.createElement('div');
+    overlay.className = 'skill-hotbar-picker';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', `Choose skill for button ${slot + 1}`);
+    const card = document.createElement('div');
+    card.className = 'skill-hotbar-picker-card';
+    const heading = document.createElement('div');
+    heading.className = 'skill-hotbar-picker-heading';
+    const title = document.createElement('b');
+    title.textContent = `Assign skill · Button ${slot + 1}`;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'skill-hotbar-picker-close';
+    close.textContent = '×';
+    close.setAttribute('aria-label', 'Close skill picker');
+    close.addEventListener('click', () => this.closeSkillPicker());
+    heading.append(title, close);
+    const hint = document.createElement('p');
+    hint.textContent = skills.length ? 'Choose an unlocked active or special skill.' : 'Learn an active or special skill in the Skill Tree first.';
+    const list = document.createElement('div');
+    list.className = 'skill-hotbar-picker-list';
+    const addChoice = (skill) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'skill-hotbar-choice';
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      paintSkillIcon(canvas, skill.shape, skill.color);
+      const copy = document.createElement('span');
+      const name = document.createElement('b');
+      name.textContent = skill.name;
+      const detail = document.createElement('small');
+      detail.textContent = `${skill.pathName} · ${skill.kind === 'special' ? 'Special' : 'Active'} · ${skill.res}`;
+      copy.append(name, detail);
+      button.append(canvas, copy);
+      button.addEventListener('click', () => {
+        if (game.equipSkill(slot, skill.id)) {
+          this.closeSkillPicker();
+          this.toast(`${skill.name} assigned to button ${slot + 1}.`, 1400);
+        }
+      });
+      list.appendChild(button);
+    };
+    for (const skill of skills) addChoice(skill);
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'skill-hotbar-clear';
+    clear.textContent = 'Clear this button';
+    clear.addEventListener('click', () => {
+      game.equipSkill(slot, null);
+      this.closeSkillPicker();
+    });
+    card.append(heading, hint, list, clear);
+    overlay.appendChild(card);
+    overlay.addEventListener('pointerdown', (event) => {
+      if (event.target === overlay) this.closeSkillPicker();
+    });
+    this.skillPicker = overlay;
+    document.body.appendChild(overlay);
+    close.focus();
+    this.syncWindows();
+    return true;
+  }
+
+  closeSkillPicker() {
+    this.skillPicker?.remove();
+    this.skillPicker = null;
+    this.syncWindows();
+  }
+
   updateSkillbar(game) {
     if (!game?.progress || !game.player) return;
     const eq = game.progress.equipped();
+    const locked = this.hotbarLocked;
     const keys = ['Z', 'X', 'V'];
     const fallback = ['Spirit Bolt', 'Empty', 'Fury'];
     const rightIds = ['tb-bolt', 'tb-skill', 'tb-fury'];
     const casts = [...document.querySelectorAll('#cast-buttons .cast')];
     if (!document.body.dataset.skillsWired) {
       document.body.dataset.skillsWired = '1';
+      const armLongPress = (el, i) => {
+        let holdTimer = 0;
+        let held = false;
+        const cancel = () => {
+          if (holdTimer) clearTimeout(holdTimer);
+          holdTimer = 0;
+          el.classList.remove('hold-arming');
+        };
+        el.addEventListener('pointerdown', (event) => {
+          if (event.button !== undefined && event.button !== 0) return;
+          if (this.hotbarLocked) return;
+          held = false;
+          el.classList.add('hold-arming');
+          el.style.setProperty('--hold-ms', `${HOTBAR_HOLD_MS}ms`);
+          holdTimer = setTimeout(() => {
+            holdTimer = 0;
+            held = true;
+            el.classList.remove('hold-arming');
+            el.dataset.skillPickerConsumed = '1';
+            this.openSkillPicker(game, i);
+          }, HOTBAR_HOLD_MS);
+        });
+        for (const eventName of ['pointerup', 'pointercancel', 'pointerleave']) {
+          el.addEventListener(eventName, cancel);
+        }
+        el.addEventListener('contextmenu', (event) => {
+          if (held || holdTimer) event.preventDefault();
+        });
+        el.addEventListener('click', (event) => {
+          if (el.dataset.skillPickerConsumed === '1') {
+            delete el.dataset.skillPickerConsumed;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+      };
       const accept = (el, i) => {
         el.addEventListener('dragover', (e) => e.preventDefault());
         el.addEventListener('drop', (e) => {
@@ -1082,11 +1210,12 @@ export class HUD {
       };
       casts.forEach((b, i) => {
         b.addEventListener('click', () => game.castSlot(i));
+        armLongPress(b, i);
         accept(b, i);
       });
       rightIds.forEach((id, i) => {
         const el = document.getElementById(id);
-        if (el) accept(el, i);
+        if (el) { armLongPress(el, i); accept(el, i); }
       });
     }
     const paintCanvas = (canvas, skill, i) => {
@@ -1112,6 +1241,7 @@ export class HUD {
       const title = skill ? `${skill.name} (${keys[i]})` : `${fallback[i]} (${keys[i]})`;
       const cast = casts[i];
       if (cast) {
+        cast.classList.toggle('skill-locked', locked);
         paintCanvas(cast.querySelector('canvas'), skill, i);
         cast.classList.toggle('on', !!skill);
         cast.classList.toggle('cd', frac > 0);
@@ -1123,6 +1253,7 @@ export class HUD {
       }
       const touch = document.getElementById(rightIds[i]);
       if (touch) {
+        touch.classList.toggle('skill-locked', locked);
         let cv = touch.querySelector('canvas');
         if (!cv) {
           cv = document.createElement('canvas');
