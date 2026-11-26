@@ -663,6 +663,14 @@ for (const g of GEAR) {
   g.reqSmith = g.id === 'orcwarhammer' ? 15 : 30;
   g.forgeXp = 40;
 }
+// Preserve both monster hammer families as independent forge recipes.
+for (const g of GEAR.filter(g => g.type === 'weapon' && g.wtype === 'hammer' && !g.found)) {
+  const id = `${g.id}_twohand`;
+  const recipe = Object.fromEntries(Object.entries(g.recipe).map(([k,n]) => [k, Math.ceil(n * 1.5)]));
+  GEAR.push(weapon(id, 'twohammer', `${g.name} (Two-Handed)`, g.monster, `Heavy two-handed variant of ${g.name}.`, recipe,
+    M('twohand', Math.round(g.item.dmg * 1.3), 2.8, 2.4, 0.72, 0.34, 15, 9, 'Two-handed. Heavy crushing strikes.'),
+    { reqLevel: g.reqLevel, reqSmith: g.reqSmith, forgeXp: g.forgeXp }));
+}
 for (const metal of METALS) {
   for (const w of metalWeapons(metal)) {
     GEAR.push(weapon(
