@@ -605,6 +605,7 @@ export class CampStage {
   setPreview(look, armor, held) {
     for (const f of this.figures.values()) f.obj.visible = false;
     this.mode = 'create';
+    this.createZoom = 1;
     if (!this.preview) {
       this.preview = new CampFigure('preview', look, armor, held);
       this.group.add(this.preview.obj);
