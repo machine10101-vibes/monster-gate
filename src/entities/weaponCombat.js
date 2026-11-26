@@ -20,6 +20,7 @@ export function weaponFamily(item = {}, heldKind = item.held || '') {
   if (has(held, /scythe/)) return 'scythe';
   if (has(held, /spear|pike|lance/)) return 'spear';
   if (/dual|claws/.test(held) || style === 'dual') return 'dual';
+  if (style === 'twohand') return 'heavy';
   if (has(held, /hammer|maul/) && (style === 'swordshield' || ONE_HANDED_HAMMERS.has(held))) return 'hammer';
   if (has(held, /hammer|maul|greatsword|cleaver/) || style === 'twohand') return 'heavy';
   if (style === 'swordshield' || has(held, /sword|blade|cutlass|saber/)) return 'sword';
