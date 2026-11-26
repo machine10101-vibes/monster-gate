@@ -28,3 +28,15 @@ test('two-pointer pinch gestures adjust preview camera zoom without rotating the
   assert.match(camp, /baseDist \* this\.createZoom/);
   assert.match(camp, /this\.createZoom = 1/);
 });
+
+test('character roster panel has its own minimize control', () => {
+  assert.match(html, /id="cs-panel-minimize"/);
+  assert.match(charselect, /togglePanelMinimized\(\)/);
+  assert.match(charselect, /addEventListener\('click', \(\) => this\.togglePanelMinimized\(\)\)/);
+  assert.match(css, /\.cs-panel\.minimized > :not\(\.cs-panel-head\)/);
+});
+
+test('pinch zoom stays active until both contacts are released and zooms in on outward pinch', () => {
+  assert.match(charselect, /this\.stage\.setCreateZoom\(pinchStart\.zoom \* pinchStart\.distance \/ distance\)/);
+  assert.doesNotMatch(charselect, /addEventListener\('lostpointercapture', end\)/);
+});
