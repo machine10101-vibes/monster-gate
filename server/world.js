@@ -2,7 +2,7 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify, originAllowed, parseOrigins } from './auth.js';
-import { appearanceFromState, createMonsters, createNodes, createRiftMonster, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
+import { rosterAppearance, appearanceFromState, createMonsters, createNodes, createRiftMonster, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
 import { applyMove, createBucket, createLimiter } from './limits.js';
 import {
   AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, CLOSE_POLICY, CLOSE_TOO_LARGE,
@@ -330,6 +330,7 @@ export class World {
       riftClearAt: Number(row?.state?.riftClearAt) || 0,
       movedAt: 0,
     });
+    await this.refreshAppearance(session);
     this.players.set(session.id, session);
     this.byUser.set(ident.userId, session);
     const token = this.rememberResume(session);
@@ -387,6 +388,21 @@ export class World {
     };
   }
 
+  async refreshAppearance(session) {
+    const adapter = this.persist?.adapter;
+    if (!adapter?.loadRoster || session.appearancePending) return;
+    session.appearancePending = true;
+    session.appearanceCheckedAt = this.now();
+    try {
+      const visual = rosterAppearance(await adapter.loadRoster(session.userId), session.name);
+      if (visual && !session.gone) session.rosterVisual = visual;
+    } catch (err) {
+      console.warn('roster appearance', err?.message || err);
+    } finally {
+      session.appearancePending = false;
+    }
+  }
+
   move(session, msg) {
     if (session.pvpMatchId && session.pvpDead) { session.move = 0; return; }
     if (!session.limiter.allowMove()) {
@@ -416,6 +432,7 @@ export class World {
       session.zone = prevZone;
       return;
     }
+    if (this.now() - (session.appearanceCheckedAt || 0) >= 5000) void this.refreshAppearance(session);
     this.dirty.add(session.id);
     const zoneChanged = session.zone !== prevZone;
     if (zoneChanged) {
