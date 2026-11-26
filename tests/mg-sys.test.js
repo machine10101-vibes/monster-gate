@@ -97,18 +97,18 @@ test('huntMerge still folds two rosters', () => {
   assert.equal(m.roster.chars.length, 2);
 });
 
-test('MG-UI title: guest play, matching email button, password hint, cover fit, no float', () => {
+test('MG-UI title: account sign-in, password hint, cover fit, no float', () => {
   const html = src('../index.html');
   const css = src('../src/style.css');
   const main = src('../src/main.js');
-  assert.match(html, /id="btn-guest"[^>]*>Play as guest/);
+  assert.doesNotMatch(html, /id="btn-guest"|Play as guest/i);
   assert.doesNotMatch(html, /id="btn-world1"/);
-  assert.match(html, /id="world-guest-note"/);
+  assert.doesNotMatch(html, /id="world-guest-note"/);
   assert.match(html, /id="btn-account-signin" class="start"/);
   assert.match(html, /id="account-pass-hint"[^>]*>Use 8 to 72 characters/);
   assert.match(css, /#game \{[\s\S]*object-fit: cover/);
   assert.match(css, /#title \.account-choices \.start \{[\s\S]*animation: none/);
-  assert.match(main, /playAsGuest\(\)/);
+  assert.doesNotMatch(main, /getElementById\([\'"]btn-guest[\'"]\)/);
   assert.match(main, /kind: 'guest'/);
 });
 

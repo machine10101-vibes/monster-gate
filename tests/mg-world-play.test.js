@@ -416,10 +416,10 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   const view = src('../src/net/worldView.js');
   const vite = src('../vite.config.js');
   const readme = src('../README.md');
-  assert.match(html, /id="btn-guest"[^>]*>Play as guest/);
+  assert.doesNotMatch(html, /id="btn-guest"|Play as guest/i);
   assert.doesNotMatch(html, /id="btn-world1"/);
   assert.doesNotMatch(html, /Play Online — World 1/);
-  assert.match(html, /id="world-guest-note"[^>]*>Sign in to play online/);
+  assert.doesNotMatch(html, /id="world-guest-note"/);
   assert.match(html, /id="world-picker"/);
   assert.match(html, /Choose a world/);
   assert.match(html, /id="pick-world1"/);
