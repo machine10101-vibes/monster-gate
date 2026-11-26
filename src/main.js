@@ -1024,8 +1024,13 @@ class Game {
     if (isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
       try { history.replaceState({}, '', hrefWithSearch(offlineSearch(search), location)); } catch { /* ignore */ }
     }
-    if (this.mmo) disposeMmoClient(this.mmo, this);
-    this.worldView?.dispose?.();
+    // Detach the presentation before closing the socket: an intentional exit
+    // must not paint the reconnect/error UI or reopen an auth overlay.
+    const client = this.mmo;
+    const view = this.worldView;
+    if (client) client.view = null;
+    if (client) disposeMmoClient(client, this);
+    view?.dispose?.();
     this.worldView = null;
     const pill = typeof document !== 'undefined' ? document.getElementById('world-mode-pill') : null;
     if (pill?.dataset) delete pill.dataset.connectionState;
@@ -1251,11 +1256,15 @@ class Game {
     this.roster.touch(Date.now());
     this.roster.save();
     // Local progress is already safe; finish the cloud push in the background.
+    this.pushRoster();
     Promise.resolve(flushCloud()).catch(() => {});
-    this.leaveOnlineInPlace();
-    rememberWorldMode('offline');
-    this.net?.leave?.();
     this.started = false;
+    clearRotationRecovery(localStorage);
+    this.hud?.closePanel?.();
+    document.getElementById('hud')?.classList.add('hidden');
+    this.leaveOnlineInPlace();
+    // Keep the preferred world and account session for the next hunter.
+    if (this.net?.role) this.net.leave();
     if (typeof window !== 'undefined') window.__mgHuntStarted = false;
     document.body.classList.remove('hunting', 'landscape-full');
     document.documentElement.classList.remove('landscape-full');
