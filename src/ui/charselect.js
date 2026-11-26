@@ -477,7 +477,7 @@ export class CharacterSelect {
     $('cs-enter-wrap').classList.add('hidden');
     $('cs-toggle').classList.add('hidden');
     this.clearPlates();
-    this.draft = { look: { ...DEFAULT_LOOK }, classId: CLASS_LIST[0].id };
+    this.draft = { look: { ...DEFAULT_LOOK }, classId: null };
     $('cs-name-input').value = '';
     $('cs-form-error').textContent = '';
     $('cs-form-cancel').textContent = this.roster.chars.length ? 'Cancel' : 'Back';
@@ -505,7 +505,9 @@ export class CharacterSelect {
     const host = $('cs-classes');
     host.replaceChildren();
     for (const def of CLASS_LIST) {
-      const b = el('button', 'cs-class' + (def.id === this.draft.classId ? ' on' : ''));
+      const selected = def.id === this.draft.classId;
+      const b = el('button', 'cs-class' + (selected ? ' on' : ''));
+      b.setAttribute('aria-pressed', selected ? 'true' : 'false');
       b.type = 'button';
       b.dataset.id = def.id;
       b.style.setProperty('--c', def.color);
@@ -519,7 +521,7 @@ export class CharacterSelect {
       host.append(b);
     }
     const def = CLASSES[this.draft.classId];
-    $('cs-class-blurb').textContent = def.blurb;
+    $('cs-class-blurb').textContent = def?.blurb || 'Choose a class to determine this hunter’s starting path.';
   }
 
   buildLooks() {
@@ -583,6 +585,11 @@ export class CharacterSelect {
     event.preventDefault();
     if (!canEditRoster({ kind: this.game.wallet?.kind, cloudState: this.game.cloudState })) {
       $('cs-form-error').textContent = 'Account sync is unavailable. Your characters are safe; retry sync before creating.';
+      return;
+    }
+    if (!this.draft?.classId || !CLASSES[this.draft.classId]) {
+      $('cs-form-error').textContent = 'Choose a class before creating your character.';
+      $('cs-classes')?.querySelector('.cs-class')?.focus();
       return;
     }
     const name = $('cs-name-input').value;
