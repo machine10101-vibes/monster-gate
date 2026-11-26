@@ -202,7 +202,7 @@ export class CharacterSelect {
     this.stage.frame = null;
     this.root.classList.remove('list-off');
     $('cs-list-toggle').setAttribute('aria-pressed', 'true');
-    this.togglePanelMinimized(false);
+    if (selectId != null) this.togglePanelMinimized(false);
     this.root?.classList.toggle('single-character', roster.chars.length === 1);
     $('cs-form').classList.add('hidden');
     $('cs-panel').classList.remove('hidden');
@@ -497,6 +497,7 @@ export class CharacterSelect {
       this.note('Your saved characters could not be loaded. Retry account sync before creating a character.', true, true);
       return;
     }
+    if (this.mode === 'create' && this.draft) { this.toggleFormMinimized(false); return; }
     this.mode = 'create';
     this.root.classList.remove('list-off');
     this.root.classList.add('creating');
@@ -558,6 +559,7 @@ export class CharacterSelect {
   hideForm() {
     this.mode = 'list';
     this.draft = null;
+    this.togglePanelMinimized(false);
     this.stage.frame = null;
     this.stage.endPreview();
     this.refresh();
