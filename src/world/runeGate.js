@@ -4,15 +4,15 @@ import { VoxelModel, hash3, shade } from '../engine/voxel.js';
 import { J } from './models.js';
 
 /**
- * Dark rune gates in the style of the Monster Gate logo: charcoal ashlar,
- * gold bands, red runes on the pillars and a ruby crest. The opening holds a
- * red plasma curtain with rings and a rising smoke, the same entrance effect as
- * the other gates.
+ * Dark rune gates in the style of the Monster Gate logo: carved charcoal
+ * ashlar, gold cornices and rivets, red runes in framed panels on the pillars,
+ * a ruby-cut crest on the arch. The opening holds swirling red plasma with
+ * rings and rising smoke, the same entrance effect as the other gates.
  */
 
 const W = 46;
 const H = 50;
-const D = 12;
+const D = 13;
 const S = 0.2;
 const OX = 23;
 const OZ = 5;
@@ -20,73 +20,126 @@ const RED = 0xff2a1a;
 const RUBY = 0xff1f2a;
 const INNER = 12;
 const SPRING = 29;
+const PLASMA_Y = 4.4;
 
 /** Voxel gate, base at y 0, opening facing local +z. */
 export function buildRuneGate() {
   const M = new VoxelModel(W, H, D);
   const stone = (x, y, z) => {
-    const row = Math.floor(y / 4);
-    const col = Math.floor((x + (row % 2) * 3) / 6);
-    const base = [0x3b3b42, 0x47474f, 0x303036, 0x55555e][Math.abs(col * 3 + row) % 4];
+    const row = Math.floor(y / 3);
+    const col = Math.floor((x + (row % 2) * 3) / 5);
+    const base = [0x3b3b42, 0x4a4a53, 0x303036, 0x57575f][Math.abs(col * 3 + row) % 4];
     let c = J(base, x, y, z, 21, 0.05);
-    if (y % 4 === 0) c = shade(c, 0.78);
-    if (hash3(x >> 2, y >> 2, z >> 2, 22) > 0.9) c = shade(c, 0.7);
+    if (y % 3 === 0) c = shade(c, 0.7);
+    if ((x + z) % 4 === 0 && y % 3 !== 0) c = shade(c, 0.88);
+    if (hash3(x >> 2, y >> 2, z >> 2, 22) > 0.92) c = shade(c, 0.66);
     return c;
   };
-  const gold = (x, y, z) => J((x + y) % 3 === 0 ? 0xc9a23c : 0x9a7428, x, y, z, 23, 0.05);
-  const deep = (x, y, z) => J(0x1c1418, x, y, z, 24, 0.05);
+  const cut = (x, y, z) => shade(stone(x, y, z), 0.74);
+  const gold = (x, y, z) => J((x + y) % 3 === 0 ? 0xd4a944 : 0x9a7428, x, y, z, 23, 0.05);
+  const deep = (x, y, z) => J(0x1a1216, x, y, z, 24, 0.05);
 
-  // Steps and pillars.
-  M.box(0, 0, 0, W, 3, 11, stone);
-  M.box(0, 3, 0, W, 4, 11, gold);
-  for (const px of [2, 35]) {
-    M.box(px, 4, 0, px + 9, 40, 11, stone);
-    M.box(px, 17, 0, px + 9, 19, 11, gold);
-    M.box(px, 31, 0, px + 9, 33, 11, gold);
-    // Rune glyphs, glowing on the front face.
-    for (let i = 0; i < 5; i++) {
-      const y = 7 + i * 5;
-      const gx = px + 3;
+  // Plinth: three stepped courses with a gold band between.
+  M.box(0, 0, 0, W, 2, D - 1, cut);
+  M.box(1, 2, 0, W - 1, 4, D - 1, stone);
+  M.box(2, 4, 0, W - 2, 5, D, gold);
+  M.box(3, 5, 0, W - 3, 6, D - 1, stone);
+
+  // Pillars with fluted shafts, carved capitals and bases.
+  for (const px of [4, 33]) {
+    M.box(px, 6, 0, px + 9, 26, 11, stone);
+    for (let x = px + 1; x < px + 9; x += 2) for (let y = 7; y < 25; y++) M.set(x, y, 11, shade(stone(x, y, 11), 0.82));
+    M.box(px - 1, 6, 0, px + 10, 9, 12, cut);
+    M.box(px - 1, 9, 0, px + 10, 10, 12, gold);
+    M.box(px - 1, 24, 0, px + 10, 27, 12, cut);
+    M.box(px - 2, 27, 0, px + 11, 28, 12, stone);
+    M.box(px - 2, 28, 0, px + 11, 29, 12, gold);
+    // Gold rivets along the shaft edges.
+    for (let y = 11; y < 25; y += 6) {
+      M.set(px + 1, y, 11, gold(px, y, 11));
+      M.set(px + 7, y, 11, gold(px, y, 11));
+    }
+    // Rune panels: a gold frame around a glowing glyph.
+    for (let i = 0; i < 3; i++) {
+      const y0 = 11 + i * 5;
+      const gx = px + 2;
+      for (let x = gx; x <= gx + 5; x++) {
+        M.set(x, y0, 12, gold(x, y0, 12));
+        M.set(x, y0 + 5, 12, gold(x, y0 + 5, 12));
+      }
+      for (let y = y0; y <= y0 + 5; y++) {
+        M.set(gx, y, 12, gold(gx, y, 12));
+        M.set(gx + 5, y, 12, gold(gx, y, 12));
+      }
+      const g = (x, y) => M.set(x, y, 11, RED, true);
       if (i % 2 === 0) {
-        M.box(gx, y, 11, gx + 2, y + 4, 12, RED, true);
-        M.box(gx + 2, y + 3, 11, gx + 4, y + 4, 12, RED, true);
+        for (let y = y0 + 1; y <= y0 + 4; y++) g(gx + 2, y);
+        g(gx + 3, y0 + 4); g(gx + 3, y0 + 3); g(gx + 4, y0 + 2);
+        g(gx + 1, y0 + 4);
       } else {
-        M.box(gx - 1, y + 2, 11, gx + 4, y + 3, 12, RED, true);
-        M.box(gx + 1, y, 11, gx + 2, y + 4, 12, RED, true);
+        for (let x = gx + 1; x <= gx + 4; x++) g(x, y0 + 2);
+        g(gx + 2, y0 + 1); g(gx + 3, y0 + 3); g(gx + 2, y0 + 4);
       }
     }
   }
 
-  // Arch band from the spring line up, with gold on the outer edge and a red
-  // glow lining the inner edge.
+  // Arch band built from alternating voussoirs; the keystone is cut darker.
   for (let y = SPRING; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const d = Math.hypot(x + 0.5 - OX, y + 0.5 - SPRING);
-      if (d < INNER || d > 18) continue;
+      if (d < INNER || d > 18.5) continue;
+      const ang = Math.atan2(y + 0.5 - SPRING, x + 0.5 - OX);
+      const seg = Math.floor(((ang + Math.PI) / Math.PI) * 9);
+      const keystone = seg === 4 || seg === 5;
       for (let z = 0; z < 11; z++) {
-        if (d >= 16.8) M.set(x, y, z, gold(x, y, z));
-        else M.set(x, y, z, stone(x, y, z));
+        let c;
+        if (d >= 16.9) c = gold(x, y, z);
+        else if (d >= 15.8) c = shade(gold(x, y, z), 0.6);
+        else if (keystone) c = shade(stone(x, y, z), 1.25);
+        else c = seg % 2 ? stone(x, y, z) : cut(x, y, z);
+        M.set(x, y, z, c);
       }
-      if (d < INNER + 1) M.set(x, y, 11, RED, true);
+      if (d < INNER + 1) {
+        M.set(x, y, 10, gold(x, y, 10));
+        M.set(x, y, 11, RED, true);
+      }
     }
   }
 
-  // Dark backing inside the opening, and a glowing threshold.
-  M.box(11, 3, 0, 35, SPRING, 2, deep);
-  M.box(11, 3, 11, 35, 4, 12, RED, true);
+  // Dark backing and a glowing threshold rune line.
+  M.box(11, 5, 0, 36, SPRING, 2, deep);
+  M.box(11, 5, 11, 36, 6, 12, RED, true);
+  for (let x = 13; x < 34; x += 4) M.set(x, 6, 12, gold(x, 6, 12));
 
-  // Ruby crest on top of the arch.
-  M.box(18, 39, 0, 28, 48, 11, stone);
-  M.box(18, 39, 0, 28, 40, 11, gold);
-  M.box(18, 47, 0, 28, 48, 11, gold);
-  M.box(21, 42, 11, 25, 46, 12, RUBY, true);
-  M.set(23, 44, 12, 0xffd0c8, true);
+  // Crest: a gold-rimmed shield with a ruby cut in its centre.
+  for (let y = 37; y <= 49; y++) {
+    const half = y < 43 ? 6 : Math.max(2, 6 - (y - 43) * 0.7);
+    for (let x = Math.floor(OX - half); x <= Math.ceil(OX + half); x++) {
+      const edge = Math.abs(x + 0.5 - OX) > half - 1.2 || y <= 37;
+      M.set(x, y, 0, edge ? gold(x, y, 0) : stone(x, y, 0));
+      for (let z = 1; z < 12; z++) {
+        const rim = Math.abs(x + 0.5 - OX) > half - 1 || y === 49;
+        M.set(x, y, z, rim ? gold(x, y, z) : stone(x, y, z));
+      }
+    }
+  }
+  const diamond = (cx, cy, r) => {
+    for (let dy = -r; dy <= r; dy++) {
+      const w = r - Math.abs(dy);
+      for (let dx = -w; dx <= w; dx++) M.set(cx + dx, cy + dy, 12, dx === 0 && dy === 0 ? 0xffd0c8 : RUBY, true);
+    }
+  };
+  diamond(OX, 44, 3);
+  M.set(OX - 5, 43, 12, RED, true);
+  M.set(OX + 5, 43, 12, RED, true);
 
   return M.build(S, OX, 0, OZ);
 }
 
-const curtainFrag = `
+const plasmaFrag = `
 uniform float uTime;
+uniform float uDir;
+uniform float uAlpha;
 varying vec2 vP;
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p){
@@ -95,25 +148,22 @@ float vn(vec2 p){
   return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 void main(){
-  vec2 c = vec2(vP.x, vP.y - 2.4);
+  vec2 c = vec2(vP.x, vP.y - ${PLASMA_Y.toFixed(2)});
   float r = length(c);
-  vec2 q = floor(c * 22.0) / 22.0;
-  float rq = length(q);
-  float n = vn(q * 3.0 + vec2(0.0, uTime * 0.7)) * 0.6 + vn(q * 8.0 - uTime * 0.95) * 0.4;
-  float pulse = 0.0;
-  for (int i = 0; i < 3; i++) {
-    float t = fract(uTime * 0.45 + float(i) * 0.333);
-    float band = abs(rq - t * 2.6);
-    pulse += smoothstep(0.12, 0.0, band) * (1.0 - t);
-  }
-  float core = smoothstep(0.9, 0.0, r);
-  vec3 deep = vec3(0.32, 0.02, 0.02);
-  vec3 red = vec3(1.0, 0.16, 0.08);
-  vec3 hot = vec3(1.0, 0.72, 0.42);
-  vec3 col = mix(deep, red, clamp(n * 0.9 + pulse * 0.6, 0.0, 1.0));
-  col = mix(col, hot, clamp(core * 0.5 + pulse * 0.25, 0.0, 1.0));
-  float fade = smoothstep(0.0, 0.7, vP.y) * smoothstep(0.0, 0.5, 2.6 - abs(vP.x) + 0.2);
-  float alpha = (0.38 + n * 0.3 + pulse * 0.55 + core * 0.35) * fade;
+  float a = atan(c.y, c.x);
+  // Spiral arms that wind inward and turn with time, in the direction of uDir.
+  float spin = a * 2.0 + 4.2 / (r + 0.55) - uDir * uTime * 1.9;
+  float arms = 0.5 + 0.5 * sin(spin * 3.0 + vn(vec2(r * 3.0, uTime * 0.6)) * 2.5);
+  float n = vn(vec2(spin * 1.8, r * 5.0 - uDir * uTime * 1.4)) * 0.7 + vn(vec2(a * 4.0 + uTime * 0.35, r * 9.0)) * 0.3;
+  float swirl = smoothstep(0.42, 0.95, arms * 0.62 + n * 0.55);
+  float core = smoothstep(1.5, 0.0, r);
+  vec3 deep = vec3(0.26, 0.02, 0.03);
+  vec3 red = vec3(0.95, 0.14, 0.08);
+  vec3 hot = vec3(1.0, 0.72, 0.36);
+  vec3 col = mix(deep, red, clamp(n * 0.8 + swirl * 0.6, 0.0, 1.0));
+  col = mix(col, hot, clamp(swirl * core * 0.9 + core * 0.22, 0.0, 1.0));
+  float fade = smoothstep(0.0, 0.55, vP.y);
+  float alpha = (0.22 + swirl * 0.7 + core * 0.25) * fade * uAlpha;
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -145,7 +195,7 @@ function openingShape() {
   shape.lineTo(hw, spring);
   shape.absarc(0, spring, hw, 0, Math.PI, false);
   shape.lineTo(-hw, 0.6);
-  return new THREE.ShapeGeometry(shape, 12);
+  return new THREE.ShapeGeometry(shape, 16);
 }
 
 const SMOKE_N = 90;
@@ -206,19 +256,25 @@ export function placeRuneGate(world, spec) {
     group.add(new THREE.Mesh(built.glow, new THREE.MeshBasicMaterial({ vertexColors: true })));
   }
 
-  const curtainMat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: curtainFrag,
-  });
-  const curtain = new THREE.Mesh(openingShape(), curtainMat);
-  curtain.position.set(0, 0, 0);
-  curtain.renderOrder = 3;
-  group.add(curtain);
+  const plasmaVert = `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const makeLayer = (dir, alpha, z) => {
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      uniforms: { uTime: { value: 0 }, uDir: { value: dir }, uAlpha: { value: alpha } },
+      vertexShader: plasmaVert,
+      fragmentShader: plasmaFrag,
+    });
+    const mesh = new THREE.Mesh(openingShape(), mat);
+    mesh.position.set(0, 0, z);
+    mesh.renderOrder = 3;
+    group.add(mesh);
+    return mat;
+  };
+  // Two counter-turning layers give the plasma depth.
+  const plasmaMats = [makeLayer(1, 1.0, 0), makeLayer(-1, 0.55, 0.04)];
 
   const ringGeo = new THREE.PlaneGeometry(4.2, 4.2);
   const ringMats = [0, 1].map((i) => new THREE.ShaderMaterial({
@@ -232,7 +288,7 @@ export function placeRuneGate(world, spec) {
   }));
   ringMats.forEach((mat, i) => {
     const ring = new THREE.Mesh(ringGeo, mat);
-    ring.position.set(0, SPRING * S, 0.25 + i * 0.05);
+    ring.position.set(0, PLASMA_Y, 0.25 + i * 0.05);
     ring.renderOrder = 4;
     group.add(ring);
   });
@@ -260,7 +316,7 @@ export function placeRuneGate(world, spec) {
     group,
     light,
     tick(t) {
-      curtainMat.uniforms.uTime.value = t;
+      for (const m of plasmaMats) m.uniforms.uTime.value = t;
       for (const mat of ringMats) mat.uniforms.uTime.value = t;
       updateSmoke(smoke, t);
       light.intensity = 1.8 + 0.8 * Math.sin(t * 3.1) * Math.sin(t * 1.7);
