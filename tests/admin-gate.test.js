@@ -92,3 +92,13 @@ test('the guild master is sent to the ledger before a hunt can start', () => {
   assert.equal(canCreateWorld(''), false);
   assert.equal(canCreateWorld('master'), false);
 });
+
+test('explicit ledger signout returns to the current game login', () => {
+  const main = src('../src/admin/main.js');
+  const handler = main.slice(main.indexOf("$('signout').addEventListener"), main.indexOf("document.addEventListener('visibilitychange'"));
+  assert.match(handler, /clearAccount\(\)/);
+  assert.match(handler, /clearSession\(\)/);
+  assert.match(handler, /new URL\(gameHref\(\), location.href\)/);
+  assert.match(handler, /location.replace\(next.href\)/);
+  assert.doesNotMatch(handler, /showGate\(/);
+});
