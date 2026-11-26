@@ -245,7 +245,8 @@ class Game {
     this.kills = 0;
     this.rank = 0;
     this.quest = { text: 'Slay 5 Gate monsters', n: 0, total: 5 };
-    this.items = ITEMS.map((i) => ({ ...i }));
+    this.baseItems = ITEMS.map((i) => ({ ...i }));
+    this.items = this.baseItems.slice();
     this.progress = new Progress();
     this.journal = new Journal(this.progress);
     this.bounties = new Bounties(this.progress);
@@ -659,7 +660,8 @@ class Game {
     this.journal?.rebind();
     this.bounties?.rebind();
     this.gold = this.progress.gold;
-    this.items = ITEMS.map((i) => ({ ...i }));
+    this.baseItems = ITEMS.map((i) => ({ ...i }));
+    this.items = this.baseItems.slice();
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.applyGear(true);
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
@@ -2125,6 +2127,13 @@ class Game {
   onHotbar(i) {
     const it = this.items[i];
     if (!it) return;
+    if (it.bagRef) {
+      const ref = it.bagRef;
+      if (ref.k === 'gear') { if (!this.progress.worn(ref.id)) this.wearPiece(ref.id); }
+      else if (ref.k === 'good' && this.progress.good(ref.id)) this.eatGood(ref.id);
+      else this.hud.toast(it.name, 900);
+      return;
+    }
     if (it.kind === 'use') {
       this.player?.tryAttack(it);
       return;
@@ -2138,15 +2147,14 @@ class Game {
       this.hud.toast('Item hotbar is locked in Settings.');
       return false;
     }
-    if (!Number.isInteger(slot) || !Number.isInteger(sourceSlot)
-      || slot < 0 || sourceSlot < 0 || slot >= this.items.length || sourceSlot >= this.items.length
-      || !this.items[sourceSlot] || this.items[sourceSlot].id === 'empty') return false;
-    if (slot === sourceSlot) return true;
+    if (!Number.isInteger(slot) || slot < 0 || slot >= this.items.length || !item) return false;
+    const existing = this.items.findIndex(it => it.id === item.id);
+    if (existing === slot) return true;
     const previous = this.items[slot];
-    this.items[slot] = this.items[sourceSlot];
-    this.items[sourceSlot] = previous || { ...ITEMS[7] };
+    this.items[slot] = item;
+    if (existing >= 0) this.items[existing] = previous || { ...ITEMS[7] };
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
-    this.selectSlot(this.sel, true);
+    if (this.sel === slot && !item.bagRef) this.selectSlot(slot, true);
     return true;
   }
 
@@ -2159,12 +2167,12 @@ class Game {
 
   selectSlot(i, silent = false) {
     if (i < 0 || i >= this.items.length) return;
-    this.sel = i;
+    if (this.items[i]?.bagRef) return this.onHotbar(i);
     const raw = this.items[i];
     const it = this.carried(raw);
     if (it !== raw) {
       this.items[i] = it;
-      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
+      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n), (n) => this.hud.openPanel('bag', this, { assignSlot: n }));
     }
     // Weapon hotbar slots switch the saved equipment, not just the hand model.
     const gear = gearById(it.id);
@@ -2178,6 +2186,7 @@ class Game {
     } else if (it.kind === 'melee' || it.kind === 'ranged') {
       this.player.setSheath(it.held || null);
     }
+    this.sel = i;
     this.player.setHeld(it.held || null);
     this.syncVitals();
     this.itemsChanged();
@@ -2197,9 +2206,10 @@ class Game {
     const w = pr.weaponItem;
     // Keep the equipped weapon in slot zero until the player deliberately
     // assigns a different item there. Other slots remain freely assignable.
-    if (!this.items[0] || this.items[0]._equippedWeapon || this.items[0].id === 'blade') {
-      this.items[0] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
-    }
+    const equippedSlot = this.items.findIndex(it => it.id === w?.id);
+    const activeSlot = equippedSlot >= 0 ? equippedSlot : Math.max(0, this.items.findIndex(it => it._equippedWeapon || it.id === 'blade'));
+    this.items[activeSlot] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
+    if (!initial) this.sel = activeSlot;
     p.setSheath(w?.held || 'blade');
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
@@ -2308,7 +2318,7 @@ class Game {
     const was = this.progress.worn(id);
     this.progress.toggleWear(id);
     this.applyGear();
-    if (g.type === 'weapon') this.selectSlot(0, true);
+    if (g.type === 'weapon') this.selectSlot(this.sel, true);
     this.audio.select();
     this.hud.toast(was ? `${g.name} unequipped` : `${g.name} equipped`, 1200);
     return true;
@@ -2796,7 +2806,7 @@ class Game {
       label = g.name;
       this.dropGear(spec.id, x, y, z, true);
     } else if (spec.k === 'held') {
-      const it = this.items.find((i) => i.id === spec.id);
+      const it = this.baseItems.find((i) => i.id === spec.id);
       if (!it || it.count == null || it.count < n) return false;
       it.count -= n;
       if (it.kind === 'use') this.progress.setStock(spec.id, it.count);
@@ -2864,7 +2874,7 @@ class Game {
           if (k.k === 'good') added = this.progress.addGood(k.id, k.n);
           else if (k.k === 'part') added = this.progress.addPart(k.id, k.n);
           else if (k.k === 'held') {
-            const it = this.items.find((i) => i.id === k.id);
+            const it = this.baseItems.find((i) => i.id === k.id);
             if (!it || it.count == null) k.done = true;
             else {
               const cap = POTION_SHOP[k.id]?.max;
@@ -3043,7 +3053,7 @@ class Game {
     if (it !== this.items[this.sel]) {
       this.items[this.sel] = it;
       this.player.setHeld(it.held || null);
-      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
+      this.hud.buildHotbar(this.items, (n) => this.onHotbar(n), (n) => this.hud.openPanel('bag', this, { assignSlot: n }));
       this.itemsChanged();
     }
     if (it.kind === 'light' || it.kind === 'none') {
@@ -3612,7 +3622,7 @@ class Game {
 
   buyPotion(id) {
     const offer = POTION_SHOP[id];
-    const it = this.items.find((i) => i.id === id);
+    const it = this.baseItems.find((i) => i.id === id);
     if (!offer || !it) return false;
     if (it.count >= offer.max) {
       this.hud.toast('Your belt is full of those', 1400);
@@ -3841,7 +3851,7 @@ class Game {
       if (k === 'good') pr.addGood(id, n);
       else if (k === 'part') pr.addPart(id, n);
       else if (k === 'potion') {
-        const it = this.items.find((i) => i.id === id);
+        const it = this.baseItems.find((i) => i.id === id);
         if (it) {
           it.count += n;
           pr.setStock(id, it.count);
@@ -3862,7 +3872,7 @@ class Game {
         if (g?.type === 'weapon') this.selectSlot(0, true);
       }
     } else if (k === 'potion') {
-      const it = this.items.find((i) => i.id === id);
+      const it = this.baseItems.find((i) => i.id === id);
       if (!it || it.count < n) return false;
       it.count -= n;
       pr.setStock(id, it.count);
@@ -3884,7 +3894,7 @@ class Game {
     let want = n == null ? s.n : Math.min(s.n, n | 0);
     if (want < 1) return false;
     if (s.k === 'potion') {
-      const it = this.items.find((i) => i.id === s.id);
+      const it = this.baseItems.find((i) => i.id === s.id);
       const room = (POTION_SHOP[s.id]?.max ?? 99) - (it?.count | 0);
       if (room < 1) {
         this.hud.toast('Your belt is full of those', 1400);
@@ -3912,7 +3922,7 @@ class Game {
     if (out.k === 'good') pr.addGood(out.id, out.n);
     else if (out.k === 'part') pr.addPart(out.id, out.n);
     else if (out.k === 'potion') {
-      const it = this.items.find((i) => i.id === out.id);
+      const it = this.baseItems.find((i) => i.id === out.id);
       if (it) {
         it.count += out.n;
         pr.setStock(out.id, it.count);
