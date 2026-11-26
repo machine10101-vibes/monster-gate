@@ -67,6 +67,21 @@ export class Input {
     return false;
   }
 
+  releaseControls() {
+    this.keys.clear();
+    this.pressed.clear();
+    this.attackHeld = false;
+    this.shieldBtn = false;
+    this.drag = false;
+    this.stick.id = null;
+    this.stick.x = this.stick.y = 0;
+    this.look.id = null;
+    this.moveX = this.moveY = 0;
+    this.rotateDelta = this.zoomDelta = 0;
+    this.slotSelect = -1;
+    this.resetStick();
+  }
+
   bind() {
     const k = this.keys;
     window.addEventListener('keydown', (e) => {
@@ -154,10 +169,9 @@ export class Input {
       }
     });
     window.addEventListener('keyup', (e) => k.delete(e.code));
-    window.addEventListener('blur', () => {
-      k.clear();
-      this.attackHeld = false;
-      this.shieldBtn = false;
+    window.addEventListener('blur', () => this.releaseControls());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.releaseControls();
     });
 
     const c = this.canvas;
