@@ -12,13 +12,15 @@
         // Mobile back gestures can restore an entire obsolete document from
         // the browser's back/forward cache without executing startup scripts.
         // Reload restored title/login documents, but never interrupt a hunt.
-        window.addEventListener('pageshow', function (event) {
-          if (!event.persisted) return;
-          // The global hunt marker can survive a return to login in a restored
-          // document. The body class reflects the screen the player is actually on.
-          if (document.body && document.body.classList.contains('hunting')) return;
-          location.reload();
-        });
+        if (typeof window.addEventListener === 'function') {
+          window.addEventListener('pageshow', function (event) {
+            if (!event.persisted) return;
+            // The global hunt marker can survive a return to login in a restored
+            // document. The body class reflects the screen the player is actually on.
+            if (document.body && document.body.classList.contains('hunting')) return;
+            location.reload();
+          });
+        }
         var meta = document.querySelector('meta[name="mg-build"]');
         var mine = meta && meta.getAttribute('content');
         // Split so Vite's meta stamp cannot rewrite this into `mine === '<sha>'`
