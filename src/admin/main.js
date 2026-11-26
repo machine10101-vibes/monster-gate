@@ -5,6 +5,9 @@ import '../ui/theme.css';
 import './admin.css';
 import { checkDevice, clearAccount, readAccount, signInAccount } from '../wallet/account.js';
 import { adminHref, gameHref, isAdminAccount } from './gate.js';
+import { clearSession } from '../wallet/klever.js';
+import { clearCloudToken } from '../wallet/cloud.js';
+import { clearRotationRecovery } from '../engine/rotationRecovery.js';
 import { changeStaff, issuePassCode, loadLedger, loadPassCodes } from './api.js';
 import { present } from '../../supabase/functions/_shared/ledger.js';
 import { chipsHtml, drawerHtml, leadIndex, stageHtml, toolsNote, windowsHtml } from './view.js';
@@ -381,13 +384,23 @@ $('hold').addEventListener('click', () => {
   paint();
 });
 $('signout').addEventListener('click', () => {
+  clearInterval(timer);
+  clearInterval(seatTimer);
   clearAccount();
+  clearSession();
+  clearCloudToken();
+  clearRotationRecovery(localStorage);
   session = null;
   state.ledger = null;
   state.selected = '';
   state.role = '';
   state.canPromote = false;
-  showGate('');
+  state.passCodes = [];
+  $('app').classList.add('hidden');
+  // Never reveal the legacy ledger login on explicit sign-out.
+  const next = new URL(gameHref(), location.href);
+  next.searchParams.set('signedout', String(Date.now()));
+  location.replace(next.href);
 });
 document.addEventListener('visibilitychange', () => {
   if (!state.hold && document.visibilityState === 'visible' && session) refresh();
