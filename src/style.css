@@ -1441,9 +1441,9 @@ body.touch #top-right {
 .playmap-gate-pin {
   position: absolute;
   z-index: 6;
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
   border: 1px solid #ff9aa1;
   border-radius: 50%;
   background: #e20f25;
@@ -1454,7 +1454,7 @@ body.touch #top-right {
 .playmap-gate-pin::after {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: -2px;
   border: 1px solid rgba(255, 48, 66, 0.78);
   border-radius: 50%;
   animation: monster-gate-ripple 1.25s ease-out infinite;
