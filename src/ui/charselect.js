@@ -815,7 +815,7 @@ export class CharacterSelect {
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pinching && pinchStart && pointers.size >= 2 && this.mode === 'create') {
         const distance = pointerDistance();
-        if (distance > 0) this.stage.setCreateZoom(pinchStart.zoom * distance / pinchStart.distance);
+        if (distance > 0) this.stage.setCreateZoom(pinchStart.zoom * pinchStart.distance / distance);
         e.preventDefault();
         return;
       }
