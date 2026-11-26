@@ -321,6 +321,8 @@ export function placeRuneGate(world, spec) {
     ...spec,
     y,
     group,
+    // Stable map ownership survives distance-based scene streaming detaching the mesh.
+    mapParent: spec.parent || world.group,
     light,
     tick(t) {
       for (const m of plasmaMats) m.uniforms.uTime.value = t;
