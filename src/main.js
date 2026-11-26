@@ -1253,6 +1253,7 @@ class Game {
     // Local progress is already safe; finish the cloud push in the background.
     Promise.resolve(flushCloud()).catch(() => {});
     this.leaveOnlineInPlace();
+    rememberWorldMode('offline');
     this.net?.leave?.();
     this.started = false;
     if (typeof window !== 'undefined') window.__mgHuntStarted = false;
