@@ -23,7 +23,6 @@ function closeBagAsk() {
 
 const TABS = [
   ['bag', 'Bag'],
-  ['carried', 'Hotbar'],
   ['tools', 'Tools'],
   ['goods', 'Gathered'],
   ['gear', 'Gear'],
@@ -32,7 +31,7 @@ const TABS = [
 
 /** Goods, parts, and gear share one bag. Empty cells keep all 40 slots on screen. */
 function slotList(groups) {
-  const cells = [...groups.goods, ...groups.parts, ...groups.gear];
+  const cells = [...groups.goods, ...groups.parts, ...groups.gear, ...groups.carried];
   while (cells.length < BAG_SLOTS) cells.push(null);
   return cells;
 }
@@ -40,7 +39,7 @@ function slotList(groups) {
 /** The hunter's bag. The Bag tab is 40 slots, with a detail card for the selection. */
 export function mountBag(body, game, options = {}) {
   const { assignSlot, onAssign } = options;
-  let tab = assignSlot == null ? 'bag' : 'carried';
+  let tab = 'bag';
   let sel = null;
 
   const paint = () => {
@@ -160,12 +159,12 @@ export function mountBag(body, game, options = {}) {
         note.textContent = current.setNote;
         detail.appendChild(note);
       }
-      if (onAssign && Number.isInteger(current.slotIndex)) {
+      if (onAssign && (current.item || current.drop || current.key)) {
         const assign = document.createElement('button');
         assign.type = 'button';
         assign.className = 'bag-act';
         assign.textContent = `Assign to hotbar slot ${assignSlot + 1}`;
-        assign.onclick = () => onAssign(current.item, current.slotIndex);
+        assign.onclick = () => onAssign(current.item || { id: current.drop?.id || current.key, name: current.name, icon: current.drop?.id || 'tome', kind: 'none', bagRef: current.drop || { k: 'tool', id: current.key } }, current.slotIndex);
         detail.appendChild(assign);
       }
       const held = bagHoldChoices(current);
@@ -360,14 +359,14 @@ function emptyText(tab) {
 function collect(game) {
   const forged = new Set(GEAR.map((g) => g.id));
   const carried = [];
-  game.items.forEach((it, i) => {
+  (game.baseItems || game.items).forEach((it, i) => {
     if (!it || it.id === 'empty' || !it.held || forged.has(it.id)) return;
     const count = it.count !== undefined ? `Carried ${it.count}` : i === game.sel ? 'In hand' : 'On the hotbar';
     const held = heldStats(it);
     carried.push({
       key: 'c' + i,
       slotIndex: i,
-      item: { ...it },
+      item: it,
       name: it.name,
       sub: it.desc ? `${count}. ${it.desc}` : count,
       stats: held,
@@ -377,7 +376,7 @@ function collect(game) {
       drop: it.count != null && it.count > 0 ? { k: 'held', id: it.id, n: 1, name: it.name } : null,
       run: (paint) => {
         if (it.kind === 'use') game.player?.tryAttack(it);
-        else game.selectSlot(i);
+        else { const slot = game.items.findIndex(x => x.id === it.id); if (slot >= 0) game.selectSlot(slot); else game.hud.toast('Assign this item to a hotbar slot first.'); }
         paint();
       },
     });
@@ -488,6 +487,7 @@ function collect(game) {
     const sheet = pieceStats(g, game.progress);
     return {
       key: 'w' + g.id,
+      item: g.type === 'weapon' ? { ...g.item } : null,
       name: g.name,
       sub: worn ? 'Equipped.' : 'In the bag.',
       badge: worn ? 'Worn' : null,
