@@ -184,7 +184,10 @@ test('slice wiring: rift button, guest-session block, journal gear reward', () =
   assert.match(session, /Sign in with an account to hunt with friends/);
   assert.match(journal, /gear: q\.reward\?\.gear/);
   assert.match(main, /hellspire: this\.world\.demonKeep/);
-  assert.match(main, /grantFound\(e\.gear\)/);
+  // Quest gear is delivered through the journal, which keeps it owed while the bag is full.
+  assert.match(main, /deliverQuestGear\(e\.gear/);
+  assert.match(main, /journal\.deliverGear\(id\)/);
+  assert.match(journal, /grantFound\(id\)/);
   assert.match(main, /enterRiftFromGate/);
   const journalUi = src('../src/ui/journal.js');
   assert.match(journalUi, /\/\^b\\d\+\$\/\.test\(sel\)/);

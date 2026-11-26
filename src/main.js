@@ -611,7 +611,7 @@ class Game {
       this.membershipChecking = true;
       try {
         const account = readAccount();
-        if (this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken) {
+        if ((this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken)) {
           this.openSocialSignIn();
           return;
         }
@@ -2446,23 +2446,26 @@ class Game {
     return false;
   }
 
+  /** Hand a quest's gear reward to the hunter. If the bag is full it stays owed and is retried. */
+  deliverQuestGear(id, announce = false) {
+    const result = this.journal.deliverGear(id);
+    if (result === 'granted') {
+      const gg = gearById(id);
+      this.applyGear();
+      if (gg) this.hud.toast(`Earned: ${gg.name}`, 2800);
+    } else if (result === 'full' && announce) {
+      this.hud.toast(`${INVENTORY_FULL} Your quest reward waits for you.`, 3200);
+    }
+    return result;
+  }
+
   applyJournal(events) {
     const list = Array.isArray(events) ? events : events ? [events] : [];
     let hud = false;
     for (const e of list) {
       if (!e) continue;
       if (e.gold) this.addGold(e.gold);
-      if (e.gear) {
-        const gg = gearById(e.gear);
-        if (this.progress.crafted(e.gear)) {
-          /* already owned */
-        } else if (!this.progress.grantFound(e.gear)) {
-          this.hud.toast(INVENTORY_FULL, 1800);
-        } else if (gg) {
-          this.applyGear();
-          this.hud.toast(`Earned: ${gg.name}`, 2800);
-        }
-      }
+      if (e.gear) this.deliverQuestGear(e.gear, true);
       if (e.fanfare) this.audio.quest();
       if (e.banner) this.hud.banner(e.banner[0], e.banner[1], 3800);
       if (e.toast && !e.quiet) this.hud.toast(e.toast, 2800);
@@ -4374,6 +4377,8 @@ class Game {
       this.journalT -= dt;
       if (this.journalT <= 0) {
         this.journalT = 0.45;
+        // A quest reward that did not fit in the bag is delivered as soon as there is room.
+        for (const id of this.journal.owedGear()) this.deliverQuestGear(id);
         const gilan = this.world.gilantre;
         this.applyJournal(this.journal.pulse(this.player.pos, {
           gate: GATE,

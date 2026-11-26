@@ -17,8 +17,10 @@ collect(b, bMsgs);
 await hello(a, 'ann', { name: 'Ann' });
 await hello(b, 'bea', { name: 'Bea' });
 await waitUntil(() => bMsgs.some((m) => m.type === 'snapshot' && m.players.some((p) => p.name === 'Ann')));
+// Deltas identify a player by id and omit the name, so take Ann's id from the snapshot.
+const annId = bMsgs.filter((m) => m.type === 'snapshot').flatMap((m) => m.players).find((p) => p.name === 'Ann').id;
 a.send(encode('move', { x: 74, y: 3.2, z: 73, yaw: 0.2, move: 1, anim: 0, zone: 'Oakhollow' }));
-await waitUntil(() => bMsgs.some((m) => m.type === 'delta' && m.upsert?.some((p) => p.name === 'Ann' && p.x >= 73)));
+await waitUntil(() => bMsgs.some((m) => m.type === 'delta' && m.upsert?.some((p) => p.id === annId && p.x >= 73)));
 a.send(encode('chat', { channel: 'world', text: 'Smoke is clear.' }));
 await waitUntil(() => bMsgs.some((m) => m.type === 'chat' && m.text === 'Smoke is clear.'));
 a.close();
