@@ -1225,20 +1225,39 @@ export class HUD {
     const fallback = ['Spirit Bolt', 'Empty', 'Fury'];
     const rightIds = ['tb-bolt', 'tb-skill', 'tb-fury'];
     const casts = [...document.querySelectorAll('#cast-buttons .cast')];
+    // Keep handlers bound once, but refresh their references when the game/HUD is recreated.
+    casts.forEach((el, i) => { el._skillPickerContext = { hud: this, game }; });
+    rightIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el._skillPickerContext = { hud: this, game };
+    });
     if (!document.body.dataset.skillsWired) {
       document.body.dataset.skillsWired = '1';
       const armLongPress = (el, i) => {
         let holdTimer = 0;
         let held = false;
-        const cancel = () => {
+        let pointerId = null;
+        let startX = 0;
+        let startY = 0;
+        const cancel = (event) => {
+          if (pointerId != null && event?.pointerId != null && event.pointerId !== pointerId) return;
           if (holdTimer) clearTimeout(holdTimer);
           holdTimer = 0;
           el.classList.remove('hold-arming');
+          if (pointerId != null && el.hasPointerCapture?.(pointerId)) {
+            try { el.releasePointerCapture(pointerId); } catch { /* pointer already ended */ }
+          }
+          pointerId = null;
         };
         el.addEventListener('pointerdown', (event) => {
           if (event.button !== undefined && event.button !== 0) return;
-          if (this.hotbarLocked) return;
+          const context = el._skillPickerContext;
+          if (!context || context.hud.hotbarLocked) return;
           held = false;
+          pointerId = event.pointerId;
+          startX = event.clientX;
+          startY = event.clientY;
+          try { el.setPointerCapture(pointerId); } catch { /* capture is optional */ }
           el.classList.add('hold-arming');
           el.style.setProperty('--hold-ms', `${HOTBAR_HOLD_MS}ms`);
           holdTimer = setTimeout(() => {
@@ -1246,12 +1265,17 @@ export class HUD {
             held = true;
             el.classList.remove('hold-arming');
             el.dataset.skillPickerConsumed = '1';
-            this.openSkillPicker(game, i);
+            const current = el._skillPickerContext;
+            if (current && !current.hud.hotbarLocked) current.hud.openSkillPicker(current.game, i);
           }, HOTBAR_HOLD_MS);
         });
-        for (const eventName of ['pointerup', 'pointercancel', 'pointerleave']) {
-          el.addEventListener(eventName, cancel);
-        }
+        el.addEventListener('pointermove', (event) => {
+          if (holdTimer && pointerId === event.pointerId
+            && Math.hypot(event.clientX - startX, event.clientY - startY) > 18) cancel(event);
+        });
+        el.addEventListener('pointerup', cancel);
+        el.addEventListener('pointercancel', cancel);
+        el.addEventListener('lostpointercapture', cancel);
         el.addEventListener('contextmenu', (event) => {
           if (held || holdTimer) event.preventDefault();
         });
@@ -1267,13 +1291,16 @@ export class HUD {
         el.addEventListener('dragover', (e) => e.preventDefault());
         el.addEventListener('drop', (e) => {
           e.preventDefault();
+          const context = el._skillPickerContext;
+          if (!context) return;
+          const { game: currentGame } = context;
           const id = (e.dataTransfer.getData('text/plain') || '').replace(/^skill:/, '');
-          if (SKILLS[id]) game.equipSkill(i, id);
-          if (game.hud.panelId === 'spellbook' || game.hud.panelId === 'skills') game.hud.openPanel(game.hud.panelId, game);
+          if (SKILLS[id]) currentGame.equipSkill(i, id);
+          if (currentGame.hud.panelId === 'spellbook' || currentGame.hud.panelId === 'skills') currentGame.hud.openPanel(currentGame.hud.panelId, currentGame);
         });
       };
       casts.forEach((b, i) => {
-        b.addEventListener('click', () => game.castSlot(i));
+        b.addEventListener('click', () => b._skillPickerContext?.game?.castSlot(i));
         armLongPress(b, i);
         accept(b, i);
       });
