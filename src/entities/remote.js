@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, gripRoll, placeSheath } from './weaponModels.js';
+import { DUAL_KINDS, SIDE_SWORDS, gripRoll, placeSheath } from './weaponModels.js';
 import { lookOptions } from '../systems/roster.js';
 
 const LOOKS = [
@@ -139,11 +139,12 @@ export class RemoteHunter {
   }
 
   syncSheath() {
-    const slot = this.model.backSlot;
-    if (!slot) return;
-    while (slot.children.length) slot.remove(slot.children[0]);
+    for (const slot of [this.model.backSlot, this.model.hipSlot]) {
+      while (slot?.children.length) slot.remove(slot.children[0]);
+    }
     const kind = this.sheathKind;
     if (!kind || kind === this.heldKind) return;
+    const slot = SIDE_SWORDS.has(kind) ? this.model.hipSlot : this.model.backSlot;
     const g = buildHeld(kind);
     g.traverse((o) => (o.castShadow = true));
     placeSheath(g, kind);

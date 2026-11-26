@@ -549,8 +549,16 @@ export function buildHumanoid(o = {}) {
 
   /* Sheathed weapon. The grip clears the right shoulder and the blade angles down the back. */
   const backSlot = new THREE.Group();
-  backSlot.position.set(0.02, 0.5, -0.3);
+  backSlot.position.set(c.armor?.shield ? 0.26 : 0.02, 0.5, c.armor?.shield ? -0.43 : -0.3);
   upper.add(backSlot);
+  const hipSlot = new THREE.Group();
+  hipSlot.position.set(-0.34, -0.08, 0.04);
+  hip.add(hipSlot);
+  const shieldBack = new THREE.Group();
+  shieldBack.position.set(0, 0.13, -0.32);
+  shieldBack.rotation.x = -Math.PI / 2;
+  upper.add(shieldBack);
+  if (c.armor?.shield) shieldBack.add(buildThemedShield(c.armor.shield, mat));
 
   const legL = new THREE.Group();
   const legR = new THREE.Group();
@@ -611,7 +619,7 @@ export function buildHumanoid(o = {}) {
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, wristL, wristR, legL, legR, kneeL, kneeR, ankleL, ankleR, hand, heldSlot, backSlot, shieldG, offhand, bookG, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, wristL, wristR, legL, legR, kneeL, kneeR, ankleL, ankleR, hand, heldSlot, backSlot, hipSlot, shieldBack, shieldG, offhand, bookG, mat };
 }
 
 function buildThemedShield(setId, mat) {

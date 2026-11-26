@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, TALL_KINDS, gripRoll, placeSheath, swingRoll, bendBowString } from './weaponModels.js';
+import { DUAL_KINDS, TALL_KINDS, SIDE_SWORDS, gripRoll, placeSheath, swingRoll, bendBowString } from './weaponModels.js';
 import { clamp, lerp } from '../engine/voxel.js';
 import { WATER_Y, ZONE } from '../world/terrain.js';
 import { WeaponTrail } from '../engine/trail.js';
@@ -146,18 +146,19 @@ export class Player {
     this.syncSheath();
   }
 
-  /** Equipped weapon to carry on the back whenever it is not in the hand. */
+  /** Equipped weapon to carry when it is not in the hand. */
   setSheath(kind) {
     this.sheathKind = kind || null;
     this.syncSheath();
   }
 
   syncSheath() {
-    const slot = this.model.backSlot;
-    if (!slot) return;
-    while (slot.children.length) slot.remove(slot.children[0]);
+    for (const slot of [this.model.backSlot, this.model.hipSlot]) {
+      while (slot?.children.length) slot.remove(slot.children[0]);
+    }
     const kind = this.sheathKind;
     if (!kind || kind === this.heldKind) return;
+    const slot = SIDE_SWORDS.has(kind) ? this.model.hipSlot : this.model.backSlot;
     const g = buildHeld(kind);
     g.traverse((o) => (o.castShadow = true));
     placeSheath(g, kind);
@@ -577,6 +578,7 @@ export class Player {
     this.shielding = wantShield;
     if (wantShield && this.state === 'idle') this.state = 'idle';
     if (this.model.shieldG) this.model.shieldG.visible = this.shielding;
+    if (this.model.shieldBack) this.model.shieldBack.visible = !this.shielding;
     const dualHeld = DUAL_KINDS.has(this.heldKind);
     const heldFamily = weaponFamily({ kind: 'melee' }, this.heldKind);
     const twoHandHeld = isTwoHandedFamily(heldFamily);
