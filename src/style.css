@@ -3735,6 +3735,18 @@ body, button, input { font-variant-ligatures: none; font-feature-settings: 'liga
   box-shadow: 0 0 0 2px #090a10, 0 14px 40px rgba(0, 0, 0, 0.6);
 }
 .cs-panel.hidden { display: none !important; }
+.cs-panel-head {
+  display: flex; align-items: center; justify-content: space-between; flex: none;
+  min-height: 36px; padding: 4px 10px; color: #f1d98a;
+  font-family: var(--font-px); font-size: 9px; letter-spacing: 1px;
+  border-bottom: 1px solid var(--gold-dim); background: linear-gradient(90deg, #30240f, #17131a);
+}
+.cs-panel-head button {
+  width: 30px; height: 28px; padding: 0; color: #ffd23f; background: #120f08;
+  border: 2px solid var(--gold); font-size: 20px; line-height: 1; cursor: pointer; touch-action: manipulation;
+}
+.cs-panel.minimized { height: auto !important; bottom: auto !important; }
+.cs-panel.minimized > :not(.cs-panel-head) { display: none !important; }
 #charselect.list-off #cs-panel { display: none; }
 .cs-search { padding: 10px 10px 4px; }
 .cs-search input {

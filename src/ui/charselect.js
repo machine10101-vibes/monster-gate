@@ -512,6 +512,19 @@ export class CharacterSelect {
     if (!matchMedia('(pointer: coarse)').matches) $('cs-name-input').focus();
   }
 
+  togglePanelMinimized(force) {
+    const panel = $('cs-panel');
+    if (!panel || this.mode !== 'list') return;
+    const minimized = typeof force === 'boolean' ? force : !panel.classList.contains('minimized');
+    panel.classList.toggle('minimized', minimized);
+    const button = $('cs-panel-minimize');
+    if (button) {
+      button.setAttribute('aria-expanded', String(!minimized));
+      button.setAttribute('aria-label', minimized ? 'Expand character list' : 'Minimize character list');
+      button.textContent = minimized ? '＋' : '−';
+    }
+  }
+
   toggleFormMinimized(force) {
     const form = $('cs-form');
     if (!form || this.mode !== 'create') return;
@@ -747,6 +760,7 @@ export class CharacterSelect {
     $('cs-confirm-no').addEventListener('click', () => $('cs-confirm').classList.add('hidden'));
     $('cs-confirm-yes').addEventListener('click', () => this.doDelete());
     $('cs-form-minimize')?.addEventListener('click', () => this.toggleFormMinimized());
+    $('cs-panel-minimize')?.addEventListener('click', () => this.togglePanelMinimized());
     $('cs-form').addEventListener('submit', (e) => this.submitForm(e));
     $('cs-form-cancel').addEventListener('click', () => this.back());
     $('cs-name-input').addEventListener('input', () => this.onName());
@@ -780,13 +794,14 @@ export class CharacterSelect {
     let pinching = false;
     let drag = null;
     const pointerDistance = () => {
-      const [a, b] = [...pointers.values()];
-      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+      const values = [...pointers.values()];
+      return values.length >= 2 ? Math.hypot(values[0].x - values[1].x, values[0].y - values[1].y) : 0;
     };
     stage.addEventListener('pointerdown', (e) => {
-      stage.setPointerCapture?.(e.pointerId);
+      if (!this.active) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.active && this.mode === 'create' && pointers.size === 2) {
+      stage.setPointerCapture?.(e.pointerId);
+      if (this.mode === 'create' && pointers.size >= 2) {
         const distance = pointerDistance();
         if (distance > 0) pinchStart = { distance, zoom: this.stage?.createZoom || 1 };
         pinching = true;
@@ -794,9 +809,7 @@ export class CharacterSelect {
         e.preventDefault();
         return;
       }
-      if (pointers.size === 1) {
-        drag = { x: e.clientX, y: e.clientY, last: e.clientX, moved: 0 };
-      }
+      if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, last: e.clientX, moved: 0 };
     });
     stage.addEventListener('pointermove', (e) => {
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -813,12 +826,14 @@ export class CharacterSelect {
       if (drag.moved > 8) this.turn(dx * 0.012);
     });
     const end = (e) => {
-      const wasPinching = pinching;
+      if (!pointers.has(e.pointerId)) return;
       pointers.delete(e.pointerId);
-      if (wasPinching) {
-        pinchStart = null;
-        pinching = false;
-        drag = null;
+      if (pinching) {
+        if (pointers.size < 2) {
+          pinchStart = null;
+          pinching = false;
+          drag = null;
+        }
         return;
       }
       if (!drag) return;
@@ -831,7 +846,6 @@ export class CharacterSelect {
     };
     stage.addEventListener('pointerup', end);
     stage.addEventListener('pointercancel', end);
-    stage.addEventListener('lostpointercapture', end);
 
     window.addEventListener('keydown', (e) => {
       if (!this.active) return;
