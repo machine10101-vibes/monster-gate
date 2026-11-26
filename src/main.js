@@ -1062,6 +1062,9 @@ class Game {
       return;
     }
     rememberWorldMode('online');
+    // Character Select's World 1 shortcut enters in-place (unlike the title
+    // picker, which navigates). Mark the URL first so the MMO client is mounted
+    // by both start() and ensureOnlineClient().
     if (!isWorldOnline(search) && typeof history !== 'undefined' && history.replaceState) {
       try { history.replaceState({}, '', hrefWithSearch(onlineSearch(search), location)); } catch { /* ignore */ }
     }
@@ -4404,12 +4407,13 @@ async function startGame() {
         return null;
       });
       game.ensureWorldConnection = async () => {
-        if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search: liveSearch })) return;
+        const search = typeof location !== 'undefined' ? location.search : liveSearch;
+        if (game.mmo || mockOn || mockWake || !shouldMountOnline({ search })) return;
         try {
           const ready = await game.worldViewReady;
           if (!ready || ready.flags.mock || ready.flags.mockwake) return;
           const { attachMmo } = await import('./net/mmo.js');
-          attachMmo(game, ready.view, { search: liveSearch });
+          attachMmo(game, ready.view, { search });
         } catch (err) {
           console.warn('world connection', err);
         }
