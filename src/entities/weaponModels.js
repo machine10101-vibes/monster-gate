@@ -87,6 +87,8 @@ export function placeSheath(group, kind) {
     const carryScale = Math.min(0.68, 0.66 / (bounds.max.z - bounds.min.z));
     // Tilt the point 30 degrees behind the wearer while the grip stays at the hip.
     group.quaternion.setFromUnitVectors(sheathZ, sheathTip.set(0, -Math.cos(Math.PI / 6), -Math.sin(Math.PI / 6)));
+    // Turn the broad blade or hammer face outward, parallel to the thigh.
+    group.quaternion.multiply(sheathRoll.setFromAxisAngle(sheathZ, Math.PI / 2));
     group.scale.setScalar(carryScale);
     group.position.set(0, 0, -bounds.min.z * carryScale).applyQuaternion(group.quaternion);
     return;
