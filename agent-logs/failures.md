@@ -50,3 +50,12 @@ No entries recorded yet.
 - Retry reason: none for this task; escalated. Not fixed here, and not weakened.
 - Outcome: test gate blocked for this task; task cannot be marked done until main's failures are resolved or a human decides.
 
+
+### 2026-11-26 — Sand worm forced-move live check (iteration 2)
+- Task: verify Maw Slam, Sand Torrent, dive and Dune Rupture in the live game.
+- Attempt: Playwright + swiftshader, guest at the Oasis, worm teleported in front of the hunter and set to `slamwind`.
+- Exact error: `page.evaluate: Target crashed` during the slam run.
+- Root cause: unknown (renderer crash; to be checked by rerunning slam alone).
+- Retry: rerun slam only with console capture.
+- Follow-up: rerun of slam alone did not crash, but the worm stayed in `slamwind`. A rAF probe counted 1 frame in 3 s: swiftshader renders the full scene (83 monsters) at about 0.3 fps, so game time barely advanced. Root cause of the stall: environment speed, not the worm code. The earlier crash is most likely the same renderer under load (not reproduced).
+- Different approach: step the real `sandwormAI.think/animate` inside the live game page at fixed 1/30 s steps against the real player, world and fx. Outcome: all moves passed (see progress.md).
