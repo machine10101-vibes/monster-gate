@@ -3,6 +3,7 @@ import { VoxelModel, RNG, hash3, jitter, shade, clamp } from '../engine/voxel.js
 import { toonMaterial } from '../engine/materials.js';
 import { meshFrom, splitLimb, relief } from './humanoid.js';
 import { YETI } from '../data/yeti.js';
+import { detailYetiTorso, detailYetiHead, detailYetiJaw, detailYetiArm, detailYetiLeg } from './yetiDetail.js';
 
 /**
  * Ravenous Snow Yeti, built like the hero and the orc: a barrel torso, a head with a
@@ -225,6 +226,7 @@ function paintTorso() {
     const fz = frontZ(T, CX + dx, ty(14) + dy);
     if (fz >= 0) T.set(CX + dx, ty(14) + dy, fz + 1, YETI.trim);
   }
+  detailYetiTorso(T);
   return T;
 }
 
@@ -372,6 +374,7 @@ function paintHead() {
   upFang(CX + 5, 9, 2.0);
   upFang(CX - 2, 5, 1.2);
   upFang(CX + 1, 5, 1.2);
+  detailYetiHead(H);
   return H;
 }
 
@@ -400,6 +403,7 @@ function paintJaw() {
   loFang(CX - 2, 4, 1.1, 24);
   loFang(CX + 1, 4, 1.1, 24);
   for (const s of [-1, 1]) for (let z = 10; z < 21; z += 3) loFang(CX + s * 6, 2, 0.8, z);
+  detailYetiJaw(J);
   return J;
 }
 
@@ -465,6 +469,7 @@ function paintArm(seed) {
         }
   }
   relief(A, before);
+  detailYetiArm(A, seed);
   return A;
 }
 
@@ -508,6 +513,7 @@ function paintLeg(seed) {
   furClump(L, CX, 4, CZ + 4, 9, 3, 9.6, seed + 8, 3, 0, 4);
   for (let k = 0; k < 3; k++) iceSpike(L, CX - 3 + k * 3, 21, CZ + 6.5, (k - 1) * 0.3, 0.2, 1, 6 + k, 2);
   relief(L, before);
+  detailYetiLeg(L, seed);
   return L;
 }
 
