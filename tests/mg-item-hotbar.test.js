@@ -15,7 +15,8 @@ test('item hotbar hold opens inventory assignment and lock is persisted in setti
 });
 
 test('inventory exposes carried items as hotbar assignment choices', () => {
-  assert.match(bag, /assignSlot == null \? 'bag' : 'carried'/);
+  assert.match(bag, /let tab = 'bag'/);
+  assert.doesNotMatch(bag, /\['carried', 'Hotbar'\]/);
   assert.match(bag, /Assign to hotbar slot/);
   assert.match(bag, /slotIndex: i/);
   assert.match(main, /assignHotbarItem\(slot, item, sourceSlot\)/);
