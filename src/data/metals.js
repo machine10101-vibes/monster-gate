@@ -27,7 +27,8 @@ const WEAPON_KINDS = [
   { kind: 'sword', wtype: 'onesword', noun: 'Sword', bars: 'swordBars', smithOff: 0, style: 'swordshield', reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.16, stam: 8, knock: 4 },
   { kind: 'greatsword', wtype: 'twosword', noun: 'Greatsword', bars: 'greatBars', smithOff: 4, style: 'twohand', reach: 2.7, arc: 2.4, dur: 0.58, hit: 0.26, stam: 13, knock: 7 },
   { kind: 'spear', wtype: 'spear', noun: 'Spear', bars: 'spearBars', smithOff: 2, style: 'twohand', reach: 3.1, arc: 1.0, dur: 0.46, hit: 0.2, stam: 10, knock: 4 },
-  { kind: 'hammer', wtype: 'hammer', noun: 'One-Handed Hammer', bars: 'hammerBars', smithOff: 5, style: 'swordshield', reach: 2.4, arc: 2.0, dur: 0.5, hit: 0.22, stam: 10, knock: 6 },
+  { kind: 'hammer', wtype: 'twohammer', noun: 'Two-Handed Hammer', bars: 'hammerBars', smithOff: 5, style: 'twohand', reach: 2.7, arc: 2.3, dur: 0.7, hit: 0.34, stam: 15, knock: 8 },
+  { kind: 'onehammer', wtype: 'hammer', noun: 'One-Handed Hammer', bars: 'swordBars', smithOff: 3, style: 'swordshield', reach: 2.4, arc: 2.0, dur: 0.5, hit: 0.22, stam: 10, knock: 6 },
 ];
 
 function cap99(n) {
@@ -255,7 +256,7 @@ export function aliasGoodId(id) {
 /** Gear ids that no longer exist fold onto the closest living piece. */
 export const GEAR_ALIASES = (() => {
   const out = {};
-  const slots = ['helm', 'chest', 'arms', 'legs', 'boots', 'shield', 'sword', 'greatsword', 'spear', 'hammer'];
+  const slots = ['helm', 'chest', 'arms', 'legs', 'boots', 'shield', 'sword', 'greatsword', 'spear', 'hammer', 'onehammer'];
   for (const slot of slots) {
     out[`bronze${slot}`] = `copper${slot === 'sword' || slot === 'greatsword' || slot === 'spear' || slot === 'hammer' ? slot : slot}`;
     out[`adamant${slot}`] = `adamite${slot}`;
@@ -301,18 +302,20 @@ export function metalArmorPieces(metal) {
 export function metalWeapons(metal) {
   const Name = metal.name;
   const bar = metal.barId;
-  const dmgOf = { sword: metal.swordDmg, greatsword: metal.greatDmg, spear: metal.spearDmg, hammer: metal.hammerDmg };
+  const dmgOf = { sword: metal.swordDmg, greatsword: metal.greatDmg, spear: metal.spearDmg, hammer: metal.hammerDmg, onehammer: Math.round(metal.hammerDmg * 0.8) };
   const blurbOf = {
     sword: `Sword and shield. Forged ${metal.id}.`,
     greatsword: `Two-handed. Heavy ${metal.id}.`,
     spear: `Two-handed. A long ${metal.id} thrust.`,
-    hammer: `One-handed. A compact hammer balanced for shield combat.`,
+    hammer: `Two-handed. Heavy striking hammer.`,
+    onehammer: `One-handed. A compact hammer balanced for shield combat.`,
   };
   const lookOf = {
     sword: `A plain ${metal.id} blade with a straight crossguard.`,
     greatsword: `A long ${metal.id} blade on a two-hand grip. Slow, and it cleaves.`,
     spear: `A leaf-shaped ${metal.id} head on an ash shaft. It reaches past a sword.`,
-    hammer: `A block of ${metal.id} on a short haft. It is slow and it knocks things down.`,
+    hammer: `A heavy block of ${metal.id} on a long haft.`,
+    onehammer: `A compact ${metal.id} hammer for use with a shield.`,
   };
   return WEAPON_KINDS.map((w) => {
     const bars = metal[w.bars];
