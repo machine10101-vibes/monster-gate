@@ -661,6 +661,21 @@ GEAR.push(
  * Issued, not forged, so they carry no recipe.
  */
 export const STARTER = 'starter';
+export const CLASS_STARTER_WEAPON = { paladin: 'squirehammer', mage: 'apprenticewand', ranger: 'hunterbow' };
+for (const [id, type, name, held, item] of [
+  ['squirehammer', 'hammer', 'Squire War Hammer', 'ironhammer', M('twohand', 10, 2.5, 2.2, 0.72, 0.34, 10, 6, 'A basic war hammer.')],
+  ['apprenticewand', 'wand', 'Apprentice Wand', 'wand', R('wand', 6, 0.38, 4, 'A basic magic wand.', { spell: true, proj: 'orb' })],
+  ['hunterbow', 'shortbow', 'Hunter Bow', 'bow', R('shortbow', 7, 0.42, 5, 'A basic hunting bow.')],
+]) {
+  const g = weapon(id, type, name, STARTER, item.blurb, {}, item, { found: true, starter: true });
+  g.held = held;
+  g.item.held = held;
+  g.item.icon = held;
+  GEAR.push(g);
+}
+export function starterHeld(classId) {
+  return GEAR.find(g => g.id === CLASS_STARTER_WEAPON[classId])?.held || 'blade';
+}
 function starterSet(set, defs) {
   for (const [slot, id, name, def, desc] of defs) GEAR.push({ id, type: 'armor', slot, name, monster: STARTER, set, def, desc, recipe: {}, found: true, starter: true });
 }
