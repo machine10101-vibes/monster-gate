@@ -59,3 +59,11 @@ No entries recorded yet.
 - Retry: rerun slam only with console capture.
 - Follow-up: rerun of slam alone did not crash, but the worm stayed in `slamwind`. A rAF probe counted 1 frame in 3 s: swiftshader renders the full scene (83 monsters) at about 0.3 fps, so game time barely advanced. Root cause of the stall: environment speed, not the worm code. The earlier crash is most likely the same renderer under load (not reproduced).
 - Different approach: step the real `sandwormAI.think/animate` inside the live game page at fixed 1/30 s steps against the real player, world and fx. Outcome: all moves passed (see progress.md).
+
+### 2026-11-26 — PR #312 release blocked by main-branch test failures
+- Task: publish the sandworm rebuild (approved by the user: "Publish it live").
+- Attempt: PR #312 from ccr-81a4e261-p4hmfr (head 21d896f) into main. Checks ran on the head commit.
+- Exact error: `verify` and `test-and-build` both exit 1. Failing tests: `MG-UI title: account sign-in...` (334), `MG-UI panels share the journal theme tokens...` (336), `title, menu, HUD pill...` (360). Each asserts the guest button is absent: `/id="btn-guest"|Play as guest/i` must not match.
+- Root cause: the guest button was restored on main (fa64a04), so these assertions are stale. The same three fail on clean origin/main.
+- Retry: not done. Editing these assertions needs the user's approval (option 1 from the earlier blocker), and skipping tests is not allowed.
+- Outcome: PR #312 not merged; not published.
