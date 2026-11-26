@@ -5870,11 +5870,36 @@ html:has(#panel:not(.hidden)) #debug-badge {
     width: min(92vw, 560px);
     height: auto;
   }
-  #charselect .cs-form-title {
+  #charselect form.cs-form .cs-form-title {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin: 0 0 2px;
     font-size: 12px;
     letter-spacing: 1px;
+    pointer-events: auto;
+  }
+  #charselect form.cs-form .cs-form-minimize {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+  #charselect form.cs-form {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate3d(-50%, -50%, 0);
+    width: min(92vw, 560px);
+    max-width: calc(100vw - 24px);
+    height: min(82dvh, 680px);
+    max-height: calc(100dvh - 24px);
+    overflow: hidden;
   }
 }
 

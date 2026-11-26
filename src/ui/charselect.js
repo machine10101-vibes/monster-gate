@@ -774,45 +774,53 @@ export class CharacterSelect {
       b.addEventListener('lostpointercapture', stop);
     }
 
-    const zoomRoot = this.root;
+    const stage = $('cs-stage');
+    const pointers = new Map();
     let pinchStart = null;
     let pinching = false;
-    const touchDistance = (touches) => {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      return Math.hypot(dx, dy);
-    };
-    zoomRoot.addEventListener('touchstart', (e) => {
-      if (!this.active || this.mode !== 'create' || e.touches.length !== 2) return;
-      e.preventDefault();
-      pinchStart = { distance: touchDistance(e.touches), zoom: this.stage?.createZoom || 1 };
-      pinching = true;
-      drag = null;
-    }, { passive: false });
-    zoomRoot.addEventListener('touchmove', (e) => {
-      if (!pinchStart || e.touches.length !== 2 || this.mode !== 'create') return;
-      e.preventDefault();
-      const distance = touchDistance(e.touches);
-      if (distance > 0) this.stage.setCreateZoom(pinchStart.zoom * pinchStart.distance / distance);
-    }, { passive: false });
-    const endPinch = () => { pinchStart = null; pinching = false; drag = null; };
-    zoomRoot.addEventListener('touchend', endPinch, { passive: true });
-    zoomRoot.addEventListener('touchcancel', endPinch, { passive: true });
-
-    const stage = $('cs-stage');
     let drag = null;
+    const pointerDistance = () => {
+      const [a, b] = [...pointers.values()];
+      return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+    };
     stage.addEventListener('pointerdown', (e) => {
-      drag = { x: e.clientX, y: e.clientY, last: e.clientX, moved: 0 };
       stage.setPointerCapture?.(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.active && this.mode === 'create' && pointers.size === 2) {
+        const distance = pointerDistance();
+        if (distance > 0) pinchStart = { distance, zoom: this.stage?.createZoom || 1 };
+        pinching = true;
+        drag = null;
+        e.preventDefault();
+        return;
+      }
+      if (pointers.size === 1) {
+        drag = { x: e.clientX, y: e.clientY, last: e.clientX, moved: 0 };
+      }
     });
     stage.addEventListener('pointermove', (e) => {
-      if (!drag || pinching) return;
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinching && pinchStart && pointers.size >= 2 && this.mode === 'create') {
+        const distance = pointerDistance();
+        if (distance > 0) this.stage.setCreateZoom(pinchStart.zoom * pinchStart.distance / distance);
+        e.preventDefault();
+        return;
+      }
+      if (!drag || pointers.size !== 1) return;
       const dx = e.clientX - drag.last;
       drag.last = e.clientX;
       drag.moved += Math.abs(dx);
       if (drag.moved > 8) this.turn(dx * 0.012);
     });
     const end = (e) => {
+      const wasPinching = pinching;
+      pointers.delete(e.pointerId);
+      if (wasPinching) {
+        pinchStart = null;
+        pinching = false;
+        drag = null;
+        return;
+      }
       if (!drag) return;
       const tap = drag.moved <= 8;
       drag = null;
@@ -822,7 +830,8 @@ export class CharacterSelect {
       }
     };
     stage.addEventListener('pointerup', end);
-    stage.addEventListener('pointercancel', () => (drag = null));
+    stage.addEventListener('pointercancel', end);
+    stage.addEventListener('lostpointercapture', end);
 
     window.addEventListener('keydown', (e) => {
       if (!this.active) return;
