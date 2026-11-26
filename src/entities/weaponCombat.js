@@ -3,11 +3,11 @@ import { METALS } from '../data/metals.js';
 
 const has = (value, pattern) => pattern.test(String(value || '').toLowerCase());
 const ONE_HANDED_HAMMERS = new Set([
-  'hammer', 'ironhammer', 'squirehammer',
+  'squirehammer',
   'budgemaul', 'darkhammer', 'yetihammer', 'volchammer', 'rexhammer', 'holyhammer',
   'tigerhammer', 'raptorhammer', 'piratehammer', 'cursedhammer',
   'sandwormhammer', 'scorpionhammer', 'orcwarhammer', 'demonhammer', 'wardenhammer',
-  ...METALS.map((metal) => `${metal.id}hammer`),
+  ...METALS.map((metal) => `${metal.id}onehammer`),
 ]);
 
 export function weaponFamily(item = {}, heldKind = item.held || '') {
