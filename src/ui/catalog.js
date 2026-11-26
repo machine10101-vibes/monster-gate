@@ -488,6 +488,12 @@ export class Catalog {
         grid.appendChild(card);
       }
     } else if (this.tab === 'weapons') {
+      if (this.forge) {
+        for (const [type, label] of [['hammer', 'Monster single-handed hammers'], ['twohammer', 'Monster two-handed hammers']]) {
+          grid.appendChild(this.heading(label));
+          for (const g of weapons().filter(g => g.wtype === type && g.monster !== 'smith' && !g.starter)) grid.appendChild(this.gearCard(g));
+        }
+      }
       const smithW = weapons('smith');
       for (const metal of METALS) {
         const list = smithW.filter((g) => g.metal === metal.id);
@@ -496,7 +502,7 @@ export class Catalog {
         for (const g of list) grid.appendChild(this.gearCard(g));
       }
       for (const m of MONSTERS) {
-        const list = weapons(m.id);
+        const list = weapons(m.id).filter(g => !this.forge || !['hammer', 'twohammer'].includes(g.wtype));
         if (!list.length) continue;
         grid.appendChild(this.heading(pr.seen(m.id) ? m.name : '???'));
         for (const g of list) grid.appendChild(this.gearCard(g));
@@ -539,7 +545,7 @@ export class Catalog {
 
   gearCard(g) {
     const pr = this.progress;
-    const known = pr.gearSeen(g) || (this.forge && g.wtype === 'hammer');
+    const known = pr.gearSeen(g) || (this.forge && ['hammer', 'twohammer'].includes(g.wtype));
     const crafted = pr.crafted(g.id);
     let badge = '';
     let cls = known ? '' : 'locked';
@@ -592,7 +598,7 @@ export class Catalog {
       this.fillSet(info, set, known);
     } else {
       const g = gearById(view.id);
-      known = pr.gearSeen(g) || (this.forge && g.wtype === 'hammer');
+      known = pr.gearSeen(g) || (this.forge && ['hammer', 'twohammer'].includes(g.wtype));
       spec = { kind: g.type === 'weapon' ? 'weapon' : 'armor', id: g.id };
       this.fillGear(info, g, known);
     }
