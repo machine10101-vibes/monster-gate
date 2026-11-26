@@ -5926,3 +5926,46 @@ html:has(#panel:not(.hidden)) #debug-badge {
   display: flex;
   pointer-events: auto;
 }
+
+/* Character camp: keep controls reachable on short screens and after rotation. */
+#charselect .cs-panel { box-sizing: border-box; min-height: 0; }
+#charselect .cs-list { min-height: 0; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
+#charselect .cs-panel-head button, #charselect .cs-form-minimize { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+#charselect .cs-account, #charselect .cs-wallet-status { overflow-wrap: anywhere; }
+#charselect .cs-info { min-width: 0; }
+#charselect .cs-info b { overflow: hidden; text-overflow: ellipsis; }
+#charselect form.cs-form.minimized {
+  position: absolute; top: max(8px, var(--safe-t)); right: max(8px, var(--safe-r));
+  left: auto; bottom: auto; transform: none; width: min(260px, 80vw);
+  height: auto; padding: 6px; background: var(--rs-panel-bg); border: 1px solid var(--rs-gold);
+  z-index: 3;
+}
+#charselect form.cs-form.minimized .cs-form-title { display: flex; width: 100%; pointer-events: auto; }
+@media (max-width: 899px), (max-height: 559px), (max-aspect-ratio: 21/20) {
+  #charselect form.cs-form:not(.minimized) {
+    box-sizing: border-box; position: fixed; top: 50%; left: 50%; right: auto; bottom: auto;
+    transform: translate3d(-50%, -50%, 0); width: min(560px, calc(100vw - 24px - var(--safe-l) - var(--safe-r)));
+    height: auto; max-height: calc(100dvh - 24px - var(--safe-t) - var(--safe-b));
+    display: flex; gap: 6px; padding: 8px; border-width: 8px;
+    overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  }
+  #charselect form.cs-form:not(.minimized) .cs-sec { flex: 0 0 auto; overflow: visible; }
+  #charselect form.cs-form .cs-form-title { position: sticky; top: -8px; z-index: 2; background: var(--rs-panel-bg); }
+  #charselect form.cs-form .cs-form-foot { position: sticky; bottom: -8px; z-index: 2; background: var(--rs-panel-bg); padding: 4px; }
+  #charselect .cs-input, #charselect .cs-search input { font-size: 16px; }
+  #charselect .cs-form-foot .cs-btn { min-width: 0; white-space: normal; }
+}
+@media (max-height: 600px) and (min-aspect-ratio: 5/4) {
+  #charselect .cs-panel { top: max(8px, var(--safe-t)); bottom: max(8px, var(--safe-b)); height: auto; max-height: none; width: clamp(220px, 32vw, 310px); }
+  #charselect.single-character .cs-panel { height: auto; bottom: auto; max-height: calc(100dvh - 24px); }
+  #charselect .cs-enter { left: 32%; width: 44%; bottom: max(8px, var(--safe-b)); }
+  #charselect .cs-enter-actions { flex-wrap: wrap; }
+  #charselect .cs-enter-actions .cs-btn.big { min-width: 0; padding: 9px; }
+  #charselect .cs-toggle { display: none; }
+}
+@media (max-aspect-ratio: 5/6), (max-width: 640px) and (orientation: portrait) {
+  #charselect .cs-panel, #charselect.single-character .cs-panel { top: auto; bottom: max(220px, calc(var(--safe-b) + 220px)); height: auto; max-height: min(34dvh, 260px); }
+  #charselect .cs-enter { width: min(70vw, 320px); bottom: max(8px, var(--safe-b)); }
+  #charselect .cs-enter-actions .cs-btn.big { min-width: 0; width: 100%; }
+  #charselect .cs-back { bottom: max(8px, var(--safe-b)); }
+}
