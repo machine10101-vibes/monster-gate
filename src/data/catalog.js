@@ -212,7 +212,7 @@ export const ARMOR_SLOTS = [...CORE_SLOTS, 'shield', 'book', 'quiver'];
 export const SLOT_LABEL = { helm: 'Helm', chest: 'Chest', arms: 'Gloves', legs: 'Legs', boots: 'Boots', shield: 'Shield', book: 'Spell Book', quiver: 'Quiver', ammo: 'Arrows' };
 export const WEAPON_ORDER = ['onesword', 'twosword', 'dual', 'hammer', 'spear', 'staff', 'wand', 'shortbow', 'longbow', 'crossbow', 'scythe'];
 export const WEAPON_LABEL = {
-  onesword: 'One-Hand Sword', twosword: 'Two-Hand Sword', dual: 'Dual Swords', hammer: 'War Hammer', spear: 'Spear', staff: 'War Staff', wand: 'Wand',
+  onesword: 'One-Hand Sword', twosword: 'Two-Hand Sword', dual: 'Dual Swords', hammer: 'One-Handed Hammer', spear: 'Spear', staff: 'War Staff', wand: 'Wand',
   shortbow: 'Short Bow', longbow: 'Long Bow', crossbow: 'Crossbow', scythe: 'Scythe',
 };
 export const TIER_LABEL = { metal: 'Metal', leather: 'Leather', cloth: 'Cloth' };
