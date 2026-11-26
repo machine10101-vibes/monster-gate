@@ -548,7 +548,7 @@ class Game {
     }
 
     this.applyGear(true);
-    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
+    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
     this.selectSlot(0, true);
     this.refreshHud(true);
     this.syncViewDistance();
@@ -662,7 +662,7 @@ class Game {
     this.items = ITEMS.map((i) => ({ ...i }));
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.applyGear(true);
-    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
+    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
     this.selectSlot(0, true);
     this.refreshHud(true);
   }
@@ -2097,6 +2097,24 @@ class Game {
     this.selectSlot(i);
   }
 
+  /** Move an inventory item into a chosen hotbar slot without duplicating it. */
+  assignHotbarItem(slot, item, sourceSlot) {
+    if (this.hud?.itemHotbarLocked) {
+      this.hud.toast('Item hotbar is locked in Settings.');
+      return false;
+    }
+    if (!Number.isInteger(slot) || !Number.isInteger(sourceSlot)
+      || slot < 0 || sourceSlot < 0 || slot >= this.items.length || sourceSlot >= this.items.length
+      || !this.items[sourceSlot] || this.items[sourceSlot].id === 'empty') return false;
+    if (slot === sourceSlot) return true;
+    const previous = this.items[slot];
+    this.items[slot] = this.items[sourceSlot];
+    this.items[sourceSlot] = previous || { ...ITEMS[7] };
+    this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
+    this.selectSlot(this.sel, true);
+    return true;
+  }
+
   /** The starter blade stands in for whatever weapon is actually equipped. */
   carried(it) {
     const w = this.progress.weaponItem;
@@ -2130,12 +2148,14 @@ class Game {
     p.reduction = pr.reduction;
     this.syncVitals();
     const w = pr.weaponItem;
-    // The equipped weapon replaces the starter blade in the main hand slot.
-    this.items[0] = w ? { ...w } : { ...ITEMS[0] };
-    this.items[7] = { ...ITEMS[7] };
+    // Keep the equipped weapon in slot zero until the player deliberately
+    // assigns a different item there. Other slots remain freely assignable.
+    if (!this.items[0] || this.items[0]._equippedWeapon || this.items[0].id === 'blade') {
+      this.items[0] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
+    }
     p.setSheath(w?.held || 'blade');
     if (!initial) {
-      this.hud.buildHotbar(this.items, (i) => this.onHotbar(i));
+      this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
       this.selectSlot(this.sel, true);
       this.refreshHud();
     }

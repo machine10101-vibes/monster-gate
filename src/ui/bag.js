@@ -38,8 +38,9 @@ function slotList(groups) {
 }
 
 /** The hunter's bag. The Bag tab is 40 slots, with a detail card for the selection. */
-export function mountBag(body, game) {
-  let tab = 'bag';
+export function mountBag(body, game, options = {}) {
+  const { assignSlot, onAssign } = options;
+  let tab = assignSlot == null ? 'bag' : 'carried';
   let sel = null;
 
   const paint = () => {
@@ -59,7 +60,7 @@ export function mountBag(body, game) {
     root.appendChild(gold);
     const hint = document.createElement('p');
     hint.className = 'bag-hint';
-    hint.textContent = 'Hold an item to Use or Drop it.';
+    hint.textContent = assignSlot == null ? 'Hold an item to Use or Drop it.' : `Choose an item to place in hotbar slot ${assignSlot + 1}.`;
     root.appendChild(hint);
 
     const tabs = document.createElement('div');
@@ -158,6 +159,14 @@ export function mountBag(body, game) {
         note.className = 'bag-set';
         note.textContent = current.setNote;
         detail.appendChild(note);
+      }
+      if (onAssign && Number.isInteger(current.slotIndex)) {
+        const assign = document.createElement('button');
+        assign.type = 'button';
+        assign.className = 'bag-act';
+        assign.textContent = `Assign to hotbar slot ${assignSlot + 1}`;
+        assign.onclick = () => onAssign(current.item, current.slotIndex);
+        detail.appendChild(assign);
       }
       const held = bagHoldChoices(current);
       const actions = current.actions
@@ -357,6 +366,8 @@ function collect(game) {
     const held = heldStats(it);
     carried.push({
       key: 'c' + i,
+      slotIndex: i,
+      item: { ...it },
       name: it.name,
       sub: it.desc ? `${count}. ${it.desc}` : count,
       stats: held,

@@ -331,6 +331,24 @@ kbd {
   padding: 0;
   pointer-events: auto;
 }
+.slot.hold-arming {
+  box-shadow: 0 0 0 2px #f3d27a, 0 0 14px rgba(243, 210, 122, .8);
+  animation: item-hotbar-hold-pulse 3s linear forwards;
+}
+@keyframes item-hotbar-hold-pulse {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.65); }
+}
+.slot.hotbar-locked::before {
+  content: '🔒';
+  position: absolute;
+  z-index: 4;
+  right: -4px;
+  top: -7px;
+  font-size: 9px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px #000);
+}
 .slot.sel {
   border-color: #f4f6fa;
   background: linear-gradient(#444851, #2a2d34);
@@ -825,7 +843,7 @@ body.touch #top-right {
   border: 2px solid var(--panel-edge);
   border-radius: 4px;
   opacity: 0;
-  transition: opacity 0.25s;
+  transition: opacity 0.15s;
   pointer-events: none;
   text-align: center;
   line-height: 1.5;

@@ -54,6 +54,18 @@ export const POTION_SHOP = {
 };
 
 const CITY_NAMES = new Set(['Oakhollow', 'Southford', 'Dawnspire', 'Hellspire', 'Gilantre']);
+const ITEM_HOTBAR_LOCK_KEY = 'mg-hotbar-items-locked';
+function readItemHotbarLocked() {
+  try { return globalThis.localStorage?.getItem(ITEM_HOTBAR_LOCK_KEY) === '1'; }
+  catch { return false; }
+}
+function writeItemHotbarLocked(locked) {
+  try {
+    if (locked) globalThis.localStorage?.setItem(ITEM_HOTBAR_LOCK_KEY, '1');
+    else globalThis.localStorage?.removeItem(ITEM_HOTBAR_LOCK_KEY);
+    return true;
+  } catch { return false; }
+}
 
 function isPartyRemote(r, partyOf) {
   if (!r || !partyOf) return false;
@@ -196,6 +208,7 @@ export class HUD {
     this.sunKind = '';
     this.mapLabels = true;
     this.hotbarLocked = readHotbarLocked();
+    this.itemHotbarLocked = readItemHotbarLocked();
 
     document.querySelectorAll('.mbtn .ico').forEach((n) => {
       const cls = [...n.classList].find((c) => c !== 'ico');
@@ -257,7 +270,7 @@ export class HUD {
     document.documentElement.classList.toggle('dialog-open', !!dialog);
   }
 
-  buildHotbar(items, onSelect) {
+  buildHotbar(items, onSelect, onHold) {
     this.el.hotbar.innerHTML = '';
     this.slots = [];
     items.forEach((it, i) => {
@@ -276,12 +289,45 @@ export class HUD {
       const cnt = document.createElement('span');
       cnt.className = 'cnt';
       b.appendChild(cnt);
+      let holdTimer = 0;
+      let held = false;
+      let suppressClick = false;
       b.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.stopPropagation();
+        held = false;
+        if (this.itemHotbarLocked || !onHold) return;
+        b.classList.add('hold-arming');
+        holdTimer = setTimeout(() => {
+          holdTimer = 0;
+          held = true;
+          suppressClick = true;
+          b.classList.remove('hold-arming');
+          onHold(i);
+        }, HOTBAR_HOLD_MS);
+      });
+      const cancelHold = () => {
+        if (holdTimer) clearTimeout(holdTimer);
+        holdTimer = 0;
+        b.classList.remove('hold-arming');
+      };
+      b.addEventListener('pointerup', cancelHold);
+      b.addEventListener('pointercancel', cancelHold);
+      b.addEventListener('pointerleave', cancelHold);
+      b.addEventListener('contextmenu', (e) => {
+        if (held || holdTimer) e.preventDefault();
+      });
+      b.addEventListener('click', (e) => {
+        if (suppressClick) {
+          suppressClick = false;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          return;
+        }
         onSelect(i);
       });
       this.el.hotbar.appendChild(b);
+      b.classList.toggle('hotbar-locked', this.itemHotbarLocked);
       this.slots.push({ b, cnt });
     });
   }
@@ -354,11 +400,12 @@ export class HUD {
     this.el.rank.textContent = r;
   }
 
-  toast(msg, ms = 2200) {
+  toast(msg, ms = 1500) {
     this.el.toast.textContent = msg;
     this.el.toast.classList.add('show');
     clearTimeout(this.toastT);
-    this.toastT = setTimeout(() => this.el.toast.classList.remove('show'), ms);
+    const duration = Math.min(1500, Math.max(0, Number(ms) || 1500));
+    this.toastT = setTimeout(() => this.el.toast.classList.remove('show'), Math.max(0, duration - 150));
   }
 
   banner(sub, main, ms = 3200) {
@@ -645,7 +692,7 @@ export class HUD {
     if (this.el.area.textContent !== name) this.el.area.textContent = name;
   }
 
-  openPanel(name, game) {
+  openPanel(name, game, options = {}) {
     if (name === 'world' && !canCreateWorld(game.staffRole)) {
       this.toast('World Creator is for moderators.', 1800);
       return;
@@ -792,8 +839,15 @@ export class HUD {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);
     } else if (name === 'bag') {
-      title.textContent = 'Inventory';
-      this.cleanup = mountBag(body, game);
+      title.textContent = options.assignSlot == null ? 'Inventory' : `Choose Item · Hotbar ${options.assignSlot + 1}`;
+      this.cleanup = mountBag(body, game, {
+        assignSlot: options.assignSlot,
+        onAssign: (item, sourceSlot) => {
+          if (!game.assignHotbarItem(options.assignSlot, item, sourceSlot)) return;
+          this.closePanel();
+          this.toast(`${item.name} assigned to hotbar slot ${options.assignSlot + 1}.`);
+        },
+      });
     } else if (name === 'storage') {
       title.textContent = 'Storage Crate';
       this.cleanup = mountStorage(body, game);
@@ -961,6 +1015,7 @@ export class HUD {
         ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Strafing', `<button id="set-strafe" aria-pressed="${game.input.strafe ? 'true' : 'false'}">${game.input.strafe ? 'On' : 'Off'}</button>`],
         ['Lock skill buttons', `<button id="set-skill-lock" aria-pressed="${readHotbarLocked() ? 'true' : 'false'}">${readHotbarLocked() ? 'Locked' : 'Unlocked'}</button>`],
+        ['Lock item hotbar', `<button id="set-item-hotbar-lock" aria-pressed="${readItemHotbarLocked() ? 'true' : 'false'}">${readItemHotbarLocked() ? 'Locked' : 'Unlocked'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -995,6 +1050,15 @@ export class HUD {
         skillLock.setAttribute('aria-pressed', locked ? 'true' : 'false');
         this.updateSkillbar(game);
         this.toast(locked ? 'Skill buttons locked.' : 'Skill buttons unlocked.', 1400);
+      };
+      const itemHotbarLock = document.getElementById('set-item-hotbar-lock');
+      if (itemHotbarLock) itemHotbarLock.onclick = () => {
+        this.itemHotbarLocked = !this.itemHotbarLocked;
+        writeItemHotbarLocked(this.itemHotbarLocked);
+        itemHotbarLock.textContent = this.itemHotbarLocked ? 'Locked' : 'Unlocked';
+        itemHotbarLock.setAttribute('aria-pressed', this.itemHotbarLocked ? 'true' : 'false');
+        this.slots.forEach(({ b }) => b.classList.toggle('hotbar-locked', this.itemHotbarLocked));
+        this.toast(this.itemHotbarLocked ? 'Item hotbar locked.' : 'Item hotbar unlocked.');
       };
       const skillBtn = document.getElementById('set-skills');
       if (skillBtn) skillBtn.onclick = () => this.openPanel('skills', game);
