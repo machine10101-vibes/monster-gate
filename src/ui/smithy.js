@@ -1,11 +1,35 @@
 import { GOODS, SHAFT_FROM_LOG, SHAFT_IDS, SHAFT_LOGS, SHAFTS_PER_LOG, SMELTS } from '../data/gathering.js';
 import { METALS } from '../data/metals.js';
 import { flushThumbs, renderThumb } from './catalog.js';
+import { smithingDurationMs, startSmithingQueue } from './smithingQueue.js';
 
 const STOCK = [...METALS.filter((m) => m.ore).map((m) => m.oreId), 'coal', ...METALS.map((m) => m.barId)];
 
 /** Ore and coal become bars here. Each recipe wants a Smithing level. */
 export function mountSmithy(body, game) {
+  let activeCancel = null;
+  const queueSmelt = (rec, all, acts, controls) => {
+    if (activeCancel) return;
+    const count = all ? game.progress.smeltCan(rec.id) : Math.min(1, game.progress.smeltCan(rec.id));
+    if (!count) return;
+    activeCancel = startSmithingQueue({
+      container: acts,
+      label: `Smelting ${rec.name}`,
+      count,
+      durationMs: smithingDurationMs(),
+      buttons: controls,
+      processOne: () => {
+        const before = game.progress.level('smithing');
+        const made = game.progress.smelt(rec.id, false);
+        return made ? { made, before } : false;
+      },
+      onStep: (_done, _total, result) => pingSmith(game, rec, result.made, result.before),
+      onDone: (done) => {
+        activeCancel = null;
+        if (done) paint();
+      },
+    });
+  };
   const paint = () => {
     body.innerHTML = '';
     const pr = game.progress;
@@ -34,25 +58,13 @@ export function mountSmithy(body, game) {
       one.className = 'cat-btn' + (can >= 1 ? ' go' : '');
       one.textContent = `Smelt 1 ${rec.name.toLowerCase()}`;
       one.disabled = can < 1;
-      one.onclick = () => {
-        const before = pr.level('smithing');
-        const n = pr.smelt(rec.id, false);
-        if (!n) return;
-        pingSmith(game, rec, n, before);
-        paint();
-      };
+      one.onclick = () => queueSmelt(rec, false, acts, [...body.querySelectorAll('.smith-acts button')]);
       const all = document.createElement('button');
       all.type = 'button';
       all.className = 'cat-btn' + (can >= 1 ? ' go' : '');
       all.textContent = can > 1 ? `Smelt all (${can})` : 'Smelt all';
       all.disabled = can < 1;
-      all.onclick = () => {
-        const before = pr.level('smithing');
-        const n = pr.smelt(rec.id, true);
-        if (!n) return;
-        pingSmith(game, rec, n, before);
-        paint();
-      };
+      all.onclick = () => queueSmelt(rec, true, acts, [...body.querySelectorAll('.smith-acts button')]);
       acts.append(one, all);
       body.appendChild(acts);
       if (lock === `smith:${rec.level}`) {
@@ -70,7 +82,10 @@ export function mountSmithy(body, game) {
     flushThumbs(200);
   };
   paint();
-  return () => {};
+  return () => {
+    activeCancel?.();
+    activeCancel = null;
+  };
 }
 
 function pingSmith(game, rec, n, before) {

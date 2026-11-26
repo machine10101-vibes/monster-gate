@@ -2473,7 +2473,12 @@ body.touch .how {
 .smith-bench{display:flex;flex-direction:column;gap:8px;margin:0 0 14px}
 .smith-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:2px solid #5a4632;border-radius:6px;background:#161410}
 .smith-row small{display:block;color:#b7c0b4;font-size:12px;margin-top:2px}
-.smith-acts{display:flex;gap:8px;flex:none}
+.smith-acts{display:flex;flex-wrap:wrap;gap:8px;flex:none}
+.smith-progress{display:flex;flex-direction:column;gap:4px;flex:1 0 100%;min-width:0;margin-top:6px;padding:6px 8px;border:1px solid rgba(255,190,100,.48);border-radius:4px;background:rgba(8,10,12,.72);color:#ffe2ad}
+.smith-progress-label{font-size:11px;line-height:1.25;font-weight:700;letter-spacing:.02em}
+.smith-progress-track{height:6px;overflow:hidden;border:1px solid #8a6031;border-radius:99px;background:#090b0d;box-shadow:inset 0 1px 2px #000}
+.smith-progress-track i{display:block;width:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#d87928,#ffd36a);box-shadow:0 0 6px rgba(255,170,70,.65);transition:width .04s linear}
+.smith-row .smith-progress{flex-basis:100%}
 .smith-stock{display:flex;gap:12px;margin:0 0 12px}
 .smith-stock div{display:flex;flex-direction:column;align-items:center;gap:4px;color:#d7deea;font-size:12px}
 .smith-stock canvas{width:64px;height:64px;background:#0e1210;border-radius:6px}
