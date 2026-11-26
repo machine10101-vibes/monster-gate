@@ -90,6 +90,7 @@ export function waitUntil(fn, timeoutMs = 2000) {
 }
 
 export async function hello(ws, token, extra = {}) {
+  const welcome = once(ws, 'welcome');
   ws.send(encode('hello', { token, name: extra.name, look: extra.look, resume: extra.resume }));
-  return once(ws, 'welcome');
+  return welcome;
 }
