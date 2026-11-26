@@ -1,0 +1,9 @@
+max_iterations: 6
+max_output_chars: 120000
+timeout_seconds: 900
+# Explicitly configure a local coding agent command as a YAML array.
+# The command receives the role prompt on stdin.
+agent_command: []
+# External agent must enforce its own token/spend limit.
+max_tokens: 50000
+max_cost_usd: 5
