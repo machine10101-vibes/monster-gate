@@ -606,7 +606,7 @@ class Game {
   async start() {
     if (this.started) return;
     if (!this.wallet?.address || this.cloudSyncing || !this.character) return;
-    if (!this.membershipGatePassed) {
+    if (this.wallet.kind !== 'guest' && !this.membershipGatePassed) {
       if (this.membershipChecking) return;
       this.membershipChecking = true;
       try {
@@ -1232,6 +1232,12 @@ class Game {
   /** Local hunt only. No guild record, and the waygate stays closed. */
   playAsGuest() {
     if (this.started || this.walletBusy) return;
+    if (this.wallet?.address) return;
+    rememberWorldMode('offline');
+    if (isWorldOnline(location.search)) {
+      leaveOnlineWorld();
+      return;
+    }
     this.closeAccount();
     this.hideWorldPicker();
     this.hideWorldAuth();
@@ -1287,6 +1293,8 @@ class Game {
   /** Put the chosen character in the world. Runs inside the tap so phones can go fullscreen. */
   async enterWorld(char) {
     if (this.started || !this.roster?.get(char.id) || this.membershipChecking) return;
+    if (this.wallet?.kind === 'guest' && isWorldOnline(location.search)) return;
+    if (this.wallet?.kind !== 'guest') {
     this.membershipChecking = true;
     try {
       const account = readAccount();
@@ -1300,6 +1308,7 @@ class Game {
       this.membershipGatePassed = true;
     } finally {
       this.membershipChecking = false;
+    }
     }
     rememberRotationRecovery(
       localStorage,
@@ -1764,6 +1773,7 @@ class Game {
       if (window.__mgPendingBuild) this.offerBuildReload(window.__mgPendingBuild);
     }
     document.getElementById('btn-account-create')?.addEventListener('click', () => this.openAccount('create'));
+    document.getElementById('btn-guest')?.addEventListener('click', () => this.playAsGuest());
     document.getElementById('btn-account-signin')?.addEventListener('click', () => this.openAccount('signin'));
     document.getElementById('account-cancel')?.addEventListener('click', () => {
       this.closeAccount();
