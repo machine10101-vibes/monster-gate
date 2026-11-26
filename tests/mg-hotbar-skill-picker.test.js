@@ -26,4 +26,7 @@ test('HUD wires hold-to-assign for desktop and touch buttons and exposes the loc
   assert.match(hud, /openSkillPicker/);
   assert.match(hud, /set-skill-lock/);
   assert.match(hud, /skill-locked/);
+  assert.match(hud, /setPointerCapture\(pointerId\)/);
+  assert.match(hud, /_skillPickerContext/);
+  assert.doesNotMatch(hud, /\['pointerup', 'pointercancel', 'pointerleave'\]/);
 });
