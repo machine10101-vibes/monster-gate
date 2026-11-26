@@ -12,6 +12,16 @@ export const CONFIG_BACKOFF_MS = [200, 500];
 let configPromise = null;
 let timer = 0;
 let pending = null;
+let inFlight = null;
+const retryMs = 2000;
+const outboxKey = session => `mg-cloud-outbox:${session.userId || session.address}`;
+function persist(job) {
+  try { localStorage.setItem(outboxKey(job.session), JSON.stringify(job.data)); } catch { /* roster storage remains the fallback */ }
+}
+function acknowledge(job) {
+  try { const key = outboxKey(job.session); if (localStorage.getItem(key) === JSON.stringify(job.data)) localStorage.removeItem(key); } catch { /* retry on next login */ }
+}
+if (typeof window !== 'undefined') window.addEventListener('online', () => { flushCloud(); });
 
 function envOf(env) {
   return env ?? (typeof import.meta !== 'undefined' ? import.meta.env : undefined);
@@ -232,30 +242,34 @@ export async function syncHunt(session, progress, gate = { open: true }) {
   return syncEmailHunt(session, progress, gate);
 }
 
-/** Debounce gameplay saves so a fight does not write the guild record on every hit. */
+/** Durable, single-flight account save queue. */
 export function schedulePush(session, data, onDone) {
-  pending = {
-    session,
-    data: JSON.parse(JSON.stringify(data)),
-    onDone,
-  };
-  clearTimeout(timer);
-  timer = setTimeout(() => {
-    flushCloud();
-  }, 1500);
+  if (!cloudHuntAllowed(session)) return;
+  pending = { session, data: JSON.parse(JSON.stringify(data)), onDone };
+  persist(pending);
+  if (!timer && !inFlight) timer = setTimeout(flushCloud, 150);
 }
 
 export function flushCloud() {
+  if (inFlight) return inFlight;
+  clearTimeout(timer); timer = 0;
   const job = pending;
-  pending = null;
-  clearTimeout(timer);
-  timer = 0;
   if (!job) return Promise.resolve();
-  return pushHunt(job.session, job.data, true)
-    .then((result) => {
+  pending = null;
+  inFlight = Promise.resolve().then(() => pushHunt(job.session, job.data, false)).then(result => {
+    if (!result || result.error || result.conflict || !result.revision) {
+      if (!result?.taken && !result?.conflict && !pending) pending = job;
+      job.onDone?.({ ...result, error: true });
+    } else {
+      acknowledge(job);
       job.onDone?.(result);
-    })
-    .catch((err) => {
-      job.onDone?.({ error: true, taken: err?.code === 'taken', message: err?.message });
-    });
+    }
+  }).catch(err => {
+    if (err?.code !== 'taken' && !pending) pending = job;
+    job.onDone?.({ error: true, taken: err?.code === 'taken', message: err?.message });
+  }).finally(() => {
+    inFlight = null;
+    if (pending) timer = setTimeout(flushCloud, pending === job ? retryMs : 0);
+  });
+  return inFlight;
 }
