@@ -1135,7 +1135,7 @@ const BUILDERS = {
       [`${m.id}greatsword`, () => sword(T, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } })],
       [`${m.id}spear`, () => spear(T, false)],
       [`${m.id}hammer`, () => metalHammer(T)],
-      [`${m.id}onehammer`, () => { const model = metalHammer(T); model.scale.multiplyScalar(0.72); return model; }],
+      [`${m.id}onehammer`, () => { const model = metalHammer(T); return { ...model, size: model.size * 0.72 }; }],
     ];
   })),
   ironsword: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } }),
