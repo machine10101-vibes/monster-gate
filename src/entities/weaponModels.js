@@ -47,7 +47,7 @@ const EDGE_HOLD = new Set([
  * The same quarter roll that stands a sword on its edge stands that bar
  * up and down. The iron mallet's face is already taller than it is wide.
  */
-const HAMMER_HOLD = new Set(['rexhammer', 'budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer', 'tigerhammer', 'raptorhammer', 'piratehammer', 'cursedhammer', 'sandwormhammer', 'scorpionhammer', 'orcwarhammer', 'demonhammer', 'wardenhammer']);
+const HAMMER_HOLD = new Set([...METALS.map(m => `${m.id}onehammer`),'rexhammer', 'budgemaul', 'darkhammer', 'yetihammer', 'holyhammer', 'volchammer', 'tigerhammer', 'raptorhammer', 'piratehammer', 'cursedhammer', 'sandwormhammer', 'scorpionhammer', 'orcwarhammer', 'demonhammer', 'wardenhammer']);
 
 /**
  * Resting roll of a weapon in the hand, around the grip.
@@ -1135,6 +1135,7 @@ const BUILDERS = {
       [`${m.id}greatsword`, () => sword(T, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } })],
       [`${m.id}spear`, () => spear(T, false)],
       [`${m.id}hammer`, () => metalHammer(T)],
+      [`${m.id}onehammer`, () => { const model = metalHammer(T); model.scale.multiplyScalar(0.72); return model; }],
     ];
   })),
   ironsword: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } }),
