@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildHumanoid, buildHeld, S } from './humanoid.js';
-import { DUAL_KINDS, SIDE_SWORDS, gripRoll, placeSheath } from './weaponModels.js';
+import { DUAL_KINDS, HIP_WEAPONS, gripRoll, placeSheath } from './weaponModels.js';
 import { lookOptions } from '../systems/roster.js';
 
 const LOOKS = [
@@ -144,7 +144,7 @@ export class RemoteHunter {
     }
     const kind = this.sheathKind;
     if (!kind || kind === this.heldKind) return;
-    const slot = SIDE_SWORDS.has(kind) ? this.model.hipSlot : this.model.backSlot;
+    const slot = HIP_WEAPONS.has(kind) ? this.model.hipSlot : this.model.backSlot;
     const g = buildHeld(kind);
     g.traverse((o) => (o.castShadow = true));
     placeSheath(g, kind);

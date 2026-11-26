@@ -45,7 +45,7 @@ const EDGE_HOLD = new Set([
 ]);
 
 /** Catalog weapon types choose the carry location, including older saved gear IDs. */
-export const SIDE_SWORDS = new Set(['blade', ...GEAR.filter(g => g.wtype === 'onesword').map(g => g.held)]);
+export const HIP_WEAPONS = new Set(['blade', 'hammer', ...GEAR.filter(g => g.wtype === 'onesword' || g.wtype === 'hammer').map(g => g.held)]);
 
 /**
  * Maul heads are widest across the grip, so the striking bar lies flat.
@@ -81,11 +81,13 @@ const sheathRoll = new THREE.Quaternion();
  * right shoulder and the blade angles down toward the left hip.
  */
 export function placeSheath(group, kind) {
-  if (SIDE_SWORDS.has(kind)) {
-    // Hilt at the left hip, blade down the outside of the thigh.
-    group.position.set(0, 0.07, 0);
+  if (HIP_WEAPONS.has(kind)) {
+    // Place the grip end at the hip, with the blade or hammer head below it.
+    const bounds = new THREE.Box3().setFromObject(group);
+    const carryScale = Math.min(0.68, 0.66 / (bounds.max.z - bounds.min.z));
     group.quaternion.setFromUnitVectors(sheathZ, sheathTip.set(-0.12, -0.99, 0.06).normalize());
-    group.scale.setScalar(0.68);
+    group.scale.setScalar(carryScale);
+    group.position.set(0, 0, -bounds.min.z * carryScale).applyQuaternion(group.quaternion);
     return;
   }
   if (TALL_KINDS.has(kind)) {
