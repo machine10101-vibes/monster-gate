@@ -18,6 +18,10 @@ const BUILD = {
   yetiset: () => frostMetal,
   // Tyrant Rex plate: olive-green scale, fang-cream trim, red stripe shadow, amber studs.
   rexset: () => makeMetalArmor({ plate: 0x56702e, plateLo: 0x3d5222, plateHi: 0x6f8a3a, trim: 0xe8dcbc, trimDk: 0x8a2a24, accent: 0xffa818 }),
+  // Starter plate: polished steel, gold trim, a blue stone.
+  noviceplate: () => makeMetalArmor({ plate: 0xb8bec8, plateLo: 0x7c838e, plateHi: 0xe2e6ec, trim: 0xd8b04a, trimDk: 0x8a6a22, accent: 0x4ea8ff }),
+  noviceleather: () => makeSoftArmor('noviceleather'),
+  novicecloth: () => makeSoftArmor('novicecloth'),
   demonset: () => demonPlate,
   holyset: () => holyPlate,
   budgeleather: () => makeSoftArmor('budgeleather'),

@@ -28,8 +28,78 @@ export function splitLimb(model, ox, oy, oz, mat, joint) {
   return { upper, lower };
 }
 
+/**
+ * Doubles a voxel model's resolution and rounds off its outer edges: a sub-voxel
+ * on the corner of a solid block is dropped when two of its sides face open air.
+ * Thin details (a strap, an eye, a hair spike) are left whole.
+ */
+export function refine(M) {
+  const { sx, sy, sz, data } = M;
+  const R = new VoxelModel(sx * 2, sy * 2, sz * 2);
+  const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz ? 0 : data[x + sx * (y + sy * z)]);
+  for (let z = 0; z < sz; z++)
+    for (let y = 0; y < sy; y++)
+      for (let x = 0; x < sx; x++) {
+        const v = data[x + sx * (y + sy * z)];
+        if (!v) continue;
+        const x0 = !at(x - 1, y, z);
+        const x1 = !at(x + 1, y, z);
+        const y0 = !at(x, y - 1, z);
+        const y1 = !at(x, y + 1, z);
+        const z0 = !at(x, y, z - 1);
+        const z1 = !at(x, y, z + 1);
+        const thinX = x0 && x1;
+        const thinY = y0 && y1;
+        const thinZ = z0 && z1;
+        for (let dz = 0; dz < 2; dz++)
+          for (let dy = 0; dy < 2; dy++)
+            for (let dx = 0; dx < 2; dx++) {
+              const open = (!thinX && (dx ? x1 : x0)) + (!thinY && (dy ? y1 : y0)) + (!thinZ && (dz ? z1 : z0));
+              if (open >= 2) continue;
+              const X = x * 2 + dx;
+              const Y = y * 2 + dy;
+              const Z = z * 2 + dz;
+              let out = v;
+              if (!(v & GLOW_BIT)) {
+                // Fine grain, lit top edges and shaded undersides read as material and depth up close.
+                let f = 1 + (hash3(X, Y, Z, 41) - 0.5) * 0.07;
+                if (dy && y1) f *= 1.07;
+                else if (!dy && y0) f *= 0.9;
+                if (f !== 1) out = (v & ~0xffffff) | shade(v & 0xffffff, f);
+              }
+              R.data[R.idx(X, Y, Z)] = out;
+            }
+      }
+  return R;
+}
+
+/** Mesh a voxel model, at double resolution with rounded edges when `hd` is set. */
+function meshPart(model, ox, oy, oz, mat, hd, post) {
+  if (!hd) return meshFrom(model, ox, oy, oz, mat);
+  const R = refine(model);
+  post?.(R);
+  return meshFrom(R, ox * 2, oy * 2, oz * 2, mat, S / 2);
+}
+
+/**
+ * Splits a limb into three pieces at two joint rows: the root piece pivots at
+ * the top, the middle at `joint` (elbow or knee), the end at `end` (wrist or
+ * ankle). Each piece overlaps the next by a row so bent joints stay closed.
+ */
+function splitLimb3(model, ox, oy, oz, mat, joint, end, hd, tipPost) {
+  const upper = meshPart(slice(model, joint, model.sy), ox, oy, oz, mat, hd);
+  const mid = meshPart(slice(model, end, joint + 1), ox, joint, oz, mat, hd);
+  const tip = meshPart(slice(model, 0, end + 1), ox, end, oz, mat, hd, tipPost);
+  mid.scale.set(0.975, 1, 0.975);
+  tip.scale.set(0.96, 1, 0.96);
+  return { upper, lower: mid, tip };
+}
+
 export const ELBOW_Y = 12;
 export const KNEE_Y = 12;
+/** Wrist and ankle rows in the limb grids: the hand sits below the wrist, the foot below the ankle. */
+export const WRIST_Y = 7;
+export const ANKLE_Y = 4;
 
 export function meshFrom(model, ox, oy, oz, mat, size = S) {
   const g = model.build(size, ox, oy, oz);
@@ -78,13 +148,15 @@ export const HERO = {
 export function buildHumanoid(o = {}) {
   const c = { ...HERO, ...o };
   const seed = c.seed;
+  // Hunters (the player, other players, the camp lineup) get the finer, rounded model.
+  const hd = c.hd ?? !!c.hero;
   const mat = toonMaterial({ vertexColors: true });
   const skinShade = shade(c.skin, 0.84);
   const need = (part) => !c.parts || c.parts.includes(part);
   let torso = new THREE.Group();
   let head = new THREE.Group();
-  let makeArm = () => ({ upper: new THREE.Group(), lower: new THREE.Group() });
-  let makeLeg = () => ({ upper: new THREE.Group(), lower: new THREE.Group() });
+  let makeArm = () => ({ upper: new THREE.Group(), lower: new THREE.Group(), tip: new THREE.Group() });
+  let makeLeg = () => ({ upper: new THREE.Group(), lower: new THREE.Group(), tip: new THREE.Group() });
 
   /* --------------------------- torso --------------------------- */
   if (need('torso')) {
@@ -152,7 +224,7 @@ export function buildHumanoid(o = {}) {
     const tSnap = T.data.slice();
     painterFor(c.armor?.chest)?.paintChest(T, ty);
     relief(T, tSnap);
-    torso = meshFrom(T, 13, OY, 9, mat);
+    torso = meshPart(T, 13, OY, 9, mat, hd);
   }
 
   /* ---------------------------- head --------------------------- */
@@ -305,7 +377,29 @@ export function buildHumanoid(o = {}) {
     const hSnap = H.data.slice();
     painterFor(c.armor?.helm)?.paintHelm(H, rowY);
     relief(H, hSnap);
-    head = meshFrom(H, HC, rowY(0), HC, mat);
+    const face = (R) => {
+      const F = fz * 2 + 1;
+      const put = (x, y, z, col) => {
+        if (R.has(x, y, z)) R.set(x, y, z, col);
+      };
+      // A catch-light in each eye, and the lower lid a shade darker.
+      for (const x0 of [2, 7]) {
+        const ix = col(x0 + 2) * 2;
+        const iy = rowY(5) * 2;
+        put(ix, iy + 1, F, 0xfff8ea);
+        for (let k = 0; k < 6; k++) put(col(x0) * 2 + k, iy, F, shade(R.get?.(col(x0) * 2 + k, iy, F) ?? eyeWhite, 0.86));
+      }
+      // Lips: a darker parting line over a lighter lower lip.
+      for (let cc = 4; cc <= 7; cc++) {
+        for (let k = 0; k < 2; k++) {
+          put(col(cc) * 2 + k, rowY(1) * 2 + 1, F, shade(mouth, 0.72));
+          put(col(cc) * 2 + k, rowY(1) * 2, F, shade(mouth, 1.18));
+        }
+      }
+      // A touch of warmth on the cheeks.
+      for (const cc of [2, 3, 8, 9]) for (let k = 0; k < 2; k++) put(col(cc) * 2 + k, rowY(3) * 2 + 1, F, mix(c.skin, 0xd05a4a, 0.14));
+    };
+    head = meshPart(H, HC, rowY(0), HC, mat, hd, c.armor?.helm ? null : face);
   }
 
   /* ---------------------------- arms --------------------------- */
@@ -357,7 +451,17 @@ export function buildHumanoid(o = {}) {
       const aSnap = A.data.slice();
       painterFor(c.armor?.arms)?.paintArm(A, set);
       relief(A, aSnap);
-      return splitLimb(A, 6.5, 22, 7, mat, ELBOW_Y);
+      const knuckles = (R) => {
+        // Finger lines across the fist, front and back, below the knuckle row.
+        for (let z = 0; z < R.sz; z++)
+          for (let y = 6; y < 12; y++)
+            for (const x of [10, 13, 16]) {
+              if (!R.has(x, y, z)) continue;
+              const front = !R.has(x, y, z + 1) || !R.has(x, y, z - 1);
+              if (front) R.set(x, y, z, shade(c.skin, y < 8 ? 0.8 : 0.86));
+            }
+      };
+      return splitLimb3(A, 6.5, 22, 7, mat, ELBOW_Y, WRIST_Y, hd, c.armor?.arms ? null : knuckles);
     };
   }
 
@@ -401,7 +505,7 @@ export function buildHumanoid(o = {}) {
         for (const id of PAINTER_SETS) painterFor(id).paintLeg(set, legFlags(c.armor, id));
         relief(L, lSnap);
       }
-      return splitLimb(L, 6.5, 24, 6.5, mat, KNEE_Y);
+      return splitLimb3(L, 6.5, 24, 6.5, mat, KNEE_Y, ANKLE_Y, hd);
     };
   }
 
@@ -432,6 +536,15 @@ export function buildHumanoid(o = {}) {
   armR.add(aR.upper, elbowR);
   elbowL.add(aL.lower);
   elbowR.add(aR.lower);
+  // Wrists carry only the hands, so the hand can flex on its own; the weapon grip stays on the forearm.
+  const wristL = new THREE.Group();
+  const wristR = new THREE.Group();
+  wristL.position.y = -(ELBOW_Y - WRIST_Y) * S;
+  wristR.position.y = -(ELBOW_Y - WRIST_Y) * S;
+  wristL.add(aL.tip);
+  wristR.add(aR.tip);
+  elbowL.add(wristL);
+  elbowR.add(wristR);
   upper.add(armL, armR);
 
   /* Sheathed weapon. The grip clears the right shoulder and the blade angles down the back. */
@@ -453,6 +566,15 @@ export function buildHumanoid(o = {}) {
   legR.add(lR.upper, kneeR);
   kneeL.add(lL.lower);
   kneeR.add(lR.lower);
+  // Ankles carry the feet, so a foot can roll from heel to toe.
+  const ankleL = new THREE.Group();
+  const ankleR = new THREE.Group();
+  ankleL.position.y = -(KNEE_Y - ANKLE_Y) * S;
+  ankleR.position.y = -(KNEE_Y - ANKLE_Y) * S;
+  ankleL.add(lL.tip);
+  ankleR.add(lR.tip);
+  kneeL.add(ankleL);
+  kneeR.add(ankleR);
   hip.add(legL, legR);
 
   const handY = -(17.3 - (22 - ELBOW_Y)) * S;
@@ -486,7 +608,7 @@ export function buildHumanoid(o = {}) {
   root.traverse((o) => {
     if (o.isMesh) o.frustumCulled = true;
   });
-  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, legL, legR, kneeL, kneeR, hand, heldSlot, backSlot, shieldG, offhand, bookG, mat };
+  return { root, torso, hip, upper, head: headG, armL, armR, elbowL, elbowR, wristL, wristR, legL, legR, kneeL, kneeR, ankleL, ankleR, hand, heldSlot, backSlot, shieldG, offhand, bookG, mat };
 }
 
 function buildThemedShield(setId, mat) {

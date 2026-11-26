@@ -1,5 +1,6 @@
 import { Progress, saveKey } from './progress.js';
 import { CLASSES } from '../data/skills.js';
+import { CLASS_STARTER_ARMOR } from '../data/catalog.js';
 import { SKILL_ORDER } from '../data/gathering.js';
 import { dropKey, readJson as readStored, writeJson } from './saveio.js';
 
@@ -248,6 +249,7 @@ export class Roster {
     p.loadRaw(null);
     p.address = this.charKey(c.id);
     p.setClass(classId);
+    for (const id of CLASS_STARTER_ARMOR[classId] || []) p.grantFound(id);
     p.save();
     this.chars.push(c);
     this.last = c.id;

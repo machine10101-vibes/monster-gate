@@ -654,6 +654,51 @@ GEAR.push(
   { id: 'quiver', type: 'armor', slot: 'quiver', name: 'Leather Quiver', monster: 'smith', set: 'iron', def: 0, reqLevel: 1, reqSmith: 15, forgeXp: 20, desc: 'A birch-and-iron quiver. Once worn, it fills itself from the arrows in your bag, 99 at a time.', recipe: { iron_bar: 1, birch_logs: 2 } },
 );
 
+/**
+ * Starting outfits the Hunter Guild issues with a class: leathers for a
+ * ranger, a robe for a mage, plate for a paladin. Warriors keep the fighting
+ * tunic. Issued, not forged, so they carry no recipe.
+ */
+export const STARTER = 'starter';
+function starterSet(set, defs) {
+  for (const [slot, id, name, def, desc] of defs) GEAR.push({ id, type: 'armor', slot, name, monster: STARTER, set, def, desc, recipe: {}, found: true, starter: true });
+}
+starterSet('noviceleather', [
+  ['chest', 'rangerjerkin', 'Ranger\'s Jerkin', 1, 'Oiled brown leather laced up the front, with a green-edged collar.'],
+  ['arms', 'rangerbracers', 'Ranger\'s Bracers', 1, 'Leather bracers that keep a bowstring off the wrist.'],
+  ['legs', 'rangerleggings', 'Ranger\'s Leggings', 1, 'Strapped leather leggings, quiet in the brush.'],
+  ['boots', 'rangerboots', 'Ranger\'s Boots', 0, 'Soft-soled leather boots for a long walk.'],
+]);
+starterSet('novicecloth', [
+  ['chest', 'apprenticerobe', 'Apprentice Robe', 1, 'A deep blue robe with gold thread at the hem and a rune at the clasp.'],
+  ['arms', 'apprenticegloves', 'Apprentice Gloves', 0, 'Thin cloth gloves under wide blue cuffs.'],
+  ['legs', 'apprenticetrousers', 'Apprentice Trousers', 0, 'Light blue trousers tied at the knee.'],
+  ['boots', 'apprenticeslippers', 'Apprentice Slippers', 0, 'Quiet cloth slippers with a gold-stitched toe.'],
+]);
+starterSet('noviceplate', [
+  ['chest', 'squirebreastplate', 'Squire\'s Breastplate', 2, 'Polished steel with gold trim and a blue stone over the heart.'],
+  ['arms', 'squiregauntlets', 'Squire\'s Gauntlets', 1, 'Steel gauntlets with gold-rimmed cuffs.'],
+  ['legs', 'squiregreaves', 'Squire\'s Greaves', 1, 'Steel greaves over padded trousers.'],
+  ['boots', 'squiresabatons', 'Squire\'s Sabatons', 1, 'Plated steel boots with a gold toe cap.'],
+]);
+
+/** Starting armor ids by class. */
+export const CLASS_STARTER_ARMOR = {
+  ranger: ['rangerjerkin', 'rangerbracers', 'rangerleggings', 'rangerboots'],
+  mage: ['apprenticerobe', 'apprenticegloves', 'apprenticetrousers', 'apprenticeslippers'],
+  paladin: ['squirebreastplate', 'squiregauntlets', 'squiregreaves', 'squiresabatons'],
+};
+
+/** The look (slot to set id) a class starts in, for previews. */
+export function starterLook(classId) {
+  const look = {};
+  for (const id of CLASS_STARTER_ARMOR[classId] || []) {
+    const g = GEAR.find((x) => x.id === id);
+    if (g) look[g.slot] = g.set;
+  }
+  return look;
+}
+
 const set = (id, name, monster, tier, role, stats, bonus) => ({ id, name, monster, tier, role, hp: 0, mana: 0, stamina: 0, spell: 0, ranged: 0, crit: 0, ...stats, bonus });
 export const SETS = [
   ...METALS.map(metalSetDef),
