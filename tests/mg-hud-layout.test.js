@@ -249,7 +249,7 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   const style = src('../src/style.css');
   assert.match(hud, /layoutPlaymapLabels/);
   assert.match(hud, /playmap-leads/);
-  assert.match(hud, /playmap-pin/);
+  assert.match(hud, /playmap-player-pin/);
   assert.match(hud, /playmap-fit/);
   assert.match(hud, /chartedAnchor/);
   assert.match(hud, /holyKeep/);
@@ -257,7 +257,7 @@ test('MG-UI-50 map labels nudge apart instead of stacking on one pin', () => {
   assert.match(style, /--map-w/);
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*font-size: 12px/);
   assert.match(style, /\.playmap-label\.uncharted \{[\s\S]*#7a4a18/);
-  assert.match(style, /\.playmap-pin/);
+  assert.match(style, /\.playmap-player-pin/);
   assert.match(style, /\.playmap-label\.side-e/);
   const layout = src('../src/ui/hudLayout.js');
   assert.match(layout, /d < 8/);
