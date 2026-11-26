@@ -341,7 +341,7 @@ function dressMesa(world, land, spec, place) {
   const { cx, cz, rTop, ramp } = spec.mesa;
   const wx = land.x0 + cx + 0.5;
   const wz = land.z0 + cz + 0.5;
-  world.yetiPeak = { x: wx, z: wz, r: rTop };
+  world.yetiPeak = { x: wx, z: wz, r: rTop, ramp };
 
   const nests = [[0, 0, 0.3, 1.25], [-8.2, 6, 2.2, 1], [8.4, -5.5, 4.1, 1.05], [-3.4, -9.8, 5.3, 0.95]];
   nests.forEach(([ox, oz, rot, sc], k) => {

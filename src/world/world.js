@@ -1347,7 +1347,7 @@ export class World {
       if (flat - sphere.r > radius) {
         const parent = obj.parent;
         obj.removeFromParent();
-        this.parked.push({ obj, parent });
+        this.parked.push({ obj, parent, sphere });
       } else if (obj.children?.length) {
         for (const child of [...obj.children]) pull(child);
       }
@@ -1362,7 +1362,7 @@ export class World {
     const near = [];
     const far = [];
     for (const row of this.parked) {
-      const sphere = meshSphere(row.obj);
+      const sphere = row.sphere || meshSphere(row.obj);
       if (!sphere) {
         near.push(row);
         continue;
@@ -1373,8 +1373,8 @@ export class World {
       else far.push(row);
     }
     near.sort((a, b) => {
-      const as = meshSphere(a.obj);
-      const bs = meshSphere(b.obj);
+      const as = a.sphere || meshSphere(a.obj);
+      const bs = b.sphere || meshSphere(b.obj);
       const ad = as ? Math.hypot(as.x - x, as.z - z) : 0;
       const bd = bs ? Math.hypot(bs.x - x, bs.z - z) : 0;
       return ad - bd;
@@ -1382,7 +1382,7 @@ export class World {
     let added = 0;
     const keep = far;
     for (const row of near) {
-      const sphere = meshSphere(row.obj);
+      const sphere = row.sphere || meshSphere(row.obj);
       const under = sphere && Math.hypot(sphere.x - x, sphere.z - z) <= sphere.r + 6;
       if (!under && added >= budget) {
         keep.push(row);
@@ -1662,9 +1662,17 @@ export class World {
   /** Dark rune gates beside Volcanum's lair and on the yeti peak. */
   placeRuneGates() {
     const L = this.volcanumLair;
-    if (L) placeRuneGate(this, { name: 'volcanum-gate', x: L.x - 9, z: L.z, yaw: Math.PI / 2 });
+    if (L) {
+      // On the side the hunter climbs from, facing them.
+      const t = L.toward || { x: 0, z: 1 };
+      placeRuneGate(this, { name: 'volcanum-gate', x: L.x + t.x * 9, z: L.z + t.z * 9, yaw: Math.atan2(t.x, t.z) });
+    }
     const P = this.yetiPeak;
-    if (P) placeRuneGate(this, { name: 'yeti-gate', x: P.x, z: P.z + P.r * 0.55, yaw: Math.PI });
+    if (P) {
+      // At the top of the ramp, facing down it.
+      const a = P.ramp ?? 0;
+      placeRuneGate(this, { name: 'yeti-gate', x: P.x + Math.cos(a) * 10.5, z: P.z + Math.sin(a) * 10.5, yaw: Math.atan2(Math.cos(a), Math.sin(a)) });
+    }
   }
 
   placeWaygate() {

@@ -326,7 +326,17 @@ export function dressVolcanic(world, land, spec) {
     const z = land.z0 + L.cz + 0.5;
     // The nest sits on the slope itself. A moat or a ring of solid spires here
     // was the wall that stopped the climb short of Volcanum.
-    world.volcanumLair = { x, z, r: 8 };
+    // Which way the hunter climbs from: toward the nearest point of the road.
+    let toward = { x: 0, z: 1 };
+    let best = Infinity;
+    for (const [rx, rz] of (spec.roads || [])[0] || []) {
+      const d = Math.hypot(rx - L.cx, rz - L.cz);
+      if (d < best && d > 1) {
+        best = d;
+        toward = { x: (rx - L.cx) / d, z: (rz - L.cz) / d };
+      }
+    }
+    world.volcanumLair = { x, z, r: 8, toward };
     world.lightSpots.push({ x, y: world.heightAt(x, z) + 4, z, color: 0xff6a1a });
     world.lightSpots.push({ x: x + 4, y: world.heightAt(x, z) + 2, z: z + 3, color: 0xff5a12 });
   }
