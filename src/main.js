@@ -2166,6 +2166,18 @@ class Game {
       this.items[i] = it;
       this.hud.buildHotbar(this.items, (n) => this.onHotbar(n));
     }
+    // Weapon hotbar slots switch the saved equipment, not just the hand model.
+    const gear = gearById(it.id);
+    if (gear?.type === 'weapon') {
+      if (!this.progress.crafted(gear.id) || this.progress.storedGear(gear.id) || !this.progress.meetsReq(gear)) {
+        this.hud.toast('That weapon is not available to equip.', 1400);
+        return;
+      }
+      if (!this.progress.worn(gear.id)) this.progress.toggleWear(gear.id);
+      this.player.setSheath(gear.held);
+    } else if (it.kind === 'melee' || it.kind === 'ranged') {
+      this.player.setSheath(it.held || null);
+    }
     this.player.setHeld(it.held || null);
     this.syncVitals();
     this.itemsChanged();
