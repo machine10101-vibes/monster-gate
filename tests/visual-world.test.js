@@ -267,10 +267,13 @@ test('world map raster is one resolution with a 16-24px warped border, not a glo
   assert.match(hud, /frame\.addEventListener\('wheel'/);
   assert.match(hud, /frame\.addEventListener\('pointermove'/);
   assert.match(hud, /frame\.addEventListener\('touchmove'/);
+  assert.match(hud, /PLAYMAP_MAX_ZOOM = 10/);
+  assert.match(hud, /--map-marker-scale/);
   assert.match(hud, /playmap-player-pin/);
   assert.doesNotMatch(hud, /className = 'playmap-pin'/);
   assert.match(style, /\.playmap-zoom-controls/);
   assert.match(style, /\.playmap-player-pin/);
+  assert.match(style, /transform: scale\(var\(--map-marker-scale, 1\)\)/);
   assert.doesNotMatch(style, /\.playmap-pin(?:\s|\{|\.)/);
   assert.match(style, /\.bigmap \{[\s\S]*image-rendering:\s*auto/);
   assert.match(style, /font-size: 13px/);
