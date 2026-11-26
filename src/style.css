@@ -5969,3 +5969,12 @@ html:has(#panel:not(.hidden)) #debug-badge {
   #charselect .cs-enter-actions .cs-btn.big { min-width: 0; width: 100%; }
   #charselect .cs-back { bottom: max(8px, var(--safe-b)); }
 }
+
+/* Keep camp controls above the interactive preview and honor explicit visibility. */
+#charselect .cs-panel { z-index: 5; }
+#charselect form.cs-form { z-index: 6; pointer-events: auto; }
+#charselect form.cs-form.hidden, #charselect .cs-panel.hidden { display: none !important; pointer-events: none !important; }
+#charselect #cs-create, #charselect #cs-form-submit, #charselect #cs-panel-minimize, #charselect #cs-form-minimize { touch-action: manipulation; pointer-events: auto; min-height: 44px; }
+#charselect form.cs-form.minimized { max-height: none; overflow: visible; box-sizing: border-box; }
+#charselect form.cs-form.minimized .cs-form-title { position: static; margin: 0; }
+#charselect .cs-panel.minimized { max-height: none; overflow: visible; }
