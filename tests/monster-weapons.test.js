@@ -98,3 +98,58 @@ test('forge groups hammer variants with their source monster rather than weapon 
     assert.ok(group.some(x => x.id === `${g.id}_twohand`), g.id);
   }
 });
+
+// Ignore palette, model scale and preview zoom: compare filled pixels when
+// the head and grip are viewed broadside, fitted to the same square.
+function hammerOutline({ M }) {
+  const pixels = new Set();
+  const span = Math.max(M.sx - 2, M.sz - 2);
+  for (let v = 0; v < 48; v++) {
+    const z = Math.floor(M.sz / 2 + ((v + 0.5) / 48 - 0.5) * span);
+    for (let u = 0; u < 48; u++) {
+      const x = Math.floor(M.sx / 2 + ((u + 0.5) / 48 - 0.5) * span);
+      for (let y = 0; y < M.sy; y++) {
+        if (M.has(x, y, z)) {
+          pixels.add(48 * v + u);
+          break;
+        }
+      }
+    }
+  }
+  return pixels;
+}
+
+function assertDifferentHammers(a, b, label) {
+  let shared = 0;
+  for (const pixel of a) if (b.has(pixel)) shared++;
+  assert.ok(shared / (a.size + b.size - shared) < 0.9, label);
+}
+
+test('forge and equipped hammer IDs resolve to distinct one- and two-hand silhouettes', async () => {
+  const { GEAR } = await import('../src/data/catalog.js');
+  const singles = GEAR.filter(g => g.wtype === 'hammer' && !g.starter);
+  const monsters = new Map();
+  let metalShape;
+  const metalPalettes = new Set();
+  for (const single of singles) {
+    const heavy = GEAR.find(g => g.wtype === 'twohammer' && g.monster === single.monster && g.metal === single.metal);
+    assert.ok(heavy, single.id);
+    assert.equal(single.held, single.item.held);
+    assert.equal(heavy.held, heavy.item.held);
+    const singleModel = model(single.held);
+    const outline = hammerOutline(singleModel);
+    assertDifferentHammers(outline, hammerOutline(model(heavy.held)), single.id);
+    if (single.metal) {
+      metalShape ??= singleModel.M;
+      assert.deepEqual([singleModel.M.sx, singleModel.M.sy, singleModel.M.sz], [metalShape.sx, metalShape.sy, metalShape.sz]);
+      assert.ok(singleModel.M.data.every((cell, i) => Boolean(cell) === Boolean(metalShape.data[i])), single.id);
+      const palette = [...new Set(singleModel.M.data)].sort((a,b) => a-b).join(',');
+      assert.ok(!metalPalettes.has(palette), single.id);
+      metalPalettes.add(palette);
+    } else {
+      for (const [id, other] of monsters) assertDifferentHammers(outline, other, single.id + ' and ' + id);
+      monsters.set(single.id, outline);
+    }
+  }
+  assert.ok(monsters.size >= 15 && metalPalettes.size >= 7);
+});
