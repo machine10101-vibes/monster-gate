@@ -482,6 +482,13 @@ test('worldView does not open sockets; mmo.js stays inert without ?mmo=1', () =>
   assert.equal(attachMmo(game, view, { search: '?mmo=1&mock=1' }), null);
 });
 
+test('confirmed account writes restore the cloud-saved status', () => {
+  const main = src('../src/main.js');
+  assert.match(main, /onPushed\(result, session = this\.wallet\)/);
+  assert.match(main, /this\.cloudState = 'on';\s*this\.cloudReachable = true;/);
+  assert.match(main, /onPushed\(result, session\)/);
+});
+
 test('Character Select World 1 entry sets the MMO URL flag before starting the hunt', () => {
   const main = src('../src/main.js');
   const entry = main.slice(main.indexOf('async enterWorldOneHunt'), main.indexOf('async pickWorldOnline'));

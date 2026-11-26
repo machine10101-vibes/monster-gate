@@ -667,8 +667,8 @@ class Game {
     this.refreshHud(true);
   }
 
-  onPushed(result) {
-    if (!result) return;
+  onPushed(result, session = this.wallet) {
+    if (!result || (session && this.wallet !== session)) return;
     if (result.taken) {
       this.dropTakenAccount(result.message);
       return;
@@ -680,6 +680,9 @@ class Game {
       return;
     }
     if (result.revision && this.roster) this.roster.revision = result.revision;
+    // A confirmed account-save response is stronger evidence than a previous
+    // transient sync failure; keep the account-save indicator in sync.
+    this.cloudState = 'on';
     this.cloudReachable = true;
     this.cloudSavedAt = Number(result.savedAt) || Date.now();
     if (result.progress && this.roster?.mergeFrom) {
@@ -688,7 +691,8 @@ class Game {
       if (activeReplaced && this.started) this.adoptActiveHunt();
       else if (this.charSelect?.active) this.charSelect.refresh();
       if (outcome.push && !result.retried && this.wallet && this.cloudState === 'on' && !activeReplaced) {
-        schedulePush(this.wallet, this.roster.data, (next) => this.onPushed({ ...next, retried: true }));
+        const session = this.wallet;
+        schedulePush(session, this.roster.data, (next) => this.onPushed({ ...next, retried: true }, session));
         flushCloud();
       }
     }
@@ -740,8 +744,9 @@ class Game {
     }
     this.progress.onCloud = (data) => {
       if (!this.roster || !this.wallet) return;
+      const session = this.wallet;
       this.roster.touch(data.savedAt);
-      schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
+      schedulePush(session, this.roster.data, (result) => this.onPushed(result, session));
     };
     this.startAutosave();
   }
@@ -801,7 +806,8 @@ class Game {
     }
     if (this.cloudState !== 'on') return;
     if (this.started) this.captureHunter();
-    schedulePush(this.wallet, this.roster.data, (result) => this.onPushed(result));
+    const session = this.wallet;
+    schedulePush(session, this.roster.data, (result) => this.onPushed(result, session));
     flushCloud();
   }
 
