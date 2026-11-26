@@ -484,61 +484,83 @@ function metalHammer(T = THEMES.iron) {
 }
 
 /** Bespoke compact hammers for additional monster and knight sets. */
-function wildHammer(kind) {
-  const palettes = { tiger: THEMES.budge, raptor: THEMES.frost, pirate: THEMES.iron, cursed: THEMES.dark, sandworm: THEMES.iron, scorpion: THEMES.volcanum, orc: THEMES.iron, demon: THEMES.dark, warden: THEMES.dark };
-  const base = palettes[kind];
-  const T = { ...base };
-  if (kind === 'tiger') Object.assign(T,{wood:0x60331c,wrap:0xc75a20,wrapLo:0x241b17,wrapHi:0xf0b46b,blade:0xc77b38,edge:0xf4d7a2,dark:0x713b20,guard:0x24201c,guardHi:0xe7a54a,glow:0xffb44d,glow2:0xffe0a0,horn:0xd7a761,hornDark:0x4b2918,claw:0xe8d3ad});
-  if (kind === 'raptor') Object.assign(T,{wood:0x54422b,wrap:0x777447,wrapLo:0x4d5135,wrapHi:0xa79a63,blade:0x8e8b63,edge:0xd1c89b,dark:0x535441,guard:0x454331,guardHi:0xb6a45d,glow:0xc5aa60,glow2:0xe8d797,horn:0xc9bd87,hornDark:0x474637,claw:0xe1d1a1});
-  if (kind === 'pirate') Object.assign(T,{wood:0x704622,wrap:0x742f22,wrapLo:0x40231b,wrapHi:0xad6942,blade:0x777977,edge:0xd6d0ba,dark:0x41454a,guard:0x8e5e22,guardHi:0xe5bc59,glow:0xffd769,glow2:0xffefab,horn:0xd1bd96,hornDark:0x504332,claw:0xd1bd96});
-  if (kind === 'cursed') Object.assign(T,{wood:0x5b4938,wrap:0x5e3326,wrapLo:0x2b2625,wrapHi:0x92704f,blade:0x686052,edge:0xc8b99c,dark:0x373331,guard:0x62512d,guardHi:0xb5964c,glow:0x55dd73,glow2:0xa8ff80,horn:0xd7c49c,hornDark:0x63543e,claw:0xe1d3b5});
-  if (kind === 'sandworm') Object.assign(T,{wood:0x735736,wrap:0x9b7a48,wrapLo:0x5b4930,wrapHi:0xc7a66d,blade:0xb7985f,edge:0xe3d1a0,dark:0x746042,guard:0x725936,guardHi:0xd1ae68,glow:0xddbd78,glow2:0xf6e4ad,horn:0xd8c28f,hornDark:0x756043});
-  if (kind === 'scorpion') Object.assign(T,{wood:0x55402c,wrap:0x93713b,wrapLo:0x4b3826,wrapHi:0xc7a654,blade:0xa77932,edge:0xe4c56d,dark:0x51412c,guard:0x65502a,guardHi:0xe0b949,glow:0xf5d55f,glow2:0xfff0a0,horn:0xd3ad55,hornDark:0x513c25});
-  if (kind === 'orc') Object.assign(T,{wood:0x493522,wrap:0x66543a,wrapLo:0x2c2821,wrapHi:0x96815b,blade:0x62666a,edge:0xb6b7ad,dark:0x35383c,guard:0x545045,guardHi:0x92805e,glow:0xb54436,glow2:0xe06a4e,horn:0xc7b58c,hornDark:0x514634});
-  if (kind === 'demon') Object.assign(T,{wood:0x38221b,wrap:0x461d1b,wrapLo:0x211c20,wrapHi:0x762622,blade:0x29272d,edge:0x8c4541,dark:0x17171d,guard:0x46201f,guardHi:0xa33c32,glow:0xff392a,glow2:0xff9a37,horn:0x7f302b,hornDark:0x241b20,claw:0xb84a36});
-  if (kind === 'warden') Object.assign(T,{wood:0x493523,wrap:0x555457,wrapLo:0x27282d,wrapHi:0x9b8c64,blade:0xa6a9ad,edge:0xe5e2d7,dark:0x25272e,guard:0x78633d,guardHi:0xd2b66b,glow:0x5eb9ff,glow2:0xff6548,horn:0xe1d8c1,hornDark:0x3a3531,claw:0xe6decd});
-  const c=ctx(); haft(c,T,-10,85,2.2,T.wood,0); wrapRod(c,T,-7,28,2.3);
-  for(const z of [-5,19,43,53,76,84]) ringAt(c,z,z>48?2.7:2.3,T.guard,z&3);
-  pommelAt(c,T,-10,kind==='pirate'||kind==='cursed'?'ball':'horn',T.glow);
-  const [hx,hy]=kind==='raptor'?[7,10]:kind==='sandworm'?[11,8]:kind==='warden'?[10,11]:[9,10];
-  blockHead(c,T,{z0:52,z1:78,hx,hy,bands:[[52,55],[74,78]],scale:false,fill:T.blade,glow:kind==='cursed'||kind==='demon'});
-  if(kind==='tiger'){
-    for(const x of [-hx,hx-1])for(let z=58;z<74;z+=5)for(let y=-7;y<=7;y++)c.set(x,y,z,z%2?T.dark:T.guard);
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,15,66,3.4,.4,d*3,k=>k>12?T.claw:k%3?T.horn:T.hornDark);
-    for(const x of [-3,2])c.set(x,hy,65,T.glow,true);
+/** Independent one-hand sculpts for every monster hammer. */
+function customMonsterHammer(kind) {
+  const base={budge:THEMES.budge,dusk:THEMES.dark,yeti:THEMES.frost,volc:THEMES.volcanum,rex:THEMES.iron,holy:THEMES.iron,tiger:THEMES.budge,raptor:THEMES.frost,pirate:THEMES.iron,cursed:THEMES.dark,sandworm:THEMES.iron,scorpion:THEMES.volcanum,orc:THEMES.iron,demon:THEMES.dark,warden:THEMES.dark};
+  const T={...base[kind]},c=ctx();
+  const accents={tiger:[0xc75a20,0xf4d7a2,0x241b17,0xe7a54a,0xe8d3ad],raptor:[0x777447,0xd1c89b,0x4d5135,0xb6a45d,0xe1d1a1],pirate:[0x777979,0xd6d0ba,0x41454a,0xe5bc59,0xd1bd96],cursed:[0x686052,0xc8b99c,0x373331,0xb5964c,0xd7c49c],sandworm:[0xb7985f,0xe3d1a0,0x746042,0xd1ae68,0xd8c28f],scorpion:[0xa77932,0xe4c56d,0x51412c,0xe0b949,0xd3ad55],orc:[0x62666a,0xb6b7ad,0x35383c,0x92805e,0xc7b58c],demon:[0x29272d,0x8c4541,0x17171d,0xa33c32,0x7f302b],warden:[0xa6a9ad,0xe5e2d7,0x25272e,0xd2b66b,0xe1d8c1]};
+  if(accents[kind]) [T.blade,T.edge,T.dark,T.guardHi,T.horn]=accents[kind];
+  if(kind==='holy'){T.glow=0x52bcff;T.glow2=0xc9efff;}
+  if(kind==='rex'){T.glow=0xffa51f;T.glow2=0xffd15a;}
+  haft(c,T,-6,62,2.3,T.wood,0); wrapRod(c,T,-5,25,2.5);
+  for(const z of [7,20,27,42,54,61])ringAt(c,z,z>42?3:2.6,T.guard,1);
+  pommelAt(c,T,-6,kind==='pirate'||kind==='cursed'?'ball':'horn',T.glow);
+  const head=(z0,z1,hx,hy,color=T.blade)=>blockHead(c,T,{z0,z1,hx,hy,bands:[[z0,z0+2],[z1-2,z1]],scale:false,fill:color});
+  if(kind==='budge'){
+    head(46,70,10,9,T.wrap); for(const d of [-1,1])spike(c,'x',d,d<0?-10:9,14,59,4,.4,d*5,k=>k>10?T.claw:T.horn);
+    for(let z=51;z<67;z+=5)for(const x of [-10,9])c.set(x,0,z,z%2?T.dark:T.glow,z%2===0); ball(c,0,8,58,3,T.glow,true);
+  } else if(kind==='dusk'){
+    head(46,69,8,10,T.dark); for(const d of [-1,1])spike(c,'x',d,d<0?-8:7,19,d<0?52:64,4,.3,d*8,k=>k>14?T.edge:T.glow); ball(c,0,0,57,5,T.glow,true);
+  } else if(kind==='yeti'){
+    head(47,68,9,10,T.blade); for(const d of [-1,1])spike(c,'x',d,d<0?-9:8,13,59,4.5,.4,d*2,k=>k>10?T.edge:T.claw);
+    for(const x of [-7,-3,2,6])spike(c,'z',1,68,x,0,2.7,.2,0,k=>k>8?T.edge:T.glow); ball(c,0,0,57,4,T.glow,true);
+  } else if(kind==='volc'){
+    head(45,70,10,9,T.dark); for(const d of [-1,1]){spike(c,'x',d,d<0?-10:9,15,d<0?55:63,4,.3,d*6,k=>k>11?T.edge:T.hornDark);spike(c,'z',d,d<0?45:70,11,0,3,.2,0,k=>k>8?T.edge:T.horn);}
+    for(let z=50;z<67;z+=4)for(const y of [-8,7])c.set(0,y,z,T.glow,true);
+  } else if(kind==='rex'){
+    head(45,70,10,8,T.horn); for(const x of [-7,-3,2,6])spike(c,'z',1,70,x,0,2.7,.2,0,k=>k>8?T.edge:T.hornDark);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-10:9,10,57,3.4,.3,d*2,k=>k>8?T.claw:T.dark);
+  } else if(kind==='holy'){
+    head(47,69,9,10,T.blade); for(const z of [49,67])ringAt(c,z,10.5,T.guardHi,2);
+    for(let z=52;z<=64;z+=2)c.set(0,10,z,T.glow,true); for(let y=-5;y<=5;y+=2)c.set(0,y,58,T.glow,true);
+  } else if(kind==='tiger'){
+    head(47,68,9,9,T.blade); for(const x of [-9,8])for(let z=51;z<65;z+=4)c.set(x,0,z,T.dark);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-9:8,16,56,3.5,.25,d*4,k=>k>12?T.claw:T.hornDark);
   } else if(kind==='raptor'){
-    for(let z=57;z<74;z+=4)for(let y=-8;y<=8;y+=4)for(const x of [-hx,hx-1])c.set(x,y,z,(z+y)%3?T.wrap:T.wrapHi);
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,13,d<0?62:69,3.5,.35,d*6,k=>k>10?T.claw:T.hornDark);
-    spike(c,'z',1,78,12,0,2.8,.25,0,k=>k>8?T.claw:T.edge);
+    head(47,68,8,10,T.blade); for(let z=51;z<65;z+=3)for(const x of [-8,7])for(const y of [-8,7])c.set(x,y,z,z%2?T.wrap:T.wrapHi);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-8:7,14,d<0?52:62,3.8,.3,d*7,k=>k>10?T.claw:T.hornDark);
   } else if(kind==='pirate'){
-    ball(c,0,0,65,5,T.guardHi,false,.85,.85); ball(c,0,0,66,2.6,T.glow2,true);
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,9,65,2.5,.6,0,k=>k<3?T.guardHi:T.edge);
-    for(const x of [-3,3])c.set(x,-5,65,T.dark); for(const z of [59,72])ringAt(c,z,hx+1,T.guardHi,1);
+    head(48,67,9,9,T.dark); ball(c,0,0,57,6,T.guardHi,false,.85,.85); ball(c,0,0,58,2.6,T.glow2,true); for(const z of [50,65])ringAt(c,z,9.5,T.guardHi,1);
   } else if(kind==='cursed'){
-    ball(c,0,0,65,6,T.horn,false,1,.9); ball(c,0,1,66,2.5,T.glow,true);
-    for(const x of [-4,3]){c.set(x,4,64,T.dark);c.set(x,4,65,T.dark);}
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,11,65,2.2,.25,d*2,k=>k>8?T.horn:T.hornDark);
-    c.set(0,-9,65,T.edge,true);c.set(0,9,65,T.edge,true);
+    head(48,67,9,9,T.dark); ball(c,0,0,57,6,T.horn,false,1,.9); ball(c,0,1,58,2.5,T.glow,true);
+    for(const d of [-1,1])spike(c,'x',d,d<0?-9:8,11,57,2.2,.2,d*2,k=>k>8?T.horn:T.hornDark);
   } else if(kind==='sandworm'){
-    for(let z=57;z<=73;z+=4)for(let x=-hx+1;x<hx-1;x++)for(const y of [-hy,hy-1])c.set(x,y,z,z%8?T.guard:T.edge);
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,10,65,2.4,.4,d*4,k=>k>7?T.edge:T.hornDark);
-    spike(c,'z',1,78,14,0,3,.2,0,k=>k>10?T.edge:T.horn);
+    head(45,70,10,8,T.wrap); for(let z=49;z<=66;z+=3)for(let x=-8;x<8;x++)for(const y of [-8,7])c.set(x,y,z,z%2?T.guard:T.edge);
+    spike(c,'z',1,70,14,0,3,.2,0,k=>k>10?T.edge:T.horn);
   } else if(kind==='scorpion'){
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,11,63,3.6,.8,d*2,k=>k>8?T.claw:T.guardHi);
-    spike(c,'z',1,78,15,0,3.6,.25,0,k=>k>11?T.claw:T.horn);
-    for(const z of [59,64,69])ringAt(c,z,4.5,T.guardHi,1); ball(c,0,0,65,3,T.glow,true);
+    head(47,69,10,8,T.blade); for(const d of [-1,1])spike(c,'x',d,d<0?-10:9,12,55,4,.6,d*3,k=>k>9?T.claw:T.guardHi);
+    spike(c,'z',1,69,16,0,3.8,.2,0,k=>k>12?T.claw:T.horn);
   } else if(kind==='orc'){
-    for(const d of [-1,1])spike(c,'x',d,d<0?-hx:hx-1,8,d<0?58:72,3.8,.4,d*2,k=>k>6?T.edge:T.dark);
-    for(let z=57;z<75;z+=7)ringAt(c,z,hx+1,T.guardHi,1);
-    for(const x of [-5,4])c.set(x,0,65,T.glow,true);
+    head(45,70,10,8,T.dark); for(const d of [-1,1])spike(c,'x',d,d<0?-10:9,9,d<0?50:64,4,.3,d*2,k=>k>7?T.edge:T.hornDark);
+    for(let z=49;z<67;z+=6)ringAt(c,z,10.5,T.guardHi,1);
   } else if(kind==='demon'){
-    for(const d of [-1,1]){spike(c,'x',d,d<0?-hx:hx-1,14,66,4,.4,d*5,k=>k>10?T.horn:T.dark);spike(c,'z',d,d<0?51:78,11,0,3.1,.3,0,k=>k>8?T.edge:T.hornDark);}
-    for(let z=58;z<74;z+=4)c.set(0,0,z,T.glow,true);
+    head(45,70,10,9,T.dark); for(const d of [-1,1]){spike(c,'x',d,d<0?-10:9,15,58,4.2,.3,d*5,k=>k>11?T.horn:T.dark);spike(c,'z',d,d<0?45:70,11,0,3,.2,0,k=>k>8?T.edge:T.hornDark);}
+    for(let z=50;z<67;z+=4)c.set(0,0,z,T.glow,true);
   } else if(kind==='warden'){
-    for(let z=57;z<74;z++)for(let y=-8;y<8;y++)c.set(0,y,z,z%2?T.dark:T.guardHi);
-    ball(c,0,0,65,4,T.glow,true); ball(c,0,0,71,3,T.glow2,true);
-    for(const x of [-hx,hx-1])for(let z=58;z<74;z+=4)for(let y=-8;y<8;y+=3)c.set(x,y,z,x<0?T.dark:T.edge);
+    head(47,69,10,10,T.blade); for(let z=51;z<66;z++)for(let y=-8;y<8;y++)c.set(0,y,z,z%2?T.dark:T.guardHi);
+    ball(c,0,0,57,4,T.glow,true); ball(c,0,0,63,3,T.glow2,true);
   }
+  return c.done();
+}
+function metalOneHammer(T = THEMES.iron) {
+  const c=ctx(); haft(c,T,-6,62,2.2,T.wood,0); wrapRod(c,T,-5,25,2.5);
+  for(const z of [6,20,27,42,62]) ringAt(c,z,z===27?3.4:2.7,T.guard,1);
+  pommelAt(c,T,-6,'ball',T.guardHi);
+  for(let z=45;z<=69;z++){
+    const t=Math.abs((z-57)/12),r=Math.max(1,Math.round(10*Math.sqrt(Math.max(0,1-t*t))));
+    for(let y=-r;y<=r;y++)for(let x=-r;x<=r;x++){
+      if(Math.hypot(x+.5,y+.5)>r)continue;
+      const bevel=t>.76||Math.abs(x)>r-2||Math.abs(y)>r-2;
+      c.set(x,y,z,J(bevel?T.edge:((x+y+z)%4===0?T.blade:T.dark),x,y,z,122,.035));
+    }
+  }
+  for(const z of [46,47,68,69])ringAt(c,z,7.5,T.guardHi,1);
+  for(const z of [45,69]){
+    ball(c,0,0,z,4.2,T.dark,false);
+    for(const [x,y] of [[-3,-3],[-3,2],[2,-3],[2,2]])c.set(x,y,z,T.guardHi);
+    c.set(0,0,z,T.edge);
+  }
+  for(const x of [-8,7])for(let z=51;z<=63;z+=3){c.set(x,0,z,T.guardHi);c.set(x,1,z,T.edge);}
   return c.done();
 }
 
@@ -1135,7 +1157,7 @@ const BUILDERS = {
       [`${m.id}greatsword`, () => sword(T, { guardHalf: 12, b: { z1: 108, w0: 12, tip: 0.78 } })],
       [`${m.id}spear`, () => spear(T, false)],
       [`${m.id}hammer`, () => metalHammer(T)],
-      [`${m.id}onehammer`, () => { const model = metalHammer(T); return { ...model, size: model.size * 0.72 }; }],
+      [`${m.id}onehammer`, () => metalOneHammer(T)],
     ];
   })),
   ironsword: () => sword(THEMES.iron, { guardHalf: 8, b: { z1: 86, w0: 9, tip: 0.82 } }),
@@ -1181,15 +1203,21 @@ const BUILDERS = {
   ...frostWeapons(KIT),
   ...volcWeapons(KIT),
   ...rexWeapons(KIT),
-  tigerhammer: () => wildHammer('tiger'),
-  raptorhammer: () => wildHammer('raptor'),
-  piratehammer: () => wildHammer('pirate'),
-  cursedhammer: () => wildHammer('cursed'),
-  sandwormhammer: () => wildHammer('sandworm'),
-  scorpionhammer: () => wildHammer('scorpion'),
-  orcwarhammer: () => wildHammer('orc'),
-  demonhammer: () => wildHammer('demon'),
-  wardenhammer: () => wildHammer('warden'),
+  budgemaul: () => customMonsterHammer('budge'),
+  darkhammer: () => customMonsterHammer('dusk'),
+  yetihammer: () => customMonsterHammer('yeti'),
+  volchammer: () => customMonsterHammer('volc'),
+  rexhammer: () => customMonsterHammer('rex'),
+  holyhammer: () => customMonsterHammer('holy'),
+  tigerhammer: () => customMonsterHammer('tiger'),
+  raptorhammer: () => customMonsterHammer('raptor'),
+  piratehammer: () => customMonsterHammer('pirate'),
+  cursedhammer: () => customMonsterHammer('cursed'),
+  sandwormhammer: () => customMonsterHammer('sandworm'),
+  scorpionhammer: () => customMonsterHammer('scorpion'),
+  orcwarhammer: () => customMonsterHammer('orc'),
+  demonhammer: () => customMonsterHammer('demon'),
+  wardenhammer: () => customMonsterHammer('warden'),
 };
 
 /** Voxel model for the held weapons; null for kinds built elsewhere. */
