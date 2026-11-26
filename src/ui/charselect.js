@@ -776,6 +776,7 @@ export class CharacterSelect {
 
     const zoomRoot = this.root;
     let pinchStart = null;
+    let pinching = false;
     const touchDistance = (touches) => {
       const dx = touches[0].clientX - touches[1].clientX;
       const dy = touches[0].clientY - touches[1].clientY;
@@ -785,6 +786,8 @@ export class CharacterSelect {
       if (!this.active || this.mode !== 'create' || e.touches.length !== 2) return;
       e.preventDefault();
       pinchStart = { distance: touchDistance(e.touches), zoom: this.stage?.createZoom || 1 };
+      pinching = true;
+      drag = null;
     }, { passive: false });
     zoomRoot.addEventListener('touchmove', (e) => {
       if (!pinchStart || e.touches.length !== 2 || this.mode !== 'create') return;
@@ -792,7 +795,7 @@ export class CharacterSelect {
       const distance = touchDistance(e.touches);
       if (distance > 0) this.stage.setCreateZoom(pinchStart.zoom * pinchStart.distance / distance);
     }, { passive: false });
-    const endPinch = () => { pinchStart = null; };
+    const endPinch = () => { pinchStart = null; pinching = false; drag = null; };
     zoomRoot.addEventListener('touchend', endPinch, { passive: true });
     zoomRoot.addEventListener('touchcancel', endPinch, { passive: true });
 
@@ -803,7 +806,7 @@ export class CharacterSelect {
       stage.setPointerCapture?.(e.pointerId);
     });
     stage.addEventListener('pointermove', (e) => {
-      if (!drag) return;
+      if (!drag || pinching) return;
       const dx = e.clientX - drag.last;
       drag.last = e.clientX;
       drag.moved += Math.abs(dx);
