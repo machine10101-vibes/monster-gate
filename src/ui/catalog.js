@@ -488,23 +488,17 @@ export class Catalog {
         grid.appendChild(card);
       }
     } else if (this.tab === 'weapons') {
-      if (this.forge) {
-        for (const [type, label] of [['hammer', 'Monster single-handed hammers'], ['twohammer', 'Monster two-handed hammers']]) {
-          grid.appendChild(this.heading(label));
-          for (const g of weapons().filter(g => g.wtype === type && g.monster !== 'smith' && !g.starter)) grid.appendChild(this.gearCard(g));
-        }
-      }
       const smithW = weapons('smith');
       for (const metal of METALS) {
         const list = smithW.filter((g) => g.metal === metal.id);
         if (!list.length) continue;
-        grid.appendChild(this.heading(`${metal.name} smithing — one- and two-handed weapons`));
+        grid.appendChild(this.heading(`${metal.name} smithing`));
         for (const g of list) grid.appendChild(this.gearCard(g));
       }
       for (const m of MONSTERS) {
-        const list = weapons(m.id).filter(g => !this.forge || !['hammer', 'twohammer'].includes(g.wtype));
+        const list = weapons(m.id);
         if (!list.length) continue;
-        grid.appendChild(this.heading(pr.seen(m.id) ? m.name : '???'));
+        grid.appendChild(this.heading(this.forge || pr.seen(m.id) ? m.name : '???'));
         for (const g of list) grid.appendChild(this.gearCard(g));
       }
     } else {
