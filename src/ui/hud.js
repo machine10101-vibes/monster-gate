@@ -1,4 +1,5 @@
 import { iconCanvas, iconURL, uiIconURL, heartCanvas } from './icons.js';
+import { gearById } from '../data/catalog.js';
 import { GOODS } from '../data/gathering.js';
 import { isUnsellableGood } from '../debug/transient.js';
 import { mountStats } from './stats.js';
@@ -281,8 +282,12 @@ export class HUD {
       const cv = document.createElement('canvas');
       cv.width = 16;
       cv.height = 16;
-      cv.getContext('2d').drawImage(iconCanvas(it.icon), 0, 0);
-      b.appendChild(cv);
+      const gear = gearById(it.id);
+      if (gear) b.appendChild(renderThumb({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
+      else {
+        cv.getContext('2d').drawImage(iconCanvas(it.icon), 0, 0);
+        b.appendChild(cv);
+      }
       const key = document.createElement('span');
       key.className = 'key';
       key.textContent = i > 9 ? '' : i === 9 ? '0' : String(i + 1);
@@ -638,7 +643,7 @@ export class HUD {
     }
     for (const gate of visibleMonsterGates(world)) {
       if (inView(gate.x, gate.z)) {
-        paintMonsterGateMarker(ctx, toX(gate.x), toZ(gate.z), Math.max(2.6, Math.min(4.1, sc * 0.9)), time);
+        paintMonsterGateMarker(ctx, toX(gate.x), toZ(gate.z), Math.max(1.5, Math.min(2.4, sc * 0.55)), time);
       }
     }
     if (world.waygate && inView(world.waygate.x, world.waygate.z)) {
@@ -651,9 +656,9 @@ export class HUD {
     ctx.fillStyle = '#5aa8d4';
     for (const p of world.teleports || []) {
       if (!inView(p.x, p.z)) continue;
-      ctx.fillRect(toX(p.x) - 2, toZ(p.z) - 2, 5, 5);
+      ctx.fillRect(toX(p.x) - 1.5, toZ(p.z) - 1.5, 3, 3);
       ctx.fillStyle = '#1d4a66';
-      ctx.fillRect(toX(p.x) - 1, toZ(p.z) - 1, 3, 3);
+      ctx.fillRect(toX(p.x) - 0.5, toZ(p.z) - 0.5, 1, 1);
       ctx.fillStyle = '#5aa8d4';
     }
     if (world.smithy && inView(world.smithy.x, world.smithy.z)) {
@@ -817,9 +822,9 @@ export class HUD {
         }
         ctx.fillStyle = '#5aa8d4';
         for (const p of game.world.teleports || []) {
-          ctx.fillRect(p.x - ox - 2, p.z - oz - 2, 5, 5);
+          ctx.fillRect(p.x - ox - 1.5, p.z - oz - 1.5, 3, 3);
           ctx.fillStyle = '#1d4a66';
-          ctx.fillRect(p.x - ox - 1, p.z - oz - 1, 3, 3);
+          ctx.fillRect(p.x - ox - 0.5, p.z - oz - 0.5, 1, 1);
           ctx.fillStyle = '#5aa8d4';
         }
         if (game.world.smithy) {
