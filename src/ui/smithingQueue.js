@@ -16,6 +16,7 @@ export function startSmithingQueue({
   count,
   durationMs = SMITHING_UNIT_MS,
   processOne,
+  buttons = [],
   onStep = () => {},
   onDone = () => {},
 }) {
@@ -38,6 +39,8 @@ export function startSmithingQueue({
   wrap.append(caption, track);
   container.appendChild(wrap);
 
+  const controls = [...buttons];
+  controls.forEach((button) => { button.disabled = true; });
   const stepMs = Math.max(250, durationMs | 0);
   let completed = 0;
   let startedAt = Date.now();
@@ -56,6 +59,7 @@ export function startSmithingQueue({
     stopped = true;
     if (interval) clearInterval(interval);
     wrap.remove();
+    controls.forEach((button) => { button.disabled = false; });
     onDone(completed);
   };
 
@@ -82,5 +86,6 @@ export function startSmithingQueue({
     stopped = true;
     if (interval) clearInterval(interval);
     wrap.remove();
+    controls.forEach((button) => { button.disabled = false; });
   };
 }
