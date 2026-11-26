@@ -89,6 +89,8 @@ export class CharacterSelect {
       this.paintWalletLink();
       g.paintCloudStatus?.();
       this.filter = '';
+      this.root.classList.remove('list-off');
+      $('cs-list-toggle').setAttribute('aria-pressed', 'true');
       $('cs-search').value = '';
       this.refresh();
     } catch (err) {
@@ -190,6 +192,10 @@ export class CharacterSelect {
     $('cs-list').classList.remove('hidden');
     $('cs-panel').querySelector('.cs-foot')?.classList.remove('hidden');
     this.mode = 'list';
+    this.stage.frame = null;
+    this.root.classList.remove('list-off');
+    $('cs-list-toggle').setAttribute('aria-pressed', 'true');
+    this.togglePanelMinimized(false);
     this.root?.classList.toggle('single-character', roster.chars.length === 1);
     $('cs-form').classList.add('hidden');
     $('cs-panel').classList.remove('hidden');
@@ -485,6 +491,7 @@ export class CharacterSelect {
       return;
     }
     this.mode = 'create';
+    this.root.classList.remove('list-off');
     this.root.classList.add('creating');
     $('cs-panel').classList.add('hidden');
     $('cs-form').classList.remove('hidden', 'minimized');
@@ -531,6 +538,8 @@ export class CharacterSelect {
     if (!form || this.mode !== 'create') return;
     const minimized = typeof force === 'boolean' ? force : !form.classList.contains('minimized');
     form.classList.toggle('minimized', minimized);
+    this.frameAt = 0;
+    if (minimized && form.contains(document.activeElement)) document.activeElement.blur();
     const button = $('cs-form-minimize');
     if (button) {
       button.setAttribute('aria-expanded', String(!minimized));
@@ -683,6 +692,7 @@ export class CharacterSelect {
     const H = window.innerHeight;
     const f = { l: 0, t: 0, r: W, b: H, W, H };
     const top = this.root.querySelector('.cs-top');
+    if ($('cs-form')?.classList.contains('minimized')) return f;
     const blocks = [top, ...this.root.querySelectorAll('#cs-form .cs-sec, #cs-form .cs-name-block, #cs-form .cs-form-foot, #cs-form .cs-form-title, #cs-form .cs-tabs')];
     const form = $('cs-form');
     if (form && getComputedStyle(form).display !== 'grid') blocks.push(form);
@@ -823,6 +833,7 @@ export class CharacterSelect {
         return;
       }
       if (!drag || pointers.size !== 1) return;
+      if (!pointers.has(e.pointerId)) return;
       const dx = e.clientX - drag.last;
       drag.last = e.clientX;
       drag.moved += Math.abs(dx);
@@ -832,7 +843,7 @@ export class CharacterSelect {
       if (!pointers.has(e.pointerId)) return;
       pointers.delete(e.pointerId);
       if (pinching) {
-        if (pointers.size < 2) {
+        if (pointers.size === 0) {
           pinchStart = null;
           pinching = false;
           drag = null;
@@ -840,7 +851,7 @@ export class CharacterSelect {
         return;
       }
       if (!drag) return;
-      const tap = drag.moved <= 8;
+      const tap = e.type === 'pointerup' && drag.moved <= 8;
       drag = null;
       if (tap && this.mode === 'list') {
         const id = this.stage.pick(e.clientX, e.clientY);
@@ -849,6 +860,8 @@ export class CharacterSelect {
     };
     stage.addEventListener('pointerup', end);
     stage.addEventListener('pointercancel', end);
+    stage.addEventListener('lostpointercapture', (e) => { if (pointers.has(e.pointerId)) end(e); });
+    window.addEventListener('blur', () => { pointers.clear(); drag = null; pinchStart = null; pinching = false; });
 
     window.addEventListener('keydown', (e) => {
       if (!this.active) return;

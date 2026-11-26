@@ -197,7 +197,7 @@ export class Input {
       if (!this.enabled) return;
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (e.target?.closest?.('#panel, #dialog, #title, #world-chat, #loading')) return;
+      if (e.target?.closest?.('#panel, #dialog, #title, #world-chat, #loading, #charselect')) return;
       e.preventDefault();
       const step = Math.sign(e.deltaY) * Math.min(2.4, Math.max(0.35, Math.abs(e.deltaY) / 100));
       this.zoomDelta += step;
@@ -210,6 +210,8 @@ export class Input {
       this.touch = true;
       document.body.classList.add('touch');
       const t = e.target;
+      // Native text focus and character preview gestures belong to the UI, not gameplay.
+      if (t.closest?.('#charselect, input, textarea, select, [contenteditable]')) return;
       if (t.closest && t.closest('.tbtn, .slot, .mbtn, .mini, #panel, #dialog, #title, #loading, #rotate-overlay, #party-frame, #social-invite, #social-menu, #world-chat, #clock, #quest, #menu-col, #minimap-wrap, #center-bottom, #hotbar')) return;
       e.preventDefault();
       try { t.setPointerCapture?.(e.pointerId); } catch { /* capture is best-effort */ }
