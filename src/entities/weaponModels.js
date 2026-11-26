@@ -85,7 +85,8 @@ export function placeSheath(group, kind) {
     // Place the grip end at the hip, with the blade or hammer head below it.
     const bounds = new THREE.Box3().setFromObject(group);
     const carryScale = Math.min(0.68, 0.66 / (bounds.max.z - bounds.min.z));
-    group.quaternion.setFromUnitVectors(sheathZ, sheathTip.set(-0.12, -0.99, 0.06).normalize());
+    // Tilt the point 30 degrees behind the wearer while the grip stays at the hip.
+    group.quaternion.setFromUnitVectors(sheathZ, sheathTip.set(0, -Math.cos(Math.PI / 6), -Math.sin(Math.PI / 6)));
     group.scale.setScalar(carryScale);
     group.position.set(0, 0, -bounds.min.z * carryScale).applyQuaternion(group.quaternion);
     return;
