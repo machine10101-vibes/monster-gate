@@ -5823,3 +5823,57 @@ html:has(#panel:not(.hidden)) #debug-badge {
   #charselect form.cs-form .cs-opt { grid-template-columns: 1fr; gap: 6px; }
   .cs-class-detail { font-size: 14px; }
 }
+
+
+/* Mobile character creation: centered, collapsible sheet and pinch-to-zoom canvas. */
+#charselect .cs-form-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cs-form-minimize {
+  flex: 0 0 36px;
+  width: 36px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--rs-bone);
+  font: 20px/1 var(--font-px);
+  background: rgba(0, 0, 0, 0.38);
+  border: 2px solid var(--rs-stone-4);
+  cursor: pointer;
+  pointer-events: auto;
+}
+#charselect form.cs-form.minimized {
+  height: auto;
+  max-height: none;
+  overflow: hidden;
+}
+#charselect form.cs-form.minimized > :not(.cs-form-title) {
+  display: none !important;
+}
+@media (max-width: 899px), (max-height: 559px) {
+  #charselect form.cs-form {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(92vw, 560px);
+    max-width: calc(100vw - 24px);
+    height: min(82dvh, 680px);
+    max-height: calc(100dvh - 24px);
+    padding: 10px 10px 0;
+    border-width: 10px;
+  }
+  #charselect form.cs-form.minimized {
+    width: min(92vw, 560px);
+    height: auto;
+  }
+  #charselect .cs-form-title {
+    display: flex;
+    margin: 0 0 2px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+}
