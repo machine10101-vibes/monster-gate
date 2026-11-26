@@ -388,6 +388,7 @@ export class Catalog {
     this.view = null;
     this.body = null;
     this.viewer = null;
+    this.smithingCancel = null;
   }
 
   get progress() {
@@ -415,6 +416,8 @@ export class Catalog {
   }
 
   unmount() {
+    this.smithingCancel?.();
+    this.smithingCancel = null;
     this.stopViewer();
     this.body = null;
   }
@@ -436,6 +439,8 @@ export class Catalog {
 
   render() {
     if (!this.body) return;
+    this.smithingCancel?.();
+    this.smithingCancel = null;
     this.stopViewer();
     getStage().cancel();
     this.body.innerHTML = '';
@@ -686,6 +691,25 @@ export class Catalog {
     return chip;
   }
 
+  queueSmithing(container, label, count, units, buttons, processOne, onDone) {
+    if (this.smithingCancel || !count) return;
+    const controls = [...this.body.querySelectorAll('.smith-acts button, .cat-actions button')];
+    this.smithingCancel = startSmithingQueue({
+      container,
+      label,
+      count,
+      durationMs: smithingDurationMs(units),
+      buttons: controls.length ? controls : buttons,
+      processOne,
+      onStep: () => this.sparkForge(),
+      onDone: (done) => {
+        this.smithingCancel = null;
+        if (done) onDone?.(done);
+        else this.render();
+      },
+    });
+  }
+
   forgeBench() {
     const pr = this.progress;
     const box = el('div', 'smith-bench');
@@ -699,7 +723,7 @@ export class Catalog {
         const btn = el('button', 'cat-btn' + (b.on ? ' go' : ''), esc(b.label));
         btn.type = 'button';
         btn.disabled = !b.on;
-        btn.onclick = b.run;
+        btn.onclick = () => b.run(acts, [...acts.querySelectorAll('button'), btn]);
         acts.appendChild(btn);
       }
       r.appendChild(acts);
@@ -712,8 +736,8 @@ export class Catalog {
       'Arrowheads',
       `1 iron bar makes ${HEADS_PER_BAR}. You have ${bars} ${bars === 1 ? 'bar' : 'bars'} and ${heads} heads.`,
       [
-        { label: `Forge ${HEADS_PER_BAR}`, on: bars >= 1, run: () => this.madeHeads(false) },
-        { label: 'Forge all', on: bars >= 1, run: () => this.madeHeads(true) },
+        { label: `Forge ${HEADS_PER_BAR}`, on: bars >= 1, run: (container, buttons) => this.madeHeads(false, container, buttons) },
+        { label: 'Forge all', on: bars >= 1, run: (container, buttons) => this.madeHeads(true, container, buttons) },
       ],
     ));
     for (const shaftId of SHAFT_IDS) {
@@ -732,13 +756,14 @@ export class Catalog {
     return box;
   }
 
-  madeHeads(all) {
-    const n = this.progress.forgeHeads(all);
-    if (!n) return;
-    this.game.audio.quest();
-    this.game.hud.toast(`Forged ${n} arrowheads`, 1600);
-    this.sparkForge();
-    this.render();
+  madeHeads(all, container, buttons) {
+    const pr = this.progress;
+    const count = all ? pr.good('iron_bar') : Math.min(1, pr.good('iron_bar'));
+    this.queueSmithing(container, 'Forging arrowheads', count, 1, buttons, () => pr.forgeHeads(false), (done) => {
+      this.game.audio.quest();
+      this.game.hud.toast(`Forged ${done * HEADS_PER_BAR} arrowheads`, 1600);
+      this.render();
+    });
   }
 
   madeArrows(shaftId, all) {
@@ -809,20 +834,21 @@ export class Catalog {
       b.type = 'button';
       b.disabled = !can;
       b.onclick = () => {
+        if (!this.forge || this.smithingCancel) return;
         const before = pr.level('smithing');
-        if (!this.forge || !pr.craft(g.id)) return;
-        this.game.applyGear();
-        if (g.type === 'weapon') this.game.selectSlot(0, true);
-        this.game.audio.quest();
-        this.game.hud.toast(`Forged ${g.name}`, 1800);
-        const after = pr.level('smithing');
-        if (after > before) this.game.gather?.levelUp('smithing', after);
-        const f = this.game.world.forge;
-        if (f) {
-          this.game.fx.burst(f.x + 0.4, f.y + 1.1, f.z, [0xff8a1e, 0xffd27a, 0xffffff], 22, 4.5, 0.09, 0.9, 6, 2);
-          this.game.fx.ring(f.x + 0.6, f.y + 0.6, f.z, 0xffb347, 14, 2.5, 0.09, 0.5);
-        }
-        this.render();
+        const bars = Object.values(g.recipe || {}).reduce((n, amount) => n + (amount | 0), 0);
+        this.queueSmithing(actions, `Forging ${g.name}`, 1, bars, [b], () => pr.craft(g.id), (done) => {
+          if (!done) return;
+          this.game.applyGear();
+          if (g.type === 'weapon') this.game.selectSlot(0, true);
+          this.game.audio.quest();
+          this.game.hud.toast(`Forged ${g.name}`, 1800);
+          const after = pr.level('smithing');
+          if (after > before) this.game.gather?.levelUp('smithing', after);
+          const f = this.game.world.forge;
+          if (f) this.game.fx.ring(f.x + 0.6, f.y + 0.6, f.z, 0xffb347, 14, 2.5, 0.09, 0.5);
+          this.render();
+        });
       };
       actions.appendChild(b);
       if (!this.forge) actions.appendChild(el('p', 'cat-muted', 'Weapons and armor are forged at the forge beside Greyrock Pit, just outside Oakhollow.'));
