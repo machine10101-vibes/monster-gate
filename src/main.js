@@ -706,7 +706,7 @@ class Game {
     if (this.wallet.kind === 'guest') return 'Guest hunt. Saved on this device only.';
     if (this.cloudSyncing) return 'Opening the hunt saved to your account…';
     if (this.cloudState === 'on' && this.cloudReachable) return 'Saved to your account';
-    return 'Saved on this device only';
+    return 'Saved on this device — awaiting database sync';
   }
 
   paintCloudStatus() {
@@ -801,13 +801,16 @@ class Game {
 
   /** Write the roster, hunts included, to the guild record. */
   autosaveCloud() {
-    if (!this.wallet || this.wallet.kind === 'guest' || !this.roster || this.cloudSyncing || this.cloudConflict) return;
+    if (!this.wallet || this.wallet.kind === 'guest' || !this.roster) return;
+    // Always checkpoint the active hunt locally, even during an outage or conflict.
+    if (this.started) this.captureHunter();
+    this.roster.save();
+    if (this.cloudSyncing || this.cloudConflict) return;
     if (this.cloudState === 'error') {
       this.applyWallet(this.wallet);
       return;
     }
     if (this.cloudState !== 'on') return;
-    if (this.started) this.captureHunter();
     const session = this.wallet;
     schedulePush(session, this.roster.data, (result) => this.onPushed(result, session));
     flushCloud();
@@ -1799,6 +1802,16 @@ class Game {
         this.captureHunter();
         flushCloud();
       }
+    });
+    window.addEventListener('online', () => {
+      this.autosaveCloud();
+      flushCloud();
+    });
+    window.addEventListener('offline', () => {
+      if (this.started) this.captureHunter();
+      this.roster?.save();
+      this.cloudReachable = false;
+      this.paintCloudStatus();
     });
     window.addEventListener('pagehide', () => {
       this.captureHunter();
