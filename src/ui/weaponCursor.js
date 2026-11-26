@@ -17,6 +17,7 @@ const WTYPE_TO_KIND = {
   twosword: 'sword',
   dual: 'dual',
   hammer: 'hammer',
+  twohammer: 'hammer',
   spear: 'spear',
   staff: 'staff',
   wand: 'wand',
