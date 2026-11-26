@@ -54,3 +54,15 @@ test('strafe preference persists and movement/facing use independent references'
   assert.match(hud, /id="set-strafe"/);
   assert.match(hud, /writeStrafeSetting\(!game\.input\.strafe\)/);
 });
+
+
+test('teleport interaction waits for release and requires explicit destination confirmation', () => {
+  const input = src('src/engine/input.js');
+  const tome = src('src/ui/teleport.js');
+  assert.match(input, /!\['bolt', 'skill', 'fury', 'talk'\]\.includes\(act\)/);
+  assert.match(input, /e\.type === 'pointerup' && act === 'talk'/);
+  assert.doesNotMatch(tome, /b\.onclick = \(\) => game\.travelTo/);
+  assert.match(tome, /confirm\.disabled = true/);
+  assert.match(tome, /if \(!selected\) return/);
+  assert.match(tome, /selected = dest/);
+});
