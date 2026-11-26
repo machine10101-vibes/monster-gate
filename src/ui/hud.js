@@ -7,7 +7,6 @@ import { clamp } from '../engine/voxel.js';
 import { FARM, GATE, GUILD, LAKE, MINE, TOWN } from '../world/terrain.js';
 import { TILE_SIZE, TILES, originOf } from '../world/tiles.js';
 import { chartedAnchor, chartedWeight } from '../world/playmap.js';
-import { CAVE_MOUTH } from '../world/southford.js';
 import { SKILLS } from '../data/skills.js';
 import { mountSkillTree, paintSkillIcon } from './skilltree.js';
 import { mountGear } from './gear.js';
@@ -29,6 +28,7 @@ import { applyHudLayout, layoutPlaymapLabels, measureHudSafeRects, measurePlateS
 import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
 import { QUALITIES } from '../engine/quality.js';
 import { canCreateWorld } from '../admin/gate.js';
+import { paintMonsterGateMarker, visibleMonsterGates } from './gateMarkers.js';
 
 export const ITEMS = [
   { id: 'blade', icon: 'blade', name: 'Hunter Blade', kind: 'melee', style: 'swordshield', dmg: 9, reach: 2.4, arc: 2.0, dur: 0.4, hit: 0.17, stam: 9, knock: 4.5, held: 'blade', desc: 'Sword and shield. Hold Shift to block.' },
@@ -584,6 +584,11 @@ export class HUD {
       ctx.fillStyle = '#1b0e3a';
       ctx.fillRect(toX(GATE.x) - 2, toZ(GATE.z) - 2, 4, 4);
     }
+    for (const gate of visibleMonsterGates(world)) {
+      if (inView(gate.x, gate.z)) {
+        paintMonsterGateMarker(ctx, toX(gate.x), toZ(gate.z), Math.max(2.6, Math.min(4.1, sc * 0.9)), time);
+      }
+    }
     if (world.waygate && inView(world.waygate.x, world.waygate.z)) {
       const pulse = 3 + Math.sin(time * 5) * 1;
       ctx.fillStyle = '#7ef6ff';
@@ -684,8 +689,6 @@ export class HUD {
         ctx.fillRect((GATE.x - ox) * mapScale - 3, (GATE.z - oz) * mapScale - 3, 6, 6);
         ctx.fillStyle = '#ffd23f';
         ctx.fillRect((GUILD.x - ox) * mapScale - 3, (GUILD.z - oz) * mapScale - 3, 6, 6);
-        ctx.fillStyle = '#b25cff';
-        ctx.fillRect((CAVE_MOUTH.x - ox) * mapScale - 3, (CAVE_MOUTH.z - oz) * mapScale - 3, 6, 6);
       }
       ctx.fillStyle = '#fff';
       ctx.fillRect(mx - 2, mz - 2, 4, 4);
@@ -698,6 +701,20 @@ export class HUD {
       const fit = document.createElement('div');
       fit.className = 'playmap-fit';
       fit.appendChild(c);
+      const mapPxX = mapScale * (c.width / src.width);
+      const mapPxZ = mapScale * (c.height / src.height);
+      for (const gate of visibleMonsterGates(game.world)) {
+        const x = (gate.x - ox) * mapPxX;
+        const z = (gate.z - oz) * mapPxZ;
+        if (x < 0 || z < 0 || x > c.width || z > c.height) continue;
+        const marker = document.createElement('i');
+        marker.className = 'playmap-gate-pin';
+        marker.title = gate.name || 'Monster Gate';
+        marker.setAttribute('aria-label', gate.name || 'Monster Gate');
+        marker.style.left = (x / c.width * 100).toFixed(3) + '%';
+        marker.style.top = (z / c.height * 100).toFixed(3) + '%';
+        fit.appendChild(marker);
+      }
       const raw = inCave ? caveMapLabels(game.world.cave) : inRift ? [{ name: 'Tear', x: game.world.rift.arena.x, z: game.world.rift.arena.z }] : landMapLabels(game.world);
       const pins = raw.map((label) => ({
         ...label,
@@ -766,7 +783,7 @@ export class HUD {
         ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">The Darksycle Den, under the bluff in Southford. Walk back down the tunnel to return to the vale. White dot: you.</p>'
         : inRift
           ? '<p style="margin:10px 0 0;font-size:13px;color:#aab">A waygate tear. Clear the waves, open the chest in the middle, then walk south to leave. White dot: you.</p>'
-          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you. L hides names.</p>');
+          : '<p class="playmap-hint" style="margin:10px 0 0;font-size:13px;color:#aab">Gold names are towns and cities. Gold square: Hunter Guild. Red pulse: Monster Gate. Cyan: the Waygate. Blue square: a teleportation portal. Ember: the smithy. White dot: you. L hides names.</p>');
     } else if (name === 'quest') {
       title.textContent = '';
       this.cleanup = mountJournal(body, game);
