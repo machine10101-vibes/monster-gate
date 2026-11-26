@@ -141,6 +141,33 @@ test('disconnect saves the hunter through openPersistence()', async () => {
   await srv.close();
 });
 
+test('online gathering grants an authoritative item and skill XP before depleting the node', async () => {
+  const node = { id: 'ore_test_copper', kind: 'mine', type: 'copper', x: 72, z: 72, y: 1, zone: 'Oakhollow', ready: true, respawn: 30, respawnAt: 0 };
+  const srv = await startWorld({ nodes: [node] });
+  const ws = await open(srv.url);
+  const msgs = [];
+  collect(ws, msgs);
+  await hello(ws, 'ann', { name: 'Ann' });
+
+  // Same-frame duplicate requests are serialized by the server-owned node lock.
+  ws.send(encode('gather', { id: node.id }));
+  ws.send(encode('gather', { id: node.id }));
+  await waitUntil(() => msgs.some((m) => m.type === 'reward_update' && m.kind === 'good' && m.id === 'copper_ore'));
+  await waitUntil(() => msgs.some((m) => m.type === 'reward_update' && m.kind === 'xp' && m.id === 'mining'));
+  await srv.world.idle();
+
+  const row = await srv.persist.loadCharacter(ANN);
+  assert.equal(row.state.goods.copper_ore, 1);
+  assert.equal(row.state.xp.mining, 17.5);
+  assert.equal(srv.world.byNode.get(node.id).ready, false);
+
+  ws.send(encode('gather', { id: node.id }));
+  await waitUntil(() => msgs.some((m) => m.type === 'error' && m.code === 'gather'));
+  assert.equal(row.state.goods.copper_ore, 1);
+  ws.close();
+  await srv.close();
+});
+
 test('reconnect with resumeToken restores the same hunter id', async () => {
   const srv = await startWorld();
   const a = await open(srv.url);
