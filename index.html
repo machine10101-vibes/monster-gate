@@ -39,7 +39,7 @@
           var u = new URL(location.href);
           // Fastly ignores ?t= and ?mgb=, so a second replace can land on the
           // same stale index. One shot only; then a title-screen notice (MG-SYS-11).
-          if (u.searchParams.get('mgb') === build) {
+          if (u.searchParams.has('mgb')) {
             notice();
             return;
           }
