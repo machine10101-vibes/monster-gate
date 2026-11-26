@@ -285,3 +285,24 @@ test('pit quest and bounties no longer ask for tin or adamant', () => {
   assert.ok(TEMPLATES.some((t) => t.good === 'coal'));
   assert.ok(!GEAR.some((g) => /^(tin_|bronze|adamant)/.test(g.id)));
 });
+
+
+test('all skills use a uniformly tougher 15% level curve', () => {
+  const classic = (level) => {
+    let points = 0;
+    for (let l = 1; l < level; l++) points += Math.floor(l + 300 * Math.pow(2, l / 7));
+    return Math.floor(points / 4);
+  };
+  for (const level of [2, 10, 25, 50, 75, 99]) {
+    assert.ok(xpForLevel(level) >= Math.ceil(classic(level) * 1.15));
+    assert.ok(xpForLevel(level) <= Math.ceil(classic(level) * 1.15) + 1);
+  }
+});
+
+test('mineable nodes form irregular nearby seams instead of an even ring', () => {
+  const gather = src('../src/world/gatherSite.js');
+  assert.match(gather, /dx: -4\.4, dz: -2\.6/);
+  assert.match(gather, /dx: -2\.2, dz: -3\.5/);
+  assert.match(gather, /\[106, 96\], \[109, 99\], \[112, 95\]/);
+  assert.doesNotMatch(gather, /a: -62, r: 3\.7/);
+});
