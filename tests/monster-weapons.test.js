@@ -84,3 +84,17 @@ test('monster hammer families coexist with separate recipes and models', async (
     assert.ok(buildWeaponVoxels(heavy.held)?.M?.data?.some(Boolean), heavy.id);
   }
 });
+
+
+test('forge groups hammer variants with their source monster rather than weapon type', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { GEAR, weapons } = await import('../src/data/catalog.js');
+  const ui = readFileSync(new URL('../src/ui/catalog.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(ui, /Monster (single|two)-handed hammers/);
+  assert.match(ui, /const list = weapons\(m\.id\);/);
+  for (const g of GEAR.filter(g => g.wtype === 'hammer' && !g.starter && g.monster !== 'smith')) {
+    const group = weapons(g.monster);
+    assert.ok(group.some(x => x.id === g.id), g.id);
+    assert.ok(group.some(x => x.id === `${g.id}_twohand`), g.id);
+  }
+});
