@@ -635,28 +635,28 @@ export class HUD {
       ctx.fillRect(toX(GUILD.x) - 1, toZ(GUILD.z) - 1, 2, 2);
     }
     if (inView(GATE.x, GATE.z)) {
-      const pulse = 4 + Math.sin(time * 4) * 1.2;
+      const pulse = 1.5 + Math.sin(time * 4) * 0.3;
       ctx.fillStyle = '#c27bff';
       ctx.fillRect(toX(GATE.x) - pulse, toZ(GATE.z) - pulse, pulse * 2, pulse * 2);
       ctx.fillStyle = '#1b0e3a';
-      ctx.fillRect(toX(GATE.x) - 2, toZ(GATE.z) - 2, 4, 4);
+      ctx.fillRect(toX(GATE.x) - 0.5, toZ(GATE.z) - 0.5, 1, 1);
     }
     for (const gate of visibleMonsterGates(world)) {
       if (inView(gate.x, gate.z)) {
-        paintMonsterGateMarker(ctx, toX(gate.x), toZ(gate.z), Math.max(1.5, Math.min(2.4, sc * 0.55)), time);
+        paintMonsterGateMarker(ctx, toX(gate.x), toZ(gate.z), Math.max(0.65, Math.min(1.0, sc * 0.25)), time);
       }
     }
     if (world.waygate && inView(world.waygate.x, world.waygate.z)) {
-      const pulse = 3 + Math.sin(time * 5) * 1;
+      const pulse = 1.3 + Math.sin(time * 5) * 0.3;
       ctx.fillStyle = '#7ef6ff';
       ctx.fillRect(toX(world.waygate.x) - pulse, toZ(world.waygate.z) - pulse, pulse * 2, pulse * 2);
       ctx.fillStyle = '#14343a';
-      ctx.fillRect(toX(world.waygate.x) - 1, toZ(world.waygate.z) - 1, 3, 3);
+      ctx.fillRect(toX(world.waygate.x) - 0.5, toZ(world.waygate.z) - 0.5, 1, 1);
     }
     ctx.fillStyle = '#5aa8d4';
     for (const p of world.teleports || []) {
       if (!inView(p.x, p.z)) continue;
-      ctx.fillRect(toX(p.x) - 1.5, toZ(p.z) - 1.5, 3, 3);
+      ctx.fillRect(toX(p.x) - 1, toZ(p.z) - 1, 2, 2);
       ctx.fillStyle = '#1d4a66';
       ctx.fillRect(toX(p.x) - 0.5, toZ(p.z) - 0.5, 1, 1);
       ctx.fillStyle = '#5aa8d4';
