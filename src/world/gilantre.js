@@ -1231,6 +1231,7 @@ const ROAM = [
 ];
 
 const PEOPLE = [
+  { id: 'aldric', name: 'Aldric Goldhand', title: 'Item Merchant', spot: 'aldric', service: 'market', x: 438, z: 152, yaw: Math.PI, look: { skin: 0xc89870, hair: 0x3a2a20, beard: true, tunic: 0x365d75, sleeve: 0xe4d2b0, pants: 0x40352c, boots: 0x30251b, belt: true, seed: 72 }, lines: ['I buy gathered goods and monster parts.'] },
   {
     id: 'grimbold',
     name: 'Grimbold Ironfist',
