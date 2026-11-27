@@ -373,16 +373,16 @@ test('paintWorldPlayButton and the Online/Offline pill follow the same state', (
   assert.equal(live.dataset.mode, 'online');
 });
 
-test('character camp offers Choose world and Play solo', () => {
+test('character camp offers explicit online and offline world choices', () => {
   const html = src('../index.html');
   const camp = src('../src/ui/charselect.js');
   const main = src('../src/main.js');
   assert.match(html, /id="cs-choose-world"[^>]*>Choose world/);
-  assert.match(html, /id="cs-play-solo"[^>]*>Play solo/);
+  assert.match(html, /id="cs-play-solo"[^>]*>Solo — Offline/);
   assert.doesNotMatch(html, /id="cs-enter"/);
   assert.match(html, /id="cs-worlds"/);
   assert.match(html, /id="cs-world-1"[\s\S]*World 1/);
-  assert.doesNotMatch(html.slice(html.indexOf('id="cs-worlds"'), html.indexOf('id="cs-toggle"')), /Play solo/);
+  assert.match(html, /id="cs-worlds"[\s\S]*id="cs-play-solo"[^>]*>Solo — Offline/);
   assert.match(camp, /chooseWorld\(\)/);
   assert.match(camp, /playSolo\(\)/);
   assert.match(camp, /pickWorld1\(\)/);
@@ -416,7 +416,7 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   const view = src('../src/net/worldView.js');
   const vite = src('../vite.config.js');
   const readme = src('../README.md');
-  assert.doesNotMatch(html, /id="btn-guest"|Play as guest/i);
+  assert.match(html, /id="btn-guest"[^>]*>Play as Guest/i);
   assert.doesNotMatch(html, /id="btn-world1"/);
   assert.doesNotMatch(html, /Play Online — World 1/);
   assert.doesNotMatch(html, /id="world-guest-note"/);
