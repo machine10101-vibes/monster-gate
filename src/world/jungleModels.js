@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { VoxelModel, RNG, hash3, jitter, mix, shade, clamp } from '../engine/voxel.js';
 import { J } from './models.js';
 import { buildShips } from './jungleShips.js';
+import { buildTribeModels, TRIBE_LODS } from './tribeModels.js';
 
 /**
  * Props for the tropical jungle oasis tiles and the pirate shipyard: palms, canopy giants,
@@ -67,6 +68,7 @@ export const LODS = {
   pierSegment: { k: 3.2, thr: 0.12 },
   pierEnd: { k: 3.2, thr: 0.12 },
   pierPlatform: { k: 2, thr: 0.12 },
+  ...TRIBE_LODS,
 };
 export const TIMES = {};
 let curLod = null;
@@ -2596,6 +2598,7 @@ export function buildJungleModels() {
     plankPile: setLod('plankPile', buildPlankPile),
     treasureChest: setLod('treasureChest', buildTreasureChest),
     skullTotems: setLod('skullTotems', buildSkullTotems),
+    ...buildTribeModels({ blob, cyl, tube, bundle, setLod }),
     ...Object.fromEntries(
       Object.entries(buildShips({ blob, cyl, leaf, mossify, vines, skullPix, bundle, setLod })).map(([k, v]) => [k, Array.isArray(v[0]) ? v : [v]])
     ),

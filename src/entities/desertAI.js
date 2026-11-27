@@ -7,7 +7,7 @@ const BY_TYPE = { sandworm, scorpion };
 
 export const TYPES = new Set(['sandworm', 'scorpion']);
 export const DEFS = {
-  sandworm: { name: 'Sand Spine Worm', hp: 180, radius: 1.15, speed: 3.6, dmg: 8, gold: [40, 70], aggro: 16, build: buildSandSpineWorm },
+  sandworm: { name: 'Sand Spine Worm', hp: 1500, radius: 2.3, speed: 4.6, dmg: 9, gold: [360, 560], aggro: 24, build: buildSandSpineWorm },
   scorpion: { name: 'Desert Scorpion', hp: 90, radius: 0.85, speed: 4.2, dmg: 5, gold: [22, 40], aggro: 14, build: buildDesertScorpion },
 };
 export const FX = { sandworm: sandworm.FX, scorpion: scorpion.FX };

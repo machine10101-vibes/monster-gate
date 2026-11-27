@@ -25,13 +25,14 @@ const BIOMES = {
   V: { id: 'volcanic', name: 'Volcanic wasteland', color: '#5a2c28', blurb: 'Black stone, drifting ash and rivers of fire.' },
   D: { id: 'ruins', name: 'Ruins', color: '#8d6e9c', blurb: 'Something old broke here.' },
   Q: { id: 'oasis', name: 'Desert oasis', color: '#e6c56a', blurb: 'Dry dunes around a living pool.' },
+  J: { id: 'jungle', name: 'Northern Jungle', color: '#3f8f3c', blurb: 'Light jungle, open glades and tribe villages.' },
 };
 
 const CODES = [
   'PPPPPPPPPP',
   'PFVVFFFPPP',
-  'PFVVGGFFWP',
-  'PRFVFMIIWP',
+  'PFVVJJFFWP',
+  'PRFVJJIIWP',
   'RRMMMFIIWA',
   'MRLMOMAHMM',
   'CRMMRMAHDD',
@@ -56,6 +57,10 @@ const RING = {
   '2,2': ['dawnspire', 'West of the Endless Field. Dawnspire is the Holy Knight\'s white marble castle, with gold-trimmed towers, a cathedral keep and a courtyard of blue fire.'],
   '3,1': ['hellspire', 'North of the Endless Field. Hellspire is the Demon Knight\'s black fortress, ringed in iron spikes, with lava in every crack and a gate shaped like a mouth.'],
   '2,1': ['cinderfall', 'West of Hellspire. Cinderfall is a smoking volcano of black basalt. Volcanum rests on the south shoulder of the cone, above the climb.'],
+  '4,3': ['fernreach', 'North of Northleas. A pass through the ridge climbs into Fernreach, the first of the Northern Jungle: open glades, broadleaf stands and Leafmask Village behind its stake fence.'],
+  '5,3': ['mistvale', 'North of Goldmead. Mistvale is light jungle around a reed-fringed pond, with bamboo, palms and a dugout canoe pulled up on the bank, under the cliffs of Rimefang Mesa.'],
+  '4,2': ['vinecrest', 'North of Fernreach. Vinecrest is hillier jungle of mossy rocks and old trees, with a pass west down to the Endless Field.'],
+  '5,2': ['sunfeather', 'North of Mistvale. Sunfeather Village stands in a wide clearing among flowering jungle, its huts painted in ochre and its fire never out.'],
   '2,5': ['lagoon', 'West of Brookside. A pass through the western peaks opens onto Mirrormere Oasis, a turquoise lagoon ringed by palms, ferns and flowering jungle.'],
   '1,5': ['canopy', 'West of the oasis. Silverrun Canopy is thick jungle under giant trees, with an overgrown stone temple, carved idols and roaming Bengal Tigers.'],
   '2,6': ['sunken', 'South of the oasis, west of Longacre. Southmead is dense jungle with bamboo groves, pools and tall grass, where Battle Raptors hunt in packs.'],
@@ -82,8 +87,8 @@ const RING = {
 const NAMES = [
   ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Glasscrag', 'Pale Spire', 'Frostspire', 'Last Snow'],
   ['Greymarch', 'Pinehollow', 'Cinderfall', 'Hellspire', 'Northwood', 'Hartwood', 'Ashgrove', 'Elmshade', 'Coldridge', 'Windcrag'],
-  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Gatewood', 'Wyrmwood', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
-  ['Riverwatch', 'Silverbend', 'Fernwood', 'Ashen Road', 'Goldglade', 'Meadowrise', 'Rimefang Mesa', 'Glimmerfrost', 'Dusthill', 'Redcrag'],
+  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Vinecrest', 'Sunfeather', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
+  ['Riverwatch', 'Silverbend', 'Fernwood', 'Ashen Road', 'Fernreach', 'Mistvale', 'Rimefang Mesa', 'Glimmerfrost', 'Dusthill', 'Redcrag'],
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Gilantre', 'Gilantre', 'Reedbank', 'Frogmarsh'],
   ['Sandcliff', 'Runmouth', 'Southmead', 'Longacre', 'Southford', 'Hayfield', 'Gilantre', 'Gilantre', 'Broken Arch', 'Old Stones'],
@@ -173,6 +178,18 @@ export function sampleTile(tile, u, v) {
       r = lerp(0.24 + n * 0.04, 0.70, snow);
       g = lerp(0.26 + n * 0.03, 0.74, snow);
       b = lerp(0.32, 0.80, snow);
+      break;
+    }
+    case 'jungle': {
+      h = 2.4 + n * 2.2;
+      r = 0.16 + n2 * 0.06;
+      g = 0.42 + n * 0.16;
+      b = 0.16;
+      if (n2 > 0.8) {
+        r = 0.5;
+        g = 0.6;
+        b = 0.3;
+      }
       break;
     }
     case 'forest':

@@ -601,7 +601,7 @@ class Game {
       this.membershipChecking = true;
       try {
         const account = readAccount();
-        if (this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken) {
+        if ((this.wallet?.kind !== 'email' || !account?.userId || this.wallet.userId !== account.userId || !account?.accessToken)) {
           this.openSocialSignIn();
           return;
         }
@@ -2481,23 +2481,26 @@ class Game {
     return false;
   }
 
+  /** Hand a quest's gear reward to the hunter. If the bag is full it stays owed and is retried. */
+  deliverQuestGear(id, announce = false) {
+    const result = this.journal.deliverGear(id);
+    if (result === 'granted') {
+      const gg = gearById(id);
+      this.applyGear();
+      if (gg) this.hud.toast(`Earned: ${gg.name}`, 2800);
+    } else if (result === 'full' && announce) {
+      this.hud.toast(`${INVENTORY_FULL} Your quest reward waits for you.`, 3200);
+    }
+    return result;
+  }
+
   applyJournal(events) {
     const list = Array.isArray(events) ? events : events ? [events] : [];
     let hud = false;
     for (const e of list) {
       if (!e) continue;
       if (e.gold) this.addGold(e.gold);
-      if (e.gear) {
-        const gg = gearById(e.gear);
-        if (this.progress.crafted(e.gear)) {
-          /* already owned */
-        } else if (!this.progress.grantFound(e.gear)) {
-          this.hud.toast(INVENTORY_FULL, 1800);
-        } else if (gg) {
-          this.applyGear();
-          this.hud.toast(`Earned: ${gg.name}`, 2800);
-        }
-      }
+      if (e.gear) this.deliverQuestGear(e.gear, true);
       if (e.fanfare) this.audio.quest();
       if (e.banner) this.hud.banner(e.banner[0], e.banner[1], 3800);
       if (e.toast && !e.quiet) this.hud.toast(e.toast, 2800);
@@ -4326,6 +4329,22 @@ class Game {
     this.forestAmt += (inForest - this.forestAmt) * Math.min(1, dt * 1.5);
   }
 
+  /** Wood smoke drifting up from the village fires of the Northern Jungle, only near the hunter. */
+  emitVillageSmoke(dt) {
+    const spots = this.world?.tribe?.smoke;
+    if (!spots?.length || !this.fx) return;
+    const P = this.player.pos;
+    for (const s of spots) {
+      if (Math.abs(s.x - P.x) > 70 || Math.abs(s.z - P.z) > 70) continue;
+      s.acc = (s.acc || 0) + dt * 7;
+      while (s.acc >= 1) {
+        s.acc -= 1;
+        const c = [0x9a948a, 0x8a847a, 0xb0aaa0, 0x7a746c][Math.floor(Math.random() * 4)];
+        this.fx.emit(s.x + (Math.random() - 0.5) * 0.6, s.y, s.z + (Math.random() - 0.5) * 0.6, 0.25 + (Math.random() - 0.5) * 0.3, 1.1 + Math.random() * 0.5, (Math.random() - 0.5) * 0.3, c, 0.22 + Math.random() * 0.14, 3.2, -0.12);
+      }
+    }
+  }
+
   /* ------------------------------ loop ------------------------------ */
   loop(now) {
     requestAnimationFrame(this.loop);
@@ -4409,6 +4428,8 @@ class Game {
       this.journalT -= dt;
       if (this.journalT <= 0) {
         this.journalT = 0.45;
+        // A quest reward that did not fit in the bag is delivered as soon as there is room.
+        for (const id of this.journal.owedGear()) this.deliverQuestGear(id);
         const gilan = this.world.gilantre;
         this.applyJournal(this.journal.pulse(this.player.pos, {
           gate: GATE,
@@ -4440,6 +4461,7 @@ class Game {
       for (const f of this.ambient.fowl) f.update(dt, t);
       for (const c of this.ambient.cows || []) c.update(dt, t);
       for (const b of this.ambient.butterflies) b.update(dt);
+      this.emitVillageSmoke(dt);
     }
     this.updateProjectiles(dt);
     this.updatePickups(dt);

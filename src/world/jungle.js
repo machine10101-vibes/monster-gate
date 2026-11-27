@@ -276,7 +276,9 @@ export function dressJungle(world, land, spec) {
   const seed = spec.seed;
   const D = budgeted(spec.dress, J);
   const jun = (world.jungle ||= { lands: [], yards: [], piers: [], gates: [] });
-  jun.lands.push(land);
+  // The Northern Jungle keeps its own list so its glades stay free of tigers, raptors and pirates.
+  if (spec.north) (jun.north ||= []).push(land);
+  else jun.lands.push(land);
 
   const place = (parts, lx, lz, rot, scale, o = {}) => {
     if (!parts) return false;
@@ -295,6 +297,7 @@ export function dressJungle(world, land, spec) {
     if (spec.clearing && Math.hypot(lx - spec.clearing.cx, lz - spec.clearing.cz) < spec.clearing.r) return true;
     if (spec.piers) for (const p of spec.piers) if (Math.abs(lx - p.x) < 14 && lz > 92) return true;
     if (spec.gate && Math.abs(lx - spec.gate.x) < 10 && Math.abs(lz - spec.gate.z) < 8) return true;
+    if (spec.village && Math.hypot(lx - spec.village.cx, lz - spec.village.cz) < spec.village.r + 4) return true;
     if (land.kind === 'lagoon' && lz > 54 && lz < 82 && Math.abs(lx - 62) < 14) return true;
     return false;
   };
@@ -312,6 +315,7 @@ export function dressJungle(world, land, spec) {
     const i = lz * W + lx;
     const h = data.H[i];
     if (data.pathMask[i] || h < lo || h > hi || reserved(lx, lz)) return false;
+    if (spec.density && hash2(lx, lz, seed + 97) > spec.density(lx, lz)) return false;
     if (data.zone[i] === ZONE.WATER) return false;
     const sand = data.top[i] === TILE.SAND;
     if (onSand === true && !sand) return false;

@@ -36,6 +36,8 @@ function normalize(raw) {
     activity,
     challengeNew: Math.max(0, src.challengeNew | 0),
     tracked: typeof src.tracked === 'string' ? src.tracked : null,
+    // Gear a finished quest promised that has not reached the bag yet (for example, a full bag).
+    owedGear: Array.isArray(src.owedGear) ? [...new Set(src.owedGear.filter((id) => typeof id === 'string'))].slice(0, 8) : [],
   };
 }
 
@@ -97,6 +99,32 @@ export class Journal {
     this.state.tracked = id;
     this.persist();
     return true;
+  }
+
+  /** Gear the hunter was promised and does not hold yet. */
+  owedGear() {
+    return [...(this.state.owedGear || [])];
+  }
+
+  settleGear(id) {
+    const owed = this.state.owedGear || [];
+    if (!owed.includes(id)) return;
+    this.state.owedGear = owed.filter((g) => g !== id);
+    this.persist(false);
+  }
+
+  /**
+   * Hand over one owed piece of gear. 'granted' and 'owned' settle it; 'full'
+   * leaves it owed so it is tried again when there is room.
+   */
+  deliverGear(id) {
+    if (this.progress.crafted(id)) {
+      this.settleGear(id);
+      return 'owned';
+    }
+    if (!this.progress.grantFound(id)) return 'full';
+    this.settleGear(id);
+    return 'granted';
   }
 
   points() {
@@ -295,6 +323,10 @@ export class Journal {
       if (this.state.tracked === id) this.state.tracked = null;
       st.step = q.steps.length;
       this.log('Quest complete', `${q.name}. ${q.points} quest point${q.points === 1 ? '' : 's'}.`);
+      if (q.reward?.gear) {
+        const owed = this.state.owedGear || (this.state.owedGear = []);
+        if (!owed.includes(q.reward.gear)) owed.push(q.reward.gear);
+      }
       const started = [];
       const follow = [];
       for (const next of QUESTS) {
