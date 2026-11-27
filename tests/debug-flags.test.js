@@ -740,9 +740,9 @@ test("Dalla skips session debug pouch in sellGood and the market listing", () =>
   assert.deepEqual(sold, [['copper_ore', 1]]);
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(main, /sellGood\(id, n = 1\) \{[\s\S]{0,180}isUnsellableGood\(g\)/);
-  assert.match(main, /sellAllGoods\(\) \{[\s\S]{0,220}if \(g\.session\) continue/);
+  assert.match(main, /sellAllGoods\(\) \{[\s\S]{0,220}if \(isUnsellableGood\(g\)/);
   const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
-  assert.match(hud, /function mountMarket[\s\S]*isUnsellableGood\(g\)\) continue/);
+  assert.match(hud, /function mountMarket[\s\S]*!isUnsellableGood\(g\)/);
 });
 
 test('tp crate plaza lira dalla stand next to the props and do not write saves', () => {

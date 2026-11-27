@@ -138,7 +138,7 @@ export function mountExchange(body, game) {
     root.innerHTML = '';
     const head = el('div', 'ex-head');
     const crest = el('div', 'ex-crest');
-    crest.append(el('b', null, 'Gilantre Exchange'), el('small', null, at() ? 'You are at the Exchange.' : 'Browse anywhere. Trade at the Exchange, outside Gilantre\'s east gate.'));
+    crest.append(el('b', null, 'Trade with every hunter on World 1'), el('small', null, at() ? 'You are at the Exchange.' : 'Browse anywhere. Trade at the Exchange, outside Gilantre\'s east gate.'));
     const purse = el('div', 'ex-purse');
     const vault = state.mine?.vault;
     purse.append(el('span', 'ex-coin', `${fmt(vault ? vault.gold : 0)}`), el('small', null, 'World 1 gold'));
@@ -198,7 +198,7 @@ export function mountExchange(body, game) {
 
     const q = el('input', 'mg-input ex-search');
     q.type = 'search';
-    q.placeholder = 'Search items, monsters, types';
+    q.placeholder = 'Search items or monsters';
     q.value = f.q;
     q.oninput = () => {
       f.q = q.value;
@@ -223,6 +223,16 @@ export function mountExchange(body, game) {
       chips.appendChild(b);
     }
     side.appendChild(chips);
+    // On narrow screens the detailed filters fold behind one toggle, so results stay in view.
+    const active = [f.sub, f.family, f.minLevel, f.maxLevel, f.minPrice, f.maxPrice].filter(Boolean).length + (f.sort !== 'price' ? 1 : 0);
+    const more = el('button', 'mg-btn quiet ex-more', active ? `Filters (${active})` : 'Filters');
+    more.type = 'button';
+    more.onclick = () => {
+      state.filtersOpen = !state.filtersOpen;
+      side.classList.toggle('open', state.filtersOpen);
+    };
+    side.classList.toggle('open', !!state.filtersOpen);
+    side.appendChild(more);
 
     const field = (label, input) => {
       const row = el('label', 'ex-field');

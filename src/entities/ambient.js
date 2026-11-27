@@ -420,7 +420,13 @@ export function createAmbient(game) {
       butterflies.push(new Butterfly(game, v.x + Math.cos(a) * r, v.z + Math.sin(a) * r, colors[i % colors.length]));
     }
   }
-  return { npcs: npcs.concat(farmers, townsfolk, tribeFolk), fowl, butterflies, cows };
+  // The Gilantre Exchange: brokers, tenders and the crowd of hunters browsing the stalls.
+  const exchangeFolk = (game.world.exchange?.folk || []).map((p) => new NPC(game, p));
+  if (game.world.exchange) {
+    const ex = game.world.exchange;
+    for (let i = 0; i < 6; i++) butterflies.push(new Butterfly(game, ex.x + rng.range(-14, 14), ex.z + rng.range(-4, 16), colors[i % colors.length]));
+  }
+  return { npcs: npcs.concat(farmers, townsfolk, tribeFolk, exchangeFolk), fowl, butterflies, cows };
 }
 
 export { ZONE, shade };
