@@ -120,3 +120,10 @@
 - Root cause: environment network interface enumeration fails in Vite and the Chromium binary is absent. A static Python server starts, but the browser cannot launch.
 - Retry: inspected arena geometry and render path in source and ran production build and automated checks; preserve manual visual inspection as an outstanding release limitation.
 - Outcome: no local visual browser evidence claimed.
+### 2026-11-27 — Pending-upgrade reconciliation, iteration 1
+- Task: integrate the two outstanding modern PR upgrades onto current main.
+- Attempt: `git cherry-pick --no-commit b81fa00` for the hotbar change.
+- Exact error: content conflicts in `agent-logs/failures.md` and `agent-logs/progress.md`; application code and regression test merged cleanly.
+- Root cause: the old PR branch contained log snapshots that diverged substantially from current main.
+- Retry: retain current main logs, apply the four code/test files, record this reconciliation separately, and run full tests.
+- Outcome: 551/551 project tests, 41/41 persistence tests, smoke and build pass with both reconciled upgrades.
