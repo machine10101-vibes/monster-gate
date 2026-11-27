@@ -13,10 +13,12 @@ test('settings offers Low, Medium, and High', () => {
   assert.deepEqual(QUALITIES.map((q) => q.label), ['Low', 'Medium', 'High']);
 });
 
-test('a phone with no saved choice boots on Low and can still select the others', () => {
+test('a phone with no saved choice boots on High and can still select the others', () => {
   const boot = chooseBootQuality({ safeBoot: true, desktop: false, cores: 4 });
-  assert.equal(boot.quality.id, 'low');
-  assert.equal(boot.quality.label, 'Low');
+  assert.equal(boot.quality.id, 'high');
+  assert.equal(boot.quality.label, 'High');
+  assert.equal(boot.quality.dpr, 2);
+  assert.equal(boot.light, false);
   assert.equal(qualityById('medium').label, 'Medium');
   assert.equal(qualityById('high').label, 'High');
 });
@@ -43,8 +45,12 @@ test('a boot that died restarts on Low without forgetting that Low is one of thr
   assert.equal(boot.quality.shadows, false);
 });
 
-test('a desktop with no saved choice starts on Medium', () => {
+test('a desktop with no saved choice starts on High', () => {
   const boot = chooseBootQuality({ safeBoot: false, desktop: true });
-  assert.equal(boot.quality.id, 'medium');
+  assert.equal(boot.quality.id, 'high');
   assert.equal(boot.light, false);
+});
+
+test('explicit Low choice is preserved', () => {
+  assert.equal(chooseBootQuality({ saved: qualityById('low'), safeBoot: true }).quality.id, 'low');
 });
