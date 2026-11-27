@@ -66,7 +66,13 @@ export function createPvpRuntime(world, opts = {}) {
         p.pvpWins = Math.max(0, Number(p.pvpWins) || 0) + (team === winner ? 1 : 0);
         p.pvpLosses = Math.max(0, Number(p.pvpLosses) || 0) + (team === winner ? 0 : 1);
         world.dirty.add(p.id);
-        world.persistPose(p, true);
+        // Save the result now, without ever writing the temporary arena pose.
+        // The return transition subsequently commits the safe pose as well.
+        if (world.persist && p.userId) {
+          void world.persist.saveCharacter(p.userId, {
+            pvp: { rating: p.pvpRating, wins: p.pvpWins, losses: p.pvpLosses },
+          }, { immediate: true }).catch(err => console.warn('pvp rating save', err?.message || err));
+        }
       }
     }
   };
@@ -137,7 +143,7 @@ export function createPvpRuntime(world, opts = {}) {
         world.dirty.add(p.id);
         world.sendSnapshot(p);
         send(p, 'pvp_queue', { mode, status: 'matched' });
-        world.social.onZone(p, match.teams[team][index] === p.id ? p.pvpReturnPose.zone : p.zone);
+        world.social.onZone(p, p.pvpReturnPose.zone);
         send(p, 'pvp_match_start', { match_id: id, mode, team, arena: 'Gilantre Colosseum', pose: { x: p.x, y: p.y, z: p.z, yaw: p.yaw }, hp: p.hp, max_hp: p.maxHp || 20 });
       }
     }

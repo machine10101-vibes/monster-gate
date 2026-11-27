@@ -107,12 +107,54 @@ export function buildColosseum(world) {
   ring.rotation.x = Math.PI / 2;
   ring.position.set(OX + 19.5, FLOOR + 0.15, OZ + 19.5);
   group.add(ring);
+  // Repeated seating is instanced so the tiers read as a built arena without
+  // adding hundreds of independent draw calls or changing the playable floor.
+  const seatStone = new THREE.MeshStandardMaterial({ color: 0x746777, roughness: 0.94 });
+  const wornStone = new THREE.MeshStandardMaterial({ color: 0x554b59, roughness: 0.96 });
+  const dummy = new THREE.Object3D();
+  for (const [radius, height, count, material] of [
+    [16.7, 0.65, 96, wornStone], [17.65, 1.45, 112, seatStone],
+    [18.55, 2.25, 128, wornStone],
+  ]) {
+    const seats = new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, 0.55, 1.02), material, count);
+    for (let i = 0; i < count; i++) {
+      const angle = (i + 0.5) / count * Math.PI * 2;
+      dummy.position.set(OX + 19.5 + Math.cos(angle) * radius, FLOOR + height, OZ + 19.5 + Math.sin(angle) * radius);
+      dummy.rotation.set(0, -angle, 0);
+      dummy.updateMatrix();
+      seats.setMatrixAt(i, dummy.matrix);
+    }
+    seats.instanceMatrix.needsUpdate = true;
+    seats.computeBoundingSphere();
+    group.add(seats);
+  }
+  const flagA = new THREE.MeshStandardMaterial({ color: 0x992f35, side: THREE.DoubleSide, roughness: 0.9 });
+  const flagB = new THREE.MeshStandardMaterial({ color: 0x315b88, side: THREE.DoubleSide, roughness: 0.9 });
+  const flagGeometry = new THREE.PlaneGeometry(1.25, 2.5);
+  for (let i = 0; i < 12; i++) {
+    const angle = i / 12 * Math.PI * 2;
+    const x = OX + 19.5 + Math.cos(angle) * 18.1;
+    const z = OZ + 19.5 + Math.sin(angle) * 18.1;
+    const banner = new THREE.Mesh(flagGeometry, i % 2 ? flagA : flagB);
+    banner.position.set(x, FLOOR + 4.95, z);
+    banner.rotation.y = -angle + Math.PI / 2;
+    group.add(banner);
+  }
+  const paving = new THREE.MeshStandardMaterial({ color: 0xb39a76, roughness: 1 });
+  for (const radius of [4.4, 9.7, 14.15]) {
+    const inlay = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.055, 4, 96), paving);
+    inlay.rotation.x = Math.PI / 2;
+    inlay.position.set(OX + 19.5, FLOOR + 0.12, OZ + 19.5);
+    group.add(inlay);
+  }
   for (const [x, z, color] of [[OX + 5, OZ + 5, 0xffa34d], [OX + 34, OZ + 5, 0x75cfff], [OX + 5, OZ + 34, 0x75cfff], [OX + 34, OZ + 34, 0xffa34d]]) {
     const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.5, 1.1, 8), trim);
     brazier.position.set(x, FLOOR + 0.55, z);
     const flame = new THREE.PointLight(color, 1.7, 12, 2);
     flame.position.set(x, FLOOR + 2.3, z);
-    group.add(brazier, flame);
+    const fire = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.9, 7), new THREE.MeshBasicMaterial({ color }));
+    fire.position.set(x, FLOOR + 1.65, z);
+    group.add(brazier, fire, flame);
   }
   buildBoard(group, OX + 18, OZ + 34, FLOOR, 0);
   const heightAt = (x, z) => {
