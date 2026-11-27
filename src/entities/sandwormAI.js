@@ -111,7 +111,16 @@ export function wormSand(w, x, z) {
   return land.data.top[i] === TILE.SAND && land.data.zone[i] !== ZONE.WATER;
 }
 export function think(m, dt, c) {
-  const { g, P, dist, sees } = c;
+  const { g } = c;
+  let { P, dist, sees } = c;
+  for (const prey of g.monsters || []) {
+    if (prey === m || prey.dead || prey.type === 'sandworm' || prey.serverAuthoritative || prey.puppet || (prey.realm || 'over') !== (m.realm || 'over') || !wormSand(g.world,prey.x,prey.z)) continue;
+    const d = Math.hypot(prey.x-m.x,prey.z-m.z);
+    if (d >= m.def.aggro || (sees && d >= dist)) continue;
+    dist = d; sees = true;
+    P = { pos: { x:prey.x,y:prey.y,z:prey.z }, get dead(){return prey.dead;}, hurt(dmg,x,z,knock){ if(prey.dead) return false; const dx=prey.x-x,dz=prey.z-z,len=Math.hypot(dx,dz)||1; prey.takeHit(dmg,dx/len,dz/len,knock); return true; } };
+  }
+  c = { ...c, P };
   if (typeof m.wanderT !== 'number') m.wanderT = 2;
   if (typeof m.cd !== 'number') m.cd = 0;
   const leashed = !wormSand(g.world, P.pos.x, P.pos.z);
