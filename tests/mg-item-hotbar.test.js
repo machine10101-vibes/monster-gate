@@ -26,3 +26,26 @@ test('toast notifications are capped at 1.5 seconds', () => {
   assert.match(hud, /toast\(msg, ms = 1500\)/);
   assert.match(hud, /Math\.min\(1500/);
 });
+
+test('entering a character restores slot one from the saved hunt before drawing the bar', () => {
+  const defaults = [{ id: 'blade', kind: 'melee' }, { id: 'potion', kind: 'use' }];
+  const method = (name) => {
+    const body = main.match(new RegExp(`  ${name}\\(\\) \\{[\\s\\S]*?\\n  \\}`))?.[0];
+    assert.ok(body, `${name} method exists`);
+    return Function('ITEMS', 'gearById', 'GOODS', `return ({${body}}).${name}`)(
+      defaults, () => null, {},
+    );
+  };
+  let rendered;
+  const game = {
+    progress: { gold: 0, data: { itemHotbar: [{ id: 'potion' }, { id: 'blade', equipped: true }] }, hasStock: () => false },
+    journal: { rebind() {} }, bounties: { rebind() {} },
+    applyGear() { this.items[0] = { ...this.items[0], _equippedWeapon: true }; },
+    restoreItemHotbar: method('restoreItemHotbar'),
+    hud: { buildHotbar(items) { rendered = items.map((item) => item.id); } },
+    selectInitialHotbarSlot() {}, refreshHud() {},
+  };
+  const rebind = method('rebindFromProgress');
+  rebind.call(game);
+  assert.deepEqual(rendered, ['potion', 'blade']);
+});
