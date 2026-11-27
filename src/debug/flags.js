@@ -164,6 +164,10 @@ const DEBUG_ALIAS_EXPLICIT = {
   leafmask: 'fernreach',
   'leafmask village': 'fernreach',
   'sunfeather village': 'sunfeather',
+  'glacier bay': 'glacierbay',
+  'seawind leas': 'seawind',
+  eastcoast: 'seawind',
+  'east coast': 'seawind',
 };
 
 export const DEBUG_ALIASES = { ...DEBUG_ALIAS_EXPLICIT };

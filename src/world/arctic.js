@@ -114,7 +114,8 @@ export function paintArcticCell(out, H, x, z, kind, isPath, n, spec) {
   const h = H[i];
   const slope = localSlope(H, x, z);
   const n2 = fbm(x * 0.09 + 3, z * 0.09, spec.seed + 6, 2);
-  const sa0 = spec.blend ? smoothstep(1, spec.blend.w, x) : 1;
+  // Snow cover rises away from a greener neighbour: from the west edge (Snowfall) or the south edge (Frostshore).
+  const sa0 = spec.blend ? (spec.blend.s ? smoothstep(1, spec.blend.s, W - 1 - z) : smoothstep(1, spec.blend.w, x)) : 1;
   const sa = spec.blend ? clamp(sa0 + (n - 0.5) * 0.75, 0, 1) : 1;
   out.forest[i] = 0;
   const set = (zone, top, r, g, b) => {
@@ -214,14 +215,14 @@ export function dressArctic(world, land, spec) {
     }
     return placed;
   };
-  const snowAmt = (lx) => (spec.blend ? smoothstep(4, spec.blend.w, lx) : 1);
+  const snowAmt = (lx, lz) => (spec.blend ? (spec.blend.s ? smoothstep(4, spec.blend.s, W - 1 - lz) : smoothstep(4, spec.blend.w, lx)) : 1);
   const pad = (lx, lz) => (spec.pads || []).some(([cx, cz, r]) => Math.hypot(lx - cx, lz - cz) < r * 1.2);
 
   scatter(D.pines, 1, D.pines * 14, (lx, lz, n) => {
     if (!cellOk(lx, lz, 1.4, 7.2) || onMesaTop(lx, lz) || pad(lx, lz)) return false;
     const grove = fbm(lx * 0.034, lz * 0.034, seed + 5, 3);
     if (grove < 0.38 + hash2(n, 3, seed) * 0.12) return false;
-    if (spec.blend && hash2(n, 8, seed) > snowAmt(lx) + 0.12) {
+    if (spec.blend && hash2(n, 8, seed) > snowAmt(lx, lz) + 0.12) {
       const parts = hash2(n, 9, seed) > 0.5 ? M.pines[n % M.pines.length] : M.oaks[n % M.oaks.length];
       const x = land.x0 + lx + 0.5;
       const z = land.z0 + lz + 0.5;

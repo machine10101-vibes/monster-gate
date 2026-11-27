@@ -8,6 +8,7 @@ import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, embe
 import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert, openLongacreSouth, openDunesEast } from './desert.js';
 import { buildHouse } from './models.js';
 import { NORTH_JUNGLE_SPECS, northFeature, paintNorthCell, dressNorthJungle, northEmber, northChill } from './northJungle.js';
+import { EAST_COAST_SPECS, coastFeature, paintCoastCell, coastChill, dressFrozenCoast, dressSeawind, OCEAN_FLOOR } from './eastCoast.js';
 import { GILANTRE_SPECS, openGilantreWest, carveGilantre, dressGilantre } from './gilantre.js';
 
 /**
@@ -218,7 +219,8 @@ function openEastPass(data, zc, fromX) {
   const mark = new Uint8Array(W * W);
   digBand(H, mark, (x, z, h) => {
     const dx = W - 1 - x;
-    if (dx > 36) return null;
+    // Rows 0 and W - 1 are shared with the tiles north and south; never touch them.
+    if (dx > 36 || z === 0 || z === W - 1) return null;
     const fade = 1 - smoothstep(26, 36, dx);
     if (fade <= 0) return null;
     const bank = Math.abs(z - zc);
@@ -447,6 +449,7 @@ const SPECS = {
   ...JUNGLE_SPECS,
   ...DESERT_SPECS,
   ...NORTH_JUNGLE_SPECS,
+  ...EAST_COAST_SPECS,
 };
 
 const HAY = 6;
@@ -576,6 +579,26 @@ function silverrunRidgeEdge() {
   return edge;
 }
 
+/** Grades the first cells of a road coming in across the west edge into an even ramp from the border height. */
+function rampWestEntry(data, zc, depth = 12) {
+  const H = data.H;
+  for (let z = Math.max(1, zc - 5); z <= Math.min(W - 2, zc + 5); z++) {
+    const k = 1 - Math.max(0, Math.abs(z - zc) - 2) / 4;
+    const h0 = H[z * W];
+    const h1 = H[z * W + depth];
+    for (let x = 1; x < depth; x++) {
+      const i = z * W + x;
+      H[i] = Math.round(lerp(H[i], lerp(h0, h1, x / depth), k) * 2) / 2;
+    }
+  }
+  reslope(H, data.slope);
+}
+
+/** The east edge of the coast tiles: open sea floor, matching the ocean tiles beyond. */
+function oceanEdge() {
+  return new Float32Array(W).fill(OCEAN_FLOOR);
+}
+
 function silverrunOceanEdge() {
   return new Float32Array(W).fill(0.1);
 }
@@ -604,6 +627,7 @@ function silverrunFeature(h, x, z, spec) {
 
 function applyFeature(h, x, z, spec) {
   if (spec.silverrunRiver || spec.silverrunMountain) return silverrunFeature(h, x, z, spec);
+  if (spec.eastCoast) return coastFeature(h, x, z, spec);
   if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.volcanic) return volcanicFeature(h, x, z, spec);
   if (spec.north) return northFeature(h, x, z, spec);
@@ -738,6 +762,10 @@ function makeTile(spec, edges) {
       const n = fbm(x * 0.05, z * 0.05, spec.seed + 2, 2);
       const k = kind[i];
       if (k === PATH) mask[i] = 1;
+      if (spec.eastCoast) {
+        paintCoastCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
+        continue;
+      }
       if (spec.arctic) {
         paintArcticCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
         continue;
@@ -855,6 +883,9 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'mistvale') return { s: rowOf(made.goldmead, 0), w: colOf(made.fernreach, W - 1), e: colOf(made.rimefang, 0) };
   if (kind === 'vinecrest') return { s: rowOf(made.fernreach, 0), w: colOf(made.warfield, W - 1) };
   if (kind === 'sunfeather') return { s: rowOf(made.mistvale, 0), w: colOf(made.vinecrest, W - 1) };
+  if (kind === 'glacierbay') return { w: colOf(made.glimmerfrost, W - 1), e: oceanEdge() };
+  if (kind === 'frostshore') return { w: colOf(made.icewind, W - 1), n: rowOf(made.glacierbay, W - 1), e: oceanEdge() };
+  if (kind === 'seawind') return { w: colOf(made.gilantreNe, W - 1), n: rowOf(made.frostshore, W - 1), e: oceanEdge() };
   if (kind === 'silverrunPeak') return { n: rowOf(made.silverrunEast, W - 1), w: colOf(made.silverrunRiver, W - 1), s: silverrunOceanEdge() };
   return {};
 }
@@ -985,7 +1016,7 @@ function silverrunEdgeDensity(land, lx, lz) {
 }
 
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak', 'fernreach', 'mistvale', 'vinecrest', 'sunfeather'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak', 'fernreach', 'mistvale', 'vinecrest', 'sunfeather', 'glacierbay', 'frostshore', 'seawind'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -1000,6 +1031,11 @@ export function generateRing(oak, south) {
       openNorthPass(made.goldmead, 84, 58);
       openEastPass(made.warfield, 72, 72);
     }
+    if (kind === 'glacierbay') {
+      // Ways out to the east coast: from Glimmerfrost's south road and Icewind Reach's east bend.
+      openEastPass(made.glimmerfrost, 112, 70);
+      openEastPass(made.icewind, 50, 100);
+    }
     const spec = { ...(SPECS[kind] || GILANTRE_SPECS[kind]), kind };
     const tile = TILES.find((t) => t.kind === kind);
     const edges = specEdges(kind, oak, south, made);
@@ -1011,6 +1047,9 @@ export function generateRing(oak, south) {
     if (kind === 'harefield') openHarefieldNorth(data);
     if (kind === 'brookside') openWestPass(data, 78);
     if (kind === 'longacre') openWestPass(data, 70);
+    if (kind === 'glacierbay') rampWestEntry(data, 112);
+    if (kind === 'frostshore') rampWestEntry(data, 50);
+    if (kind === 'seawind') rampWestEntry(data, 72);
     made[kind] = data;
     lands.push({
       role: 'ring',
@@ -1028,7 +1067,9 @@ export function generateRing(oak, south) {
       desert: !!spec.desert,
       silverrun: !!spec.silverrun,
       emberAt: spec.volcanic ? emberAmount(spec) : spec.north ? northEmber(spec) : () => 0,
-      chillAt: spec.north
+      chillAt: spec.eastCoast
+        ? coastChill(spec)
+        : spec.north
         ? northChill(spec)
         : spec.arctic
         ? spec.blend
@@ -1042,6 +1083,15 @@ export function generateRing(oak, south) {
   frostGoldmead(made.goldmead);
   carveDesert(lands.filter((l) => DESERT_SPECS[l.kind]));
   carveGilantre(lands);
+  // Gilantre's carving can touch its east column after Seawind Leas copied it; copy it again.
+  {
+    const ne = lands.find((l) => l.kind === 'gilantreNe')?.data;
+    const sw = lands.find((l) => l.kind === 'seawind')?.data;
+    if (ne && sw) {
+      for (let z = 1; z < W; z++) sw.H[z * W] = ne.H[z * W + W - 1];
+      reslope(sw.H, sw.slope);
+    }
+  }
   stitchSilverrunToGilantre(lands);
   stitchSilverrunRiver(lands);
   blendSilverrunEcotones(lands);
@@ -1308,6 +1358,13 @@ function dressLand(world, land) {
   const data = land.data;
   const trees = [];
   if (land.kind === 'brookside') dressOrcCamp(world, land);
+  if (spec.eastCoast) {
+    if (spec.arctic) {
+      dressArctic(world, land, spec);
+      dressFrozenCoast(world, land, spec);
+    } else dressSeawind(world, land, spec);
+    return;
+  }
   if (spec.arctic) {
     dressArctic(world, land, spec);
     return;
