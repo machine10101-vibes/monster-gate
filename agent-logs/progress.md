@@ -18,3 +18,10 @@
 - Implementer: added `gatherYield()` in `server/content.js`, awaited gather handling in `server/world.js`, an in-flight node lock, immediate persistence of goods + skill XP, and reward updates. Updated `server/PROTOCOL.md` and added an integration regression test.
 - Tester: focused World 1 suite passed 18/18; full `npm test` passed 494/494; `npm run test:smoke` built successfully and shader check skipped only because Chrome is unavailable; `npm run test:persistence` passed 33/33.
 - Release gate: local verification is complete, but this checkout has no `.git` branch/commit support. The change affects authenticated player progression/database writes, so production merge/publish requires explicit human approval and a deployment-capable checkout. No production-live claim made.
+
+## 2026-11-26 — Hotbar holds and locks
+
+- Clear stale click suppression on a new press, consume skill holds only when the picker opens, and show the current lock state when Settings reopens. The skill picker accepts Escape and blocks gameplay input while open.
+- Focused tests passed 10/10. Production build passed. Full Windows test run passed 493/498 with the same five failures as clean main. The server smoke timeout also reproduced on clean main. Browser gameplay verification remains pending.
+- Prepared on a dedicated review branch. Production deployment was outside this task.
+- Proposed follow-up: use `fileURLToPath` for the admin test's checkout root and run the targeted test on Windows and Linux.
