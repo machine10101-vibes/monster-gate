@@ -65,3 +65,7 @@
 - Tests: new `tests/north-jungle.test.js` (7: tile registry, exact border seams with all 9 neighbours, walkable passes and inter-tile roads, flat dry plazas with gates, border thinning and recolouring, no mesh cracks, wiring). The three stale guest-button assertions now assert the restored Play as Guest button (matches `tests/mg-no-guest-entry.test.js` from fa64a04/2e29c42).
 - Checks: build pass; npm test 506 pass / 0 fail; smoke pass; live game (guest, ?debug=1&tp=fernreach): 4 lands present, 2 villages with 6 huts each, 8 villagers, 2 smoke spots, 7 routes walked with 0 blocked steps, 0 page errors; renders of both villages, the Northleas pass, Mistvale, Vinecrest and the Ashen Road border reviewed.
 - Not re-verified in browser: attack/evade (combat code untouched by this change).
+
+### 2026-11-27 — Release: Northern Jungle and Sand Spine Worm live
+- PR #312 merged (squash) as f20c9d8 after `verify` and `test-and-build` passed on 8a1e116 (main merged in first; 524 tests pass locally, smoke pass).
+- Pages run 45951933083: success. gh-pages `version.json` build = f20c9d8. Live at monstergate.online.
