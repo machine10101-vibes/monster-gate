@@ -3633,6 +3633,10 @@ class Game {
         script = this.journal.scriptFor(near.def.id);
       }
     }
+    if (near.def.service === 'market' && !script) {
+      this.openMarket(near.def.name);
+      return;
+    }
     if (near.def.service === 'alchemy' && !script) {
       this.openAlchemy();
       return;
@@ -3784,7 +3788,7 @@ class Game {
 
   sellGood(id, n = 1) {
     const g = GOODS[id];
-    if (!g || isUnsellableGood(g)) return false;
+    if (!g || isUnsellableGood(g) || !Number.isSafeInteger(n) || n < 1 || !(g.price > 0)) return false;
     if (!this.progress.takeGood(id, n)) return false;
     this.addGold(g.price * n);
     this.audio.coin();
@@ -3794,10 +3798,17 @@ class Game {
     return true;
   }
 
+  sellPart(id, n = 1) {
+    if (!MATERIALS[id] || !Number.isSafeInteger(n) || n < 1 || !this.progress.takePart(id, n)) return false;
+    this.addGold(n * 5);
+    this.audio.coin();
+    return true;
+  }
+
   sellAllGoods() {
     let gold = 0;
     for (const g of Object.values(GOODS)) {
-      if (g.session) continue;
+      if (isUnsellableGood(g) || !(g.price > 0)) continue;
       const n = this.progress.good(g.id);
       if (n > 0 && this.progress.takeGood(g.id, n)) gold += n * g.price;
     }
@@ -3824,7 +3835,8 @@ class Game {
     return true;
   }
 
-  openMarket() {
+  openMarket(name = 'Dalla') {
+    this.marketName = name;
     this.hud.openPanel('market', this);
     this.hud.panelId = 'market';
     this.audio.select();
