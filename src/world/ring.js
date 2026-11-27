@@ -675,10 +675,8 @@ function makeTile(spec, edges) {
   for (let z = 0; z < W; z++) {
     for (let x = 0; x < W; x++) {
       let h = spec.base + noiseAt(x, z, spec.seed, spec.amp) + knollAt(x, z, spec.knolls);
-      if (spec.rim.n && z < 14) h += (14 - z) * 0.8;
-      if (spec.rim.s && z > W - 15) h += (z - (W - 15)) * 0.8;
-      if (spec.rim.w && x < 14) h += (14 - x) * 0.8;
-      if (spec.rim.e && x > W - 15) h += (x - (W - 15)) * 0.8;
+      // Tile boundaries are storage partitions, not enclosing mountain walls.
+      // Authored knolls, mesas and volcanic features provide the relief.
       if (edges.n) h = pullEdge(h, edges.n[x], z);
       if (edges.s) h = pullEdge(h, edges.s[x], W - 1 - z);
       if (edges.w) h = pullEdge(h, edges.w[z], x);
