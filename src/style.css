@@ -6032,3 +6032,30 @@ html:has(#panel:not(.hidden)) #debug-badge {
 #charselect form.cs-form.minimized { max-height: none; overflow: visible; box-sizing: border-box; }
 #charselect form.cs-form.minimized .cs-form-title { position: static; margin: 0; }
 #charselect .cs-panel.minimized { max-height: none; overflow: visible; }
+
+/* Character camp world picker: override shared mobile big-button widths. */
+#charselect .cs-worlds-box {
+  box-sizing: border-box;
+  width: min(288px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  align-items: center;
+  gap: 7px;
+  padding: 12px;
+}
+#charselect .cs-worlds-title { margin: 0 0 3px; font-size: 11px; }
+#charselect .cs-world-list { width: 100%; align-items: center; }
+#charselect .cs-worlds-box .cs-btn {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 224px;
+  min-height: 44px;
+  margin: 0 auto;
+  padding: 6px 8px;
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: center;
+}
+#charselect .cs-worlds-box .cs-world { gap: 2px; }
+#charselect .cs-worlds-box .cs-world small { font-size: 11px; }
