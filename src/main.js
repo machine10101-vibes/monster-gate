@@ -10,7 +10,7 @@ import { Sky } from './world/sky.js';
 import { Snowfall } from './world/snowfall.js';
 import { Ashfall } from './world/ashfall.js';
 import { FX } from './engine/fx.js';
-import { QUALITIES, chooseBootQuality, qualityById, readSavedQuality } from './engine/quality.js';
+import { QUALITIES, QUALITY_CHOICE_KEY, chooseBootQuality, qualityById, readSavedQuality } from './engine/quality.js';
 import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
@@ -132,7 +132,7 @@ const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && show
 });
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
-const BOOT_KEY = 'mg-boot';
+const BOOT_KEY = 'mg-boot-v2';
 function bootWasKilled() {
   try {
     return sessionStorage.getItem(BOOT_KEY) === '1';
@@ -1970,7 +1970,10 @@ class Game {
       || this.quality.density !== next.density
       || this.quality.shadows !== next.shadows;
     Object.assign(this.quality, next);
-    try { localStorage.setItem('mg-quality', next.id); } catch { /* private mode */ }
+    try {
+      localStorage.setItem('mg-quality', next.id);
+      localStorage.setItem(QUALITY_CHOICE_KEY, '1');
+    } catch { /* private mode */ }
     if (!changed) return false;
     this.applyQuality();
     if (this.fx) this.fx.quality = this.quality;
@@ -4346,11 +4349,11 @@ class Game {
       }
       this.step(dt, rawMs / 1000);
       this.renderer.render(this.scene, this.camera);
-      // Keep the crash-recovery marker until gameplay has actually started and stayed alive.
-      // The old counter ran during login/character select, so it expired before the first hunt.
-      if (this.started && this.bootFrames >= 0) {
+      // A successfully rendered title or character screen proves the boot worked.
+      // Do not treat a normal logout or refresh there as a crash next launch.
+      if (this.bootFrames >= 0) {
         this.bootFrames += 1;
-        if (this.bootFrames === 600) {
+        if (this.bootFrames === 1) {
           clearBoot();
           this.bootFrames = -1;
         }
