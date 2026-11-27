@@ -556,42 +556,149 @@ function tunaModel() {
   return [M, 0.058, 20, cy, cz];
 }
 
+/** Blunt-nosed tiger shark: tall dorsal, long upper tail, dark vertical bars. Not the tapered river-fish body. */
 function tigerSharkModel() {
-  const L = 50;
-  const { M, x0, cy, cz } = fishBody({
-    L, rh: 8, wide: 0.72, sz: 14, seed: 101, tailLen: 14,
-    prof: (t) => 7 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.58) + 0.8,
-    paint: (u, t, x, y, z) => {
-      if (u > 0.1) {
-        const bar = (x + Math.floor(u * 2)) % 6 < 2 && t > 0.2 && t < 0.88;
-        return bar ? 0x35434f : hash3(x, y, z, 102) > 0.9 ? 0x5a6c7a : 0x6e8392;
+  const L = 46;
+  const x0 = 8;
+  const sy = 40;
+  const sz = 16;
+  const tailLen = 16;
+  const M = new VoxelModel(x0 + L + tailLen + 4, sy, sz);
+  const cy = 15;
+  const cz = sz / 2;
+  const BACK = 0x5c6468;
+  const GREY = 0x7d8488;
+  const BELLY = 0xf3f6f4;
+  const BAR = 0x23272b;
+  const FIN = 0x4c565c;
+  const FIN_EDGE = 0x1a2024;
+
+  const prof = (t) => {
+    if (t < 0.07) return 4.8;
+    if (t < 0.2) return 5.4 + (t - 0.07) * 12;
+    if (t < 0.5) return 7.2;
+    if (t < 0.74) return 7.2 - (t - 0.5) * 16;
+    return Math.max(1.4, 3.3 - (t - 0.74) * 7);
+  };
+  const wideAt = (t) => (t < 0.16 ? 0.95 : t > 0.8 ? 0.4 : 0.56);
+  const barred = (x, y) => {
+    const bars = [16, 22, 28, 34, 40];
+    const shift = Math.round((y - cy) * 0.12);
+    return bars.some((b) => Math.abs(x - (b + shift)) <= (hash3(x, y, 3, 141) > 0.88 ? 1 : 0));
+  };
+
+  for (let x = 0; x < L; x++) {
+    const t = x / (L - 1);
+    const rh = prof(t);
+    const rz = Math.max(1.2, rh * wideAt(t));
+    for (let y = 0; y < sy; y++)
+      for (let z = 0; z < sz; z++) {
+        const dy = y + 0.5 - cy;
+        const dz = z + 0.5 - cz;
+        if ((dy / rh) ** 2 + (dz / rz) ** 2 > 1) continue;
+        const u = dy / rh;
+        const spot = x > 28 && u > -0.1 && u < 0.75 && hash3(x, y, z, 121) > 0.86;
+        const bar = (barred(x, y) || spot) && u > -0.22 && u < 0.95;
+        let c;
+        if (u > 0.38) c = bar ? BAR : hash3(x, y, z, 122) > 0.88 ? 0x8a9094 : BACK;
+        else if (u > -0.02) c = bar ? BAR : GREY;
+        else if (u > -0.42) c = 0xd5ddda;
+        else c = BELLY;
+        M.set(x + x0, y, z, J(c, x, y, z, 101, 0.03));
       }
-      if (u > -0.35) {
-        const bar = (x + 3) % 6 < 1 && t > 0.3 && t < 0.8;
-        return bar ? 0x6a7c8a : 0x93a4b0;
-      }
-      return hash3(x >> 1, y, z, 103) > 0.9 ? 0xdde4e6 : 0xf0f3f2;
-    },
-  });
-  const mid = [6, 7];
-  for (let k = 0; k < 12; k++) {
-    const h = Math.round(9 * (1 - k / 12) ** 1.3);
-    for (let d = 0; d < h; d++) for (const z of mid) M.set(x0 + 14 + k - Math.floor(d * 0.5), cy + 8 + d, z, J(d > h - 2 ? 0x2c3842 : 0x586a78, k, d, z, 104, 0.05));
   }
-  for (let k = 0; k < 6; k++) for (const z of mid) for (let d = 0; d < Math.max(1, 4 - k); d++) M.set(x0 + L - 12 + k, cy + 7 + d, z, J(0x4a5c6a, k, d, z, 105, 0.05));
-  for (const z of [1, 12]) {
-    for (let k = 0; k < 11; k++) {
-      const span = 5 - Math.floor(k * 0.4);
-      for (let w = 0; w < span; w++) M.set(x0 + 14 + k, cy - 3 - Math.floor(k * 0.55) - w, z, J(k < 4 ? 0x7c8f9e : 0x6a7e8c, k, w, z, 106, 0.05));
+
+  // Flat snout over an underslung jaw. The nose is a block, not a fish point.
+  for (let k = 1; k <= 3; k++) {
+    const rh = 3.1 - k * 0.28;
+    const rz = 3.6 - k * 0.3;
+    for (let y = cy; y <= cy + 4; y++)
+      for (let z = 0; z < sz; z++) {
+        const dy = y + 0.5 - (cy + 1.4);
+        const dz = z + 0.5 - cz;
+        if ((dy / rh) ** 2 + (dz / rz) ** 2 > 1) continue;
+        M.set(x0 - k, y, z, J(dy > 0 ? BACK : BELLY, k, y, z, 130, 0.03));
+      }
+  }
+  for (let z = 5; z <= 10; z++) {
+    M.set(x0 - 1, cy - 1, z, 0x16181a);
+    M.set(x0, cy - 2, z, 0x121416);
+    if ((z & 1) === 0) {
+      M.set(x0 - 1, cy - 2, z, 0xf4f1e4);
+      M.set(x0, cy - 3, z, 0xe7e2d0);
     }
   }
-  for (let k = 0; k < 7; k++) for (const z of [6, 7]) M.set(x0 + L - 20 + k, cy - 6 - Math.round(2.4 - Math.abs(k - 2) * 0.5), z, J(0x7a8e9c, k, 0, z, 107, 0.05));
-  for (const gx of [8, 10, 12]) for (let y = cy - 3; y <= cy + 3; y++) for (const z of [1, 12]) if (M.has(x0 + gx, y, z)) M.set(x0 + gx, y, z, 0x20282e);
-  for (let k = 0; k < 9; k++) for (const z of [4, 5, 6, 7, 8, 9]) if (!M.has(x0 + 1 + k, cy - 4, z) && M.has(x0 + 1 + k, cy - 3, z)) M.set(x0 + 1 + k, cy - 4, z, k % 2 === 0 ? 0xf6f6f0 : 0x7a2a2a);
-  for (let z = 4; z <= 9; z++) M.set(x0 + 1, cy - 2, z, 0x1b1f22);
-  fishTail(M, x0 + L, cy, [6, 7], 13, 15, 6, 0x4a5c6a, 108);
-  fishEyes(M, x0 + 5, cy + 2, 0x050505, 0xf0e8b0);
-  return [M, 0.05, 25, cy, cz];
+  M.set(x0 - 2, cy, 6, 0x1a1e22);
+  M.set(x0 - 2, cy, 9, 0x1a1e22);
+
+  for (let i = 0; i < 5; i++) {
+    const gx = x0 + 5 + i * 2;
+    for (const dir of [-1, 1]) {
+      for (let z = dir < 0 ? 0 : sz - 1; z >= 0 && z < sz; z -= dir) {
+        let n = 0;
+        for (let y = cy - 2; y <= cy + 3; y++) {
+          if (!M.has(gx, y, z)) continue;
+          M.set(gx, y, z, 0x1c2226);
+          n += 1;
+        }
+        if (n) break;
+      }
+    }
+  }
+
+  // Tall triangular first dorsal, set back on the shoulder, with a dark leading edge.
+  for (let k = 0; k < 13; k++) {
+    const h = Math.round(12 * (1 - k / 13) ** 1.12);
+    const lean = Math.floor(k * 0.4);
+    for (let d = 0; d < h; d++) {
+      const x = x0 + 16 + k - Math.floor(d * 0.12) - lean;
+      const y = cy + 6 + d;
+      const edge = k === 0 || d > h - 2;
+      for (const z of [7, 8]) M.set(x, y, z, J(edge ? FIN_EDGE : FIN, k, d, z, 104, 0.04));
+    }
+  }
+  for (let k = 0; k < 5; k++) {
+    const h = 4 - Math.floor(k * 0.55);
+    for (let d = 0; d < h; d++)
+      for (const z of [7, 8]) M.set(x0 + L - 12 + k, cy + 2 + d, z, J(d === h - 1 ? FIN_EDGE : FIN, k, d, z, 105, 0.04));
+  }
+  for (let k = 0; k < 5; k++) {
+    const h = 4 - Math.floor(k * 0.5);
+    for (let d = 0; d < h; d++)
+      for (const z of [7, 8]) M.set(x0 + L - 11 + k, cy - 2 - d, z, J(FIN, k, d, z, 109, 0.04));
+  }
+
+  // Long sickle pectorals, one each flank, swept back.
+  for (const zEdge of [1, sz - 2]) {
+    const inward = zEdge < cz ? 1 : -1;
+    for (let k = 0; k < 13; k++) {
+      const span = Math.max(1, 4 - Math.floor(k * 0.3));
+      for (let w = 0; w < span; w++) {
+        const x = x0 + 11 + k;
+        const y = cy - 2 - Math.floor(k * 0.28) - w;
+        const edge = w === span - 1 || k > 9;
+        M.set(x, y, zEdge, J(edge ? FIN_EDGE : 0x667076, k, w, zEdge, 106, 0.04));
+        M.set(x, y, zEdge + inward, J(0x8d9598, k, w, zEdge, 111, 0.03));
+      }
+    }
+  }
+  for (const z of [3, sz - 4]) {
+    for (let k = 0; k < 5; k++) {
+      const h = 3 - Math.floor(k * 0.4);
+      for (let d = 0; d < h; d++) M.set(x0 + 24 + k, cy - 5 - d, z, J(FIN, k, d, z, 107, 0.04));
+    }
+  }
+
+  fishTail(M, x0 + L, cy + 1, [7, 8], 14, 15, 6, 0x465056, 108);
+  // Subterminal notch on the long upper lobe, the requiem-shark tail rather than a fish fork.
+  for (const z of [7, 8]) {
+    M.clear(x0 + L + 11, cy + 12, z);
+    M.clear(x0 + L + 12, cy + 11, z);
+    M.set(x0 + L + 10, cy + 13, z, FIN_EDGE);
+  }
+
+  fishEyes(M, x0 + 3, cy + 2, 0x0a0a0a, 0xe4d08a);
+  return [M, 0.048, x0 + Math.floor(L / 2), cy, cz];
 }
 
 function stingrayModel() {
