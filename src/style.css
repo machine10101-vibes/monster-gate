@@ -6059,3 +6059,20 @@ html:has(#panel:not(.hidden)) #debug-badge {
 }
 #charselect .cs-worlds-box .cs-world { gap: 2px; }
 #charselect .cs-worlds-box .cs-world small { font-size: 11px; }
+
+/* Inventory-only compact controls; leave storage grids unchanged. */
+.bag > .bag-controls { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin:4px 0 8px; }
+.bag > .bag-controls input { flex:1 1 110px; min-width:0 !important; }
+.bag > .bag-controls button, .bag > .bag-controls select { min-height:32px; padding:4px 8px; font:inherit; }
+.bag > progress { display:block; height:6px; margin:0 0 6px; accent-color:#c7a35a; }
+.bag > .bag-stage { min-width:0; }
+.bag > .bag-stage .bag-acts { flex-wrap:wrap; }
+.bag > .bag-stage .bag-detail { min-width:0; overflow-wrap:anywhere; }
+.bag-ask-row input[type=number] { width:5em; min-height:36px; font:inherit; }
+@media (orientation:landscape) and (max-height:540px) {
+  body.touch .bag > .bag-stage .bag-grid.slots { grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; }
+  body.touch .bag > .bag-stage .bag-grid.slots .bag-cell { min-height:42px; }
+  body.touch .bag > .bag-hint { margin:2px 0; font-size:11px; }
+  body.touch .bag > .bag-stage .bag-detail canvas { width:40px; height:40px; }
+  body.touch .bag > .bag-stage .bag-act { min-height:36px; }
+}
