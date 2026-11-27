@@ -81,7 +81,7 @@ import { Catalog } from './ui/catalog.js';
 import { Gathering } from './systems/gather.js';
 import { GOODS } from './data/gathering.js';
 import { updateGatherSites } from './world/gatherSite.js';
-import { MONSTERS, MATERIALS, GEAR_DROPS, gearById } from './data/catalog.js';
+import { MONSTERS, MATERIALS, GEAR_DROPS, gearById, gearSalePrice } from './data/catalog.js';
 import { ZONE, GATE, GUILD, MINE } from './world/terrain.js';
 import { updateCaveTravel, tendCaveDragon, restoreOverworld, enterCave } from './world/cave.js';
 import { updateRift, enterRift, lootRiftChest, leaveRift, tryEnterRift, riftReady, syncRiftFollow } from './world/rift.js';
@@ -3803,6 +3803,18 @@ class Game {
     const m = this.world.market;
     if (m) this.fx.burst(m.x, m.y + 1.3, m.z, [0xffd23f, 0xfff3a8, 0xffffff], 10, 2, 0.07, 0.6, 3, 2);
     this.hud.toast(`Sold ${n} ${g.name.toLowerCase()} for ${g.price * n}g`, 1400);
+    return true;
+  }
+
+  sellGear(id) {
+    const g = gearById(id);
+    const pr = this.progress;
+    if (!g || id === 'knife' || id.startsWith('__') || pr.data.debugGranted?.items?.includes(id) || pr.data.debugGranted?.weapon === id || !pr.crafted(id) || pr.storedGear(id) || pr.worn(id)) return false;
+    if (!pr.releaseCrafted(id)) return false;
+    this.addGold(gearSalePrice(g));
+    this.applyGear();
+    this.itemsChanged();
+    this.audio.coin();
     return true;
   }
 

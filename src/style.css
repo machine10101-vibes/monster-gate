@@ -6178,3 +6178,12 @@ html:has(#panel:not(.hidden)) #debug-badge {
   .ex-pick { max-height: 32vh; }
   .ex-head { flex-wrap: wrap; }
 }
+.merchant-toolbar {display:flex;gap:6px;margin:4px 0 8px;align-items:center;}
+.merchant-toolbar input {flex:1;min-width:0;}
+.merchant-list {display:grid;gap:3px;}
+.merchant-row {display:flex;align-items:center;gap:6px;padding:3px 5px;border-bottom:1px solid #ffffff20;min-height:42px;}
+.merchant-row canvas {width:36px!important;height:36px!important;flex:none;}
+.merchant-row .alc-info {flex:1;min-width:0;font-size:12px;overflow-wrap:anywhere;}
+.merchant-row input {width:4em!important;min-width:0;}
+.merchant-row button {padding:4px 7px;min-height:32px;font-size:12px;white-space:nowrap;}
+.merchant-spacer {flex:0 0 0;}

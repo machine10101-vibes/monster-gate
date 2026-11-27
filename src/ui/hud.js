@@ -1,6 +1,6 @@
 import { MATERIALS } from '../data/catalog.js';
 import { iconCanvas, iconURL, uiIconURL, heartCanvas } from './icons.js';
-import { gearById } from '../data/catalog.js';
+import { gearById, GEAR, gearSalePrice } from '../data/catalog.js';
 import { GOODS } from '../data/gathering.js';
 import { isUnsellableGood } from '../debug/transient.js';
 import { mountStats } from './stats.js';
@@ -1586,7 +1586,9 @@ export function bindPanelClose(btn, onClose) {
 function mountMarket(body, game) {
   const pr = game.progress;
   let query = '';
+  let category = 'all';
   const paint = () => {
+    const scroll = body.scrollTop;
     body.innerHTML = '';
     const gold = document.createElement('p');
     gold.className = 'alc-gold';
@@ -1597,19 +1599,30 @@ function mountMarket(body, game) {
     search.placeholder = 'Find items to sell';
     search.value = query;
     search.setAttribute('aria-label', 'Search merchant inventory');
-    body.appendChild(search);
+    const toolbar = document.createElement('div');
+    toolbar.className = 'merchant-toolbar';
+    const filter = document.createElement('select');
+    filter.setAttribute('aria-label','Item category');
+    for (const [id,name] of [['all','All'],['good','Goods'],['material','Parts'],['weapon','Weapons'],['armor','Armor']]) {
+      const o = document.createElement('option'); o.value=id; o.textContent=name; filter.appendChild(o);
+    }
+    filter.value=category;
+    toolbar.append(search,filter);
+    body.appendChild(toolbar);
     const list = document.createElement('div');
+    list.className = 'merchant-list';
     body.appendChild(list);
     const draw = () => {
       list.innerHTML = '';
       const offers = [
         ...Object.values(GOODS).filter(g => !isUnsellableGood(g) && g.price > 0).map(g => ({...g, n:pr.good(g.id), kind:'good', sell:n=>game.sellGood(g.id,n)})),
         ...Object.entries(MATERIALS).map(([id,g]) => ({...g,id,n:pr.count(id),price:5,kind:'material',sell:n=>game.sellPart(id,n)})),
-      ].filter(g=>g.n>0 && g.name.toLowerCase().includes(query.toLowerCase()));
+        ...GEAR.filter(g=>g.id !== 'knife' && !g.id.startsWith('__') && !pr.data.debugGranted?.items?.includes(g.id) && pr.data.debugGranted?.weapon !== g.id && pr.crafted(g.id) && !pr.storedGear(g.id) && !pr.worn(g.id)).map(g=>({...g,n:1,price:gearSalePrice(g),kind:g.type,sell:()=>game.sellGear(g.id)})),
+      ].filter(g=>g.n>0 && (category==='all'||category===g.kind) && g.name.toLowerCase().includes(query.toLowerCase()));
       for (const g of offers) {
         const row = document.createElement('div');
-        row.className = 'alc-row';
-        row.appendChild(renderThumb({kind:g.kind,id:g.id},64));
+        row.className = 'merchant-row';
+        row.appendChild(renderThumb({kind:g.kind,id:g.id},40));
         const info = document.createElement('div');
         info.className = 'alc-info';
         info.textContent = g.name + ' · ' + g.n + ' carried · ' + g.price + 'g each';
@@ -1627,14 +1640,19 @@ function mountMarket(body, game) {
         all.onclick=()=>{qty.value=String(g.n);label();};
         sell.onclick=()=>{if(g.sell(amount())) paint();};
         label();
-        row.append(info,qty,all,sell);
+        row.append(info);
+        if(g.n>1) row.append(qty,all);
+        else { const spacer=document.createElement('span'); spacer.className='merchant-spacer'; row.append(spacer); }
+        row.append(sell);
         list.appendChild(row);
       }
       if(!offers.length) list.textContent='No matching sellable items.';
       flushThumbs(240);
     };
     search.oninput=()=>{query=search.value;draw();};
+    filter.onchange=()=>{category=filter.value;draw();};
     draw();
+    body.scrollTop=scroll;
   };
   paint();
   return () => {};
