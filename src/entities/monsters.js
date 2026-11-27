@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { wormSand } from './sandwormAI.js';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildFowl } from './creatures.js';
 import { buildDarksycleDragon } from './darksycle.js';
 import { buildVolcanumDragon } from './volcanum.js';
@@ -484,6 +485,7 @@ export class Monster {
 
   groundOk(x, z) {
     const w = this.game.world;
+    if (this.type === 'sandworm' && !wormSand(w,x,z)) return false;
     if (!w.playable(x, z)) return false;
     const h = w.heightAt(x, z);
     if (h - this.y > 1.01 || h < WATER_Y - 0.1 || h > 9) return false;
@@ -502,8 +504,10 @@ export class Monster {
     else if (this.groundOk(this.x, nz)) this.z = nz;
     const p = { x: this.x, z: this.z };
     this.game.world.resolve(p, this.radius * 0.8);
-    this.x = p.x;
-    this.z = p.z;
+    if (this.type !== 'sandworm' || wormSand(this.game.world,p.x,p.z)) {
+      this.x = p.x;
+      this.z = p.z;
+    }
   }
 
   /** Hosts chase whichever hunter is closest, including friends in the world. */
@@ -1889,7 +1893,7 @@ export class Monster {
 }
 
 const JUNGLE_QUOTA = { tiger: 5, raptor: 7, cursedpirate: 6, pirate: 7 };
-const DESERT_QUOTA = { sandworm: 2, scorpion: 6 };
+const DESERT_QUOTA = { sandworm: 3, scorpion: 6 };
 
 export class Spawner {
   constructor(game) {
@@ -2234,10 +2238,11 @@ export class Spawner {
     const mine = D.mine;
     const oasis = D.oasis;
     for (let n = 0; n < 24; n++) {
-      const land = D.lands[(n + (type === 'sandworm' ? 0 : 1)) % D.lands.length];
+      const land = D.lands[Math.floor(Math.random() * D.lands.length)];
       const x = land.x0 + 12 + this.rng.range(0, 120);
       const z = land.z0 + 12 + this.rng.range(0, 100);
       if (!w.playable(x, z)) continue;
+      if (type === 'sandworm' && (!wormSand(w,x,z) || g.monsters.some(m => !m.dead && m.type === type && Math.hypot(m.x-x,m.z-z)<24))) continue;
       const zn = w.zoneAt(x, z);
       if (zn === ZONE.WATER || zn === ZONE.MINE) continue;
       const h = w.heightAt(x, z);
