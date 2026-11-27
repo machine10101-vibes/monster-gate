@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import * as THREE from 'three';
 import { TILE } from '../src/engine/materials.js';
-import { W, ZONE, generateTile } from '../src/world/terrain.js';
+import { W, ZONE, generateTile, buildTerrainMeshes } from '../src/world/terrain.js';
 import { generateSouthford, openSouthPass } from '../src/world/southford.js';
 import { openSouthfordDesert } from '../src/world/desert.js';
 import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.js';
@@ -158,4 +159,52 @@ test('the Northern Jungle keeps out of the jungle monster lands and has villager
   assert.match(src('src/entities/ambient.js'), /game\.world\.tribe\?\.folk/);
   assert.match(src('src/main.js'), /emitVillageSmoke\(dt\)/);
   assert.ok(tileAt(4, 2).built && tileAt(5, 2).built && tileAt(4, 3).built && tileAt(5, 3).built);
+});
+
+/** Top-face heights per grid vertex: more than one height at a vertex is a crack in the terrain mesh. */
+function topYs(group) {
+  const map = new Map();
+  group.traverse((m) => {
+    const pos = m.geometry?.attributes?.position;
+    const nor = m.geometry?.attributes?.normal;
+    if (!pos || !nor) return;
+    for (let i = 0; i < pos.count; i++) {
+      if (nor.getY(i) < 0.3) continue;
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const gx = Math.round(x);
+      const gz = Math.round(z);
+      if (Math.abs(x - gx) > 0.02 || Math.abs(z - gz) > 0.02) continue;
+      const k = `${gx},${gz}`;
+      const s = map.get(k) || [];
+      if (!s.some((v) => Math.abs(v - pos.getY(i)) < 0.02)) s.push(pos.getY(i));
+      map.set(k, s);
+    }
+  });
+  return map;
+}
+
+test('the Northern Jungle ground meshes have no cracks on gentle terraces', () => {
+  for (const kind of NORTH_JUNGLE_KINDS) {
+    const l = land(kind);
+    const ys = topYs(buildTerrainMeshes(l.data, new THREE.MeshBasicMaterial(), { ox: l.x0, oz: l.z0 }));
+    let cracks = 0;
+    let samples = 0;
+    for (let z = 1; z < W - 1; z++)
+      for (let x = 1; x < W - 1; x++) {
+        let lo = 1e9;
+        let hi = -1e9;
+        for (const [cx, cz] of [[x - 1, z - 1], [x - 1, z], [x, z - 1], [x, z]]) {
+          lo = Math.min(lo, H(l, cx, cz));
+          hi = Math.max(hi, H(l, cx, cz));
+        }
+        if (hi - lo > 1.001 || hi - lo < 0.05) continue;
+        const got = ys.get(`${x + l.x0},${z + l.z0}`);
+        if (!got) continue;
+        samples++;
+        if (got.length > 1) cracks++;
+      }
+    assert.ok(samples > 200, `${kind} samples ${samples}`);
+    assert.equal(cracks, 0, `${kind} cracks ${cracks}/${samples}`);
+  }
 });

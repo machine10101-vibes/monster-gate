@@ -163,7 +163,8 @@ export function paintNorthCell(out, H, x, z, kind, isPath, n, spec) {
     out.tint[i * 3 + 2] = lerp(out.tint[i * 3 + 2], b.tint[2], k);
     out.forest[i] *= 1 - t * 0.6;
     if (t > 0.55 && out.top[i] === TILE.MOSS_STONE && H[i] < 8) out.top[i] = TILE.GRASS;
-    if (b === BLEND.ash && t > 0.5 && hash2(gx, gz, 17) > 0.7) out.top[i] = TILE.DIRT;
+    // Dry, bare patches on the low ground toward Ashen Road; the stone ridge itself is left as stone.
+    if (b === BLEND.ash && t > 0.45 && out.zone[i] !== ZONE.MOUNTAIN && H[i] < 7 && fbm(gx * 0.12, gz * 0.12, spec.seed + 41, 2) > 0.6) out.top[i] = TILE.DIRT;
   }
 }
 
