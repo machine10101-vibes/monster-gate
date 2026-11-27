@@ -216,6 +216,7 @@ class Game {
     this.hud = new HUD();
     this.audio = new Audio8();
     this.input = new Input(this.canvas);
+    this.input.canTabCamera = () => this.started && !this.uiBlocking && !this.hud?.panelOpen;
     this.hud.layoutHud();
     const buildEl = document.getElementById('build-id');
     if (buildEl) buildEl.textContent = BUILD_ID;
