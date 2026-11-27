@@ -1,3 +1,5 @@
+import { TILE } from '../engine/materials.js';
+import { W, ZONE } from '../world/terrain.js';
 import { clamp } from '../engine/voxel.js';
 import { TAU, angDiff, turn, stateClock, ease3 } from './beastMove.js';
 
@@ -102,12 +104,17 @@ function mawPos(m) {
 /* brain                                                               */
 /* ------------------------------------------------------------------ */
 
+export function wormSand(w, x, z) {
+  const land = w.landAt(x, z);
+  if (!land || !w.desert?.lands.includes(land) || !w.playable(x,z)) return false;
+  const i = (Math.floor(z)-land.z0)*W + Math.floor(x)-land.x0;
+  return land.data.top[i] === TILE.SAND && land.data.zone[i] !== ZONE.WATER;
+}
 export function think(m, dt, c) {
   const { g, P, dist, sees } = c;
   if (typeof m.wanderT !== 'number') m.wanderT = 2;
   if (typeof m.cd !== 'number') m.cd = 0;
-  const homeD = Math.hypot(m.x - m.home.x, m.z - m.home.z);
-  const leashed = homeD > 48;
+  const leashed = !wormSand(g.world, P.pos.x, P.pos.z);
   const st = m.state;
   const toP = Math.atan2(P.pos.x - m.x, P.pos.z - m.z);
   const done = (to) => {
@@ -125,17 +132,23 @@ export function think(m, dt, c) {
     }
     m.wanderT -= dt;
     if (m.wanderT <= 0) {
-      m.wanderT = 3 + Math.random() * 3;
-      const a = Math.random() * TAU;
-      m.wx = m.home.x + Math.cos(a) * (5 + Math.random() * 10);
-      m.wz = m.home.z + Math.sin(a) * (5 + Math.random() * 10);
+      m.wanderT = 12 + Math.random() * 12;
+      for (let i = 0; i < 32; i++) {
+        const a = Math.random() * TAU;
+        const r = 18 + Math.random() * 42;
+        const x = m.x + Math.cos(a)*r, z = m.z + Math.sin(a)*r;
+        if (wormSand(g.world,x,z) && [0.25,0.5,0.75].every(f => wormSand(g.world,m.x+(x-m.x)*f,m.z+(z-m.z)*f))) {
+          m.wx=x; m.wz=z; break;
+        }
+      }
+      if (!Number.isFinite(m.wx)) return [0,0];
       done('wander');
     }
     if (m.state === 'wander') {
       const tx = m.wx - m.x;
       const tz = m.wz - m.z;
       const td = Math.hypot(tx, tz);
-      if (td < 1.5) done('idle');
+      if (td < 1.5) { m.wanderT = 0; done('idle'); }
       else {
         turn(m, Math.atan2(tx, tz), 1.8, dt);
         if (Math.random() < dt * 8) spray(g, m.x, m.y, m.z, 1, 1.2, 1);
