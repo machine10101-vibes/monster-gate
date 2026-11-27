@@ -1162,26 +1162,17 @@ export class HUD {
       game.refreshWaygate();
     } else if (name === 'settings') {
       title.textContent = 'Settings';
-      const jumps = document.createElement('div');
-      jumps.className = 'set-jumps';
-      const jumpsList = [
-        ['tome', 'Teleportation Tome', 'Travel to a remembered place'],
-        ['friends', 'Friends', 'Friends list and party'],
-        ['gear', 'Character', 'Equipped and unequipped'],
-        ['bag', 'Inventory', 'Bag, tools and goods'],
-      ];
       if (canCreateWorld(game.staffRole)) {
-        jumpsList.push(['world', 'World Creator', '100-tile map']);
-      }
-      for (const [id, label, sub] of jumpsList) {
+        const jumps = document.createElement('div');
+        jumps.className = 'set-jumps';
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'set-jump';
-        b.innerHTML = `<b>${label}</b><small>${sub}</small>`;
-        b.onclick = () => this.openPanel(id, game);
+        b.innerHTML = '<b>World Creator</b><small>100-tile map</small>';
+        b.onclick = () => this.openPanel('world', game);
         jumps.appendChild(b);
+        body.appendChild(jumps);
       }
-      body.appendChild(jumps);
       add(`<section class="set-hotbar-controls" aria-label="Hotbar controls">
         <h3>Hotbar controls</h3>
         <p>Lock a bar to prevent accidental long-press assignment or changes.</p>
