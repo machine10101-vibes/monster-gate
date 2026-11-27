@@ -15,14 +15,14 @@ import { HOTBAR_HOLD_MS, availableHotbarSkills, readHotbarLocked, writeHotbarLoc
 import { mountGear } from './gear.js';
 import { mountBag } from './bag.js';
 import { mountStorage } from './storage.js';
-import { flushThumbs, renderThumb } from './catalog.js';
+import { flushThumbs, renderThumb, renderThumbNow } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
 import { mountTeleport } from './teleport.js';
 import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
 import { mountWalletSettings } from '../wallet/settings.js';
-import { writeStrafeSetting } from '../engine/input.js';
+import { writeStrafeSetting, writeTabCamera } from '../engine/input.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
@@ -284,9 +284,18 @@ export class HUD {
       cv.width = 16;
       cv.height = 16;
       const gear = gearById(it.id);
-      if (gear) b.appendChild(renderThumb({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
-      else {
-        cv.getContext('2d').drawImage(iconCanvas(it.icon), 0, 0);
+      // Hotbar icons must be ready on the first paint; catalog thumbnails can wait in the queue.
+      let renderedGear = false;
+      if (gear) {
+        try {
+          b.appendChild(renderThumbNow({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
+          renderedGear = true;
+        } catch {
+          // A lost secondary WebGL context must not leave the whole hotbar blank.
+        }
+      }
+      if (!renderedGear) {
+        cv.getContext('2d').drawImage(iconCanvas(gear ? (gear.type === 'weapon' ? 'blade' : 'shield') : it.icon), 0, 0);
         b.appendChild(cv);
       }
       const key = document.createElement('span');
@@ -755,6 +764,9 @@ export class HUD {
       const fit = document.createElement('div');
       fit.className = 'playmap-fit';
       fit.appendChild(c);
+      frame.appendChild(fit);
+      body.appendChild(frame);
+      this.el.panel.classList.remove('hidden');
       const playerPin = document.createElement('i');
       playerPin.className = 'playmap-player-pin';
       playerPin.title = 'Your position';
@@ -782,7 +794,8 @@ export class HUD {
         nx: ((label.x - ox) * mapScale / src.width) * 100,
         ny: ((label.z - oz) * mapScale / src.height) * 100,
       }));
-      const placed = layoutPlaymapLabels(pins);
+      const mapRect = fit.getBoundingClientRect();
+      const placed = layoutPlaymapLabels(pins, { mapW: mapRect.width || 720, mapH: mapRect.height || 560 });
       const leads = document.createElement('canvas');
       leads.className = 'playmap-leads';
       leads.width = 720;
@@ -808,7 +821,6 @@ export class HUD {
         b.style.top = (atPin ? label.ay : label.y).toFixed(2) + '%';
         fit.appendChild(b);
       }
-      frame.appendChild(fit);
       const zoomControls = document.createElement('div');
       zoomControls.className = 'playmap-zoom-controls';
       zoomControls.setAttribute('aria-label', 'Map zoom controls');
@@ -1195,6 +1207,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
         ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Strafing', `<button id="set-strafe" aria-pressed="${game.input.strafe ? 'true' : 'false'}">${game.input.strafe ? 'On' : 'Off'}</button>`],
+        ['Tab camera rotation (R)', `<button id="set-tab-camera" aria-pressed="${game.input.tabCamera}">${game.input.tabCamera ? 'On' : 'Off'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -1279,6 +1292,12 @@ export class HUD {
         const btn = document.getElementById('set-strafe');
         btn.textContent = game.input.strafe ? 'On' : 'Off';
         btn.setAttribute('aria-pressed', game.input.strafe ? 'true' : 'false');
+      };
+      document.getElementById('set-tab-camera').onclick = () => {
+        game.input.tabCamera = writeTabCamera(!game.input.tabCamera);
+        const btn = document.getElementById('set-tab-camera');
+        btn.textContent = game.input.tabCamera ? 'On' : 'Off';
+        btn.setAttribute('aria-pressed', String(game.input.tabCamera));
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
       const worldBtn = document.getElementById('set-world1');

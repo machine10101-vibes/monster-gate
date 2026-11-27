@@ -141,6 +141,33 @@ test('disconnect saves the hunter through openPersistence()', async () => {
   await srv.close();
 });
 
+test('online gathering grants an authoritative item and skill XP before depleting the node', async () => {
+  const node = { id: 'ore_test_copper', kind: 'mine', type: 'copper', x: 72, z: 72, y: 1, zone: 'Oakhollow', ready: true, respawn: 30, respawnAt: 0 };
+  const srv = await startWorld({ nodes: [node] });
+  const ws = await open(srv.url);
+  const msgs = [];
+  collect(ws, msgs);
+  await hello(ws, 'ann', { name: 'Ann' });
+
+  // Same-frame duplicate requests are serialized by the server-owned node lock.
+  ws.send(encode('gather', { id: node.id }));
+  ws.send(encode('gather', { id: node.id }));
+  await waitUntil(() => msgs.some((m) => m.type === 'reward_update' && m.kind === 'good' && m.id === 'copper_ore'));
+  await waitUntil(() => msgs.some((m) => m.type === 'reward_update' && m.kind === 'xp' && m.id === 'mining'));
+  await srv.world.idle();
+
+  const row = await srv.persist.loadCharacter(ANN);
+  assert.equal(row.state.goods.copper_ore, 1);
+  assert.equal(row.state.xp.mining, 17.5);
+  assert.equal(srv.world.byNode.get(node.id).ready, false);
+
+  ws.send(encode('gather', { id: node.id }));
+  await waitUntil(() => msgs.some((m) => m.type === 'error' && m.code === 'gather'));
+  assert.equal(row.state.goods.copper_ore, 1);
+  ws.close();
+  await srv.close();
+});
+
 test('reconnect with resumeToken restores the same hunter id', async () => {
   const srv = await startWorld();
   const a = await open(srv.url);
@@ -156,7 +183,60 @@ test('reconnect with resumeToken restores the same hunter id', async () => {
   const again = await hello(b, 'ann', { name: 'Ann', resume: token });
   assert.equal(again.you.id, id);
   assert.equal(again.resumed, true);
+  assert.ok(again.pose.x >= 73, 'resume uses the last accepted position, not the login position');
+  assert.ok(again.pose.z < 72.5);
+  assert.equal(again.pose.yaw, 0.2);
   b.close();
+  await srv.close();
+});
+
+test('a long lived hunter resumes at the latest pose after the original token expires', async () => {
+  let time = 1_000_000;
+  const srv = await startWorld({ now: () => time });
+  const a = await open(srv.url);
+  const welcome = await hello(a, 'ann', { name: 'Ann' });
+  time += 120_000;
+  a.send(encode('move', { x: 74, y: 3.2, z: 72, yaw: 1.1, zone: 'Oakhollow' }));
+  await waitUntil(() => srv.world.byUser.get(ANN)?.x >= 74);
+  a.close();
+  await waitUntil(() => !srv.world.byUser.has(ANN));
+  const b = await open(srv.url);
+  const resumed = await hello(b, 'ann', { name: 'Ann', resume: welcome.resumeToken });
+  assert.equal(resumed.resumed, true);
+  assert.ok(resumed.pose.x >= 74);
+  assert.equal(resumed.pose.yaw, 1.1);
+  b.close();
+  await srv.close();
+});
+
+test('a replacement socket loads the previous socket position without a resume token', async () => {
+  const srv = await startWorld();
+  const first = await open(srv.url);
+  await hello(first, 'ann', { name: 'Ann' });
+  first.send(encode('move', { x: 74, y: 3.2, z: 72, yaw: 0.7, zone: 'Oakhollow' }));
+  await waitUntil(() => srv.world.byUser.get(ANN)?.x >= 74);
+
+  const second = await open(srv.url);
+  const joined = await hello(second, 'ann', { name: 'Ann' });
+  assert.ok(joined.pose.x >= 74);
+  assert.equal(joined.pose.yaw, 0.7);
+  second.close();
+  first.close();
+  await srv.close();
+});
+
+test('periodic save commits movement while the hunter remains connected', async () => {
+  const srv = await startWorld();
+  const ws = await open(srv.url);
+  await hello(ws, 'ann', { name: 'Ann' });
+  ws.send(encode('move', { x: 74, y: 3.2, z: 72, yaw: 0.5, zone: 'Oakhollow' }));
+  await waitUntil(() => srv.world.byUser.get(ANN)?.x >= 74);
+  await srv.world.saveAll();
+  assert.equal(srv.world.pendingSaves.size, 0, 'queued moves do not retain one promise per frame');
+  const row = await srv.persist.loadCharacter(ANN);
+  assert.ok(row.state.hunter.x >= 74);
+  assert.equal(row.state.hunter.yaw, 0.5);
+  ws.close();
   await srv.close();
 });
 

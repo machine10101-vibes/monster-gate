@@ -526,14 +526,14 @@ const PLAYMAP_SIDE_NAME = {
 export function layoutPlaymapLabels(labels, opts = {}) {
   const mapW = Number(opts.mapW) > 0 ? Number(opts.mapW) : 720;
   const mapH = Number(opts.mapH) > 0 ? Number(opts.mapH) : 560;
-  const padX = (PLAYMAP_FRAME_PAD_PX / mapW) * 100;
-  const padY = (PLAYMAP_FRAME_PAD_PX / mapH) * 100;
+  const padX = (Math.min(PLAYMAP_FRAME_PAD_PX, mapW * 0.055) / mapW) * 100;
+  const padY = (Math.min(PLAYMAP_FRAME_PAD_PX, mapH * 0.055) / mapH) * 100;
   const list = (labels || []).map((label, i) => {
     const kind = playmapLabelKind(label);
-    const font = kind === 'city' ? 14 : kind === 'landmark' ? 13 : kind === 'uncharted' ? 12 : 12;
+    const font = kind === 'city' ? 11 : kind === 'landmark' ? 10 : kind === 'uncharted' ? 8 : 9;
     const name = String(label.name || '');
     const twoLine = /\s/.test(name) || name.length > 10;
-    const bw = Math.min(mapW * 0.14, Math.max(36, name.length * font * (twoLine ? 0.52 : 0.62) + 14));
+    const bw = Math.min(mapW * 0.12, Math.max(24, name.length * font * (twoLine ? 0.52 : 0.62) + 8));
     const bh = font * (twoLine ? 2.6 : 1.55);
     return {
       ...label,

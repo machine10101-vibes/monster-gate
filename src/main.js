@@ -10,7 +10,7 @@ import { Sky } from './world/sky.js';
 import { Snowfall } from './world/snowfall.js';
 import { Ashfall } from './world/ashfall.js';
 import { FX } from './engine/fx.js';
-import { QUALITIES, chooseBootQuality, qualityById, readSavedQuality } from './engine/quality.js';
+import { QUALITIES, QUALITY_CHOICE_KEY, chooseBootQuality, qualityById, readSavedQuality } from './engine/quality.js';
 import { VFX } from './engine/vfx.js';
 import { Audio8 } from './engine/audio.js';
 import { Input } from './engine/input.js';
@@ -132,7 +132,7 @@ const glDeadAtBoot = !sendingToLedger && typeof document !== 'undefined' && show
 });
 
 /** Set while a boot is in progress. A reload that finds it still set is the iPad crash-restart. */
-const BOOT_KEY = 'mg-boot';
+const BOOT_KEY = 'mg-boot-v2';
 function bootWasKilled() {
   try {
     return sessionStorage.getItem(BOOT_KEY) === '1';
@@ -181,14 +181,6 @@ function isDesktopGraphics() {
   }
 }
 
-function pickQuality() {
-  const saved = readSavedQuality(typeof localStorage !== 'undefined' ? localStorage : null);
-  if (saved) return { ...saved };
-  if (isDesktopGraphics()) return QUALITIES[1];
-  const cores = navigator.hardwareConcurrency || 4;
-  return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
-}
-
 function graphicsSize() {
   try {
     return {
@@ -207,20 +199,16 @@ class Game {
     this.canvas = document.getElementById('game');
     const killed = bootWasKilled();
     markBoot();
-    // iPad Chrome and Brave both pretend to be a desktop. The first boot has to
-    // be the small one: a crash-then-retry still dies if every boot draws the whole world.
-    // Touch phones can lose the WebGL context when the game first expands to landscape.
-    // Start them on the same conservative scene budget as iOS/tablets, then let them upgrade later.
+    // Use the same preset before character selection and throughout gameplay.
+    // A failed WebGL boot retains the one-launch recovery budget.
     this.safeBoot = isIOS() || isTablet() || !isDesktopGraphics() || killed;
     const savedQuality = readSavedQuality(typeof localStorage !== 'undefined' ? localStorage : null);
-    const bootQuality = this.safeBoot
-      ? chooseBootQuality({
-        saved: savedQuality,
-        safeBoot: true,
-        killed,
-        size: graphicsSize(),
-      })
-      : { quality: pickQuality(), recovered: false, light: false };
+    const bootQuality = chooseBootQuality({
+      saved: savedQuality,
+      safeBoot: this.safeBoot,
+      killed,
+      size: graphicsSize(),
+    });
     this.heavyBoot = bootQuality.light;
     this.lightBoot = bootQuality.light;
     this.quality = bootQuality.quality;
@@ -228,6 +216,7 @@ class Game {
     this.hud = new HUD();
     this.audio = new Audio8();
     this.input = new Input(this.canvas);
+    this.input.canTabCamera = () => this.started && !this.uiBlocking && !this.hud?.panelOpen;
     this.hud.layoutHud();
     const buildEl = document.getElementById('build-id');
     if (buildEl) buildEl.textContent = BUILD_ID;
@@ -549,8 +538,9 @@ class Game {
     }
 
     this.applyGear(true);
+    this.restoreItemHotbar();
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
-    this.selectSlot(0, true);
+    this.selectInitialHotbarSlot();
     this.refreshHud(true);
     this.syncViewDistance();
     const startX = this.player?.pos?.x ?? 72;
@@ -664,8 +654,9 @@ class Game {
     this.items = this.baseItems.slice();
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.applyGear(true);
+    this.restoreItemHotbar();
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
-    this.selectSlot(0, true);
+    this.selectInitialHotbarSlot();
     this.refreshHud(true);
   }
 
@@ -1979,7 +1970,10 @@ class Game {
       || this.quality.density !== next.density
       || this.quality.shadows !== next.shadows;
     Object.assign(this.quality, next);
-    try { localStorage.setItem('mg-quality', next.id); } catch { /* private mode */ }
+    try {
+      localStorage.setItem('mg-quality', next.id);
+      localStorage.setItem(QUALITY_CHOICE_KEY, '1');
+    } catch { /* private mode */ }
     if (!changed) return false;
     this.applyQuality();
     if (this.fx) this.fx.quality = this.quality;
@@ -2164,6 +2158,46 @@ class Game {
     this.selectSlot(i);
   }
 
+  restoreItemHotbar() {
+    const saved = this.progress.data.itemHotbar;
+    if (!Array.isArray(saved) || saved.length !== this.items.length) return;
+    const defaults = this.items.slice();
+    const restored = saved.map((ref, i) => {
+      if (!ref || typeof ref.id !== 'string') return defaults[i];
+      if (ref.equipped) return defaults.find(it => it._equippedWeapon) || defaults[i];
+      const base = defaults.find(it => it.id === ref.id);
+      if (base && !ref.bagRef) return base;
+      if (!ref.bagRef && ref.id === 'blade') return { ...ITEMS[0] };
+      const gear = gearById(ref.id);
+      if (ref.bagRef === 'gear' && gear && this.progress.crafted(ref.id) && !this.progress.storedGear(ref.id)) {
+        return { id: ref.id, name: gear.name, icon: ref.id, kind: 'none', bagRef: { k: 'gear', id: ref.id } };
+      }
+      if (ref.bagRef === 'good' && this.progress.good(ref.id)) {
+        return { id: ref.id, name: GOODS[ref.id]?.name || ref.id, icon: ref.id, kind: 'none', bagRef: { k: 'good', id: ref.id } };
+      }
+      return defaults[i];
+    });
+    this.items = restored;
+  }
+
+  selectInitialHotbarSlot() {
+    const slot = this.items.findIndex(it => it._equippedWeapon && !it.bagRef);
+    if (slot >= 0) this.selectSlot(slot, true);
+    else {
+      this.sel = Math.max(0, this.items.findIndex(it => !it.bagRef && (it.kind === 'melee' || it.kind === 'ranged')));
+      this.player.setHeld(this.progress.weaponItem?.held || 'blade');
+    }
+  }
+
+  saveItemHotbar() {
+    this.progress.data.itemHotbar = this.items.map(it => ({
+      id: it.id,
+      ...(it._equippedWeapon ? { equipped: true } : {}),
+      ...(it.bagRef ? { bagRef: it.bagRef.k } : {}),
+    }));
+    this.progress.save();
+  }
+
   /** Move an inventory item into a chosen hotbar slot without duplicating it. */
   assignHotbarItem(slot, item, sourceSlot) {
     if (this.hud?.itemHotbarLocked) {
@@ -2178,6 +2212,7 @@ class Game {
     if (existing >= 0) this.items[existing] = previous || { ...ITEMS[7] };
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
     if (this.sel === slot && !item.bagRef) this.selectSlot(slot, true);
+    this.saveItemHotbar();
     return true;
   }
 
@@ -2230,9 +2265,9 @@ class Game {
     // Keep the equipped weapon in slot zero until the player deliberately
     // assigns a different item there. Other slots remain freely assignable.
     const equippedSlot = this.items.findIndex(it => it.id === w?.id);
-    const activeSlot = equippedSlot >= 0 ? equippedSlot : Math.max(0, this.items.findIndex(it => it._equippedWeapon || it.id === 'blade'));
-    this.items[activeSlot] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
-    if (!initial) this.sel = activeSlot;
+    const activeSlot = equippedSlot >= 0 ? equippedSlot : this.items.findIndex(it => it._equippedWeapon || it.id === 'blade');
+    if (activeSlot >= 0) this.items[activeSlot] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
+    if (!initial && activeSlot >= 0) this.sel = activeSlot;
     p.setSheath(w?.held || 'blade');
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
@@ -4333,11 +4368,11 @@ class Game {
       }
       this.step(dt, rawMs / 1000);
       this.renderer.render(this.scene, this.camera);
-      // Keep the crash-recovery marker until gameplay has actually started and stayed alive.
-      // The old counter ran during login/character select, so it expired before the first hunt.
-      if (this.started && this.bootFrames >= 0) {
+      // A successfully rendered title or character screen proves the boot worked.
+      // Do not treat a normal logout or refresh there as a crash next launch.
+      if (this.bootFrames >= 0) {
         this.bootFrames += 1;
-        if (this.bootFrames === 600) {
+        if (this.bootFrames === 1) {
           clearBoot();
           this.bootFrames = -1;
         }

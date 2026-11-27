@@ -1,3 +1,4 @@
+import { portalById, arrivalOf, isPortalLanding } from '../src/data/portals.js';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TILE } from '../src/engine/materials.js';
@@ -228,4 +229,15 @@ test('Gilantre quests point at the people who stand in the city', () => {
   assert.equal(questGiverNpc(questById('gilan-timber')), 'elara');
   assert.equal(questGiverNpc(questById('gilan-reed')), 'lyra');
   assert.equal(questById('gilan-bowl').steps[1].spot, 'coliseum');
+});
+
+ test('Gilantre portal lands on walkable ground outside the west moat', () => {
+  const w = world();
+  const portal = portalById('gilantre');
+  assert.ok(portal.x < 390);
+  const arrival = arrivalOf(portal);
+  assert.equal(w.playable(portal.x, portal.z), true);
+  assert.equal(w.playable(arrival.x, arrival.z), true);
+  assert.equal(isPortalLanding(arrival.x, arrival.z), true);
+  route(w, [[arrival.x, arrival.z], [380, 144], [396, 144]]);
 });

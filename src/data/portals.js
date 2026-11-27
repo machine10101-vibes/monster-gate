@@ -29,6 +29,15 @@ export const PORTALS = [
     banner: ['The pirate docks', 'Pirate Shore'],
   },
   {
+    id: 'gilantre',
+    name: 'Gilantre City Portal',
+    place: 'Outside Gilantre, west of the drawbridge',
+    x: 380,
+    z: 141,
+    yaw: -Math.PI / 2,
+    banner: ['City', 'Outside Gilantre'],
+  },
+  {
     id: 'warfield',
     name: 'Warfield Portal',
     place: 'Between Dawnspire and Hellspire',

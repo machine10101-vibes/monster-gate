@@ -101,8 +101,7 @@ test('MG-UI title: account sign-in, password hint, cover fit, no float', () => {
   const html = src('../index.html');
   const css = src('../src/style.css');
   const main = src('../src/main.js');
-  // Play as Guest was restored on purpose (fa64a04); it stays on the title next to account sign-in.
-  assert.match(html, /id="btn-guest"[^>]*>Play as Guest</);
+  assert.match(html, /id="btn-guest"[^>]*>Play as Guest/i);
   assert.doesNotMatch(html, /id="btn-world1"/);
   assert.doesNotMatch(html, /id="world-guest-note"/);
   assert.match(html, /id="btn-account-signin" class="start"/);

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { Input, LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
+import { readTabCamera, writeTabCamera, Input, LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -48,7 +48,9 @@ test('strafe preference persists and movement/facing use independent references'
 
   const player = src('src/entities/player.js');
   const hud = src('src/ui/hud.js');
-  assert.match(player, /const moveYaw = inp\.strafe \? this\.yaw : cy/);
+  assert.match(player, /const moveYaw = cy;/);
+  assert.doesNotMatch(player, /const moveYaw = inp\.strafe/);
+  assert.match(player, /addScaledVector\(right, inp\.moveX\)\.addScaledVector\(fwd, -inp\.moveY\)/);
   assert.match(player, /!inp\.touch && inp\.strafe && !inp\.aim\?\.has/);
   assert.match(player, /!inp\.touch && inp\.aim\?\.has && this\.aimDir/);
   assert.match(hud, /id="set-strafe"/);
@@ -91,4 +93,17 @@ test('focus loss releases movement, combat and queued actions', () => {
   assert.equal(input.zoomDelta, 0);
   assert.equal(input.slotSelect, -1);
   assert.equal(input.reset, true);
+});
+
+test('Tab camera preference persists and shares R action only during gameplay', () => {
+  const map = new Map();
+  const store = { getItem: k => map.get(k) ?? null, setItem: (k,v) => map.set(k,v) };
+  assert.equal(readTabCamera(store), true);
+  assert.equal(writeTabCamera(false, store), false);
+  assert.equal(readTabCamera(store), false);
+  assert.equal(writeTabCamera(true, store), true);
+  assert.equal(readTabCamera(store), true);
+  assert.match(src('src/engine/input.js'), /if \(!e\.repeat\) this\.press\('rotateR'\)/);
+  assert.match(src('src/main.js'), /canTabCamera = \(\) => this\.started/);
+  assert.match(src('src/ui/hud.js'), /writeTabCamera\(!game\.input\.tabCamera\)/);
 });

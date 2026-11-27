@@ -335,8 +335,9 @@ test('favicon, manifest, and social meta point at the brand drop', () => {
   assert.match(main, /progress\(1, 'Ready'\);[\s\S]*if \(loadingScreen\) await loadingScreen\.dismiss\(\)/, 'the intro is awaited only after the world reports ready');
   assert.match(src('src/ui/boot.js'), /await this\.waitForVideo\(\)/, 'dismiss keeps the final intro frame visible until the world is ready');
   assert.match(main, /this\.safeBoot = isIOS\(\) \|\| isTablet\(\) \|\| !isDesktopGraphics\(\) \|\| killed/);
-  assert.match(main, /if \(this\.started && this\.bootFrames >= 0\)/);
-  assert.match(main, /this\.bootFrames === 600/);
+  assert.match(main, /const BOOT_KEY = 'mg-boot-v2'/);
+  assert.match(main, /if \(this\.bootFrames >= 0\)/);
+  assert.match(main, /this\.bootFrames === 1/);
   assert.match(main, /this\.enterImmersive\(\{ gesture: false, lock: false \}\)/);
   assert.doesNotMatch(main, /requestGameFullscreen\(true\)/);
   assert.doesNotMatch(main, /lock:\s*this\.isLandscape\(\)\s*&&\s*!tablet/, 'generic touch/click handler must not request orientation lock');

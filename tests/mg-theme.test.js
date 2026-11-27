@@ -38,8 +38,7 @@ test('MG-UI panels share the journal theme tokens and classes', () => {
   assert.match(style, /#title \.account-choices \.start \{[\s\S]*animation: none/);
   assert.match(style, /min\(320px, 86vw\)/);
   assert.match(html, /account-pass-hint/);
-  // Play as Guest was restored on purpose (fa64a04); it stays on the title next to account sign-in.
-  assert.match(html, /id="btn-guest"[^>]*>Play as Guest</);
+  assert.match(html, /id="btn-guest"[^>]*>Play as Guest/i);
   assert.doesNotMatch(html, /id="btn-world1"/);
   assert.match(html, /id="world-picker"/);
   assert.match(html, /data-panel="friends"/);

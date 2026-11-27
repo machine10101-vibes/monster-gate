@@ -8,6 +8,7 @@
 
 import { cleanZone, cleanLook } from './protocol.js';
 import { gearById } from '../src/data/catalog.js';
+import { FISH, ROCKS, TREES } from '../src/data/gathering.js';
 
 export const TILE_SIZE = 144;
 export const STARTER_TX = 4;
@@ -280,4 +281,28 @@ function fishSpots() {
 
 export function createNodes() {
   return [...mineRocks(), ...groveTrees(), ...fishSpots()];
+}
+
+/**
+ * Resolve a server-owned node to the only reward it may grant. Keeping this
+ * mapping server-side prevents a client from choosing an arbitrary inventory
+ * id while still allowing the shared node list to remain compact.
+ */
+export function gatherYield(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (node.kind === 'mine') {
+    const rock = ROCKS[node.type];
+    return rock?.ore ? { skill: 'mining', id: rock.ore, amount: 1, xp: Number(rock.xp) || 0 } : null;
+  }
+  if (node.kind === 'chop') {
+    const tree = TREES[node.type];
+    return tree?.log ? { skill: 'woodcutting', id: tree.log, amount: 1, xp: Number(tree.xp) || 0 } : null;
+  }
+  if (node.kind === 'net' || node.kind === 'rod') {
+    const fish = FISH[node.type];
+    if (fish && fish.tool === node.kind) {
+      return { skill: 'fishing', id: fish.id, amount: 1, xp: Number(fish.xp) || 0 };
+    }
+  }
+  return null;
 }

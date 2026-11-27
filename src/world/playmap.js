@@ -133,6 +133,8 @@ export function oceanWeight(wx, wz) {
 
 /** Move a pin onto charted land inside its tile, or null if none is nearby. */
 export function chartedAnchor(wx, wz) {
+  const actual = worldToTileUv(wx, wz);
+  if (tileAt(Math.floor(actual.ftx), Math.floor(actual.ftz))?.built) return { x: wx, z: wz };
   if (chartedWeight(wx, wz) > 0.5) return { x: wx, z: wz };
   const { ftx, ftz } = worldToTileUv(wx, wz);
   const tile = tileAt(Math.floor(ftx + 1e-6), Math.floor(ftz + 1e-6));
@@ -205,6 +207,32 @@ function colorFromLand(tile, wx, wz, cache) {
   const z = Math.max(0, Math.min(img.height - 1, Math.floor(wz - o.z)));
   const i = (z * img.width + x) * 4;
   return [img.data[i], img.data[i + 1], img.data[i + 2]];
+}
+
+/** Sample the terrain the player actually walks on, at its real world coordinate. */
+export function builtTerrainColor(wx, wz, cache) {
+  const { ftx, ftz } = worldToTileUv(wx, wz);
+  const tile = tileAt(Math.floor(ftx), Math.floor(ftz));
+  return tile?.built ? colorFromLand(tile, wx, wz, cache) : null;
+}
+
+/** Stamp physical bridge and dock decks over the terrain they cover. */
+export function paintMapDecks(tileCanvas, lands, decks) {
+  for (const deck of decks) {
+    if (!deck) continue;
+    for (const land of lands) {
+      const c = tileCanvas[land.tileId];
+      if (!c) continue;
+      const x0 = Math.max(deck.x0, land.x0);
+      const z0 = Math.max(deck.z0, land.z0);
+      const x1 = Math.min(deck.x1, land.x0 + c.width);
+      const z1 = Math.min(deck.z1, land.z0 + c.height);
+      if (x1 <= x0 || z1 <= z0) continue;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = deck.color || '#a98253';
+      ctx.fillRect(Math.floor(x0 - land.x0), Math.floor(z0 - land.z0), Math.ceil(x1 - x0), Math.ceil(z1 - z0));
+    }
+  }
 }
 
 function colorFromSample(tile, u, v) {
@@ -338,7 +366,7 @@ function drawN(data, w, h, cx, cy) {
   }
 }
 
-/** Full hunter-map raster: parchment uncharted, one ocean, charted land with warped edges. */
+/** Full hunter-map raster: built terrain follows the same world coordinates as gameplay. */
 export function rasterPlaymap({ width, height, minX, minZ, scale = 1, tileCanvas = null } = {}) {
   const w = width;
   const h = height;
@@ -348,16 +376,22 @@ export function rasterPlaymap({ width, height, minX, minZ, scale = 1, tileCanvas
     for (let x = 0; x < w; x++) {
       const wx = minX + (x + 0.5) / scale;
       const wz = minZ + (y + 0.5) / scale;
-      let rgb = parchment(wx, wz);
-      const ow = oceanWeight(wx, wz);
-      if (ow > 0.004) rgb = mix3(rgb, oceanColor(wx, wz, ow), ow);
-      const cw = chartedWeight(wx, wz);
-      if (cw > 0.004) {
-        const land = chartedColor(wx, wz, cache);
-        if (land) rgb = mix3(rgb, land, cw);
+      let rgb = cache.size ? builtTerrainColor(wx, wz, cache) : null;
+      if (!rgb) {
+        rgb = parchment(wx, wz);
+        const ow = oceanWeight(wx, wz);
+        if (ow > 0.004) rgb = mix3(rgb, oceanColor(wx, wz, ow), ow);
+        // Without generated terrain (e.g. map previews), retain the charted preview.
+        if (!cache.size) {
+          const cw = chartedWeight(wx, wz);
+          if (cw > 0.004) {
+            const land = chartedColor(wx, wz, cache);
+            if (land) rgb = mix3(rgb, land, cw);
+          }
+          const ink = cw > 0.06 && cw < 0.94 ? 1 - Math.abs(cw - 0.5) / 0.44 : 0;
+          if (ink > 0.55) rgb = mix3(rgb, [36, 24, 12], (ink - 0.55) * 1.4);
+        }
       }
-      const ink = cw > 0.06 && cw < 0.94 ? 1 - Math.abs(cw - 0.5) / 0.44 : 0;
-      if (ink > 0.55) rgb = mix3(rgb, [36, 24, 12], (ink - 0.55) * 1.4);
       put(data, w, (y * w + x) * 4, rgb);
     }
   }

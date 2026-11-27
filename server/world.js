@@ -2,7 +2,7 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { identify, originAllowed, parseOrigins } from './auth.js';
-import { rosterAppearance, appearanceFromState, createMonsters, createNodes, createRiftMonster, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
+import { rosterAppearance, appearanceFromState, createMonsters, createNodes, createRiftMonster, gatherYield, persistStateFromSession, spawnPoseFromRow, zoneAt } from './content.js';
 import { applyMove, createBucket, createLimiter } from './limits.js';
 import {
   AOI_FAR_HZ, AOI_NEAR, AOI_RADIUS, CLOSE_POLICY, CLOSE_TOO_LARGE,
@@ -71,7 +71,7 @@ export class World {
     this.monsters = opts.monsters || createMonsters();
     this.nodes = opts.nodes || createNodes();
     this.byNode = new Map(this.nodes.map((n) => [n.id, n]));
-    this.pendingSaves = [];
+    this.pendingSaves = new Set();
     this.riftRuns = new Map();
     this._send = send;
     this.combatLoot = opts.combatLoot || createCombatLoot({
@@ -111,7 +111,7 @@ export class World {
   }
 
   async idle() {
-    const pending = this.pendingSaves.splice(0);
+    const pending = [...this.pendingSaves];
     if (pending.length) await Promise.all(pending);
     await this.persist?.flushAll?.();
   }
@@ -120,7 +120,9 @@ export class World {
     if (this.timer) return;
     this.timer = setInterval(() => this.tick(), this.tickMs);
     if (this.timer.unref) this.timer.unref();
-    this.saveTimer = setInterval(() => this.saveAll(), SAVE_MS);
+    this.saveTimer = setInterval(() => {
+      void this.saveAll().catch((err) => console.warn('periodic save', err?.message || err));
+    }, SAVE_MS);
     if (this.saveTimer.unref) this.saveTimer.unref();
   }
 
@@ -213,7 +215,7 @@ export class World {
       else if (msg.type === TYPES.chat) this.chat(session, msg);
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
-      else if (msg.type === TYPES.gather) this.gather(session, msg);
+      else if (msg.type === TYPES.gather) await this.gather(session, msg);
       else if (msg.type === 'attack') this.combatAction(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'monster_move') this.moveMonster(session, msg);
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
@@ -275,15 +277,19 @@ export class World {
       return;
     }
     if (session.helloTimer) clearTimeout(session.helloTimer);
+    if (session.gone || session.ws.readyState !== WebSocket.OPEN) return;
 
     const existing = this.byUser.get(ident.userId);
-    if (existing && existing !== session) this.drop(existing, true);
+    if (existing && existing !== session) await this.drop(existing, true);
 
     const slot = this.takeResume(hello, ident);
 
     let row = null;
     if (this.persist) {
       try {
+        // A replacement socket must observe the last accepted pose, even when
+        // the previous socket's disconnect write was still in flight.
+        await this.persist.flush?.(ident.userId);
         row = await this.persist.loadCharacter(ident.userId);
         if (!row) row = await this.persist.createCharacter(ident.userId, ident.name, { look: hello.look });
       } catch (err) {
@@ -299,6 +305,7 @@ export class World {
         }
       }
     }
+    if (session.gone || session.ws.readyState !== WebSocket.OPEN) return;
 
     const pose = slot?.pose || spawnPoseFromRow(row, hello);
     session.id = slot?.id || `u_${ident.userId}`;
@@ -331,6 +338,7 @@ export class World {
       movedAt: 0,
     });
     await this.refreshAppearance(session);
+    if (session.gone || session.ws.readyState !== WebSocket.OPEN) return;
     this.players.set(session.id, session);
     this.byUser.set(ident.userId, session);
     const token = this.rememberResume(session);
@@ -716,19 +724,40 @@ export class World {
   }
 
   /**
-   * Shared-node deplete. Inventory credit is TODO (persistence already
-   * stores goods; the gather loop is not wired yet).
+   * Authoritative shared-node gather. The inventory write completes before
+   * the node is depleted, so a persistence outage cannot destroy a resource
+   * without granting its reward.
    */
-  gather(session, msg) {
+  async gather(session, msg) {
     const { id } = readGather(msg);
     const node = this.byNode.get(id);
     if (!node) throw new ProtocolError('gather', 'No such node.');
-    if (!node.ready) throw new ProtocolError('gather', 'That node is not ready.');
+    if (!node.ready || node.busy) throw new ProtocolError('gather', 'That node is not ready.');
     if (!inAoi(session, node, 8)) throw new ProtocolError('gather', 'Too far from that node.');
-    node.ready = false;
-    node.respawnAt = this.now() + (node.respawn || 12) * 1000;
-    this.dirtyNodes.add(node.id);
-    // TODO: credit the gather yield on the character and persist it.
+    const reward = gatherYield(node);
+    if (!reward) throw new ProtocolError('gather', 'That node has no valid yield.');
+    if (!this.persist || !session.userId || session.guest) {
+      throw new ProtocolError('auth', 'Sign in to gather online.');
+    }
+    // Lock before the await: two same-frame requests must never double grant.
+    node.busy = true;
+    try {
+      await this.persist.saveCharacter(session.userId, {
+        goods: { [reward.id]: reward.amount },
+        xp: { [reward.skill]: reward.xp },
+      }, { immediate: true });
+      node.ready = false;
+      node.respawnAt = this.now() + (node.respawn || 12) * 1000;
+      this.dirtyNodes.add(node.id);
+    } finally {
+      node.busy = false;
+    }
+    send(session.ws, 'reward_update', {
+      kind: 'good', id: reward.id, amount: reward.amount, source: 'gather', node_id: node.id,
+    });
+    if (reward.xp > 0) send(session.ws, 'reward_update', {
+      kind: 'xp', id: reward.skill, amount: reward.xp, source: 'gather', node_id: node.id,
+    });
   }
 
   persistPose(session, immediate = false) {
@@ -740,14 +769,20 @@ export class World {
       const tracked = result.catch((err) => {
         console.warn('saveCharacter', session.userId, err?.message || err);
       });
-      this.pendingSaves.push(tracked);
+      if (immediate) {
+        this.pendingSaves.add(tracked);
+        void tracked.finally(() => this.pendingSaves.delete(tracked));
+      }
       return tracked;
     }
     return result;
   }
 
-  saveAll() {
+  async saveAll() {
     for (const p of this.players.values()) this.persistPose(p);
+    // Active movement continually resets the debounce. Commit positions on
+    // this cadence so an instance restart cannot rewind a long-running hunt.
+    await this.persist?.flushAll?.();
   }
 
   drop(session, closeSocket = false) {
@@ -766,6 +801,7 @@ export class World {
         Object.assign(session, session.riftReturnPose);
         session.riftRunId = null;
       }
+      this.rememberResume(session);
       const online = this.players.size;
       for (const other of this.players.values()) {
         const watched = other.interest?.has(session.id);
@@ -776,7 +812,9 @@ export class World {
           send(other.ws, TYPES.delta, { remove: [session.id], online });
         }
       }
-      this.persistPose(session, true);
+      const saved = this.persistPose(session, true);
+      if (closeSocket && session.ws.readyState === WebSocket.OPEN) session.ws.close();
+      return saved;
     }
     if (closeSocket && session.ws.readyState === WebSocket.OPEN) session.ws.close();
   }

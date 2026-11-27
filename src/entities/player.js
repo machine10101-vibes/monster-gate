@@ -566,8 +566,8 @@ export class Player {
     }
 
     const cy = g.cam.yaw;
-    // In strafe mode movement is relative to the hunter's facing, not the camera.
-    const moveYaw = inp.strafe ? this.yaw : cy;
+    // Movement stays camera-relative in both modes. Strafing changes facing, not controls.
+    const moveYaw = cy;
     const right = new THREE.Vector3(Math.cos(moveYaw), 0, -Math.sin(moveYaw));
     const fwd = new THREE.Vector3(-Math.sin(moveYaw), 0, -Math.cos(moveYaw));
     const want = new THREE.Vector3();
