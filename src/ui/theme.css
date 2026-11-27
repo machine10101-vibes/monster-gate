@@ -1594,6 +1594,9 @@ body.weapon-cursor-on #social-menu {
 
 /* Friends panel + party HUD ------------------------------------------- */
 .mg-social { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.mg-social-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.mg-social-tabs .mg-btn { min-width: 0; }
+.mg-social-tabs .active { border-color: var(--mg-gold-bright); color: var(--mg-gold-bright); }
 .mg-social-note {
   margin: 0;
   font-size: var(--mg-small);
@@ -1622,12 +1625,14 @@ body.weapon-cursor-on #social-menu {
 .mg-social-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 8px;
   background: var(--mg-navy-3);
   border: 1px solid var(--mg-line);
   border-radius: var(--mg-radius);
 }
+.mg-social-row[hidden] { display: none !important; }
 .mg-social-who { flex: 1; min-width: 0; }
 .mg-social-who b {
   display: block;
@@ -1637,6 +1642,10 @@ body.weapon-cursor-on #social-menu {
 }
 .mg-social-who small { color: var(--mg-muted); font-size: 12px; }
 .mg-social-row .mg-btn { flex: none; padding: 6px 8px; font-size: 7px; }
+@media (max-width: 520px) {
+  .mg-social-row .mg-btn { flex: 1 0 auto; }
+  .mg-social-who { flex-basis: calc(100% - 20px); }
+}
 .mg-dot {
   width: 8px;
   height: 8px;

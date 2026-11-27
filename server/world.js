@@ -343,6 +343,9 @@ export class World {
       armor: gear.armor || {},
       zone: spawnZone,
       hp: pose.hp ?? 20,
+      pvpRating: Number(row?.state?.pvp?.rating) || 1000,
+      pvpWins: Number(row?.state?.pvp?.wins) || 0,
+      pvpLosses: Number(row?.state?.pvp?.losses) || 0,
       riftClearAt: Number(row?.state?.riftClearAt) || 0,
       movedAt: 0,
     });
@@ -362,7 +365,8 @@ export class World {
       zoneCap: this.zoneCap,
       resumeToken: token,
       resumed: !!slot,
-      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId },
+      you: { id: session.id, name: session.name, guest: false, user_id: ident.userId,
+        pvp_rating: session.pvpRating, pvp_wins: session.pvpWins, pvp_losses: session.pvpLosses },
       pose: { x: session.x, y: session.y, z: session.z, yaw: session.yaw, zone: session.zone },
       features: ident.guest ? ['party'] : this.social.features,
     });
@@ -432,12 +436,20 @@ export class World {
       send(session.ws, errorFrame('teleport', 'That move was too far.'));
       return;
     }
+    if (session.pvpMatchId && (
+      Math.hypot(result.pose.x - 1719.5, result.pose.z - 819.5) >= 15.8
+      || Math.abs(result.pose.y - 2.2) > 3
+    )) {
+      send(session.ws, errorFrame('pvp_bounds', 'Stay inside the Colosseum.'));
+      return;
+    }
     const prevZone = session.zone;
     const prevHp = session.hp;
     const prevX = session.x, prevY = session.y, prevZ = session.z, prevYaw = session.yaw;
     Object.assign(session, result.pose);
-    if (next.hp != null) session.hp = next.hp;
-    if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
+    if (!session.pvpMatchId && next.hp != null) session.hp = next.hp;
+    if (session.pvpMatchId) session.zone = prevZone;
+    else if (!next.zone || next.zone === 'Oakhollow' || next.zone === prevZone) {
       session.zone = zoneAt(session.x, session.z, session.zone === 'cave' ? 'cave' : 'over');
     }
     if (session.zone !== prevZone && this.zoneIsFull(session.zone, session.id)) {
@@ -770,7 +782,7 @@ export class World {
   }
 
   persistPose(session, immediate = false) {
-    if (!this.persist || !session.userId || session.riftRunId) return;
+    if (!this.persist || !session.userId || session.riftRunId || session.pvpMatchId) return;
     const state = persistStateFromSession(session);
     const opts = immediate ? { immediate: true } : {};
     const result = this.persist.saveCharacter(session.userId, state, opts);

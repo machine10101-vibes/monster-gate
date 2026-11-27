@@ -156,20 +156,17 @@ export class MmoClient {
     const root = document.createElement('section');
     root.id = 'gilantre-pvp-board';
     Object.assign(root.style, { position: 'fixed', zIndex: '10030', right: '14px', top: '84px', width: 'min(340px, calc(100vw - 28px))', color: '#f7e9c8', font: '14px system-ui', display: 'none' });
-    root.innerHTML = '<div data-panel style="display:none;position:relative;padding:16px;border:1px solid #b58a4c;border-radius:12px;background:linear-gradient(145deg,#241c2c,#101018);box-shadow:0 12px 36px #000b"><button type="button" data-close aria-label="Close">Close</button><h2 style="margin:0 0 6px;font:700 20px Georgia;color:#f4d58a">GILANTRE COLOSSEUM</h2><p style="margin:0 0 12px;color:#d6c6a7">Form a team, choose a bracket, and enter the arena.</p><div data-team style="font-size:12px;color:#d4c5a7;margin-bottom:8px">No team selected. 1v1 is solo; 2v2 and 3v3 need a full party.</div><div data-rating style="font-size:12px;color:#f4d58a;margin-bottom:10px">Rating 1000 · 0W / 0L</div><div style="display:flex;gap:6px;margin-bottom:12px"><input data-name maxlength="16" placeholder="Hunter name to invite" style="min-width:0;flex:1;padding:9px;border-radius:6px;border:1px solid #66533c;background:#14111b;color:#fff"><button type="button" data-invite style="padding:9px;border-radius:6px;border:1px solid #c59b52;background:#604526;color:#fff">Invite</button></div><button type="button" data-party-leave style="margin-bottom:10px">Leave team</button><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px"><button data-queue="1v1">Solo 1v1</button><button data-queue="2v2">Team 2v2</button><button data-queue="3v3">Team 3v3</button></div><p data-status aria-live="polite" style="min-height:36px;margin:10px 0;color:#f4d58a">Sign in and connect to World 1 to queue.</p><div style="display:flex;gap:7px"><button data-cancel>Cancel queue</button><button data-attack>Attack nearest</button><button data-leave>Leave match</button></div><div data-invite-prompt style="display:none;margin-top:10px;padding:10px;border:1px solid #8f7147;border-radius:8px;background:#15111a"><span data-invite-text></span><div style="display:flex;gap:8px;margin-top:8px"><button data-accept>Accept team invite</button><button data-decline>Decline</button></div></div><div data-match-prompt style="display:none;margin-top:10px;padding:10px;border:1px solid #d7ad5d;border-radius:8px;background:#211a27"><span data-match-text>Match found. Confirm to enter the arena.</span><div style="display:flex;gap:8px;margin-top:8px"><button data-match-accept>Accept match</button><button data-match-decline>Decline</button></div></div><style>#gilantre-pvp-board button{cursor:pointer;color:#fff;background:#403348;border:1px solid #88704d;border-radius:7px;padding:9px 7px;font-weight:700}#gilantre-pvp-board button:disabled{opacity:.4;cursor:not-allowed}#gilantre-pvp-board [data-close]{position:absolute;top:8px;right:8px;padding:4px 8px;font-size:11px;background:#2a2433}#gilantre-pvp-board [data-panel] button[data-queue]{font-size:12px}#gilantre-pvp-board [data-panel]>div:last-of-type button{flex:1;font-size:12px}</style></div>';
+    root.innerHTML = '<div data-panel style="display:none;position:relative;padding:16px;border:1px solid #b58a4c;border-radius:12px;background:linear-gradient(145deg,#241c2c,#101018);box-shadow:0 12px 36px #000b"><button type="button" data-close aria-label="Close">Close</button><h2 style="margin:0 0 6px;font:700 20px Georgia;color:#f4d58a">GILANTRE COLOSSEUM</h2><p style="margin:0 0 12px;color:#d6c6a7">Form a team, choose a bracket, and enter the arena.</p><div data-team style="font-size:12px;color:#d4c5a7;margin-bottom:8px">No team selected. 1v1 is solo; 2v2 and 3v3 need a full party.</div><div data-rating style="font-size:12px;color:#f4d58a;margin-bottom:10px">Rating 1000 · 0W / 0L</div><button type="button" data-manage-team style="margin-bottom:10px;width:100%">Manage team in Friends</button><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px"><button data-queue="1v1">Solo 1v1</button><button data-queue="2v2">Team 2v2</button><button data-queue="3v3">Team 3v3</button></div><p data-status aria-live="polite" style="min-height:36px;margin:10px 0;color:#f4d58a">Sign in and connect to World 1 to queue.</p><div style="display:flex;gap:7px"><button data-cancel>Cancel queue</button><button data-attack>Attack nearest</button><button data-leave>Leave match</button></div><div data-match-prompt style="display:none;margin-top:10px;padding:10px;border:1px solid #d7ad5d;border-radius:8px;background:#211a27"><span data-match-text>Match found. Confirm to enter the arena.</span><div style="display:flex;gap:8px;margin-top:8px"><button data-match-accept>Accept match</button><button data-match-decline>Decline</button></div></div><style>#gilantre-pvp-board button{cursor:pointer;color:#fff;background:#403348;border:1px solid #88704d;border-radius:7px;padding:9px 7px;font-weight:700}#gilantre-pvp-board button:disabled{opacity:.4;cursor:not-allowed}#gilantre-pvp-board [data-close]{position:absolute;top:8px;right:8px;padding:4px 8px;font-size:11px;background:#2a2433}#gilantre-pvp-board [data-panel] button[data-queue]{font-size:12px}#gilantre-pvp-board [data-panel]>div:last-of-type button{flex:1;font-size:12px}</style></div>';
     (document.getElementById('app') || document.body).append(root);
     const q = (sel) => root.querySelector(sel);
     q('[data-close]').addEventListener('click', () => this.hidePvpPanel());
-    q('[data-invite]').addEventListener('click', () => { const name=q('[data-name]').value.trim(); if(!name)return; this.partyInvite(name).then(r=>{q('[data-status]').textContent=r.ok?'Invite sent. Waiting for your teammate.':r.message||'Invite failed.';}); });
-    q('[data-party-leave]').addEventListener('click',()=>this.partyLeave());
+    q('[data-manage-team]').addEventListener('click', () => { this.hidePvpPanel(); if (this.game) this.game.socialTeamTab = true; this.game?.hud?.openPanel?.('friends', this.game); });
     root.querySelectorAll('[data-queue]').forEach(btn=>btn.addEventListener('click',()=>this.queuePvp(btn.dataset.queue)));
     q('[data-cancel]').addEventListener('click',()=>this.sendPvp('pvp_cancel'));
     q('[data-attack]').addEventListener('click',()=>this.pvpAttackNearest());
     q('[data-leave]').addEventListener('click',()=>this.sendPvp('pvp_leave'));
     q('[data-match-accept]').addEventListener('click',()=>this.confirmPvp(true));
     q('[data-match-decline]').addEventListener('click',()=>this.confirmPvp(false));
-    q('[data-accept]').addEventListener('click',()=>{if(this.pendingPartyInvite)this.partyAccept(this.pendingPartyInvite.invite_id);this.pendingPartyInvite=null;q('[data-invite-prompt]').style.display='none';});
-    q('[data-decline]').addEventListener('click',()=>{if(this.pendingPartyInvite)this.partyDecline(this.pendingPartyInvite.invite_id);this.pendingPartyInvite=null;q('[data-invite-prompt]').style.display='none';});
     this.pvpBoard = { root, q };
     this.updatePvpBoard();
   }
@@ -202,9 +199,8 @@ export class MmoClient {
     q('[data-match-prompt]').style.display = this.pvpProposalId ? 'block' : 'none';
     for(const btn of root.querySelectorAll('[data-queue]')){
       const mode=btn.dataset.queue, need=Number(mode[0]);
-      btn.disabled=!!this.pvpMatchId||!!this.pvpQueueMode||!!this.pvpProposalId||(need===1?!!this.party:members.length!==need||this.party?.leader!==this.you?.id);
+      btn.disabled=!!this.pvpMatchId||!!this.pvpQueueMode||!!this.pvpProposalId||(need===1?false:members.length!==need||this.party?.leader!==this.you?.id);
     }
-    q('[data-party-leave]').disabled=!this.party||!!this.pvpMatchId||!!this.pvpQueueMode;
     q('[data-cancel]').disabled=!(this.pvpQueueMode||this.pvpProposalId);
     q('[data-attack]').disabled=!this.pvpMatchId;
     q('[data-leave]').disabled=!this.pvpMatchId;
@@ -539,9 +535,6 @@ export class MmoClient {
     }
     if (msg.type === 'party_invite') {
       this.pendingPartyInvite = msg;
-      this.showPvpPanel();
-      const ui=this.pvpBoard;
-      if(ui){ui.q('[data-invite-text]').textContent=`${msg.from?.name||'A hunter'} invited you to join their team.`;ui.q('[data-invite-prompt]').style.display='block';}
       return;
     }
     if (msg.type === 'rift_entered') {
