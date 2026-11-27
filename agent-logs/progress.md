@@ -150,3 +150,8 @@
 - Tests: new `tests/oasis-croc.test.js` (5).
 - Checks: build pass; npm test 556 pass / 0 fail; test:persistence 41 pass; smoke pass. Browser (guest at the Oasis): 10 crocodiles; 90 s simulated unprovoked: 58% waterline, 35% shallows, 7% bank, max 12.6 past the water; provoked: stalk, bite, lunge and tail sweep all fired; after the hunter left it returned to the water. Real damage killed one in 15 hits of 60; drops 4 hide + 1 back plate; hide sold for 40 gold; refill spawner restored the count; move, attack and evade work; 0 page errors. Renders reviewed (side, front bite, top-down tail wave frames, swimming low in the pool).
 - Approval (user, 2026-11-27): publish, but keep crocodile parts at the flat 5 gold. The per-part price change was removed before release; parts sell for 5 like every other part. Rechecked after the revert: build pass, npm test 556 pass / 0 fail, test:persistence 0 fail, smoke pass.
+
+### 2026-11-27 — Release: Oasis Crocodile live
+- PR #336 merged (squash) as fd95104 after `verify` and `test-and-build` passed on 514c6d5 (main merged in first after a progress-log conflict; locally 559 tests pass, persistence 0 fail, smoke pass).
+- Pages run 46028832046: success. gh-pages `version.json` build = fd95104. Live at monstergate.online.
+- Crocodile parts sell for the flat 5 gold, as the user chose.
