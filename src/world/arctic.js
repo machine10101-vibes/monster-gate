@@ -55,7 +55,7 @@ export const ARCTIC_SPECS = {
     rim: { n: true, e: true },
     knolls: [[30, 36, 9, 3.6], [112, 40, 9, 4.2], [30, 110, 8, 3], [118, 110, 8, 3.4]],
     ice: [[92, 62, 21, 14], [40, 100, 10, 7]],
-    pads: [[48, 30, 8, 3.8]],
+    pads: [[48, 30, 8, 3.8], [50, 58, 8, 3.8]],
     roads: [[[0, 70], [50, 70], [70, 100], [70, 143]]],
     dress: { pines: 90, dead: 12, bushes: 22, flowers: 40, clusters: 34, spires: 14, rocks: 24, boulders: 10, mounds: 40, snowmen: 2 },
     camp: [48, 30],
@@ -189,6 +189,7 @@ export function dressArctic(world, land, spec) {
   const place = (parts, lx, lz, rot, scale, o = {}) => {
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
+    if (spec.seed === 38 && Math.hypot(x - 482, z + 230) < 8 + (o.r ?? 1)) return false;
     if (!world.free(x, z, o.r ?? 1)) return false;
     world.putAt(parts, x, z, rot, scale, o.opts);
     if (o.collide) world.circle(x, z, o.collide);
