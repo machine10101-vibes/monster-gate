@@ -2163,6 +2163,7 @@ class Game {
       if (ref.equipped) return defaults.find(it => it._equippedWeapon) || defaults[i];
       const base = defaults.find(it => it.id === ref.id);
       if (base && !ref.bagRef) return base;
+      if (!ref.bagRef && ref.id === 'blade') return { ...ITEMS[0] };
       const gear = gearById(ref.id);
       if (ref.bagRef === 'gear' && gear && this.progress.crafted(ref.id) && !this.progress.storedGear(ref.id)) {
         return { id: ref.id, name: gear.name, icon: ref.id, kind: 'none', bagRef: { k: 'gear', id: ref.id } };
@@ -2179,7 +2180,7 @@ class Game {
     const slot = this.items.findIndex(it => it._equippedWeapon && !it.bagRef);
     if (slot >= 0) this.selectSlot(slot, true);
     else {
-      this.sel = -1;
+      this.sel = Math.max(0, this.items.findIndex(it => !it.bagRef && (it.kind === 'melee' || it.kind === 'ranged')));
       this.player.setHeld(this.progress.weaponItem?.held || 'blade');
     }
   }
