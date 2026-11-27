@@ -44,11 +44,11 @@ export const MATERIALS = {
   rexfang: { name: 'Rex Fang', desc: 'A serrated cream fang as long as a forearm.' },
   rexclaw: { name: 'Rex Claw', desc: 'A heavy grey toe claw that has carried a mountain of meat.' },
   rexbone: { name: 'Rex Bone', desc: 'A thick, dense bone from a Tyrant Rex. It rings like stone.' },
-  // Level 80 parts: worth far more to a merchant than early drops.
-  crochide: { name: 'Oasis Croc Hide', desc: 'Olive hide tiled with square scales and blotched brown. It turns a blade like boiled leather twice over.', price: 40 },
-  croctooth: { name: 'Croc Tooth', desc: 'A pale conical tooth as long as a thumb. Crocodiles grow new ones all their lives; this one never got the chance.', price: 30 },
-  crocscute: { name: 'Croc Back Plate', desc: 'A ridged bony plate from a crocodile\'s back. Bone under the skin, hard as a shield boss.', price: 70 },
-  crocamber: { name: 'Amber Croc Eye', desc: 'A crocodile\'s eye gone hard and clear as amber. It still seems to follow you.', price: 150 },
+  // Oasis Crocodile parts (level 80).
+  crochide: { name: 'Oasis Croc Hide', desc: 'Olive hide tiled with square scales and blotched brown. It turns a blade like boiled leather twice over.' },
+  croctooth: { name: 'Croc Tooth', desc: 'A pale conical tooth as long as a thumb. Crocodiles grow new ones all their lives; this one never got the chance.' },
+  crocscute: { name: 'Croc Back Plate', desc: 'A ridged bony plate from a crocodile\'s back. Bone under the skin, hard as a shield boss.' },
+  crocamber: { name: 'Amber Croc Eye', desc: 'A crocodile\'s eye gone hard and clear as amber. It still seems to follow you.' },
 };
 
 export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'cinderscale', 'lavavein', 'ashmembrane', 'obsidianclaw', 'spirehorn', 'hearthcore', 'cinderhide', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting', 'rexhide', 'rexfang', 'rexclaw', 'rexbone', 'crochide', 'croctooth', 'crocscute', 'crocamber'];

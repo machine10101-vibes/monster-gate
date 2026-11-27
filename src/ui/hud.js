@@ -1622,7 +1622,7 @@ function mountMarket(body, game) {
       list.innerHTML = '';
       const offers = [
         ...Object.values(GOODS).filter(g => !isUnsellableGood(g) && g.price > 0).map(g => ({...g, n:pr.good(g.id), kind:'good', sell:n=>game.sellGood(g.id,n)})),
-        ...Object.entries(MATERIALS).map(([id,g]) => ({...g,id,n:pr.count(id),price:g.price||5,kind:'material',sell:n=>game.sellPart(id,n)})),
+        ...Object.entries(MATERIALS).map(([id,g]) => ({...g,id,n:pr.count(id),price:5,kind:'material',sell:n=>game.sellPart(id,n)})),
         ...GEAR.filter(g=>g.id !== 'knife' && !g.id.startsWith('__') && !pr.data.debugGranted?.items?.includes(g.id) && pr.data.debugGranted?.weapon !== g.id && pr.crafted(g.id) && !pr.storedGear(g.id) && !pr.worn(g.id)).map(g=>({...g,n:1,price:gearSalePrice(g),kind:g.type,sell:()=>game.sellGear(g.id)})),
       ].filter(g=>g.n>0 && (category==='all'||category===g.kind) && g.name.toLowerCase().includes(query.toLowerCase()));
       for (const g of offers) {

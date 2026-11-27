@@ -23,19 +23,18 @@ test('the Oasis Crocodile is a level 80 desert beast with stats between the scor
   assert.ok(d.gold[0] > DEFS.scorpion.gold[1] && d.gold[1] < DEFS.sandworm.gold[0]);
 });
 
-test('crocodile drops are new level 80 parts, worth more than early parts, with a rare amber eye', () => {
+test('crocodile drops are new level 80 parts with a rare amber eye', () => {
   const drops = DROPS.oasiscroc;
   assert.deepEqual(drops.map((d) => d.id), ['crochide', 'croctooth', 'crocscute', 'crocamber']);
   assert.deepEqual(drops.map((d) => d.rate), ['Common', 'Common', 'Uncommon', 'Rare']);
   for (const d of drops) {
     assert.ok(MATERIALS[d.id], d.id);
     assert.ok(MATERIAL_ORDER.includes(d.id), d.id);
-    assert.ok(MATERIALS[d.id].price > 5, `${d.id} sells for more than the 5 gold base`);
     assert.ok(buildMaterialModel(d.id), `${d.id} has a 3D model`);
   }
-  assert.ok(MATERIALS.crocamber.price > MATERIALS.crochide.price);
-  assert.match(src('src/main.js'), /this\.addGold\(n \* \(MATERIALS\[id\]\.price \|\| 5\)\)/);
-  assert.match(src('src/ui/hud.js'), /price:g\.price\|\|5,kind:'material'/);
+  // Parts keep the flat 5 gold merchant price (approved 2026-11-27).
+  for (const d of drops) assert.equal(MATERIALS[d.id].price, undefined);
+  assert.match(src('src/main.js'), /this\.addGold\(n \* 5\)/);
 });
 
 test('ten crocodiles spawn around the pool and refill; they move only in the shallows and near the bank', () => {
