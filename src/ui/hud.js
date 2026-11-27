@@ -285,9 +285,17 @@ export class HUD {
       cv.height = 16;
       const gear = gearById(it.id);
       // Hotbar icons must be ready on the first paint; catalog thumbnails can wait in the queue.
-      if (gear) b.appendChild(renderThumbNow({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
-      else {
-        cv.getContext('2d').drawImage(iconCanvas(it.icon), 0, 0);
+      let renderedGear = false;
+      if (gear) {
+        try {
+          b.appendChild(renderThumbNow({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
+          renderedGear = true;
+        } catch {
+          // A lost secondary WebGL context must not leave the whole hotbar blank.
+        }
+      }
+      if (!renderedGear) {
+        cv.getContext('2d').drawImage(iconCanvas(gear ? (gear.type === 'weapon' ? 'blade' : 'shield') : it.icon), 0, 0);
         b.appendChild(cv);
       }
       const key = document.createElement('span');
