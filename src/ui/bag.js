@@ -53,6 +53,7 @@ export function mountBag(body, game, options = {}) {
   let sel = null;
   let query = '';
   let sort = 'default';
+  let detailOnly = false;
 
   const paint = () => {
     closeBagAsk();
@@ -61,6 +62,9 @@ export function mountBag(body, game, options = {}) {
     const list = filterBagItems(groups[tab], query, sort);
     const filled = list.filter(Boolean);
     if (!filled.some((it) => it.key === sel)) sel = filled[0]?.key || null;
+    const previousGrid = detailOnly ? body.querySelector('.bag > .bag-stage > .bag-grid') : null;
+    const previousScroll = body.scrollTop;
+    detailOnly = false;
     body.innerHTML = '';
     const root = document.createElement('div');
     root.className = 'bag';
@@ -97,19 +101,16 @@ export function mountBag(body, game, options = {}) {
     }
     root.appendChild(tabs);
     const controls = document.createElement('div');
-    controls.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0';
+    controls.className = 'bag-controls';
     const search = document.createElement('input');
     search.type = 'search';
     search.placeholder = 'Find an item…';
     search.setAttribute('aria-label', 'Search inventory');
     search.value = query;
     search.style.cssText = 'flex:1;min-width:100px;max-width:100%;font:inherit;padding:6px;color:inherit;background:#17202b;border:1px solid #657080;border-radius:5px';
-    search.oninput = () => {
-      query = search.value;
-      paint();
-      const next = body.querySelector('input[type="search"]');
-      next?.focus({ preventScroll: true });
-    };
+    search.oninput = () => { query = search.value; };
+    search.onchange = () => { query = search.value; paint(); };
+    search.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); query = search.value; paint(); } };
     const order = document.createElement('select');
     order.setAttribute('aria-label', 'Sort inventory');
     order.style.cssText = 'font:inherit;padding:6px;color:inherit;background:#17202b;border:1px solid #657080;border-radius:5px';
@@ -121,7 +122,15 @@ export function mountBag(body, game, options = {}) {
     }
     order.value = sort;
     order.onchange = () => { sort = order.value; paint(); };
-    controls.append(search, order);
+    const find = document.createElement('button');
+    find.type = 'button';
+    find.textContent = 'Find';
+    find.onclick = () => { query = search.value; paint(); };
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.textContent = 'Clear';
+    reset.onclick = () => { query = ''; sort = 'default'; paint(); };
+    controls.append(search, find, reset, order);
     root.appendChild(controls);
 
     const stage = document.createElement('div');
@@ -134,7 +143,7 @@ export function mountBag(body, game, options = {}) {
       p.textContent = query.trim() ? 'No matching items.' : emptyText(tab);
       grid.appendChild(p);
     }
-    for (const it of list) {
+    if (!previousGrid) for (const it of list) {
       if (!it) {
         const empty = document.createElement('button');
         empty.type = 'button';
@@ -150,6 +159,9 @@ export function mountBag(body, game, options = {}) {
       b.className = 'bag-cell' + (it.key === sel ? ' sel' : '') + (it.worn ? ' worn' : '');
       b.appendChild(it.canvas());
       b.title = it.name;
+      b.dataset.itemKey = it.key;
+      b.setAttribute('aria-label', it.name + (it.badge ? `, ${it.badge}` : ''));
+      b.setAttribute('aria-pressed', String(it.key === sel));
       if (it.badge) {
         const i = document.createElement('i');
         i.className = it.worn ? 'bag-worn' : 'bag-n';
@@ -159,6 +171,7 @@ export function mountBag(body, game, options = {}) {
       bindBagHold(b, {
         onSelect: () => {
           sel = it.key;
+          detailOnly = true;
           paint();
         },
         onMenu: () => {
@@ -168,7 +181,14 @@ export function mountBag(body, game, options = {}) {
       });
       grid.appendChild(b);
     }
-    stage.appendChild(grid);
+    if (previousGrid) {
+      for (const cell of previousGrid.querySelectorAll('[data-item-key]')) {
+        const selected = cell.dataset.itemKey === sel;
+        cell.classList.toggle('sel', selected);
+        cell.setAttribute('aria-pressed', String(selected));
+      }
+    }
+    stage.appendChild(previousGrid || grid);
 
     const detail = document.createElement('aside');
     detail.className = 'bag-detail';
@@ -241,7 +261,8 @@ export function mountBag(body, game, options = {}) {
     stage.appendChild(detail);
     root.appendChild(stage);
     body.appendChild(root);
-    flushThumbs(240);
+    body.scrollTop = previousScroll;
+    flushThumbs(previousGrid ? 4 : 240);
   };
 
   paint();
@@ -329,13 +350,23 @@ function openBagMenu(anchor, item, game, paint, immediate = false) {
     row.appendChild(b);
   }
   if (drop) {
+    const max = Math.max(1, Math.floor(Number(drop.n) || 1));
+    const amount = document.createElement('input');
+    amount.type = 'number';
+    amount.min = '1';
+    amount.max = String(max);
+    amount.step = '1';
+    amount.value = String(max);
+    amount.setAttribute('aria-label', 'Quantity to drop');
+    if (max > 1) row.appendChild(amount);
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'bag-ask-drop';
     b.textContent = 'Drop';
     b.onclick = () => {
       closeBagAsk();
-      if (game.dropBagItem(drop)) paint();
+      const n = Math.max(1, Math.min(max, Math.floor(Number(amount.value) || 1)));
+      if (game.dropBagItem({ ...drop, n })) paint();
     };
     row.appendChild(b);
   }
