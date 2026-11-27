@@ -268,10 +268,11 @@ test('fullscreen is requested only from a user tap', () => {
   assert.doesNotMatch(main, /gesture \|\| \(!tablet && cooled\)/);
 });
 
-test('graphics default to Medium on desktop when nothing is saved', () => {
+test('graphics default to High before character selection when nothing is saved', () => {
   const main = src('src/main.js');
   assert.match(main, /isDesktopGraphics/);
-  assert.match(main, /if \(isDesktopGraphics\(\)\) return QUALITIES\[1\]/);
+  assert.match(main, /const bootQuality = chooseBootQuality\(/);
+  assert.match(src('src/engine/quality.js'), /return \{ \.\.\.qualityById\('high'\) \}/);
 });
 
 test('weapon cursor maps each weapon type and dusk-tints Duskbreaker', () => {
