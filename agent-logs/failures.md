@@ -74,3 +74,10 @@
 - Root cause: the guest button was restored on main (fa64a04), so these assertions are stale. The same three fail on clean origin/main.
 - Retry: not done. Editing these assertions needs the user's approval (option 1 from the earlier blocker), and skipping tests is not allowed.
 - Outcome: PR #312 not merged; not published.
+
+### 2026-11-27 — Process: an unannounced change rode along in a release PR
+- Task: publish the Northern Jungle and sandworm (PR #312).
+- What happened: the long-lived branch still held the quest gear reward commit (808785b), which was blocked pending approval. The squash merge shipped it with the approved work.
+- Root cause: one development branch reused across tasks; the PR description listed only the two approved features.
+- Outcome: shipped with CI green; reported to the user after the fact.
+- Improvement proposal (needs human approval): before opening or updating a release PR, list `git log origin/main..HEAD` and name every included change in the PR body and to the user.

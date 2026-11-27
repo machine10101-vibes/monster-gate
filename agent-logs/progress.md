@@ -69,3 +69,5 @@
 ### 2026-11-27 — Release: Northern Jungle and Sand Spine Worm live
 - PR #312 merged (squash) as f20c9d8 after `verify` and `test-and-build` passed on 8a1e116 (main merged in first; 524 tests pass locally, smoke pass).
 - Pages run 45951933083: success. gh-pages `version.json` build = f20c9d8. Live at monstergate.online.
+- Also shipped in #312: the quest gear reward fix (808785b, `journal.owedGear`, `tests/mg-quest-gear-reward.test.js`). It was still on the branch and the squash merge included it. It was not called out separately when the user approved publishing, although it touches saved journal data. CI passed with it (all tests green); the earlier blocker (three stale title tests) is resolved on main. Attack/evade still not re-verified in a browser (combat code untouched).
+- Session task count: 3 tasks released (sandworm, Northern Jungle, quest gear reward). Session limit reached; no new loop task started.
