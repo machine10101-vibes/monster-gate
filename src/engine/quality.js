@@ -1,6 +1,7 @@
 /** Graphics presets shown in Settings. High is the default on every device; players can select another preset. */
 
 export const QUALITY_KEY = 'mg-quality';
+export const QUALITY_CHOICE_KEY = 'mg-quality-choice-v2';
 
 export const QUALITIES = [
   { id: 'low', label: 'Low', density: 0.55, scatter: 0.4, motes: 120, gateMotes: 90, shadowSize: 1024, shadowExtent: 26, dpr: 1, shadows: true, viewFar: 118, glow: 0.5 },
@@ -14,6 +15,9 @@ export function qualityById(id) {
 
 export function readSavedQuality(storage) {
   try {
+    // Older builds could persist Low automatically. Treat it as a legacy default,
+    // not an explicit player choice; future selections carry their own marker.
+    if (storage?.getItem?.(QUALITY_CHOICE_KEY) !== '1') return null;
     return qualityById(storage?.getItem?.(QUALITY_KEY));
   } catch {
     return null;
