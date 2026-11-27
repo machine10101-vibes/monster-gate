@@ -33,7 +33,7 @@ export const PORTALS = [
     name: 'Gilantre City Portal',
     place: 'Outside Gilantre, west of the drawbridge',
     x: 380,
-    z: 141,
+    z: 136,
     yaw: -Math.PI / 2,
     banner: ['City', 'Outside Gilantre'],
   },
