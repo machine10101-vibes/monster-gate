@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { mountTeleport } from '../src/ui/teleport.js';
 import { readTabCamera, writeTabCamera, Input, LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -58,15 +59,31 @@ test('strafe preference persists and movement/facing use independent references'
 });
 
 
-test('teleport interaction waits for release and requires explicit destination confirmation', () => {
+test('teleport interaction waits for release and travels directly to a known destination once', () => {
   const input = src('src/engine/input.js');
-  const tome = src('src/ui/teleport.js');
   assert.match(input, /!\['bolt', 'skill', 'fury', 'talk'\]\.includes\(act\)/);
   assert.match(input, /e\.type === 'pointerup' && act === 'talk'/);
-  assert.doesNotMatch(tome, /b\.onclick = \(\) => game\.travelTo/);
-  assert.match(tome, /confirm\.disabled = true/);
-  assert.match(tome, /if \(!selected\) return/);
-  assert.match(tome, /selected = dest/);
+  const element = (tag) => ({ tag, children: [], appendChild(c) { this.children.push(c); }, append(...c) { this.children.push(...c); } });
+  const previous = globalThis.document;
+  globalThis.document = { createElement: element };
+  try {
+    const body = element('div');
+    const trips = [];
+    mountTeleport(body, { progress: { knownPortals: () => ['oasis'] }, travelTo: d => trips.push(d) });
+    const root = body.children[0];
+    const list = root.children.find(c => c.className === 'tome-list');
+    assert.equal(list.children.length, 2);
+    assert.equal(root.children.filter(c => c.tag === 'button').length, 0);
+    const oasis = list.children.find(c => c.children[0].textContent === 'Oasis Portal');
+    assert.ok(oasis);
+    oasis.onclick();
+    oasis.onclick();
+    assert.equal(trips.length, 1);
+    assert.equal(trips[0].id, 'oasis');
+  } finally {
+    if (previous === undefined) delete globalThis.document;
+    else globalThis.document = previous;
+  }
 });
 
 

@@ -3494,6 +3494,9 @@ class Game {
     this.player.setState('idle');
     this.player.invuln = 0.8;
     this.player.syncObj();
+    // Force destination streaming before the next draw, not after it.
+    this._streamX = null;
+    this._streamZ = null;
     this.snapCamera();
     this.hud.closePanel();
     this.audio.portal();
@@ -4382,7 +4385,7 @@ class Game {
   /* ------------------------------ loop ------------------------------ */
   loop(now) {
     requestAnimationFrame(this.loop);
-    if (this.walletBusy) {
+    if (this.walletBusy || this.renderer?.getContext()?.isContextLost?.()) {
       this.last = now;
       return;
     }
@@ -4401,16 +4404,6 @@ class Game {
         dt *= this.slowK + (1 - this.slowK) * Math.max(0, 1 - this.slowT / 0.25) * (this.slowT < 0.25 ? 1 : 0);
       }
       this.step(dt, rawMs / 1000);
-      this.renderer.render(this.scene, this.camera);
-      // A successfully rendered title or character screen proves the boot worked.
-      // Do not treat a normal logout or refresh there as a crash next launch.
-      if (this.bootFrames >= 0) {
-        this.bootFrames += 1;
-        if (this.bootFrames === 1) {
-          clearBoot();
-          this.bootFrames = -1;
-        }
-      }
       if (this.world && this.player && this.started) {
         const px = this.player.pos.x;
         const pz = this.player.pos.z;
@@ -4425,6 +4418,17 @@ class Game {
           this.world.revealAround(px, pz, budget);
         }
       }
+      this.renderer.render(this.scene, this.camera);
+      // A successfully rendered title or character screen proves the boot worked.
+      // Do not treat a normal logout or refresh there as a crash next launch.
+      if (this.bootFrames >= 0) {
+        this.bootFrames += 1;
+        if (this.bootFrames === 1) {
+          clearBoot();
+          this.bootFrames = -1;
+        }
+      }
+
     } catch (err) {
       this.reportFault(err);
     }
