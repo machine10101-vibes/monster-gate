@@ -48,7 +48,9 @@ test('strafe preference persists and movement/facing use independent references'
 
   const player = src('src/entities/player.js');
   const hud = src('src/ui/hud.js');
-  assert.match(player, /const moveYaw = inp\.strafe \? this\.yaw : cy/);
+  assert.match(player, /const moveYaw = cy;/);
+  assert.doesNotMatch(player, /const moveYaw = inp\.strafe/);
+  assert.match(player, /addScaledVector\(right, inp\.moveX\)\.addScaledVector\(fwd, -inp\.moveY\)/);
   assert.match(player, /!inp\.touch && inp\.strafe && !inp\.aim\?\.has/);
   assert.match(player, /!inp\.touch && inp\.aim\?\.has && this\.aimDir/);
   assert.match(hud, /id="set-strafe"/);
