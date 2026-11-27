@@ -654,6 +654,7 @@ class Game {
     this.items = this.baseItems.slice();
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.applyGear(true);
+    this.restoreItemHotbar();
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
     this.selectInitialHotbarSlot();
     this.refreshHud(true);
