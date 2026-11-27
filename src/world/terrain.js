@@ -99,7 +99,6 @@ export function generateWorld() {
       const i = z * W + x;
       const n1 = fbm(x * 0.045 + 10, z * 0.045 + 3, 1, 4);
       const n2 = fbm(x * 0.12, z * 0.12, 2, 3);
-      const warp = (fbm(x * 0.05 + 80, z * 0.05 + 20, 7, 3) - 0.5) * 14;
 
       let h = 1.0 + (n1 - 0.5) * 2.4 + (n2 - 0.5) * 0.7;
 
@@ -107,10 +106,10 @@ export function generateWorld() {
       const hf = 3 + (n1 - 0.4) * 9 + (n2 - 0.5) * 2;
       h = lerp(h, hf, fm);
 
-      const dx = x - CENTER.x;
-      const dz = z - CENTER.z;
-      const d = Math.hypot(dx, dz) + warp;
-      const m = smoothstep(46, 64, d);
+      // Local mountain shoulders replace the old circular enclosure. Their
+      // extents follow the landscape rather than all four tile boundaries.
+      const shoulder = (cx, cz, rx, rz) => Math.exp(-2 * (((x - cx) / rx) ** 2 + ((z - cz) / rz) ** 2));
+      const m = Math.max(shoulder(18, 22, 25, 30), shoulder(119, 30, 22, 34));
       const ridge = 1 - Math.abs(2 * fbm(x * 0.05 + 50, z * 0.05 + 9, 9, 4) - 1);
       const mh = m * (13 + 24 * ridge + 6 * (n2 - 0.5));
       h += mh;

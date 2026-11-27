@@ -118,3 +118,10 @@
 - Tester: `npm test` 551/551, `npm run test:persistence` 41/41, `npm run test:smoke` passed, `npm run build` passed. No live player account was used. Browser manual gameplay remains unverified in this workspace.
 - Critic: proposed a periodic stale-PR triage with a superseded-by link and current-main behavior check, so long-lived branches do not appear as ready-to-merge upgrades.
 - Release: review PR, CI and production publishing pending.
+
+## 2026-11-27 — Natural tile boundaries
+- Director: found explicit 14-cell mountain rim additions in ring.js and three enclosing height ramps in Southford; Oakhollow also generated a circular mountain enclosure propagated by copied neighbor edges.
+- Implementer: removed synthetic rim additions; replaced Oakhollow's enclosure with localized northwest/northeast shoulders. Existing edge pulling, authored mountain features and biome transitions remain.
+- Tester: 553/553 project tests pass, production build passes, server smoke passes. Added generated-height regressions for low meadow edges and retained localized mountains.
+- Release gate: visual terrain traversal and prop placement inspection blocked by missing `/usr/lib/chromium/chromium`. Not marked complete or live; review branch prepared for verification.
+- Critic proposal: add terrain overview captures plus saved-position traversal checks to the release workflow for broad heightmap changes.

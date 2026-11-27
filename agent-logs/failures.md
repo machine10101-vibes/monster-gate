@@ -127,3 +127,11 @@
 - Root cause: the old PR branch contained log snapshots that diverged substantially from current main.
 - Retry: retain current main logs, apply the four code/test files, record this reconciliation separately, and run full tests.
 - Outcome: 551/551 project tests, 41/41 persistence tests, smoke and build pass with both reconciled upgrades.
+
+### 2026-11-27 — Natural tile boundary verification blocked
+- Task: remove enclosing tile mountains; iteration 1.
+- Attempt: use the local Chromium installation for visual terrain inspection after automated verification.
+- Exact error/evidence: `/usr/bin/chromium` exists, `/usr/lib/chromium/chromium` is absent; prior launcher execution reported that binary not found.
+- Root cause: incomplete browser installation in this environment.
+- Retry strategy: preserve tested changes on isolated review branch; require a functional browser to inspect terrain slopes, prop placement and traversal before release.
+- Outcome: automated checks pass; essential manual check remains blocked, so no completion or production claim.
