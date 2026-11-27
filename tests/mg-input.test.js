@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { PORTALS } from '../src/data/portals.js';
 import { mountTeleport } from '../src/ui/teleport.js';
 import { readTabCamera, writeTabCamera, Input, LOOK_SWIPE_RAD, STRAFE_STORAGE_KEY, inStickZone, lookRadiansPerPixel, readStrafeSetting, writeStrafeSetting } from '../src/engine/input.js';
 
@@ -80,6 +81,17 @@ test('teleport interaction waits for release and travels directly to a known des
     oasis.onclick();
     assert.equal(trips.length, 1);
     assert.equal(trips[0].id, 'oasis');
+    const modBody = element('div');
+    const mod = { staffRole: 'moderator', progress: { knownPortals: () => [] }, travelTo: d => trips.push(d) };
+    mountTeleport(modBody, mod);
+    const modList = modBody.children[0].children.find(c => c.className === 'tome-list');
+    assert.equal(modList.children.length, PORTALS.length + 1);
+    mod.staffRole = '';
+    modList.children[1].onclick();
+    assert.equal(trips.length, 1);
+    mod.staffRole = 'moderator';
+    modList.children[1].onclick();
+    assert.equal(trips.length, 2);
   } finally {
     if (previous === undefined) delete globalThis.document;
     else globalThis.document = previous;
