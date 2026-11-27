@@ -27,6 +27,13 @@ test('toast notifications are capped at 1.5 seconds', () => {
   assert.match(hud, /Math\.min\(1500/);
 });
 
+test('equipped gear is drawn immediately in the selected hotbar slot', () => {
+  const skin = readFileSync(new URL('../src/ui/skin.css', import.meta.url), 'utf8');
+  assert.match(hud, /if \(gear\) b\.appendChild\(renderThumbNow\(/);
+  assert.match(skin, /:root \.slot\.sel \{[^}]*border-image-source: var\(--rs-socket\)/);
+  assert.match(skin, /outline: 2px solid #edc874/);
+});
+
 test('entering a character restores slot one from the saved hunt before drawing the bar', () => {
   const defaults = [{ id: 'blade', kind: 'melee' }, { id: 'potion', kind: 'use' }];
   const method = (name) => {
