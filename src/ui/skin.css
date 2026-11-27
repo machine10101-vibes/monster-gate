@@ -493,6 +493,13 @@
   box-shadow: none;
   filter: drop-shadow(0 0 6px rgba(255, 90, 60, 0.55));
 }
+:root .slot.sel {
+  /* A selected weapon remains dark like its neighbors, with a clear rim. */
+  border-image-source: var(--rs-socket);
+  outline: 2px solid #edc874;
+  outline-offset: -2px;
+  filter: drop-shadow(0 0 4px rgba(237, 200, 116, 0.5));
+}
 :root .bag-cell:hover:not(.empty) {
   filter: brightness(1.2);
 }
