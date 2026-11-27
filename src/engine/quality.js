@@ -1,4 +1,4 @@
-/** Graphics presets shown in Settings. The hunt starts small on a phone, then the hunter can pick one of these. */
+/** Graphics presets shown in Settings. High is the default on every device; players can select another preset. */
 
 export const QUALITY_KEY = 'mg-quality';
 
@@ -22,8 +22,7 @@ export function readSavedQuality(storage) {
 
 /**
  * A boot that already died reloads once on the small setting.
- * The first phone boot keeps that small setting too. A choice the hunter
- * already made is used on the next launch.
+ * Normal boots use High unless the hunter has explicitly selected another preset.
  */
 export function survivalBudget(q, heavy, size = {}) {
   const w = Math.max(size.screenW || 0, size.innerW || 1);
@@ -45,9 +44,8 @@ export function survivalBudget(q, heavy, size = {}) {
   };
 }
 
-export function defaultQuality({ desktop, cores = 4 } = {}) {
-  if (desktop) return { ...QUALITIES[1] };
-  return { ...(cores >= 8 ? QUALITIES[1] : QUALITIES[0]) };
+export function defaultQuality() {
+  return { ...qualityById('high') };
 }
 
 export function chooseBootQuality({ saved = null, safeBoot = false, killed = false, desktop = false, cores = 4, size } = {}) {
@@ -56,9 +54,6 @@ export function chooseBootQuality({ saved = null, safeBoot = false, killed = fal
   }
   if (saved) {
     return { quality: { ...saved }, recovered: false, light: !!(safeBoot && saved.id === 'low') };
-  }
-  if (safeBoot) {
-    return { quality: survivalBudget(QUALITIES[0], true, size), recovered: false, light: true };
   }
   return { quality: defaultQuality({ desktop, cores }), recovered: false, light: false };
 }
