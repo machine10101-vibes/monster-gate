@@ -6,12 +6,13 @@ export function mountTeleport(body, game) {
   root.className = 'tome';
   const note = document.createElement('p');
   note.className = 'tome-note';
-  note.textContent = 'Choose a destination to teleport immediately. Oakhollow is written on the first page. Walk up to a light-blue portal and attune it to add another.';
+  const moderator = game.staffRole === 'moderator';
+  note.textContent = moderator ? 'Moderator access: all teleport gates are unlocked. Choose a destination to travel immediately.' : 'Choose a destination to teleport immediately. Oakhollow is written on the first page. Walk up to a light-blue portal and attune it to add another.';
   root.appendChild(note);
 
   const list = document.createElement('div');
   list.className = 'tome-list';
-  const known = new Set(game.progress.knownPortals());
+  const known = new Set(moderator ? PORTALS.map(p => p.id) : game.progress.knownPortals());
   const destinations = [
     TOWN_RETURN,
     ...PORTALS.filter((p) => known.has(p.id)).map((p) => {
@@ -31,6 +32,7 @@ export function mountTeleport(body, game) {
     b.append(name, place);
     b.onclick = () => {
       if (traveling) return;
+      if (dest.id !== TOWN_RETURN.id && game.staffRole !== 'moderator' && !game.progress.knownPortals().includes(dest.id)) return;
       traveling = true;
       game.travelTo(dest);
     };
