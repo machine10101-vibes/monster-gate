@@ -1477,14 +1477,48 @@ class Game {
   }
 
   async signOut(repromptKlever) {
-    clearRotationRecovery(localStorage);
+    if (this.logoutSaving) return;
     const leaveWorld = this.started;
-    this.captureHunter();
-    try {
-      await Promise.race([flushCloud(), new Promise((r) => setTimeout(r, 4000))]);
-    } catch {
-      /* the hunt is still on this device */
+    const session = this.wallet;
+    if (leaveWorld && session && this.roster) {
+      this.logoutSaving = true;
+      const button = document.getElementById('set-out');
+      if (button) { button.disabled = true; button.textContent = 'Saving progress…'; }
+      const onCloud = this.progress.onCloud;
+      this.stopAutosave();
+      this.progress.onCloud = null;
+      let confirmed = false;
+      let deadline;
+      try {
+        this.captureHunter();
+        this.progress.save(false);
+        this.roster.touch(Date.now());
+        this.roster.save();
+        if (session.kind === 'guest') confirmed = true;
+        else if (session.kind === 'email' && !this.cloudSyncing && !this.cloudConflict) {
+          confirmed = await Promise.race([
+            new Promise(resolve => {
+              schedulePush(session, this.roster.data, result => {
+                resolve(!!result?.revision && !result.error && !result.conflict);
+              });
+              flushCloud();
+            }),
+            new Promise(resolve => { deadline = setTimeout(() => resolve(false), 15000); }),
+          ]);
+        }
+      } catch { /* keep the account open for retry */ }
+      finally { clearTimeout(deadline); this.logoutSaving = false; }
+      if (!confirmed || this.wallet !== session) {
+        if (this.wallet === session) {
+          this.progress.onCloud = onCloud;
+          if (session.kind !== 'guest') this.startAutosave();
+          if (button) { button.disabled = false; button.textContent = 'Retry save & log out'; }
+          this.hud?.toast('Save not confirmed. Progress retained locally; retry logout.', 5000);
+        }
+        return;
+      }
     }
+    clearRotationRecovery(localStorage);
     if (this.cloudGate) this.cloudGate.open = false;
     this.stopAutosave();
     this.stopDeviceWatch();
