@@ -127,3 +127,18 @@
 - Root cause: the old PR branch contained log snapshots that diverged substantially from current main.
 - Retry: retain current main logs, apply the four code/test files, record this reconciliation separately, and run full tests.
 - Outcome: 551/551 project tests, 41/41 persistence tests, smoke and build pass with both reconciled upgrades.
+
+### 2026-11-27 — Natural tile boundary verification blocked
+- Task: remove enclosing tile mountains; iteration 1.
+- Attempt: use the local Chromium installation for visual terrain inspection after automated verification.
+- Exact error/evidence: `/usr/bin/chromium` exists, `/usr/lib/chromium/chromium` is absent; prior launcher execution reported that binary not found.
+- Root cause: incomplete browser installation in this environment.
+- Retry strategy: preserve tested changes on isolated review branch; require a functional browser to inspect terrain slopes, prop placement and traversal before release.
+- Outcome: automated checks pass; essential manual check remains blocked, so no completion or production claim.
+
+### 2026-11-27 — Map/terrain release follow-up
+- Attempt: installed Chrome for Testing and retried visual guest-world verification.
+- Exact error: `socket() failed: Operation not permitted` in Chrome process singleton. A pipe/single-process retry ended with `TargetCloseError` before a page opened.
+- Root cause: browser process restricted by execution environment. Visual gameplay remains blocked.
+- Regression fixture initially sampled the outer raster frame (brown map border), which deliberately overlays terrain. Moved the probe to an interior terrain pixel; changed-height propagation assertion now passes.
+- Outcome: terrain-to-map regression passes; manual traversal release gate remains blocked.

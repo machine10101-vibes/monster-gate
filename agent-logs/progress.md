@@ -119,6 +119,17 @@
 - Critic: proposed a periodic stale-PR triage with a superseded-by link and current-main behavior check, so long-lived branches do not appear as ready-to-merge upgrades.
 - Release: review PR, CI and production publishing pending.
 
+## 2026-11-27 — Natural tile boundaries
+- Director: found explicit 14-cell mountain rim additions in ring.js and three enclosing height ramps in Southford; Oakhollow also generated a circular mountain enclosure propagated by copied neighbor edges.
+- Implementer: removed synthetic rim additions; replaced Oakhollow's enclosure with localized northwest/northeast shoulders. Existing edge pulling, authored mountain features and biome transitions remain.
+- Tester: 553/553 project tests pass, production build passes, server smoke passes. Added generated-height regressions for low meadow edges and retained localized mountains.
+- Release gate: visual terrain traversal and prop placement inspection blocked by missing `/usr/lib/chromium/chromium`. Not marked complete or live; review branch prepared for verification.
+- Critic proposal: add terrain overview captures plus saved-position traversal checks to the release workflow for broad heightmap changes.
+
+## Map confirmation for natural terrain PR #337
+- Confirmed full map and minimap both consume `world.minimapCanvas`, built from each land's current height and surface arrays after terrain generation.
+- Added runtime regression invoking actual `World.paintLandCanvas` and `rasterPlaymap`; changing terrain height changes the shared raster pixel. No separate map data update is necessary.
+- Chrome installed successfully, but environment socket permissions prevent launch; guest traversal and visual slope/prop validation remain blocked. Do not merge until that required gate is satisfied.
 ### 2026-11-27 — Release: Gilantre Exchange live
 - PR #333 merged (squash) as 81f20e9 after `verify` and `test-and-build` passed on f41c582 (main merged in first; 547 tests pass locally, persistence 41 pass, smoke pass).
 - Included (all listed in the PR body): Exchange SQL migration and persistence (94825fe), World 1 Exchange service (515365d), client and panel (e16c206), district and polish (d4c5f49), agent logs (1a0526f), merge of main (f41c582).

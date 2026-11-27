@@ -123,9 +123,6 @@ function wildHeight(x, z) {
     const t = bluffD / bluffR;
     h = Math.max(h, lerp(10.2 + bluffN * 3, 4.4, t * t));
   }
-  if (x < 18) h += (18 - x) * 0.55;
-  if (x > 128) h += (x - 128) * 0.62;
-  if (z > 118) h += (z - 118) * 0.42;
   return Math.max(0.2, h);
 }
 
