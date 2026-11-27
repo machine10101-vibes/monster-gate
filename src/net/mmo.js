@@ -422,7 +422,6 @@ export class MmoClient {
     this.ws = ws;
     const onOpen = () => {
       if (this.ws !== ws) return;
-      this.attempt = 0;
       this.startPing();
       const token = this.currentToken();
       this.lastHelloToken = token;
@@ -635,6 +634,7 @@ export class MmoClient {
       return;
     }
     if (msg.type === TYPES.welcome) {
+      this.attempt = 0;
       this.you = msg.you || null;
       this.updatePvpBoard();
       this.features = Array.isArray(msg.features) ? msg.features.slice() : [];
