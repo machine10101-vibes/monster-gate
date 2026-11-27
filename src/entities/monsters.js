@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { wormSand } from './sandwormAI.js';
+import { CROC_ZONE } from './oasiscrocAI.js';
+import { OASIS } from '../world/desert.js';
 import { buildSlime, buildBoar, buildWraith, buildBudgeDragon, buildFowl } from './creatures.js';
 import { buildDarksycleDragon } from './darksycle.js';
 import { buildVolcanumDragon } from './volcanum.js';
@@ -149,7 +151,7 @@ export class Monster {
     this.obj.add(built.root);
     game.scene.add(this.obj);
     this.obj.position.set(x, this.y, z);
-    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'trex' ? 3 : type === 'sandworm' ? 2.6 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
+    this.baseScale = type === 'voidslime' ? 1.15 : type === 'darksycledragon' ? 2 : type === 'volcanum' ? 2.7 : type === 'trex' ? 3 : type === 'sandworm' ? 2.6 : type === 'oasiscroc' ? 1.1 : type === 'snowyeti' ? 2 : type === 'keepwarden' ? 1.12 : 1;
     this.air = false;
     this.attacking = false;
     this.chargeDir = new THREE.Vector3();
@@ -502,6 +504,12 @@ export class Monster {
   groundOk(x, z) {
     const w = this.game.world;
     if (this.type === 'sandworm' && !wormSand(w,x,z)) return false;
+    if (this.type === 'oasiscroc') {
+      // Crocodiles keep to the Oasis: the shallows, the waterline and a short way up the bank.
+      const d = Math.hypot(x - OASIS.x, z - OASIS.z);
+      if (d > CROC_ZONE.leash) return false;
+      if (d < OASIS.r) return d >= CROC_ZONE.swimIn;
+    }
     if (!w.playable(x, z)) return false;
     const h = w.heightAt(x, z);
     if (h - this.y > 1.01 || h < WATER_Y - 0.1 || h > 9) return false;
@@ -1913,6 +1921,8 @@ export class Monster {
 
 const JUNGLE_QUOTA = { tiger: 5, raptor: 7, cursedpirate: 6, pirate: 7 };
 const DESERT_QUOTA = { sandworm: 3, scorpion: 6 };
+/** Oasis Crocodiles alive at once, all around the Oasis pool. */
+export const OASIS_CROCS = 10;
 
 export class Spawner {
   constructor(game) {
@@ -1968,6 +1978,12 @@ export class Spawner {
           const at = this.desertSpot(type, 0);
           if (at) this.spawn(type, at.x, at.z, false);
         }
+      }
+    }
+    if (desert) {
+      for (let i = 0; i < OASIS_CROCS; i++) {
+        const at = this.crocSpot(i, 0);
+        if (at) this.spawn('oasiscroc', at.x, at.z, false);
       }
     }
     if (w.cave) {
@@ -2040,6 +2056,7 @@ export class Spawner {
     this.fillJungle();
     this.fillTrex();
     this.fillDesert();
+    this.fillOasis();
     const alive = g.monsters.filter((m) => !m.dead && m.type !== 'chicken' && m.type !== 'orcscout' && m.type !== 'snowyeti' && m.type !== 'volcanum' && !KNIGHT_TYPES.has(m.type) && !FAMILY_BY_TYPE.has(m.type)).length;
     if (alive >= this.max) return;
     const spot = this.pickSpot();
@@ -2280,6 +2297,37 @@ export class Spawner {
       return { x, z };
     }
     return null;
+  }
+
+  /** A spot on the Oasis waterline, spread round the pool by index, out of the hunter's sight. */
+  crocSpot(i = Math.floor(Math.random() * OASIS_CROCS), minFromPlayer = 22) {
+    const g = this.game;
+    const P = g.player.pos;
+    for (let n = 0; n < 16; n++) {
+      const a = ((i + this.rng.range(-0.35, 0.35)) / OASIS_CROCS) * TAU;
+      const r = CROC_ZONE.edge - 3 + this.rng.range(0, 8);
+      const x = OASIS.x + Math.cos(a) * r;
+      const z = OASIS.z + Math.sin(a) * r;
+      if (minFromPlayer && Math.hypot(x - P.x, z - P.z) < minFromPlayer) continue;
+      if (g.monsters.some((m) => !m.dead && m.type === 'oasiscroc' && Math.hypot(m.x - x, m.z - z) < 5)) continue;
+      return { x, z };
+    }
+    return null;
+  }
+
+  fillOasis() {
+    const g = this.game;
+    if (!g.world.desert) return;
+    const P = g.player.pos;
+    if (Math.hypot(P.x - OASIS.x, P.z - OASIS.z) > 260) return;
+    this.oasisT = (this.oasisT || 0) + 1;
+    if (this.oasisT < 5) return;
+    const n = g.monsters.filter((m) => !m.dead && m.type === 'oasiscroc').length;
+    if (n >= OASIS_CROCS) return;
+    const at = this.crocSpot();
+    if (!at) return;
+    this.oasisT = 0;
+    this.spawn('oasiscroc', at.x, at.z);
   }
 
   fillDesert() {

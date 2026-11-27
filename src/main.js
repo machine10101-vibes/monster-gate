@@ -3820,7 +3820,7 @@ class Game {
 
   sellPart(id, n = 1) {
     if (!MATERIALS[id] || !Number.isSafeInteger(n) || n < 1 || !this.progress.takePart(id, n)) return false;
-    this.addGold(n * 5);
+    this.addGold(n * (MATERIALS[id].price || 5));
     this.audio.coin();
     return true;
   }

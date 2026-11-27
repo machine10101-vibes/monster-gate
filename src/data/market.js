@@ -63,7 +63,7 @@ function describe(kind, id) {
     const m = MATERIALS[id];
     if (!m) return null;
     const fam = MATERIAL_FAMILY[id] || '';
-    return { kind, id, name: m.name, category: 'material', sub: fam, subLabel: FAMILY_NAME[fam] || 'Monster part', family: fam, familyLabel: FAMILY_NAME[fam] || '', level: 1, value: 10, desc: m.desc || '', stack: true };
+    return { kind, id, name: m.name, category: 'material', sub: fam, subLabel: FAMILY_NAME[fam] || 'Monster part', family: fam, familyLabel: FAMILY_NAME[fam] || '', level: 1, value: m.price ? m.price * 2 : 10, desc: m.desc || '', stack: true };
   }
   if (kind === 'good') {
     const g = GOODS[id];

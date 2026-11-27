@@ -146,7 +146,55 @@ function rexHide(mat) {
 const rexFang = (mat) => curvedClaw(mat, { base: REX.fangLo, tip: 0xffffff, claw: REX.fang, clawLo: REX.fangLo }, 1.2, 0.7, 29);
 const rexClaw = (mat) => curvedClaw(mat, { base: REX.clawLo, tip: REX.clawTip, claw: REX.claw, clawLo: REX.clawLo }, 1.25, 1.4, 30);
 
+const CROC = { olv: 0x6b7a3a, olvHi: 0x87964a, olvLo: 0x4c5828, brn: 0x5a4630, brnLo: 0x3c2e20, tan: 0xc2b07e, tooth: 0xe2d4a8, toothLo: 0xb8a77c, amber: 0xe0a020, amberHi: 0xffd878, amberLo: 0x9a5a10 };
+
+/** Olive hide tiled in square scales, blotched brown, with seams between the tiles. */
+function crocHide(mat) {
+  return pelt(mat, (x, y) => {
+    if (x % 3 === 0 || y % 3 === 0) return { hi: CROC.olvLo, lo: CROC.brnLo };
+    const h = hash3(x >> 2, y >> 2, 0, 81);
+    return { hi: h > 0.72 ? CROC.brn : h > 0.3 ? CROC.olv : CROC.olvHi, lo: CROC.olvLo };
+  });
+}
+const crocTooth = (mat) => curvedClaw(mat, { base: CROC.toothLo, tip: 0xffffff, claw: CROC.tooth, clawLo: CROC.toothLo }, 0.85, 0.35, 82);
+
+/** A ridged bony back plate: an oval dome with a keel down the middle. */
+function crocScute(mat) {
+  const M = new VoxelModel(20, 9, 24);
+  for (let z = 0; z < 22; z++)
+    for (let x = 0; x < 18; x++) {
+      const ex = (x + 0.5 - 9) / 8.5;
+      const ez = (z + 0.5 - 11) / 10.5;
+      const d = ex * ex + ez * ez;
+      if (d > 1) continue;
+      const hgt = Math.round(2 + (1 - d) * 2.5 + Math.max(0, 1.6 - Math.abs(x + 0.5 - 9)) * 1.6);
+      for (let y = 0; y < hgt; y++) {
+        const pit = y === hgt - 1 && hash3(x, y, z, 83) > 0.8;
+        M.set(x + 1, y, z + 1, J(pit ? CROC.brnLo : y === 0 ? CROC.olvLo : hash3(x >> 1, y, z >> 1, 84) > 0.6 ? CROC.brn : CROC.olv, x, y, z, 85, 0.05));
+      }
+    }
+  return meshFrom(M, 10, 0, 12, mat, SZ);
+}
+
+/** A hard amber eye with a slit pupil. */
+function crocAmber(mat) {
+  const M = new VoxelModel(16, 16, 12);
+  for (let y = 0; y < 14; y++)
+    for (let x = 0; x < 14; x++)
+      for (let z = 0; z < 10; z++) {
+        const d = Math.hypot((x + 0.5 - 7) / 6.5, (y + 0.5 - 7) / 6.5, (z + 0.5 - 5) / 4.6);
+        if (d > 1) continue;
+        const slit = Math.abs(x + 0.5 - 7) < 1 && Math.abs(y + 0.5 - 7) < 5 && z >= 8;
+        M.set(x + 1, y + 1, z + 1, slit ? 0x1a1208 : J(d > 0.85 ? CROC.amberLo : d < 0.45 ? CROC.amberHi : CROC.amber, x, y, z, 86, 0.04), !slit && d < 0.7);
+      }
+  return meshFrom(M, 8, 1, 6, mat, SZ);
+}
+
 export const JUNGLE_MATERIALS = {
+  crochide: crocHide,
+  croctooth: crocTooth,
+  crocscute: crocScute,
+  crocamber: crocAmber,
   rexhide: rexHide,
   rexfang: rexFang,
   rexclaw: rexClaw,

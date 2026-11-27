@@ -386,7 +386,7 @@ const ZONE_MOBS = {
   greystone: ['boar', 'slime'],
   gate: ['slime', 'voidslime', 'wraith'],
   southford: ['slime', 'boar'],
-  oasis: ['scorpion', 'sandworm'],
+  oasis: ['oasiscroc', 'scorpion', 'sandworm'],
   greenbowl: ['scorpion', 'sandworm'],
   sunspill: ['scorpion', 'sandworm'],
   glassroad: ['scorpion', 'sandworm'],

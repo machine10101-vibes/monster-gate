@@ -44,9 +44,14 @@ export const MATERIALS = {
   rexfang: { name: 'Rex Fang', desc: 'A serrated cream fang as long as a forearm.' },
   rexclaw: { name: 'Rex Claw', desc: 'A heavy grey toe claw that has carried a mountain of meat.' },
   rexbone: { name: 'Rex Bone', desc: 'A thick, dense bone from a Tyrant Rex. It rings like stone.' },
+  // Level 80 parts: worth far more to a merchant than early drops.
+  crochide: { name: 'Oasis Croc Hide', desc: 'Olive hide tiled with square scales and blotched brown. It turns a blade like boiled leather twice over.', price: 40 },
+  croctooth: { name: 'Croc Tooth', desc: 'A pale conical tooth as long as a thumb. Crocodiles grow new ones all their lives; this one never got the chance.', price: 30 },
+  crocscute: { name: 'Croc Back Plate', desc: 'A ridged bony plate from a crocodile\'s back. Bone under the skin, hard as a shield boss.', price: 70 },
+  crocamber: { name: 'Amber Croc Eye', desc: 'A crocodile\'s eye gone hard and clear as amber. It still seems to follow you.', price: 150 },
 };
 
-export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'cinderscale', 'lavavein', 'ashmembrane', 'obsidianclaw', 'spirehorn', 'hearthcore', 'cinderhide', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting', 'rexhide', 'rexfang', 'rexclaw', 'rexbone'];
+export const MATERIAL_ORDER = ['budgescale', 'budgefang', 'budgeclaw', 'budgehorn', 'budgehide', 'budgemembrane', 'duskscale', 'duskclaw', 'scythehorn', 'gloommembrane', 'duskhide', 'gloomcore', 'cinderscale', 'lavavein', 'ashmembrane', 'obsidianclaw', 'spirehorn', 'hearthcore', 'cinderhide', 'rimefur', 'yetihide', 'glacierclaw', 'yetifang', 'frostshard', 'frostheart', 'tigerskin', 'tigerclaw', 'raptorskin', 'raptorclaw', 'scimitar', 'pirategold', 'piratebone', 'sandspine', 'wormplate', 'scorpchitin', 'scorpsting', 'rexhide', 'rexfang', 'rexclaw', 'rexbone', 'crochide', 'croctooth', 'crocscute', 'crocamber'];
 
 /** chance is 0..1 per kill, qty is [min, max]. */
 export const DROPS = {
@@ -103,6 +108,12 @@ export const DROPS = {
   sandworm: [
     { id: 'wormplate', chance: 1, qty: [1, 3], rate: 'Common' },
     { id: 'sandspine', chance: 0.75, qty: [1, 2], rate: 'Common' },
+  ],
+  oasiscroc: [
+    { id: 'crochide', chance: 1, qty: [2, 4], rate: 'Common' },
+    { id: 'croctooth', chance: 0.85, qty: [1, 3], rate: 'Common' },
+    { id: 'crocscute', chance: 0.5, qty: [1, 2], rate: 'Uncommon' },
+    { id: 'crocamber', chance: 0.15, qty: [1, 1], rate: 'Rare' },
   ],
   scorpion: [
     { id: 'scorpchitin', chance: 1, qty: [1, 3], rate: 'Common' },
@@ -195,6 +206,10 @@ export const MONSTERS = [
   {
     id: 'sandworm', name: 'Sand Spine Worm', level: 125, temper: 'Ravenous', style: 'Burrowing Ambusher', habitat: 'The desert oasis south of Southford, tiles 74, 75, 84 and 85',
     desc: 'A colossal ringed worm of mottled tan hide banded in dark brown, its whole head one round gaping maw: a red ribbed throat, three rings of inward-raking fangs and a fat tongue. Curved horn-tusks sprout from iron-grey sockets along its body. It hunts under the sand with only its horn tips showing, then bursts up beneath you. Reared, it slams its maw down in a line, spins its horns in a wide circle and blasts scouring sand; from below it drives a chain of sand geysers at you. Watch the ground tremble.',
+  },
+  {
+    id: 'oasiscroc', name: 'Oasis Crocodile', level: 80, temper: 'Vicious', style: 'Ambush Predator', habitat: 'The waterline of the Oasis pool south of Southford',
+    desc: 'A long olive crocodile tiled in square scales and blotched brown, with a double crest of plates down its back and a jaw full of pale teeth. Ten of them haunt the Oasis: they bask on the bank, glide through the shallows and patrol the waterline for prey, and never stray far from the water. Up close it bites; from a few lengths away it bursts forward in a lunge; step beside or behind it and the tail lashes round. Watch for the amber glow before each strike.',
   },
   {
     id: 'scorpion', name: 'Desert Scorpion', level: 6, temper: 'Wary', style: 'Skirmisher', habitat: 'The dunes around the oasis south of Southford',
