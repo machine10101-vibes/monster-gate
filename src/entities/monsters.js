@@ -2008,6 +2008,7 @@ export class Spawner {
   update(dt) {
     if (this.game.net?.role === 'guest') return;
     this.fillChickens(dt);
+    this.fillKnights(dt);
     if (this.game.world?.realm === 'cave' || this.game.world?.realm === 'rift') return;
     const g = this.game;
     this.timer -= dt;
@@ -2015,7 +2016,6 @@ export class Spawner {
     this.timer = 3.5;
     this.fillOrcs();
     this.fillYetis();
-    this.fillKnights();
     this.fillWarden();
     this.fillVolcanum();
     this.fillJungle();
@@ -2089,22 +2089,30 @@ export class Spawner {
     this.spawn('snowyeti', x, z);
   }
 
-  fillKnights() {
+  fillKnights(dt) {
     const g = this.game;
     const w = g.world;
-    this.knightT = (this.knightT || 0) + 1;
-    if (this.knightT < 40) return;
+    if (!w || (w.realm && w.realm !== 'over')) return;
+    this.knightRespawn = this.knightRespawn || {};
     for (const [key, type] of [['demonKeep', 'demonknight'], ['holyKeep', 'holyknight']]) {
       const keep = w[key];
       if (!keep) continue;
       const n = g.monsters.filter((m) => !m.dead && m.type === type).length;
-      if (n >= keep.posts.length) continue;
-      const [ox, oz] = keep.posts[this.rng.int(0, keep.posts.length - 1)];
-      const x = keep.x + ox;
-      const z = keep.z + oz;
-      if (!w.playable(x, z) || Math.hypot(x - g.player.pos.x, z - g.player.pos.z) < 22) continue;
-      this.knightT = 0;
-      this.spawn(type, x, z);
+      if (n >= keep.posts.length) {
+        this.knightRespawn[type] = 0;
+        continue;
+      }
+      this.knightRespawn[type] = (this.knightRespawn[type] || 0) + dt;
+      if (this.knightRespawn[type] < 180) continue;
+      const available = keep.posts.filter(([ox, oz]) => {
+        const x = keep.x + ox, z = keep.z + oz;
+        return w.playable(x,z) && Math.hypot(x-g.player.pos.x,z-g.player.pos.z) >= 22 &&
+          !g.monsters.some(m => !m.dead && m.type === type && Math.hypot(m.x-x,m.z-z)<5);
+      });
+      if (!available.length) continue;
+      const [ox, oz] = available[this.rng.int(0, available.length - 1)];
+      this.spawn(type, keep.x + ox, keep.z + oz);
+      this.knightRespawn[type] = 0;
     }
   }
 
