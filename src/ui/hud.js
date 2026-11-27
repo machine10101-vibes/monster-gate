@@ -764,6 +764,9 @@ export class HUD {
       const fit = document.createElement('div');
       fit.className = 'playmap-fit';
       fit.appendChild(c);
+      frame.appendChild(fit);
+      body.appendChild(frame);
+      this.el.panel.classList.remove('hidden');
       const playerPin = document.createElement('i');
       playerPin.className = 'playmap-player-pin';
       playerPin.title = 'Your position';
@@ -791,7 +794,8 @@ export class HUD {
         nx: ((label.x - ox) * mapScale / src.width) * 100,
         ny: ((label.z - oz) * mapScale / src.height) * 100,
       }));
-      const placed = layoutPlaymapLabels(pins);
+      const mapRect = fit.getBoundingClientRect();
+      const placed = layoutPlaymapLabels(pins, { mapW: mapRect.width || 720, mapH: mapRect.height || 560 });
       const leads = document.createElement('canvas');
       leads.className = 'playmap-leads';
       leads.width = 720;
@@ -817,7 +821,6 @@ export class HUD {
         b.style.top = (atPin ? label.ay : label.y).toFixed(2) + '%';
         fit.appendChild(b);
       }
-      frame.appendChild(fit);
       const zoomControls = document.createElement('div');
       zoomControls.className = 'playmap-zoom-controls';
       zoomControls.setAttribute('aria-label', 'Map zoom controls');
