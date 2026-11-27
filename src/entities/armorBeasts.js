@@ -762,6 +762,8 @@ function raptorCloth() {
       // A beak-shaped brim and a long plume trailing down the back.
       for (let x = 4; x <= 15; x++) for (let k = 0; k < 2; k++) set(x, rowY(10) + k, 17 + k - (Math.abs(x - 9.5) > 4 ? 1 : 0), J(RAP.clawLo, x, k, 0, 1252));
       for (let k = 0; k < 12; k++) for (const x of [9, 10]) set(x, rowY(15) - Math.round(k * 0.9), 4 - Math.round(k * 0.25), feather(x, k, 0, 2));
+      // Feather tufts swept up and back from each temple.
+      for (const sd of [-1, 1]) for (let f = 0; f < 3; f++) sweep(set, sd < 0 ? 2 : 17, rowY(9) + f, 12 - f, 6, [sd * 0.25, 0.7, -0.6], 2, (k, a) => feather(k, a, f, 3));
       set(7, rowY(9), 17, RAP.eye, true);
       set(12, rowY(9), 17, RAP.eye, true);
     },
@@ -782,6 +784,8 @@ function raptorCloth() {
       // Feather-fringed sleeves.
       box(set, 1, 4, 1, 12, 9, 12, (x, y, z) => (x > 1 && x < 11 && z > 1 && z < 11 ? null : feather(x, y, z, 20)));
       box(set, 2, 21, 2, 11, 24, 12, (x, y, z) => feather(x, y, z, 21));
+      // Long flight feathers trailing from the outer sleeve, like a folded wing.
+      for (let f = 0; f < 5; f++) sweep(set, 12, 19 - f * 2, 3 + f * 2, 6, [0.3, -1, 0.1], 1, (k) => feather(k, f, 0, 22 + (k > 4 ? 1 : 0)));
     },
     paintLeg(set, flags) {
       if (flags.legs) limb(set, 12, 23, robe);
@@ -884,7 +888,8 @@ function rexCloth() {
       limb(set, 9, 21, robe, 3, 10, 3, 10);
       box(set, 1, 4, 1, 12, 9, 12, (x, y, z) => (x > 1 && x < 11 && z > 1 && z < 11 ? null : y === 4 ? J(REX.bone, x, y, z, 1359) : robe(x, y, z)));
       box(set, 2, 21, 2, 11, 24, 12, (x, y, z) => robe(x, y, z));
-      for (let z = 3; z <= 10; z += 2) set(11, 23, z, J(REX.fang, 11, 23, z, 1360));
+      // A mantle of rex fangs hanging from the shoulder.
+      for (const z of [2.5, 5.5, 8.5, 11.5]) hornCurve(set, [12, 25, z], [13, 23, z], [12.5, 20, z], 1, (t) => (t > 0.5 ? REX.fang : REX.fangLo), 5);
     },
     paintLeg(set, flags) {
       if (flags.legs) limb(set, 12, 23, robe);
@@ -973,11 +978,19 @@ export const PLATE_SIGNATURES = {
         for (let y = 18 - k; y >= 6 + (k >> 1); y--) set(Math.round(x), y, 2, J(y === 18 - k ? BUDGE.horn : BUDGE.scale, k, y, s, 62));
       }
     },
-    arm() {},
+    arm(A, set) {
+      // A wing-claw pauldron: two horn ribs curling up and out, webbed with scale membrane.
+      for (const z of [3.5, 9.5]) hornCurve(set, [8, 26, z], [12, 29, z], [13.5, 26, z], 1.2, (t) => (t > 0.6 ? BUDGE.claw : BUDGE.horn), 8);
+      for (let y = 26; y <= 28; y++) for (let z = 4; z <= 9; z++) set(12, y, z, budgeScale(12, y, z, 63));
+    },
     leg() {},
   },
   darksyceset: {
-    helm() {},
+    helm(H, rowY) {
+      const set = (x, y, z, c, g) => H.set(x, y, z, c, g);
+      // Scythe mandibles curling forward from the cheek guards around the jaw.
+      for (const sd of [-1, 1]) hornCurve(set, [sd < 0 ? 3 : 16, rowY(6), 12], [sd < 0 ? 1 : 18, rowY(3), 16], [sd < 0 ? 5 : 14, rowY(2), 19], 1.2, (t) => (t > 0.7 ? DARK.edge : t > 0.3 ? DARK.blade : DARK.bladeDark), 10);
+    },
     chest(T, ty) {
       const set = (x, y, z, c, g) => T.set(x, ty(y), z, c, g);
       // A long tattered cape of dusk membrane down the back.
@@ -1012,6 +1025,12 @@ export const PLATE_SIGNATURES = {
         else if (d < 2.8) set(x, 28, z, VOLC.glow || 0xff6a12, true);
         else if (d < 3.6) set(x, 28, z, J(0x101014, x, 28, z, 65));
       }
+      // A raised obsidian rim round the vent, and two jagged spires on the outer shoulder.
+      for (let a = 0; a < 24; a++) {
+        const ang = (a / 24) * TAU;
+        set(Math.round(6.5 + Math.cos(ang) * 4.2), 29, Math.round(6.5 + Math.sin(ang) * 4.2), J(0x101014, a, 29, 0, 66));
+      }
+      for (const z of [3.5, 9.5]) hornCurve(set, [11, 26, z], [13, 28, z], [13, 30, z], 1.3, (t) => (t > 0.75 ? VOLC.edge || 0xffe08a : 0x1c1c22), 6);
     },
     leg() {},
   },
@@ -1031,7 +1050,14 @@ export const PLATE_SIGNATURES = {
             if (d < 1 && d > 0.45 && hash3(x, y, z, 68) > 0.1) set(x, y, z, yetiFur(x, y, z, 69));
           }
     },
-    arm() {},
+    arm(A, set) {
+      // Shaggy fur spilling over the top and outside of the shoulder plate.
+      for (let y = 26; y <= 29; y++) for (let z = 1; z <= 12; z++) for (let x = 1; x <= 13; x++) {
+        const d = Math.hypot(x - 6.5, z - 6.5) / 6.5 + (y - 26) * 0.18;
+        if (d < 1 && hash3(x, y, z, 70) > 0.15) set(x, y, z, yetiFur(x, y, z, 71));
+      }
+      for (let y = 20; y <= 26; y++) for (let z = 2; z <= 11; z++) if (hash3(y, z, 0, 72) > 0.3) set(13, y, z, yetiFur(13, y, z, 73));
+    },
     leg() {},
   },
 };
@@ -1085,18 +1111,74 @@ const skipNull = (set) => (x, y, z, c, g) => {
 };
 const guardModel = (M) => ({ set: skipNull((x, y, z, c, g) => M.set(x, y, z, c, g)), has: (x, y, z) => M.has(x, y, z) });
 
+/**
+ * Each set's own material for the upper arm and shoulder, and its own belt, painted first so the
+ * plain hunter sleeves, leather pauldrons and iron-buckled belt never show through any set.
+ * belt(x, y, z, buckle) is called with buckle true for the voxels of the clasp.
+ */
+const COVER = {
+  budgeleather: { skin: (x, y, z) => budgeScale(x, y, z, 90), belt: (x, y, z, b) => (b ? J(BUDGE.claw, x, y, z, 91) : J(0x6b4a2a, x, y, z, 92)) },
+  budgecloth: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x1f8a4c : 0x2fae62, x, y, z, 93), belt: (x, y, z, b) => (b ? J(BUDGE.ember || 0xff8a2a, x, y, z, 94) : J(y % 2 ? 0xe6d27a : 0xc9ab4c, x, y, z, 95)) },
+  darkleather: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x251f48 : 0x3b3268, x, y, z, 96), belt: (x, y, z, b) => (b ? DARK.glow || 0xff4fb8 : J(0x1d1736, x, y, z, 97)) },
+  darkcloth: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x33296a : 0x4a3a9c, x, y, z, 98), belt: (x, y, z, b) => (b ? J(DARK.blade, x, y, z, 99) : J(0x1a1430, x, y, z, 100)) },
+  volcanumleather: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x161214 : 0x2a2428, x, y, z, 101), belt: (x, y, z, b) => (b ? VOLC.glow || 0xff6a12 : J(0x3a2014, x, y, z, 102)) },
+  volcanumcloth: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x241448 : 0x3a2068, x, y, z, 103), belt: (x, y, z, b) => (b ? VOLC.glowHi || 0xffe08a : J(0x6a3820, x, y, z, 104)) },
+  yetileather: { skin: (x, y, z) => yetiFur(x, y, z, 105), belt: (x, y, z, b) => (b ? J(YETI.ice, x, y, z, 106) : J(YETI.leatherLo, x, y, z, 107)) },
+  yeticloth: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x9dbfdc : 0xcfe2f1, x, y, z, 108), belt: (x, y, z, b) => (b ? YETI.glow || 0x7fd0ff : yetiFur(x, y, z, 109)) },
+  raptorleather: { skin: (x, y, z) => raptorScale(x, y, z, 110), belt: (x, y, z, b) => (b ? J(RAP.claw, x, y, z, 111) : J(RAP.strap, x, y, z, 112)) },
+  raptorcloth: { skin: (x, y, z) => feather(x, y, z, 113), belt: (x, y, z, b) => (b ? J(RAP.claw, x, y, z, 114) : J(RAP.blue, x, y, z, 115)) },
+  rexleather: { skin: (x, y, z) => rexHide(x, y, z, 116), belt: (x, y, z, b) => (b ? J(REX.fang, x, y, z, 117) : J(REX.strap, x, y, z, 118)) },
+  rexcloth: { skin: (x, y, z) => J(((x + y) & 3) === 0 ? 0x2a3a18 : 0x3d5222, x, y, z, 119), belt: (x, y, z, b) => (b ? J(REX.fang, x, y, z, 120) : J(REX.red, x, y, z, 121)) },
+  rexset: { skin: (x, y, z) => rexHide(x, y, z, 122), belt: (x, y, z, b) => (b ? J(REX.bone, x, y, z, 123) : J(REX.strap, x, y, z, 124)) },
+};
+
+function coverArm(set, cover) {
+  box(set, 2, 14, 2, 12, 21, 12, cover.skin);
+  box(set, 1, 21, 1, 13, 27, 13, cover.skin);
+}
+
+function coverBelt(T, ty, cover) {
+  const set = (x, y, z, c) => T.set(x, ty(y), z, c);
+  for (let y = 0; y <= 5; y++) {
+    for (let x = 4; x <= 21; x++) {
+      const buckle = x >= 11 && x <= 14 && y >= 1 && y <= 4;
+      for (const z of [14, 15]) set(x, y, z, cover.belt(x, y, z, buckle && z === 15));
+      set(x, y, 3, cover.belt(x, y, 3, false));
+    }
+    for (const x of [3, 22]) for (let z = 4; z <= 13; z++) set(x, y, z, cover.belt(x, y, z, false));
+  }
+  // The hunter's back harness ring sits just behind the body; cover it with the set's own material.
+  for (let y = 6; y <= 17; y++) for (let x = 8; x <= 18; x++) set(x, y, 3, cover.skin(x, y, 3));
+}
+
+function coverLeg(set, flags, cover) {
+  if (flags.legs) box(set, 2, 12, 2, 11, 24, 11, cover.skin);
+  if (flags.boots) box(set, 2, 0, 2, 11, 12, 11, cover.skin);
+}
+
 /** Null-safe wrappers, and legs and boots only painted when the flags say they belong to this set. */
-function guarded(mod) {
+function guarded(mod, cover) {
   return {
     paintHelm: (H, rowY) => mod.paintHelm(guardModel(H), rowY),
-    paintChest: (T, ty) => mod.paintChest(guardModel(T), ty),
-    paintArm: (A, set, parts) => mod.paintArm(guardModel(A), skipNull(set), parts),
+    paintChest(T, ty) {
+      const G = guardModel(T);
+      if (cover) coverBelt(G, ty, cover);
+      mod.paintChest(G, ty);
+    },
+    paintArm(A, set, parts) {
+      const S = skipNull(set);
+      if (cover) coverArm(S, cover);
+      mod.paintArm(guardModel(A), S, parts);
+    },
     paintLeg(set, flags) {
-      if (flags.legs || flags.boots) mod.paintLeg(skipNull(set), flags);
+      if (!flags.legs && !flags.boots) return;
+      const S = skipNull(set);
+      if (cover) coverLeg(S, flags, cover);
+      mod.paintLeg(S, flags);
     },
   };
 }
 
 export const BEAST_SETS = Object.keys(BEAST_BUILD);
-export const makeBeastArmor = (setId) => guarded(BEAST_BUILD[setId]());
+export const makeBeastArmor = (setId) => guarded(BEAST_BUILD[setId](), COVER[setId]);
 void shade;

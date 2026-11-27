@@ -79,3 +79,10 @@
 - Checks: build pass; npm test 531 pass / 0 fail; live game (guest, entered via the roster API after main's class requirement): three coast lands present, three routes walked with 0 blocked steps, 0 page errors; renders of the beach, the plain, the thaw line, Glacier Bay and the pond reviewed.
 - Noted, not changed: grass skirt panels with white gaps on terrace steps (pre-existing, also on older tiles); suggested as a separate task.
 - Commit: on ccr-81a4e261-p4hmfr; not published (awaiting the user's go-ahead).
+
+### 2026-11-27 — Unique monster-part armor sets
+- Objective (user request): every monster-part armor set looks the same; make each unique and detailed like the monster weapons, then merge and publish everything.
+- Finding: Budgefang, Dusk, Volcanum and Yeti leather and cloth came from one shared leather and one shared cloth template (palette swaps); Raptor and Rex were near twins; Rex plate was the iron-tier mesh in green; the four plate sets shared one layout; the shared detail pass stamped the same medallion on all.
+- Changes: `src/entities/armorBeasts.js` with a small sculpt kit and bespoke painters for 13 sets (each with its own helm, chest, arms, legs and boots silhouette), per-set covers so the hunter's belt, sleeves, pauldrons and boots never show through, and signature layers for the Budgefang, Dusk, Volcanum and Yeti plate (snout visor and wings, mandibles and cape, crystal crown and vent pauldrons, fur mane and collar).
+- Tests: new `tests/monster-armor.test.js` (3): bespoke registration; every pair of 17 monster sets differs by at least 40 voxels in helm, chest and arm; no black voxels and full coverage of belt, sleeves and legs.
+- Checks: build pass; npm test 534 pass / 0 fail; renders of all monster sets front and back reviewed.
