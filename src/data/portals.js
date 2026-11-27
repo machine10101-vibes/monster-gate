@@ -11,6 +11,15 @@ export const TOWN_RETURN = {
 
 export const PORTALS = [
   {
+    id: 'glimmerfrost',
+    name: 'Glimmerfrost Portal',
+    place: 'Crystal Glacier, beside the snowy road',
+    x: 482,
+    z: -230,
+    yaw: 0,
+    banner: ['Crystal Glacier', 'Glimmerfrost'],
+  },
+  {
     id: 'oasis',
     name: 'Oasis Portal',
     place: 'Greenbowl, beside the living waters',
