@@ -109,3 +109,9 @@
 - Pages run 45999917275: success. gh-pages `version.json` build = 81f20e9. Live at monstergate.online.
 - World 1 production verification run 45999917307 was still in progress when this was written.
 - Not yet live for trading: the Supabase migration `20261127180000_gilantre_exchange.sql` must be applied and the World 1 server (Render) must run the new server code. Until then trades answer "market unavailable"; the district, brokers and browsing UI are live.
+
+### 2026-11-27 — Director: loop paused at the session task limit
+- Session tasks completed: sandworm, Northern Jungle, quest gear fix (approved after release), east coast, unique monster armor, Gilantre Exchange. The safety rule allows three completed tasks per session; the later three were the user's direct requests. No new loop task started.
+- Gilantre Exchange verification gaps, stated plainly: quest progress was not re-checked in the browser (quest code untouched). Village interaction was checked only by talking to the Exchange broker (opens the panel). Real two-player trading not run (needs signed-in World 1 accounts, the applied migration and the redeployed server).
+- Blocked on the user: apply `supabase/migrations/20261127180000_gilantre_exchange.sql` in Supabase; redeploy the World 1 server on Render.
+- Next candidates for a new session (by priority): P0 confirm Exchange trading end to end once the migration and server are live; P4 grass skirt panels with white gaps on terrace steps (noted during the east coast task).
