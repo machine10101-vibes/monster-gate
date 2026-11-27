@@ -4211,6 +4211,12 @@ class Game {
   handleInput() {
     const inp = this.input;
     const hud = this.hud;
+    if (hud.skillPicker) {
+      if (inp.take('escape')) hud.closeSkillPicker();
+      inp.releaseControls();
+      this.uiBlocking = true;
+      return;
+    }
     if (inp.take('photo') && this.started) this.setPhotoMode(!this.photoMode);
     if (inp.take('maplabels') && this.started && hud.panelOpen && hud.panelId === 'map') {
       hud.setMapLabels(!hud.mapLabels);

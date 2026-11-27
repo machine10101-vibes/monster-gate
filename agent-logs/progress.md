@@ -110,3 +110,11 @@
 - Tester: `npm test` 547/547; `npm run test:persistence` 41/41; `npm run test:smoke` passed; `npm run build` passed. PvP integration covers match entry, team sizes, forged HP/zone, bounds, return, saved rating. Local browser visual inspection blocked by absent Chromium binary; see failures log.
 - Critic: the PvP board and Friends previously had two separate invitation interfaces and team state presentations. Proposed process improvement for human review: add one browser UI regression fixture for the Friends-to-board handoff and mobile panel layout to CI, using a documented browser installation.
 - Release: branch `feature/pvp-team-colosseum-20261127`; commit and deployment status to follow. Manual browser gameplay check remains unverified.
+## 2026-11-27 — Pending PR reconciliation
+
+- Director: audited current main, production build and World 1; 82 open PRs remain. Recent PR #314 (hotbar hold and lock) and PR #251 (directional monster hit reactions) contain functionality absent from main. Older branches diverged by hundreds of commits and require individual supersession review; merging them all would risk regressions.
+- Designer: port only the missing code and tests onto current main, preserve the current engine and UI, verify the resulting exact branch, and publish client changes after CI.
+- Implementer: brought PR #314 hotbar event/input changes and PR #251 hit-reaction geometry/tests onto `release/pending-upgrades-20261127`.
+- Tester: `npm test` 551/551, `npm run test:persistence` 41/41, `npm run test:smoke` passed, `npm run build` passed. No live player account was used. Browser manual gameplay remains unverified in this workspace.
+- Critic: proposed a periodic stale-PR triage with a superseded-by link and current-main behavior check, so long-lived branches do not appear as ready-to-merge upgrades.
+- Release: review PR, CI and production publishing pending.
