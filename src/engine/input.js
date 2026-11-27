@@ -1,6 +1,14 @@
 /** 180° of yaw per full-width one-finger swipe on touch / coarse pointers. */
 export const LOOK_SWIPE_RAD = Math.PI;
 export const MOUSE_LOOK_GAIN = 0.006;
+export const TAB_CAMERA_KEY = 'mg-tab-camera';
+export function readTabCamera(store = typeof localStorage !== 'undefined' ? localStorage : null) {
+  try { return store?.getItem(TAB_CAMERA_KEY) !== '0'; } catch { return true; }
+}
+export function writeTabCamera(enabled, store = typeof localStorage !== 'undefined' ? localStorage : null) {
+  try { store?.setItem(TAB_CAMERA_KEY, enabled ? '1' : '0'); } catch { /* private mode */ }
+  return !!enabled;
+}
 export const STRAFE_STORAGE_KEY = 'mg-strafe';
 
 export function readStrafeSetting(store = typeof localStorage !== 'undefined' ? localStorage : null) {
@@ -45,6 +53,7 @@ export class Input {
     this.slotSelect = -1;
     this.enabled = true;
     this.strafe = readStrafeSetting();
+    this.tabCamera = readTabCamera();
 
     this.detectTouch();
     this.bind();
@@ -88,8 +97,14 @@ export class Input {
       if (!this.enabled) return;
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.code === 'Tab') {
+        if (!this.tabCamera || this.touch || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.target?.closest?.('button, select, a, [contenteditable], #panel, #dialog, #title, #char-select') || !this.canTabCamera?.()) return;
+        e.preventDefault();
+        if (!e.repeat) this.press('rotateR');
+        return;
+      }
       if (e.repeat) {
-        if (['Tab', 'Space'].includes(e.code)) e.preventDefault();
+        if (e.code === 'Space') e.preventDefault();
         return;
       }
       k.add(e.code);
@@ -159,9 +174,6 @@ export class Input {
           break;
         case 'Escape':
           this.press('escape');
-          break;
-        case 'Tab':
-          e.preventDefault();
           break;
         default:
           if (/^Digit[1-9]$/.test(e.code)) this.slotSelect = Number(e.code.slice(5)) - 1;

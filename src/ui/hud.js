@@ -22,7 +22,7 @@ import { mountCarve, mountSmithy } from './smithy.js';
 import { mountJournal } from './journal.js';
 import { shortAddress } from '../wallet/klever.js';
 import { mountWalletSettings } from '../wallet/settings.js';
-import { writeStrafeSetting } from '../engine/input.js';
+import { writeStrafeSetting, writeTabCamera } from '../engine/input.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
@@ -1195,6 +1195,7 @@ export class HUD {
         ['Fullscreen', `<button id="set-fs">Toggle</button>`],
         ['Weapon cursor', `<button id="set-wcur">${weaponCursorEnabled() ? 'On' : 'Off'}</button>`],
         ['Strafing', `<button id="set-strafe" aria-pressed="${game.input.strafe ? 'true' : 'false'}">${game.input.strafe ? 'On' : 'Off'}</button>`],
+        ['Tab camera rotation (R)', `<button id="set-tab-camera" aria-pressed="${game.input.tabCamera}">${game.input.tabCamera ? 'On' : 'Off'}</button>`],
         ['Account save', `<b id="set-cloud">${game.cloudStatusText?.() || ''}</b>`],
         ['Import old saves', '<button id="set-import-old">Open</button>'],
       ];
@@ -1279,6 +1280,12 @@ export class HUD {
         const btn = document.getElementById('set-strafe');
         btn.textContent = game.input.strafe ? 'On' : 'Off';
         btn.setAttribute('aria-pressed', game.input.strafe ? 'true' : 'false');
+      };
+      document.getElementById('set-tab-camera').onclick = () => {
+        game.input.tabCamera = writeTabCamera(!game.input.tabCamera);
+        const btn = document.getElementById('set-tab-camera');
+        btn.textContent = game.input.tabCamera ? 'On' : 'Off';
+        btn.setAttribute('aria-pressed', String(game.input.tabCamera));
       };
       document.getElementById('set-import-old').onclick = () => game.importOldSaves();
       const worldBtn = document.getElementById('set-world1');
