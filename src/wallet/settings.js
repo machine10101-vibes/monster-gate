@@ -10,6 +10,16 @@ function el(tag, className, text) {
   return n;
 }
 
+export function gatePassStatusText(status, now = Date.now()) {
+  if (!status) return 'Checking subscription…';
+  const expires = Date.parse(status.expiresAt);
+  if (status.active && Number.isFinite(expires) && expires > now) {
+    const days = Math.ceil((expires - now) / 86_400_000);
+    return `Active Gate Pass · ${days} ${days === 1 ? 'day' : 'days'} remaining · expires ${new Date(expires).toLocaleDateString()}`;
+  }
+  return 'No active Gate Pass.';
+}
+
 export function mountWalletSettings(body, game) {
   if (game.wallet?.kind !== 'email') return;
   const card = el('div', 'wallet-link-card mg-frame');
@@ -43,8 +53,11 @@ export function mountWalletSettings(body, game) {
   let busy = false;
   let address = game.wallet.kleverAddress || '';
   let membership = null;
+  let membershipError = '';
 
   const paint = () => {
+    passStatus.textContent = membershipError || gatePassStatusText(membership);
+    passAction.hidden = !!membership?.active;
     err.textContent = '';
     confirm.classList.add('hidden');
     actions.replaceChildren();
@@ -92,7 +105,7 @@ export function mountWalletSettings(body, game) {
   };
 
   passAction.onclick = async () => {
-    if (busy || !address) return;
+    if (busy) return;
     busy = true;
     passAction.disabled = true;
     passStatus.textContent = 'Preparing secure checkout…';
@@ -100,12 +113,12 @@ export function mountWalletSettings(body, game) {
       const { ensureMembership, membershipStatus } = await import('./membership.js');
       await ensureMembership(game.wallet, game);
       membership = await membershipStatus(game.wallet);
-      paint();
+      membershipError = '';
     } catch (e) {
-      passStatus.textContent = e.message || 'Could not open Gate Pass checkout.';
-      passAction.disabled = false;
+      membershipError = e.message || 'Could not open Gate Pass checkout.';
     } finally {
       busy = false;
+      passAction.disabled = false;
       paint();
     }
   };
@@ -131,7 +144,14 @@ export function mountWalletSettings(body, game) {
   };
 
   paint();
-  import('./membership.js').then(({ membershipStatus }) => membershipStatus(game.wallet)).then((status) => { membership = status; paint(); }).catch(() => { passStatus.textContent = 'Subscription status is temporarily unavailable.'; });
+  import('./membership.js').then(({ membershipStatus }) => membershipStatus(game.wallet)).then((status) => {
+    membership = status;
+    membershipError = '';
+    paint();
+  }).catch(() => {
+    membershipError = 'Subscription status is temporarily unavailable.';
+    paint();
+  });
   linkedWalletStatus(game.wallet).then((status) => {
     if (status.address !== undefined) {
       address = status.address || '';
