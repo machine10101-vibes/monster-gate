@@ -102,3 +102,10 @@
 - Checks: build pass; npm test 547 pass / 0 fail; test:persistence 41 pass / 0 fail; smoke pass; test:shaders skipped (no Chrome binary at the expected path). Browser (guest, swiftshader): district renders (overview, hall, street, arch), road and hall walk 0 blocked steps, 15 Exchange NPCs present; move, attack (combo 1), evade (roll) and talking to Odila Vane (opens the Exchange, offline notice for a guest) work; 0 page errors. Exchange UI rendered desktop and phone with a stubbed market connection (browse, search, sell, my listings, collect).
 - Not verified here: a real World 1 trade between two signed-in browsers (needs Supabase auth and the migration applied; covered by server socket tests against the memory store and by the SQL run).
 - Go-live dependencies: the migration must be applied in Supabase; the World 1 server (Render) must run the new server code. Until both, the Exchange answers "market unavailable" for trades.
+
+### 2026-11-27 — Release: Gilantre Exchange live
+- PR #333 merged (squash) as 81f20e9 after `verify` and `test-and-build` passed on f41c582 (main merged in first; 547 tests pass locally, persistence 41 pass, smoke pass).
+- Included (all listed in the PR body): Exchange SQL migration and persistence (94825fe), World 1 Exchange service (515365d), client and panel (e16c206), district and polish (d4c5f49), agent logs (1a0526f), merge of main (f41c582).
+- Pages run 45999917275: success. gh-pages `version.json` build = 81f20e9. Live at monstergate.online.
+- World 1 production verification run 45999917307 was still in progress when this was written.
+- Not yet live for trading: the Supabase migration `20261127180000_gilantre_exchange.sql` must be applied and the World 1 server (Render) must run the new server code. Until then trades answer "market unavailable"; the district, brokers and browsing UI are live.
