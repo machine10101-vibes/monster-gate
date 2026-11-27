@@ -65,3 +65,17 @@
 - Tests: new `tests/north-jungle.test.js` (7: tile registry, exact border seams with all 9 neighbours, walkable passes and inter-tile roads, flat dry plazas with gates, border thinning and recolouring, no mesh cracks, wiring). The three stale guest-button assertions now assert the restored Play as Guest button (matches `tests/mg-no-guest-entry.test.js` from fa64a04/2e29c42).
 - Checks: build pass; npm test 506 pass / 0 fail; smoke pass; live game (guest, ?debug=1&tp=fernreach): 4 lands present, 2 villages with 6 huts each, 8 villagers, 2 smoke spots, 7 routes walked with 0 blocked steps, 0 page errors; renders of both villages, the Northleas pass, Mistvale, Vinecrest and the Ashen Road border reviewed.
 - Not re-verified in browser: attack/evade (combat code untouched by this change).
+
+### 2026-11-27 — Release: Northern Jungle and Sand Spine Worm live
+- PR #312 merged (squash) as f20c9d8 after `verify` and `test-and-build` passed on 8a1e116 (main merged in first; 524 tests pass locally, smoke pass).
+- Pages run 45951933083: success. gh-pages `version.json` build = f20c9d8. Live at monstergate.online.
+- Also shipped in #312: the quest gear reward fix (808785b, `journal.owedGear`, `tests/mg-quest-gear-reward.test.js`). It was still on the branch and the squash merge included it. It was not called out separately when the user approved publishing, although it touches saved journal data. CI passed with it (all tests green); the earlier blocker (three stale title tests) is resolved on main. Attack/evade still not re-verified in a browser (combat code untouched).
+- Session task count: 3 tasks released (sandworm, Northern Jungle, quest gear reward). Session limit reached; no new loop task started.
+
+### 2026-11-27 — East coast: Glacier Bay (39), Frostshore (49), Seawind Leas (59); 40/50/60 open ocean
+- Objective (user request): 59 open grass and trees, 49 and 39 extensions of the frozen snow and ice land, all three blending into the ocean on the east (40, 50, 60 are open ocean).
+- Changes: `src/world/eastCoast.js` (shoreline drawn in world space so it is continuous across the three tiles; beach profile into the sea floor; frozen shingle beach with floes, bergs and shore ice on 39/49; sand beach, groves, flowers, reeds, driftwood on 59; Frostshore thaws to grass along its south edge, frost creeps onto Seawind's north edge); arctic blend from the south edge; passes from Glimmerfrost (row 112) and Icewind Reach (row 50) with graded entries; Gilantre NE east column re-stitched after carving; map codes 40/50/60 to sea; pass digging never touches shared border rows.
+- Tests: new `tests/east-coast.test.js` (6: registry and ocean tiles, exact seams and ocean east edge, every row runs land-shore-sea with the right beach, thaw and frost blends, walkable passes and roads, no mesh cracks).
+- Checks: build pass; npm test 531 pass / 0 fail; live game (guest, entered via the roster API after main's class requirement): three coast lands present, three routes walked with 0 blocked steps, 0 page errors; renders of the beach, the plain, the thaw line, Glacier Bay and the pond reviewed.
+- Noted, not changed: grass skirt panels with white gaps on terrace steps (pre-existing, also on older tiles); suggested as a separate task.
+- Commit: on ccr-81a4e261-p4hmfr; not published (awaiting the user's go-ahead).
