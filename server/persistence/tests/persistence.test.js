@@ -73,6 +73,25 @@ test('debounced queue coalesces two saves into one write', async () => {
   await db.close();
 });
 
+test('a failed scheduled save remains queued and does not crash the world process', async () => {
+  const adapter = createMemoryAdapter();
+  const originalSave = adapter.save.bind(adapter);
+  const errors = [];
+  const { db } = persist(adapter, { debounceMs: 10, retries: [], onError: (err) => errors.push(err) });
+  await db.createCharacter(USER, 'Bren');
+  let available = false;
+  adapter.save = (...args) => available ? originalSave(...args) : Promise.reject(new Error('database unavailable'));
+  await db.saveCharacter(USER, { hunter: { x: 88 } });
+  await new Promise((resolve) => setTimeout(resolve, 35));
+  assert.ok(errors.length >= 1);
+  assert.equal(db.queue.size, 1, 'failed position remains available for a later retry');
+  available = true;
+  await db.flush(USER);
+  const row = await db.loadCharacter(USER);
+  assert.equal(row.state.hunter.x, 88);
+  await db.close();
+});
+
 test('stale version is rejected', async () => {
   const { db, adapter } = persist();
   const created = await db.createCharacter(USER, 'Cora');
