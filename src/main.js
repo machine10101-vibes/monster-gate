@@ -181,14 +181,6 @@ function isDesktopGraphics() {
   }
 }
 
-function pickQuality() {
-  const saved = readSavedQuality(typeof localStorage !== 'undefined' ? localStorage : null);
-  if (saved) return { ...saved };
-  if (isDesktopGraphics()) return QUALITIES[1];
-  const cores = navigator.hardwareConcurrency || 4;
-  return cores >= 8 ? QUALITIES[1] : QUALITIES[0];
-}
-
 function graphicsSize() {
   try {
     return {
@@ -207,20 +199,16 @@ class Game {
     this.canvas = document.getElementById('game');
     const killed = bootWasKilled();
     markBoot();
-    // iPad Chrome and Brave both pretend to be a desktop. The first boot has to
-    // be the small one: a crash-then-retry still dies if every boot draws the whole world.
-    // Touch phones can lose the WebGL context when the game first expands to landscape.
-    // Start them on the same conservative scene budget as iOS/tablets, then let them upgrade later.
+    // Use the same preset before character selection and throughout gameplay.
+    // A failed WebGL boot retains the one-launch recovery budget.
     this.safeBoot = isIOS() || isTablet() || !isDesktopGraphics() || killed;
     const savedQuality = readSavedQuality(typeof localStorage !== 'undefined' ? localStorage : null);
-    const bootQuality = this.safeBoot
-      ? chooseBootQuality({
-        saved: savedQuality,
-        safeBoot: true,
-        killed,
-        size: graphicsSize(),
-      })
-      : { quality: pickQuality(), recovered: false, light: false };
+    const bootQuality = chooseBootQuality({
+      saved: savedQuality,
+      safeBoot: this.safeBoot,
+      killed,
+      size: graphicsSize(),
+    });
     this.heavyBoot = bootQuality.light;
     this.lightBoot = bootQuality.light;
     this.quality = bootQuality.quality;
