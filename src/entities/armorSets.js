@@ -8,6 +8,7 @@ import { withDetail } from './armorDetail.js';
 import { demonPlate, holyPlate } from './armorKnights.js';
 import { JUNGLE_SETS, makeJungleArmor } from './armorJungle.js';
 import { STARTER_SETS, makeStarterArmor } from './armorStarter.js';
+import { BEAST_SETS, makeBeastArmor, withSignature } from './armorBeasts.js';
 import { METALS } from '../data/metals.js';
 
 const CACHE = {};
@@ -31,12 +32,15 @@ const BUILD = {
   yeticloth: () => makeSoftArmor('yeticloth'),
   ...Object.fromEntries(JUNGLE_SETS.map((id) => [id, () => makeJungleArmor(id)])),
   ...Object.fromEntries(STARTER_SETS.map((id) => [id, () => makeStarterArmor(id)])),
+  // Bespoke monster sets last, so they replace the shared leather, cloth and metal templates.
+  ...Object.fromEntries(BEAST_SETS.map((id) => [id, () => makeBeastArmor(id)])),
 };
 
 /** Painter module {paintHelm, paintChest, paintArm, paintLeg} for a set id. */
 export function painterFor(setId) {
   if (!BUILD[setId]) return null;
-  return (CACHE[setId] ||= withDetail(setId, BUILD[setId]()));
+  // Bespoke sets carry their own detail; the others get the shared detail pass and any plate signature.
+  return (CACHE[setId] ||= BEAST_SETS.includes(setId) ? BUILD[setId]() : withSignature(setId, withDetail(setId, BUILD[setId]())));
 }
 
 export const PAINTER_SETS = Object.keys(BUILD);
