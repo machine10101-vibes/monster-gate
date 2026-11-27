@@ -81,3 +81,19 @@
 - Root cause: one development branch reused across tasks; the PR description listed only the two approved features.
 - Outcome: shipped with CI green; reported to the user after the fact.
 - Improvement proposal (needs human approval): before opening or updating a release PR, list `git log origin/main..HEAD` and name every included change in the PR body and to the user.
+
+### 2026-11-27 — Gilantre Exchange: stale merchant test on main (iteration 1)
+- Task: Gilantre Exchange, full `npm test` after the client wiring.
+- Attempt: `npm test` on e16c206.
+- Exact error: `Dalla skips session debug pouch in sellGood and the market listing` — input did not match `/sellAllGoods\(\) \{[\s\S]{0,220}if \(g\.session\) continue/`, then `/function mountMarket[\s\S]*isUnsellableGood\(g\)\) continue/`.
+- Root cause: 35d7425 (already on main) moved both checks to the shared `isUnsellableGood(g)` helper and a `.filter(...)`; the regexes still looked for the old loop text. Behaviour unchanged (the test's runtime half still passes).
+- Retry reason: the test asserts source text, not behaviour; updated both regexes to the helper.
+- Outcome: 21/21 in debug-flags pass.
+
+### 2026-11-27 — Gilantre Exchange: phone layout overflow and duplicate alias (iteration 2)
+- Task: Exchange panel on a 390 px phone, and the `exchange` debug teleport.
+- Attempt: Playwright render at 390x844; review of `src/debug/flags.js`.
+- Exact error: filter column wider than the panel (range inputs and chips cut off, pager off-screen); tabs stacked into three rows. `market:` already aliased to `dalla`, so my `market: 'exchange'` was a duplicate key.
+- Root cause: grid track `1fr` uses the filter column's min-content width; duplicate alias missed before writing.
+- Retry reason: layout bug visible in the render.
+- Outcome: `minmax(0, 1fr)` tracks, min-width 0, 2x2 tabs, a Filters drawer on phones; dropped the duplicate alias (`market` still goes to Dalla). Re-render clean.

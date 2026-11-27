@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createSupabaseMarket } from '../market.js';
 import {
   alreadyFriends,
   alreadyImported,
@@ -32,6 +33,7 @@ export function createSupabaseAdapter({ url, serviceRoleKey, client } = {}) {
 
   return {
     kind: 'supabase',
+    market: createSupabaseMarket(db),
 
     async grantOnce(reward) {
       const { data, error } = await db.rpc('grant_world_reward', {

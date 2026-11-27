@@ -51,6 +51,8 @@ export function createPersistence(options = {}) {
   return {
     adapter,
     queue,
+    /** The Gilantre Exchange store, or null when this adapter has none (noop). */
+    market: adapter.market || null,
 
     async grantOnce(reward) {
       if (typeof adapter.grantOnce !== 'function') throw new Error('Transactional reward grants require the Supabase persistence adapter.');

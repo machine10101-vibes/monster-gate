@@ -17,6 +17,7 @@ import {
 import { requireUserId } from '../ids.js';
 import { requireName } from '../names.js';
 import { blankState, characterView, columnsFromState, sanitizeState } from '../schema.js';
+import { createMemoryMarket } from '../market.js';
 
 /**
  * In-memory store for local dev and unit tests. Same contract as the
@@ -42,8 +43,19 @@ export function createMemoryAdapter() {
     return characterView(next);
   }
 
+  const market = createMemoryMarket({
+    getRow: rowOf,
+    writeState(userId, state) {
+      const row = rowOf(userId);
+      const next = { ...row, state, gold: Number(state.gold) || 0, version: row.version + 1, updated_at: new Date().toISOString() };
+      put(userId, next);
+      return next.version;
+    },
+  });
+
   return {
     kind: 'memory',
+    market,
     get writes() {
       return writes;
     },

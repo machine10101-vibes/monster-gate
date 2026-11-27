@@ -27,6 +27,7 @@ import { writeStrafeSetting, writeTabCamera } from '../engine/input.js';
 import { decorateAllFrames, decorateFrame } from './theme.js';
 import { applyWeaponCursor, setWeaponCursorEnabled, weaponCursorEnabled } from './weaponCursor.js';
 import { mountFriends } from '../social/ui.js';
+import { mountExchange } from './exchange.js';
 import { BUILD_ID } from './buildId.js';
 import { applyHudLayout, layoutPlaymapLabels, measureHudSafeRects, measurePlateSize, nameplateHitsHud, nameplateOutsideViewport, nudgeAnchorOffRects, readQuestOpen, stackNameplates, writeQuestOpen } from './hudLayout.js';
 import { isWorldOnline, leaveOnlineWorld, onWorldPlayClick, paintWorldModePill, paintWorldPlayButton } from '../net/worldPlay.js';
@@ -719,7 +720,7 @@ export class HUD {
     this.el.panel.classList.toggle('map-open', name === 'map');
     this.el.panel.classList.toggle('labels-off', name === 'map' && !this.mapLabels);
     const card = this.el.panel.querySelector('.panel-card');
-    const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest';
+    const wide = name === 'catalog' || name === 'forge' || name === 'skills' || name === 'gear' || name === 'bag' || name === 'spellbook' || name === 'stats' || name === 'market' || name === 'world' || name === 'map' || name === 'storage' || name === 'smithy' || name === 'carve' || name === 'quest' || name === 'exchange';
     card?.classList.toggle('wide', wide);
     card?.classList.toggle('adventures', name === 'quest');
     card?.querySelectorAll(':scope > .mg-corner').forEach((n) => n.remove());
@@ -1036,6 +1037,9 @@ export class HUD {
           this.toast(`${item.name} assigned to hotbar slot ${options.assignSlot + 1}.`);
         },
       });
+    } else if (name === 'exchange') {
+      title.textContent = 'Gilantre Exchange';
+      this.cleanup = mountExchange(body, game);
     } else if (name === 'storage') {
       title.textContent = 'Storage Crate';
       this.cleanup = mountStorage(body, game);

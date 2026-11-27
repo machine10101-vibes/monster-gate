@@ -17,3 +17,4 @@ export {
   skillPointsEarned,
 } from './schema.js';
 export { cleanName, nameProblem, requireName } from './names.js';
+export { createMemoryMarket, listingView, marketCodeOf, MARKET_CODES } from './market.js';

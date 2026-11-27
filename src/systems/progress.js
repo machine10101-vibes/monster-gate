@@ -166,7 +166,9 @@ export class Progress {
   }
 
   setGold(n) {
-    this.data.gold = Math.max(0, n | 0);
+    const next = Math.max(0, n | 0);
+    if (next < this.gold) this.onSpend?.('gold', 'gold', this.gold - next);
+    this.data.gold = next;
     this.save();
   }
 
@@ -339,6 +341,7 @@ export class Progress {
     const g = gearById(id);
     if (!g) return false;
     if (this.worn(id)) this.toggleWear(id);
+    this.onSpend?.('gear', id, 1);
     delete this.data.crafted[id];
     this.save();
     return true;
@@ -623,6 +626,7 @@ export class Progress {
 
   takeGood(id, n = 1) {
     if (!GOODS[id] || this.good(id) < n) return false;
+    this.onSpend?.('good', id, n);
     this.data.goods[id] = this.good(id) - n;
     if (!this.data.goods[id]) delete this.data.goods[id];
     this.save();
@@ -631,6 +635,7 @@ export class Progress {
 
   takePart(id, n = 1) {
     if (!MATERIALS[id] || this.count(id) < n) return false;
+    this.onSpend?.('material', id, n);
     this.data.materials[id] = this.count(id) - n;
     if (!this.data.materials[id]) delete this.data.materials[id];
     this.save();

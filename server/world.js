@@ -21,6 +21,8 @@ import { DROPS, GEAR_DROPS, MATERIALS } from '../src/data/catalog.js';
 import { GOODS } from '../src/data/gathering.js';
 import { riftChestGold, riftChestGoods, riftScale, riftWaveSpawns, RIFT_COOLDOWN_MS, RIFT_WAVES } from '../src/data/rift.js';
 
+import { WorldMarket } from './market.js';
+
 function send(ws, type, extra) {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(typeof type === 'string' && extra !== undefined ? encode(type, extra) : type);
@@ -108,6 +110,7 @@ export class World {
       inviteTtl: opts.inviteTtl,
     });
     this.pvp = opts.pvp || createPvpRuntime(this);
+    this.market = new WorldMarket(this);
   }
 
   async idle() {
@@ -216,6 +219,7 @@ export class World {
       else if (msg.type === TYPES.whisper) await this.social.handle(session,{...msg,type:'whisper'});
       else if (this.social.isSocialType(msg.type)) await this.social.handle(session, msg);
       else if (msg.type === TYPES.gather) await this.gather(session, msg);
+      else if (this.market.isMarketType(msg.type)) void this.market.handle(session, msg);
       else if (msg.type === 'attack') this.combatAction(session, msg).catch((err) => this.actionError(session, err));
       else if (msg.type === 'monster_move') this.moveMonster(session, msg);
       else if (msg.type === 'loot_roll_choice') this.lootChoice(session, msg).catch((err) => this.actionError(session, err));
@@ -235,6 +239,11 @@ export class World {
       send(session.ws, errorFrame(code, err.message));
       if ((code === 'auth' || code === 'debug') && !session.authed) session.ws.close();
     }
+  }
+
+  /** Send one typed frame to a session (used by the Exchange). */
+  sendTo(session, type, data) {
+    if (session?.ws) send(session.ws, type, data);
   }
 
   takeResume(hello, ident) {

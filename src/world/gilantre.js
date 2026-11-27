@@ -4,6 +4,7 @@ import { TILE } from '../engine/materials.js';
 import { W, ZONE } from './terrain.js';
 import { J, bundle, buildHouse, buildStall } from './models.js';
 import { buildSmithy } from './smithy.js';
+import { exchangeShape, exchangeLevel, exchangeEdge, dressExchange, EXCHANGE } from './exchange.js';
 
 /**
  * Gilantre sits on the shared corner of tiles 57, 58, 67 and 68.
@@ -643,6 +644,9 @@ function copySeam(src, dst, dstKind, read, write) {
   }
 }
 
+/** The Exchange plaza's level, measured from the prairie before carving. */
+let exchangeH = 3;
+
 function tagAt(dx, dz, r, original) {
   const bridge = Math.abs(dz) < BRIDGE && Math.abs(dx) > CITY_R && Math.abs(dx) < MOAT_OUT + 6;
   const westRoad = dz > -BRIDGE && dz < BRIDGE && dx < -MOAT_OUT;
@@ -656,6 +660,8 @@ function tagAt(dx, dz, r, original) {
   if (r < MOAT_IN) return { h: FLOOR, tag: 'cobble' };
   if (bridge) return { h: FLOOR, tag: 'path' };
   if (r < MOAT_OUT) return { h: 0, tag: 'water' };
+  const ex = exchangeShape(CX + dx, CZ + dz, original, exchangeH, lerp(FLOOR, original, clamp((dx - MOAT_OUT) / 28, 0, 1)));
+  if (ex) return ex;
   if (westRoad) {
     const t = clamp((Math.abs(dx) - MOAT_OUT) / 90, 0, 1);
     return { h: lerp(FLOOR, original, t), tag: 'path' };
@@ -683,6 +689,7 @@ export function carveGilantre(lands) {
   const four = ['gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe'].map((k) => landBy(lands, k)).filter(Boolean);
   if (four.length !== 4) return;
   const original = new Map(four.map((l) => [l, Float32Array.from(l.data.H)]));
+  exchangeH = exchangeLevel(four);
   const touched = new Map(four.map((l) => [l, new Uint8Array(W * W)]));
   for (const land of four) {
     const data = land.data;
@@ -745,6 +752,7 @@ function paintCountry(land) {
       const dz = land.z0 + z + 0.5 - CZ;
       const r = Math.hypot(dx, dz);
       if (r < MOAT_OUT + 1.5 || r > 102) continue;
+      if (exchangeEdge(land.x0 + x + 0.5, land.z0 + z + 0.5) < EXCHANGE.blend + 2) continue;
       if (Math.abs(dz) < 9 && Math.abs(dx) > 16) continue;
       const roll = hash2(x, z, seed);
       if (dx > 12 && roll > 0.38 && ((Math.floor(dx / 7) + Math.floor(dz / 5)) % 2) === 0) paintCell(data, i, 'farm');
@@ -1379,6 +1387,7 @@ export function dressGilantre(world) {
   dressWall(world, parts);
   dressArena(world, parts);
   dressTown(world, parts);
+  dressExchange(world, parts);
   for (const land of world.lands) if (String(land.kind || '').startsWith('gilantre')) dressWild(world, land);
   cluster(world, GILANTRE_SPOTS.grove.x, GILANTRE_SPOTS.grove.z, 9, 0.95);
   const m = world.models;

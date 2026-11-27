@@ -386,6 +386,28 @@ Shared XP and loot (`loot_roll` / `loot_result`, 8% bonus per extra member in-zo
 | `whisper` | whisper failed (offline, blocked, or feature off) |
 | `busy` | target has a pending invite from another leader |
 
+## Gilantre Exchange (market)
+
+World 1 player market with server-held escrow. Signed-in hunters only; guests get `market_offline`. Browsing (`market_search`, `market_mine`) works anywhere; `market_list`, `market_buy`, `market_cancel` and `market_collect` need the hunter within `MARKET.reach` (46) of the plaza at (532, 120), or they get `market_far`. Rules live in `src/data/market.js`: 5% fee, 20 open listings, prices 1 to 1,000,000, stacks up to 9,999, gear one piece at a time, listings last 72 hours.
+
+Every request carries a `request_id`; the reply is one `market_result` with the same id, `op`, `ok`, a `code` on failure and the data below.
+
+| Client → server | Body | Reply data |
+| --- | --- | --- |
+| `market_search` | `q`, `category` (`all`/`weapon`/`armor`/`material`/`good`), `sub`, `family`, `minLevel`, `maxLevel`, `minPrice`, `maxPrice`, `sort` (`price`/`price_desc`/`unit`/`new`), `page` | `total`, `page`, `pageSize`, `listings[]` (`id`, `kind`, `itemId`, `name`, `qty`, `price`, `fee`, `seller` name, `createdAt`, `expiresAt`, `mine`) |
+| `market_mine` | none | `listings[]` (open and not yet collected), `due` gold, `expired` count, `vault` (`gold`, `goods`, `materials`, `gear[]` World 1 holds), `rules` |
+| `market_list` | `kind` (`good`/`material`/`gear`), `itemId`, `qty`, `price` | `listingId`, echo. The items leave the World 1 inventory now. |
+| `market_buy` | `listingId` | `kind`, `itemId`, `qty`, `price`. Gold leaves and items arrive on World 1. |
+| `market_cancel` | `listingId` (own, still open) | `kind`, `itemId`, `qty` returned |
+| `market_collect` | none | `gold` (sales less fee) and `items[]` (expired lots returned) |
+| `inv_spend` | `gold`, `goods{}`, `materials{}`, `gear[]` | none. Mirrors what the hunter used or sold in their own game; only ever lowers World 1 counts. |
+
+Server → client `market_notice` `{ kind: 'sold', listingId, itemId, name, qty, price, payout }` reaches an online seller when a listing they opened this session sells.
+
+Codes: `market_item`, `market_qty`, `market_price`, `market_not_owned`, `market_limit`, `market_gone`, `market_own`, `market_gold`, `market_have_gear`, `market_full`, `market_far`, `market_offline`, `market_busy`, `market_unavailable`.
+
+Storage: `supabase/migrations/20261127180000_gilantre_exchange.sql` (table `market_listings` and the transactional functions `market_list`, `market_buy`, `market_cancel`, `market_collect`, `inventory_spend`). Apply it before deploying the World 1 server; without it every trade answers `market_unavailable`.
+
 ## Limits
 
 | | |
