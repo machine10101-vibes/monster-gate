@@ -179,6 +179,8 @@ export function mountStorage(body, game) {
   let sel = null;
   let slot = null;
   let page = 0;
+  let query = '';
+  let quick = false;
   const touch = isTouch();
 
   const paint = () => {
@@ -188,6 +190,7 @@ export function mountStorage(body, game) {
     if (!groups[tab].some((it) => it.key === sel)) sel = groups[tab][0]?.key || null;
     const cells = storageVisual(game.progress.data.storage, STORAGE_SLOTS);
     if (slot != null && !cells[slot]) slot = null;
+    const scroll = body.scrollTop;
     body.innerHTML = '';
 
     const root = document.createElement('div');
@@ -196,9 +199,24 @@ export function mountStorage(body, game) {
     const help = document.createElement('p');
     help.className = 'stash-help';
     help.textContent = touch
-      ? 'Tap an item to store all of it. Hold an item to store one, all, or a number you choose. Tap a stored stack to take it out, or hold it to choose how many.'
+      ? (quick ? 'Tap to transfer a stack; hold to choose quantity.' : 'Select an item, then choose Store or Take. Enable quick transfer for one-tap transfers.')
       : 'Three pages of 40 slots, shared with this hunter. Choose something you are carrying and store it. Choose a stored stack to take it back.';
     root.appendChild(help);
+    const controls = document.createElement('div');
+    controls.className = 'bag-acts';
+    const search = document.createElement('input');
+    search.type = 'search'; search.placeholder = 'Find bag or stored items'; search.value = query;
+    search.setAttribute('aria-label','Search storage');
+    search.onchange = () => { query = search.value.trim().toLowerCase(); paint(); };
+    const find = document.createElement('button');
+    find.textContent = 'Find'; find.onclick = () => { query = search.value.trim().toLowerCase(); paint(); };
+    const clear = document.createElement('button');
+    clear.textContent = 'Clear'; clear.onclick = () => { query = ''; paint(); };
+    const mode = document.createElement('button');
+    mode.textContent = quick ? 'Quick transfer: On' : 'Quick transfer: Off';
+    mode.onclick = () => { quick = !quick; paint(); };
+    controls.append(search,find,clear,mode);
+    root.appendChild(controls);
 
     const cols = document.createElement('div');
     cols.className = 'stash-cols';
@@ -223,7 +241,7 @@ export function mountStorage(body, game) {
 
     const grid = document.createElement('div');
     grid.className = 'bag-grid';
-    const list = groups[tab];
+    const list = groups[tab].filter(it => it.name.toLowerCase().includes(query));
     if (!list.length) {
       const p = document.createElement('p');
       p.className = 'bag-empty';
@@ -242,7 +260,7 @@ export function mountStorage(body, game) {
         i.textContent = it.badge;
         b.appendChild(i);
       }
-      if (touch) bindHold(b, { name: it.name, max: it.n, verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n, page), done: () => paint() });
+      if (touch && quick) bindHold(b, { name: it.name, max: it.n, verb: 'Store', run: (n) => game.storeInCrate(it.k, it.id, n, page), done: () => paint() });
       else b.onclick = () => {
         sel = it.key;
         paint();
@@ -252,7 +270,7 @@ export function mountStorage(body, game) {
     left.appendChild(grid);
 
     const current = list.find((it) => it.key === sel);
-    if (!touch && current) {
+    if ((!touch || !quick) && current) {
       const row = document.createElement('div');
       row.className = 'bag-acts';
       const all = document.createElement('button');
@@ -303,7 +321,7 @@ export function mountStorage(body, game) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'stash-slot' + (s ? '' : ' empty') + (index === slot ? ' sel' : '');
-      if (!s) {
+      if (!s || (query && !labelOf(s).toLowerCase().includes(query))) {
         b.disabled = true;
         b.textContent = '';
       } else {
@@ -313,7 +331,7 @@ export function mountStorage(body, game) {
         const i = document.createElement('i');
         i.textContent = s.k === 'gear' ? '' : String(s.n);
         if (s.k !== 'gear') b.appendChild(i);
-        if (touch) {
+        if (touch && quick) {
           bindHold(b, {
             name: labelOf(s),
             max: s.n,
@@ -330,7 +348,7 @@ export function mountStorage(body, game) {
     });
     right.appendChild(hold);
     const picked = slot != null ? cells[slot] : null;
-    if (!touch && picked) {
+    if ((!touch || !quick) && picked) {
       const row = document.createElement('div');
       row.className = 'bag-acts';
       const all = document.createElement('button');
@@ -359,6 +377,7 @@ export function mountStorage(body, game) {
     cols.append(left, right);
     root.appendChild(cols);
     body.appendChild(root);
+    body.scrollTop = scroll;
     flushThumbs(240);
   };
 
