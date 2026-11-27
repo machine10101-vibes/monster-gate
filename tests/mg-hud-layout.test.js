@@ -319,3 +319,28 @@ test('Map panel contain size stays above 300px at desktop, laptop and phone land
     assert.ok(inner.map > 300, `${vp.name} map ${inner.map.toFixed(1)}px`);
   }
 });
+
+test('map place names stay compact at every zoom and fit the actual mobile map', () => {
+  const style = src('../src/style.css');
+  const hud = src('../src/ui/hud.js');
+  const base = style.match(/\.playmap-label \{([^}]+)\}/)?.[1] || '';
+  assert.match(base, /scale: var\(--map-marker-scale, 1\)/);
+  assert.match(base, /font-size: 10px/);
+  assert.match(style, /\.playmap-label\.city \{[^}]*font-size: 11px/);
+  assert.match(style, /\.playmap-label\.uncharted \{[^}]*font-size: 8px/);
+  assert.match(hud, /const mapRect = fit\.getBoundingClientRect\(\)/);
+  assert.match(hud, /layoutPlaymapLabels\(pins, \{ mapW: mapRect\.width \|\| 720, mapH: mapRect\.height \|\| 560 \}\)/);
+  const placed = layoutPlaymapLabels([
+    { name: 'Monster Gate', nx: 50, ny: 55, landmark: true },
+    { name: 'Greyrock Pit', nx: 52, ny: 58, landmark: true },
+    { name: 'Oakhollow', nx: 50, ny: 62, city: true },
+    { name: 'Brookside', nx: 43, ny: 64 },
+  ], { mapW: 320, mapH: 320 });
+  assert.ok(placed.filter((p) => p.city || p.landmark).every((p) => p.visible));
+  for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+    const a = placed[i], b = placed[j];
+    if (!a.visible || !b.visible) continue;
+    const rect = (p) => ({ x: p.x * 3.2 - p.bw / 2, y: p.y * 3.2 - p.bh / 2, w: p.bw, h: p.bh });
+    assert.equal(overlap(rect(a), rect(b), 2), false, `${a.name} overlaps ${b.name}`);
+  }
+});
