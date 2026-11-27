@@ -235,6 +235,7 @@ test('Gilantre quests point at the people who stand in the city', () => {
   const w = world();
   const portal = portalById('gilantre');
   assert.ok(portal.x < 390);
+  assert.ok(Math.abs(portal.z - 144) >= 8, 'arch stands clear of the road');
   const arrival = arrivalOf(portal);
   assert.equal(w.playable(portal.x, portal.z), true);
   assert.equal(w.playable(arrival.x, arrival.z), true);
