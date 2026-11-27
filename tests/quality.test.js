@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { QUALITIES, chooseBootQuality, qualityById } from '../src/engine/quality.js';
+import { QUALITIES, QUALITY_CHOICE_KEY, chooseBootQuality, qualityById, readSavedQuality } from '../src/engine/quality.js';
 
 const src = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
 
@@ -49,6 +49,21 @@ test('a desktop with no saved choice starts on High', () => {
   const boot = chooseBootQuality({ safeBoot: false, desktop: true });
   assert.equal(boot.quality.id, 'high');
   assert.equal(boot.light, false);
+});
+
+test('legacy Low is not treated as a choice, but a deliberate Low remains saved', () => {
+  const values = new Map([['mg-quality', 'low']]);
+  const storage = { getItem: (key) => values.get(key) || null };
+  assert.equal(readSavedQuality(storage), null);
+  assert.equal(chooseBootQuality({ saved: readSavedQuality(storage) }).quality.id, 'high');
+  values.set(QUALITY_CHOICE_KEY, '1');
+  assert.equal(readSavedQuality(storage)?.id, 'low');
+  assert.match(src('src/main.js'), /localStorage\.setItem\(QUALITY_CHOICE_KEY, '1'\)/);
+});
+
+test('a working login screen clears the boot failure marker before gameplay', () => {
+  const main = src('src/main.js');
+  assert.match(main, /this\.renderer\.render\(this\.scene, this\.camera\);[\s\S]*?if \(this\.bootFrames >= 0\) \{[\s\S]*?clearBoot\(\)/);
 });
 
 test('explicit Low choice is preserved', () => {

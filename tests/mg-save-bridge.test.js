@@ -43,8 +43,10 @@ test('save keys match the hunt, roster, and account prefixes the game uses', () 
   assert.equal(isSaveKey('monster-gate-account-session'), true);
   assert.equal(isSaveKey('mg-name'), true);
   assert.equal(isSaveKey('mg-quality'), true);
+  assert.equal(isSaveKey('mg-quality-choice-v2'), true);
   assert.equal(isSaveKey(MIGRATED_KEY), false);
   assert.equal(isSaveKey('mg-boot'), false);
+  assert.equal(isSaveKey('mg-boot-v2'), false);
   assert.match(src('../src/systems/saveio.js'), /export function importRaw/);
 });
 

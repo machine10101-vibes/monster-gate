@@ -17,11 +17,12 @@ export const HOME_ORIGIN = 'https://monstergate.online';
 
 const NAME_KEY = 'mg-name';
 const QUALITY_KEY = 'mg-quality';
+const QUALITY_CHOICE_KEY = 'mg-quality-choice-v2';
 
 export function isSaveKey(key) {
   const k = String(key || '');
-  if (!k || k === MIGRATED_KEY || k === 'mg-boot') return false;
-  return k.startsWith('monster-gate-') || k === NAME_KEY || k === QUALITY_KEY;
+  if (!k || k === MIGRATED_KEY || k === 'mg-boot' || k === 'mg-boot-v2') return false;
+  return k.startsWith('monster-gate-') || k === NAME_KEY || k === QUALITY_KEY || k === QUALITY_CHOICE_KEY;
 }
 
 export function isHuntKey(key) {
