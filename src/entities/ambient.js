@@ -16,6 +16,7 @@ function angDiff(a, b) {
 }
 
 const NPC_DEFS = [
+  { id: 'dalla', name: 'Dalla', title: 'Item Merchant', spot: 'dalla', service: 'market', yaw: Math.PI, look: { skin: 0xe8b892, hair: 0x6a4428, tunic: 0x89652e, sleeve: 0xe9dfc8, pants: 0x40352c, boots: 0x30251b, belt: true, seed: 71 }, lines: ['Bring your gathered goods and monster parts for gold.'] },
   {
     id: 'guild',
     name: 'Mira',
