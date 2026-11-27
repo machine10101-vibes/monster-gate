@@ -87,3 +87,8 @@
 - Tests: new `tests/monster-armor.test.js` (3): bespoke registration; every pair of 17 monster sets differs by at least 40 voxels in helm, chest and arm; no black voxels and full coverage of belt, sleeves and legs.
 - Checks: build pass; npm test 534 pass / 0 fail; renders of all monster sets front and back reviewed.
 - Release: PR #331 merged (squash) as 89debc8 after `verify` and `test-and-build` passed on f3a3fed. Pages run 45970445985 success; gh-pages `version.json` build = 89debc8. The east coast had already reached main through PR #329, so it is live with this build.
+
+### 2026-11-27 — Approval: quest gear reward fix kept
+- The quest gear reward fix (808785b, `journal.owedGear` in save data, `tests/mg-quest-gear-reward.test.js`) went live with PR #312 (f20c9d8) before the separate approval the rules require for save-data changes.
+- The user reviewed this and chose "Keep it". It stays live. Approval recorded here: human approval given after the fact, 2026-11-27.
+- No further action needed on this item.
