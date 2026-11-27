@@ -7,6 +7,7 @@ import { JUNGLE_SPECS, jungleFeature, paintJungleCell, dressJungle, finishJungle
 import { VOLCANIC_SPECS, volcanicFeature, paintVolcanicCell, dressVolcanic, emberAmount, gradeCinderCone } from './volcanic.js';
 import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert, openLongacreSouth, openDunesEast } from './desert.js';
 import { buildHouse } from './models.js';
+import { NORTH_JUNGLE_SPECS, northFeature, paintNorthCell, dressNorthJungle, northEmber, northChill } from './northJungle.js';
 import { GILANTRE_SPECS, openGilantreWest, carveGilantre, dressGilantre } from './gilantre.js';
 
 /**
@@ -176,6 +177,69 @@ function openHarefieldNorth(data) {
     const want = bank <= 5 ? floor : floor + (bank - 5) * 0.85;
     return { h: lerp(h, Math.min(h, want), fade), tag: bank <= 5 && z <= 26 ? PATH : 0 };
   });
+  paintChanged(data, before, mark);
+}
+
+/** A pass through a north rim at column xc, with a path running down to the tile's own road at row toZ. */
+function openNorthPass(data, xc, toZ) {
+  const H = data.H;
+  const before = Float32Array.from(H);
+  const mark = new Uint8Array(W * W);
+  digBand(H, mark, (x, z, h) => {
+    if (z > 36) return null;
+    const fade = 1 - smoothstep(26, 36, z);
+    if (fade <= 0) return null;
+    const bank = Math.abs(x - xc);
+    if (bank > 40) return null;
+    const floor = lerp(4.4, 3.6, clamp(z / 24, 0, 1));
+    const want = bank <= 5 ? floor : floor + (bank - 5) * 0.8;
+    return { h: lerp(h, Math.min(h, want), fade), tag: bank <= 2 && z <= 28 ? PATH : 0 };
+  });
+  // Grade the path from the pass floor down to the road as an even ramp, easing the banks into it.
+  const h0 = H[26 * W + xc];
+  const h1 = H[toZ * W + xc];
+  for (let z = 27; z <= toZ; z++) {
+    const want = lerp(h0, h1, (z - 26) / (toZ - 26));
+    for (let x = xc - 6; x <= xc + 6; x++) {
+      const i = z * W + x;
+      const bank = Math.abs(x - xc);
+      const k = bank <= 2 ? 1 : 1 - (bank - 2) / 5;
+      H[i] = Math.round(lerp(H[i], want, k) * 2) / 2;
+      if (bank <= 2) mark[i] = PATH;
+    }
+  }
+  paintChanged(data, before, mark);
+}
+
+/** A pass through an east rim at row zc, with a path running back to the tile's own road at column fromX. */
+function openEastPass(data, zc, fromX) {
+  const H = data.H;
+  const before = Float32Array.from(H);
+  const mark = new Uint8Array(W * W);
+  digBand(H, mark, (x, z, h) => {
+    const dx = W - 1 - x;
+    if (dx > 36) return null;
+    const fade = 1 - smoothstep(26, 36, dx);
+    if (fade <= 0) return null;
+    const bank = Math.abs(z - zc);
+    if (bank > 40) return null;
+    const floor = lerp(4.4, 3.6, clamp(dx / 24, 0, 1));
+    const want = bank <= 5 ? floor : floor + (bank - 5) * 0.8;
+    return { h: lerp(h, Math.min(h, want), fade), tag: bank <= 2 && dx <= 28 ? PATH : 0 };
+  });
+  const x1 = W - 1 - 26;
+  const h0 = H[zc * W + fromX];
+  const h1 = H[zc * W + x1];
+  for (let x = fromX; x < x1; x++) {
+    const want = lerp(h0, h1, (x - fromX) / (x1 - fromX));
+    for (let z = zc - 6; z <= zc + 6; z++) {
+      const i = z * W + x;
+      const bank = Math.abs(z - zc);
+      const k = bank <= 2 ? 1 : 1 - (bank - 2) / 5;
+      H[i] = Math.round(lerp(H[i], want, k) * 2) / 2;
+      if (bank <= 2) mark[i] = PATH;
+    }
+  }
   paintChanged(data, before, mark);
 }
 
@@ -382,6 +446,7 @@ const SPECS = {
   ...VOLCANIC_SPECS,
   ...JUNGLE_SPECS,
   ...DESERT_SPECS,
+  ...NORTH_JUNGLE_SPECS,
 };
 
 const HAY = 6;
@@ -541,6 +606,7 @@ function applyFeature(h, x, z, spec) {
   if (spec.silverrunRiver || spec.silverrunMountain) return silverrunFeature(h, x, z, spec);
   if (spec.arctic) return arcticFeature(h, x, z, spec);
   if (spec.volcanic) return volcanicFeature(h, x, z, spec);
+  if (spec.north) return northFeature(h, x, z, spec);
   if (spec.jungle) return jungleFeature(h, x, z, spec);
   if (spec.desert) return desertFeature(h, x, z, spec);
   if (spec.camp) {
@@ -676,6 +742,10 @@ function makeTile(spec, edges) {
         paintArcticCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
         continue;
       }
+      if (spec.north) {
+        paintNorthCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
+        continue;
+      }
       if (spec.jungle) {
         paintJungleCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
         continue;
@@ -781,6 +851,10 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'silverrunWest') return { w: colOf(made.glassroad, W - 1), e: colOf(made.silverrunNorth, 0) };
   if (kind === 'silverrunEast') return { n: rowOf(made.gilantreSe, W - 1), w: colOf(made.silverrunNorth, W - 1) };
   if (kind === 'silverrunRiver') return { n: rowOf(made.silverrunNorth, W - 1), e: silverrunRidgeEdge(), s: silverrunOceanEdge() };
+  if (kind === 'fernreach') return { s: rowOf(made.northleas, 0), w: colOf(made.ashroad, W - 1) };
+  if (kind === 'mistvale') return { s: rowOf(made.goldmead, 0), w: colOf(made.fernreach, W - 1), e: colOf(made.rimefang, 0) };
+  if (kind === 'vinecrest') return { s: rowOf(made.fernreach, 0), w: colOf(made.warfield, W - 1) };
+  if (kind === 'sunfeather') return { s: rowOf(made.mistvale, 0), w: colOf(made.vinecrest, W - 1) };
   if (kind === 'silverrunPeak') return { n: rowOf(made.silverrunEast, W - 1), w: colOf(made.silverrunRiver, W - 1), s: silverrunOceanEdge() };
   return {};
 }
@@ -911,7 +985,7 @@ function silverrunEdgeDensity(land, lx, lz) {
 }
 
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak', 'fernreach', 'mistvale', 'vinecrest', 'sunfeather'];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -920,6 +994,12 @@ export function generateRing(oak, south) {
       openDunesEast(made.pirateshore);
     }
     if (kind === 'gilantreNw') openGilantreWest(made.eastleas, made.hayfield);
+    if (kind === 'fernreach') {
+      // Ways up into the Northern Jungle: from Northleas, from Goldmead and from the Endless Field.
+      openNorthPass(made.northleas, 64, 55);
+      openNorthPass(made.goldmead, 84, 58);
+      openEastPass(made.warfield, 72, 72);
+    }
     const spec = { ...(SPECS[kind] || GILANTRE_SPECS[kind]), kind };
     const tile = TILES.find((t) => t.kind === kind);
     const edges = specEdges(kind, oak, south, made);
@@ -947,8 +1027,10 @@ export function generateRing(oak, south) {
       jungle: !!spec.jungle,
       desert: !!spec.desert,
       silverrun: !!spec.silverrun,
-      emberAt: spec.volcanic ? emberAmount(spec) : () => 0,
-      chillAt: spec.arctic
+      emberAt: spec.volcanic ? emberAmount(spec) : spec.north ? northEmber(spec) : () => 0,
+      chillAt: spec.north
+        ? northChill(spec)
+        : spec.arctic
         ? spec.blend
           ? (lx) => smoothstep(0, spec.blend.w, lx)
           : () => 1
@@ -1228,6 +1310,10 @@ function dressLand(world, land) {
   if (land.kind === 'brookside') dressOrcCamp(world, land);
   if (spec.arctic) {
     dressArctic(world, land, spec);
+    return;
+  }
+  if (spec.north) {
+    dressNorthJungle(world, land, spec);
     return;
   }
   if (spec.jungle) {

@@ -158,6 +158,12 @@ const DEBUG_ALIAS_EXPLICIT = {
   elderwood: 'silverruneast',
   'silverrun crossing': 'silverrunriver',
   'greystone summit': 'silverrunpeak',
+  'northern jungle': 'fernreach',
+  northjungle: 'fernreach',
+  northernjungle: 'fernreach',
+  leafmask: 'fernreach',
+  'leafmask village': 'fernreach',
+  'sunfeather village': 'sunfeather',
 };
 
 export const DEBUG_ALIASES = { ...DEBUG_ALIAS_EXPLICIT };
@@ -390,6 +396,10 @@ const ZONE_MOBS = {
   endlessfield: ['keepwarden'],
   warfield: ['keepwarden'],
   goldmead: ['slime', 'boar'],
+  fernreach: ['boar', 'slime'],
+  mistvale: ['boar', 'slime'],
+  vinecrest: ['boar', 'slime'],
+  sunfeather: ['boar', 'slime'],
   cave: ['slime', 'wraith'],
   rift: ['voidslime', 'wraith'],
 };

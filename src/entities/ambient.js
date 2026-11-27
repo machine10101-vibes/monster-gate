@@ -410,7 +410,16 @@ export function createAmbient(game) {
       butterflies.push(new Butterfly(game, 416 + rng.range(0, 32), 132 + rng.range(0, 24), colors[i % colors.length]));
     }
   }
-  return { npcs: npcs.concat(farmers, townsfolk), fowl, butterflies, cows };
+  // The Northern Jungle villages: their people, and butterflies over the gardens.
+  const tribeFolk = (game.world.tribe?.folk || []).map((p) => new NPC(game, p));
+  for (const v of game.world.tribe?.villages || []) {
+    for (let i = 0; i < 8; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const r = v.r + rng.range(2, 9);
+      butterflies.push(new Butterfly(game, v.x + Math.cos(a) * r, v.z + Math.sin(a) * r, colors[i % colors.length]));
+    }
+  }
+  return { npcs: npcs.concat(farmers, townsfolk, tribeFolk), fowl, butterflies, cows };
 }
 
 export { ZONE, shade };

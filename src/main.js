@@ -4294,6 +4294,22 @@ class Game {
     this.forestAmt += (inForest - this.forestAmt) * Math.min(1, dt * 1.5);
   }
 
+  /** Wood smoke drifting up from the village fires of the Northern Jungle, only near the hunter. */
+  emitVillageSmoke(dt) {
+    const spots = this.world?.tribe?.smoke;
+    if (!spots?.length || !this.fx) return;
+    const P = this.player.pos;
+    for (const s of spots) {
+      if (Math.abs(s.x - P.x) > 70 || Math.abs(s.z - P.z) > 70) continue;
+      s.acc = (s.acc || 0) + dt * 7;
+      while (s.acc >= 1) {
+        s.acc -= 1;
+        const c = [0x9a948a, 0x8a847a, 0xb0aaa0, 0x7a746c][Math.floor(Math.random() * 4)];
+        this.fx.emit(s.x + (Math.random() - 0.5) * 0.6, s.y, s.z + (Math.random() - 0.5) * 0.6, 0.25 + (Math.random() - 0.5) * 0.3, 1.1 + Math.random() * 0.5, (Math.random() - 0.5) * 0.3, c, 0.22 + Math.random() * 0.14, 3.2, -0.12);
+      }
+    }
+  }
+
   /* ------------------------------ loop ------------------------------ */
   loop(now) {
     requestAnimationFrame(this.loop);
@@ -4410,6 +4426,7 @@ class Game {
       for (const f of this.ambient.fowl) f.update(dt, t);
       for (const c of this.ambient.cows || []) c.update(dt, t);
       for (const b of this.ambient.butterflies) b.update(dt);
+      this.emitVillageSmoke(dt);
     }
     this.updateProjectiles(dt);
     this.updatePickups(dt);

@@ -101,14 +101,15 @@ test('MG-UI title: account sign-in, password hint, cover fit, no float', () => {
   const html = src('../index.html');
   const css = src('../src/style.css');
   const main = src('../src/main.js');
-  assert.doesNotMatch(html, /id="btn-guest"|Play as guest/i);
+  // Play as Guest was restored on purpose (fa64a04); it stays on the title next to account sign-in.
+  assert.match(html, /id="btn-guest"[^>]*>Play as Guest</);
   assert.doesNotMatch(html, /id="btn-world1"/);
   assert.doesNotMatch(html, /id="world-guest-note"/);
   assert.match(html, /id="btn-account-signin" class="start"/);
   assert.match(html, /id="account-pass-hint"[^>]*>Use 8 to 72 characters/);
   assert.match(css, /#game \{[\s\S]*object-fit: cover/);
   assert.match(css, /#title \.account-choices \.start \{[\s\S]*animation: none/);
-  assert.doesNotMatch(main, /getElementById\([\'"]btn-guest[\'"]\)/);
+  assert.match(main, /getElementById\([\'"]btn-guest[\'"]\)/);
   assert.match(main, /kind: 'guest'/);
 });
 

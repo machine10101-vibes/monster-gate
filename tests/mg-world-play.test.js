@@ -416,7 +416,8 @@ test('title, menu, HUD pill, Vite MG_WORLD_URL, picker, and Switch world stay wi
   const view = src('../src/net/worldView.js');
   const vite = src('../vite.config.js');
   const readme = src('../README.md');
-  assert.doesNotMatch(html, /id="btn-guest"|Play as guest/i);
+  // Play as Guest was restored on purpose (fa64a04); it stays on the title next to account sign-in.
+  assert.match(html, /id="btn-guest"[^>]*>Play as Guest</);
   assert.doesNotMatch(html, /id="btn-world1"/);
   assert.doesNotMatch(html, /Play Online — World 1/);
   assert.doesNotMatch(html, /id="world-guest-note"/);
