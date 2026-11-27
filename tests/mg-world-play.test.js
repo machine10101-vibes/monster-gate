@@ -571,3 +571,10 @@ test('resolveMmoUrl prefers MG_WORLD_URL and stays empty for Pages', () => {
   assert.equal(resolveMmoUrl({ MG_WORLD_URL: 'wss://from-mg', VITE_MMO_URL: 'wss://from-vite' }), 'wss://from-mg');
   assert.equal(resolveMmoUrl({ VITE_MMO_URL: 'wss://from-vite' }), 'wss://from-vite');
 });
+
+test('character activation opens world menu and solo is an explicit choice inside it', () => {
+  const camp = src('../src/ui/charselect.js');
+  const html = src('../index.html');
+  assert.match(camp, /enter\(\) \{\s*this\.chooseWorld\(\);/);
+  assert.match(html, /id="cs-worlds"[\s\S]*id="cs-world-1"[\s\S]*id="cs-play-solo"/);
+});
