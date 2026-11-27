@@ -656,3 +656,12 @@ test('MG-UI-38 pin shares the log stack so the panel height stays put', () => {
   assert.match(style, /-webkit-line-clamp:\s*2/);
   assert.match(style, /#world-chat \.wc-pin p\.wc-you \{[\s\S]*?text-overflow:\s*ellipsis/);
 });
+
+ test('Settings only renders the World Creator shortcut for moderators', () => {
+  const hud = src('src/ui/hud.js');
+  const settings = hud.slice(hud.indexOf("} else if (name === 'settings')"), hud.indexOf('add(`<section class="set-hotbar-controls"'));
+  assert.match(settings, /if \(canCreateWorld\(game\.staffRole\)\) \{/);
+  assert.match(settings, /this\.openPanel\('world', game\)/);
+  assert.match(settings, /body\.appendChild\(jumps\);\s*\}/);
+  assert.doesNotMatch(settings, /Teleportation Tome|Friends list and party|Equipped and unequipped|Bag, tools and goods/);
+});
