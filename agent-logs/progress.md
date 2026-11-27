@@ -125,3 +125,8 @@
 - Tester: 553/553 project tests pass, production build passes, server smoke passes. Added generated-height regressions for low meadow edges and retained localized mountains.
 - Release gate: visual terrain traversal and prop placement inspection blocked by missing `/usr/lib/chromium/chromium`. Not marked complete or live; review branch prepared for verification.
 - Critic proposal: add terrain overview captures plus saved-position traversal checks to the release workflow for broad heightmap changes.
+
+## Map confirmation for natural terrain PR #337
+- Confirmed full map and minimap both consume `world.minimapCanvas`, built from each land's current height and surface arrays after terrain generation.
+- Added runtime regression invoking actual `World.paintLandCanvas` and `rasterPlaymap`; changing terrain height changes the shared raster pixel. No separate map data update is necessary.
+- Chrome installed successfully, but environment socket permissions prevent launch; guest traversal and visual slope/prop validation remain blocked. Do not merge until that required gate is satisfied.

@@ -52,3 +52,33 @@ test('full map and minimap both use the world terrain raster', () => {
   assert.match(hud, /cave \? cave\.minimap : world\.minimapCanvas/);
   assert.match(hud, /game\.world\.minimapCanvas/);
 });
+
+test('updated terrain heights and surfaces flow through the shared map raster', async () => {
+  const { World } = await import('../src/world/world.js');
+  const { generateWorld, W } = await import('../src/world/terrain.js');
+  const terrain = generateWorld();
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const data = new Uint8ClampedArray(W * W * 4);
+  const context = {
+    createImageData: () => ({ data }),
+    putImageData() {},
+    getImageData: () => ({ width: W, height: W, data }),
+  };
+  const canvas = { width: W, height: W, getContext: () => context };
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: () => canvas } });
+  try {
+    World.prototype.paintLandCanvas(terrain);
+    const raster = () => rasterPlaymap({ width: W, height: W, minX: 0, minZ: 0, tileCanvas: { [STARTER.id]: canvas } });
+    const first = raster();
+    const i = (70 * W + 70) * 4;
+    assert.deepEqual(Array.from(first.slice(i, i + 3)), Array.from(data.slice(i, i + 3)));
+    terrain.H[70 * W + 70] = -1;
+    World.prototype.paintLandCanvas(terrain);
+    const second = raster();
+    assert.notDeepEqual(Array.from(first.slice(i, i + 3)), Array.from(second.slice(i, i + 3)), 'map responds to changed terrain');
+    assert.deepEqual(Array.from(second.slice(i, i + 3)), Array.from(data.slice(i, i + 3)), 'map uses current terrain pixels');
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'document', previous);
+    else delete globalThis.document;
+  }
+});
