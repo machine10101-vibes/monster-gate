@@ -18,3 +18,12 @@
 - Implementer: added `gatherYield()` in `server/content.js`, awaited gather handling in `server/world.js`, an in-flight node lock, immediate persistence of goods + skill XP, and reward updates. Updated `server/PROTOCOL.md` and added an integration regression test.
 - Tester: focused World 1 suite passed 18/18; full `npm test` passed 494/494; `npm run test:smoke` built successfully and shader check skipped only because Chrome is unavailable; `npm run test:persistence` passed 33/33.
 - Release gate: local verification is complete, but this checkout has no `.git` branch/commit support. The change affects authenticated player progression/database writes, so production merge/publish requires explicit human approval and a deployment-capable checkout. No production-live claim made.
+
+## 2026-11-26 — World 1 reconnect and position integrity audit
+
+- Director: player reports repeated reconnects followed by location rewind. Render events show successful deployments and no recorded `server_failed` events in the recent window; app logs show process starts but lack per-socket close reasons. The verified source has a stale resume-pose cache and a background persistence rejection path capable of terminating Node.
+- Designer: resume from the last server-accepted pose, load fresh saved state on same-account replacement, commit active movement every 15 seconds, retain transient save failures, and prevent discarded sockets from joining after asynchronous authentication.
+- Implementer: refresh resume pose on disconnect; await replacement socket's final save and flush before loading; make periodic saves commit; track only in-flight disconnect saves; guard asynchronous hello after socket closure; catch background queue failures and retry transient writes.
+- Tester: focused World 1 suite passed 21/21; persistence suite passed 34/34, including expiry, replacement socket, periodic save and transient database failure regressions. Full `npm test` passed 497/497; `npm run test:smoke` built successfully (shader compilation skipped because Chrome is unavailable). Remote PR CI must verify the current main branch, which has changes beyond this local checkout.
+- Critic proposal for approval: add bounded, non-identifying close-code and save-failure counters to World 1 health/observability so future transport failures can be distinguished from service restarts without logging player data.
+- Release: pending verified commit and production deployment.
