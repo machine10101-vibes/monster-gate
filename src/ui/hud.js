@@ -15,7 +15,7 @@ import { HOTBAR_HOLD_MS, availableHotbarSkills, readHotbarLocked, writeHotbarLoc
 import { mountGear } from './gear.js';
 import { mountBag } from './bag.js';
 import { mountStorage } from './storage.js';
-import { flushThumbs, renderThumb } from './catalog.js';
+import { flushThumbs, renderThumb, renderThumbNow } from './catalog.js';
 import { mountSpellbook } from './spellbook.js';
 import { mountTeleport } from './teleport.js';
 import { mountCarve, mountSmithy } from './smithy.js';
@@ -284,7 +284,8 @@ export class HUD {
       cv.width = 16;
       cv.height = 16;
       const gear = gearById(it.id);
-      if (gear) b.appendChild(renderThumb({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
+      // Hotbar icons must be ready on the first paint; catalog thumbnails can wait in the queue.
+      if (gear) b.appendChild(renderThumbNow({ kind: gear.type === 'weapon' ? 'weapon' : 'armor', id: gear.id }, 64));
       else {
         cv.getContext('2d').drawImage(iconCanvas(it.icon), 0, 0);
         b.appendChild(cv);
