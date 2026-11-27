@@ -538,8 +538,9 @@ class Game {
     }
 
     this.applyGear(true);
+    this.restoreItemHotbar();
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
-    this.selectSlot(0, true);
+    this.selectInitialHotbarSlot();
     this.refreshHud(true);
     this.syncViewDistance();
     const startX = this.player?.pos?.x ?? 72;
@@ -654,7 +655,7 @@ class Game {
     for (const it of this.items) if (it.kind === 'use' && this.progress.hasStock(it.id)) it.count = this.progress.stock(it.id);
     this.applyGear(true);
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
-    this.selectSlot(0, true);
+    this.selectInitialHotbarSlot();
     this.refreshHud(true);
   }
 
@@ -2153,6 +2154,45 @@ class Game {
     this.selectSlot(i);
   }
 
+  restoreItemHotbar() {
+    const saved = this.progress.data.itemHotbar;
+    if (!Array.isArray(saved) || saved.length !== this.items.length) return;
+    const defaults = this.items.slice();
+    const restored = saved.map((ref, i) => {
+      if (!ref || typeof ref.id !== 'string') return defaults[i];
+      if (ref.equipped) return defaults.find(it => it._equippedWeapon) || defaults[i];
+      const base = defaults.find(it => it.id === ref.id);
+      if (base && !ref.bagRef) return base;
+      const gear = gearById(ref.id);
+      if (ref.bagRef === 'gear' && gear && this.progress.crafted(ref.id) && !this.progress.storedGear(ref.id)) {
+        return { id: ref.id, name: gear.name, icon: ref.id, kind: 'none', bagRef: { k: 'gear', id: ref.id } };
+      }
+      if (ref.bagRef === 'good' && this.progress.good(ref.id)) {
+        return { id: ref.id, name: GOODS[ref.id]?.name || ref.id, icon: ref.id, kind: 'none', bagRef: { k: 'good', id: ref.id } };
+      }
+      return defaults[i];
+    });
+    this.items = restored;
+  }
+
+  selectInitialHotbarSlot() {
+    const slot = this.items.findIndex(it => it._equippedWeapon && !it.bagRef);
+    if (slot >= 0) this.selectSlot(slot, true);
+    else {
+      this.sel = -1;
+      this.player.setHeld(this.progress.weaponItem?.held || 'blade');
+    }
+  }
+
+  saveItemHotbar() {
+    this.progress.data.itemHotbar = this.items.map(it => ({
+      id: it.id,
+      ...(it._equippedWeapon ? { equipped: true } : {}),
+      ...(it.bagRef ? { bagRef: it.bagRef.k } : {}),
+    }));
+    this.progress.save();
+  }
+
   /** Move an inventory item into a chosen hotbar slot without duplicating it. */
   assignHotbarItem(slot, item, sourceSlot) {
     if (this.hud?.itemHotbarLocked) {
@@ -2167,6 +2207,7 @@ class Game {
     if (existing >= 0) this.items[existing] = previous || { ...ITEMS[7] };
     this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
     if (this.sel === slot && !item.bagRef) this.selectSlot(slot, true);
+    this.saveItemHotbar();
     return true;
   }
 
@@ -2219,9 +2260,9 @@ class Game {
     // Keep the equipped weapon in slot zero until the player deliberately
     // assigns a different item there. Other slots remain freely assignable.
     const equippedSlot = this.items.findIndex(it => it.id === w?.id);
-    const activeSlot = equippedSlot >= 0 ? equippedSlot : Math.max(0, this.items.findIndex(it => it._equippedWeapon || it.id === 'blade'));
-    this.items[activeSlot] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
-    if (!initial) this.sel = activeSlot;
+    const activeSlot = equippedSlot >= 0 ? equippedSlot : this.items.findIndex(it => it._equippedWeapon || it.id === 'blade');
+    if (activeSlot >= 0) this.items[activeSlot] = w ? { ...w, _equippedWeapon: true } : { ...ITEMS[0], _equippedWeapon: true };
+    if (!initial && activeSlot >= 0) this.sel = activeSlot;
     p.setSheath(w?.held || 'blade');
     if (!initial) {
       this.hud.buildHotbar(this.items, (i) => this.onHotbar(i), (i) => this.hud.openPanel('bag', this, { assignSlot: i }));
