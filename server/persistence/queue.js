@@ -25,7 +25,9 @@ export function createSaveQueue({
     if (existing) clock.clearTimeout(existing);
     const handle = clock.setTimeout(() => {
       timers.delete(userId);
-      void flushOne(userId);
+      // A database outage must not become an unhandled rejection that kills
+      // the World 1 process. flushOne retains the failed write for retry.
+      void flushOne(userId).catch(() => {});
     }, debounceMs);
     timers.set(userId, handle);
   }
@@ -34,7 +36,7 @@ export function createSaveQueue({
     const job = pending.get(userId);
     if (!job) return null;
     if (inflight.has(userId)) {
-      await inflight.get(userId);
+      try { await inflight.get(userId); } catch { /* retry the newest queued state */ }
       if (pending.get(userId) !== job) return flushOne(userId);
     }
     pending.delete(userId);
@@ -42,6 +44,13 @@ export function createSaveQueue({
     inflight.set(userId, run);
     try {
       return await run;
+    } catch (err) {
+      const permanent = ['conflict', 'not_found', 'invalid', 'name_taken'].includes(err?.code);
+      if (!permanent && !pending.has(userId)) {
+        pending.set(userId, job);
+        if (!closed) schedule(userId);
+      }
+      throw err;
     } finally {
       inflight.delete(userId);
     }
@@ -104,7 +113,7 @@ export function createSaveQueue({
     start() {
       if (interval || !intervalMs) return;
       interval = clock.setInterval(() => {
-        void this.flushAll();
+        void this.flushAll().catch(() => {});
       }, intervalMs);
       if (typeof interval === 'object' && interval && 'unref' in interval) interval.unref();
     },

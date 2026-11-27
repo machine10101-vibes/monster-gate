@@ -183,7 +183,60 @@ test('reconnect with resumeToken restores the same hunter id', async () => {
   const again = await hello(b, 'ann', { name: 'Ann', resume: token });
   assert.equal(again.you.id, id);
   assert.equal(again.resumed, true);
+  assert.ok(again.pose.x >= 73, 'resume uses the last accepted position, not the login position');
+  assert.ok(again.pose.z < 72.5);
+  assert.equal(again.pose.yaw, 0.2);
   b.close();
+  await srv.close();
+});
+
+test('a long lived hunter resumes at the latest pose after the original token expires', async () => {
+  let time = 1_000_000;
+  const srv = await startWorld({ now: () => time });
+  const a = await open(srv.url);
+  const welcome = await hello(a, 'ann', { name: 'Ann' });
+  time += 120_000;
+  a.send(encode('move', { x: 74, y: 3.2, z: 72, yaw: 1.1, zone: 'Oakhollow' }));
+  await waitUntil(() => srv.world.byUser.get(ANN)?.x >= 74);
+  a.close();
+  await waitUntil(() => !srv.world.byUser.has(ANN));
+  const b = await open(srv.url);
+  const resumed = await hello(b, 'ann', { name: 'Ann', resume: welcome.resumeToken });
+  assert.equal(resumed.resumed, true);
+  assert.ok(resumed.pose.x >= 74);
+  assert.equal(resumed.pose.yaw, 1.1);
+  b.close();
+  await srv.close();
+});
+
+test('a replacement socket loads the previous socket position without a resume token', async () => {
+  const srv = await startWorld();
+  const first = await open(srv.url);
+  await hello(first, 'ann', { name: 'Ann' });
+  first.send(encode('move', { x: 74, y: 3.2, z: 72, yaw: 0.7, zone: 'Oakhollow' }));
+  await waitUntil(() => srv.world.byUser.get(ANN)?.x >= 74);
+
+  const second = await open(srv.url);
+  const joined = await hello(second, 'ann', { name: 'Ann' });
+  assert.ok(joined.pose.x >= 74);
+  assert.equal(joined.pose.yaw, 0.7);
+  second.close();
+  first.close();
+  await srv.close();
+});
+
+test('periodic save commits movement while the hunter remains connected', async () => {
+  const srv = await startWorld();
+  const ws = await open(srv.url);
+  await hello(ws, 'ann', { name: 'Ann' });
+  ws.send(encode('move', { x: 74, y: 3.2, z: 72, yaw: 0.5, zone: 'Oakhollow' }));
+  await waitUntil(() => srv.world.byUser.get(ANN)?.x >= 74);
+  await srv.world.saveAll();
+  assert.equal(srv.world.pendingSaves.size, 0, 'queued moves do not retain one promise per frame');
+  const row = await srv.persist.loadCharacter(ANN);
+  assert.ok(row.state.hunter.x >= 74);
+  assert.equal(row.state.hunter.yaw, 0.5);
+  ws.close();
   await srv.close();
 });
 

@@ -2,6 +2,8 @@
 
 ## 2026-11-26
 
+- **World 1 reconnect audit, test corrections (resolved):** Initial reconnect and periodic-save assertions expected a first move of 5–7 units to be accepted in full. `applyMove` correctly clamps the first 0.1-second move to about 3.1 units; tests now use a valid 2-unit move. Initial queue retry kept a permanent `name_taken` write, causing an existing test's `close()` to fail. The queue now retains only transient failures and discards permanent validation/conflict failures. Focused World 1 and persistence suites passed after these corrections.
+
 - **World gathering persistence test expectation (resolved):** The new authoritative gather test initially expected `12` mining XP for copper, but the server-owned `ROCKS.copper.xp` is `17.5`. Evidence: focused `server/tests/world.test.js` assertion reported `17.5 !== 12`; no implementation failure occurred. Corrected the test to assert the data-defined reward and reran the focused suite: 18/18 passed.
 
 - Repository harness files requested by the goal were absent from the provided checkout (`AGENTS.md`, `agents/config.yaml`, `agents/orchestrator.py`, `tasks/`, `skills/`).

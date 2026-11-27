@@ -71,7 +71,7 @@ export class World {
     this.monsters = opts.monsters || createMonsters();
     this.nodes = opts.nodes || createNodes();
     this.byNode = new Map(this.nodes.map((n) => [n.id, n]));
-    this.pendingSaves = [];
+    this.pendingSaves = new Set();
     this.riftRuns = new Map();
     this._send = send;
     this.combatLoot = opts.combatLoot || createCombatLoot({
@@ -111,7 +111,7 @@ export class World {
   }
 
   async idle() {
-    const pending = this.pendingSaves.splice(0);
+    const pending = [...this.pendingSaves];
     if (pending.length) await Promise.all(pending);
     await this.persist?.flushAll?.();
   }
@@ -120,7 +120,9 @@ export class World {
     if (this.timer) return;
     this.timer = setInterval(() => this.tick(), this.tickMs);
     if (this.timer.unref) this.timer.unref();
-    this.saveTimer = setInterval(() => this.saveAll(), SAVE_MS);
+    this.saveTimer = setInterval(() => {
+      void this.saveAll().catch((err) => console.warn('periodic save', err?.message || err));
+    }, SAVE_MS);
     if (this.saveTimer.unref) this.saveTimer.unref();
   }
 
@@ -275,15 +277,19 @@ export class World {
       return;
     }
     if (session.helloTimer) clearTimeout(session.helloTimer);
+    if (session.gone || session.ws.readyState !== WebSocket.OPEN) return;
 
     const existing = this.byUser.get(ident.userId);
-    if (existing && existing !== session) this.drop(existing, true);
+    if (existing && existing !== session) await this.drop(existing, true);
 
     const slot = this.takeResume(hello, ident);
 
     let row = null;
     if (this.persist) {
       try {
+        // A replacement socket must observe the last accepted pose, even when
+        // the previous socket's disconnect write was still in flight.
+        await this.persist.flush?.(ident.userId);
         row = await this.persist.loadCharacter(ident.userId);
         if (!row) row = await this.persist.createCharacter(ident.userId, ident.name, { look: hello.look });
       } catch (err) {
@@ -299,6 +305,7 @@ export class World {
         }
       }
     }
+    if (session.gone || session.ws.readyState !== WebSocket.OPEN) return;
 
     const pose = slot?.pose || spawnPoseFromRow(row, hello);
     session.id = slot?.id || `u_${ident.userId}`;
@@ -331,6 +338,7 @@ export class World {
       movedAt: 0,
     });
     await this.refreshAppearance(session);
+    if (session.gone || session.ws.readyState !== WebSocket.OPEN) return;
     this.players.set(session.id, session);
     this.byUser.set(ident.userId, session);
     const token = this.rememberResume(session);
@@ -761,14 +769,20 @@ export class World {
       const tracked = result.catch((err) => {
         console.warn('saveCharacter', session.userId, err?.message || err);
       });
-      this.pendingSaves.push(tracked);
+      if (immediate) {
+        this.pendingSaves.add(tracked);
+        void tracked.finally(() => this.pendingSaves.delete(tracked));
+      }
       return tracked;
     }
     return result;
   }
 
-  saveAll() {
+  async saveAll() {
     for (const p of this.players.values()) this.persistPose(p);
+    // Active movement continually resets the debounce. Commit positions on
+    // this cadence so an instance restart cannot rewind a long-running hunt.
+    await this.persist?.flushAll?.();
   }
 
   drop(session, closeSocket = false) {
@@ -787,6 +801,7 @@ export class World {
         Object.assign(session, session.riftReturnPose);
         session.riftRunId = null;
       }
+      this.rememberResume(session);
       const online = this.players.size;
       for (const other of this.players.values()) {
         const watched = other.interest?.has(session.id);
@@ -797,7 +812,9 @@ export class World {
           send(other.ws, TYPES.delta, { remove: [session.id], online });
         }
       }
-      this.persistPose(session, true);
+      const saved = this.persistPose(session, true);
+      if (closeSocket && session.ws.readyState === WebSocket.OPEN) session.ws.close();
+      return saved;
     }
     if (closeSocket && session.ws.readyState === WebSocket.OPEN) session.ws.close();
   }
