@@ -36,17 +36,29 @@ function slotList(groups) {
   return cells;
 }
 
+export function filterBagItems(list, query = '', sort = 'default') {
+  const term = query.trim().toLowerCase();
+  const items = list.filter(it => it && (!term || it.name.toLowerCase().includes(term)));
+  if (sort === 'name') items.sort((a,b) => a.name.localeCompare(b.name));
+  if (sort === 'quantity') items.sort((a,b) => (b.n || Number(b.badge) || 1) - (a.n || Number(a.badge) || 1));
+  if (sort === 'equipped') items.sort((a,b) => Number(!!b.worn) - Number(!!a.worn));
+  if (!term) while (items.length < list.length) items.push(null);
+  return items;
+}
+
 /** The hunter's bag. The Bag tab is 40 slots, with a detail card for the selection. */
 export function mountBag(body, game, options = {}) {
   const { assignSlot, onAssign } = options;
   let tab = 'bag';
   let sel = null;
+  let query = '';
+  let sort = 'default';
 
   const paint = () => {
     closeBagAsk();
     const groups = collect(game);
     groups.bag = slotList(groups);
-    const list = groups[tab];
+    const list = filterBagItems(groups[tab], query, sort);
     const filled = list.filter(Boolean);
     if (!filled.some((it) => it.key === sel)) sel = filled[0]?.key || null;
     body.innerHTML = '';
@@ -57,6 +69,12 @@ export function mountBag(body, game, options = {}) {
     gold.className = 'bag-gold';
     gold.textContent = `Gold ${game.gold} · ${game.progress.bagSlotsUsed()} / ${BAG_SLOTS} slots`;
     root.appendChild(gold);
+    const capacity = document.createElement('progress');
+    capacity.max = BAG_SLOTS;
+    capacity.value = game.progress.bagSlotsUsed();
+    capacity.setAttribute('aria-label', 'Bag capacity');
+    capacity.style.width = '100%';
+    root.appendChild(capacity);
     const hint = document.createElement('p');
     hint.className = 'bag-hint';
     hint.textContent = assignSlot == null ? 'Hold an item to Use or Drop it.' : `Choose an item to place in hotbar slot ${assignSlot + 1}.`;
@@ -78,15 +96,42 @@ export function mountBag(body, game, options = {}) {
       tabs.appendChild(b);
     }
     root.appendChild(tabs);
+    const controls = document.createElement('div');
+    controls.style.cssText = 'display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0';
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.placeholder = 'Find an item…';
+    search.setAttribute('aria-label', 'Search inventory');
+    search.value = query;
+    search.style.cssText = 'flex:1;min-width:100px;max-width:100%;font:inherit;padding:6px;color:inherit;background:#17202b;border:1px solid #657080;border-radius:5px';
+    search.oninput = () => {
+      query = search.value;
+      paint();
+      const next = body.querySelector('input[type="search"]');
+      next?.focus({ preventScroll: true });
+    };
+    const order = document.createElement('select');
+    order.setAttribute('aria-label', 'Sort inventory');
+    order.style.cssText = 'font:inherit;padding:6px;color:inherit;background:#17202b;border:1px solid #657080;border-radius:5px';
+    for (const [value,label] of [['default','Category'],['name','Name A–Z'],['quantity','Quantity'],['equipped','Equipped first']]) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      order.appendChild(option);
+    }
+    order.value = sort;
+    order.onchange = () => { sort = order.value; paint(); };
+    controls.append(search, order);
+    root.appendChild(controls);
 
     const stage = document.createElement('div');
     stage.className = 'bag-stage';
     const grid = document.createElement('div');
     grid.className = 'bag-grid' + (tab === 'bag' ? ' slots' : '');
-    if (!filled.length && tab !== 'bag') {
+    if (!filled.length && (tab !== 'bag' || query.trim())) {
       const p = document.createElement('p');
       p.className = 'bag-empty';
-      p.textContent = emptyText(tab);
+      p.textContent = query.trim() ? 'No matching items.' : emptyText(tab);
       grid.appendChild(p);
     }
     for (const it of list) {
@@ -175,7 +220,7 @@ export function mountBag(body, game, options = {}) {
         actions.push({
           label: 'Drop',
           run: (done) => {
-            if (game.dropBagItem(held.drop)) done();
+            openBagMenu(detail, current, game, done, true);
           },
         });
       }
@@ -251,7 +296,7 @@ function bindBagHold(button, { onSelect, onMenu }) {
   });
 }
 
-function openBagMenu(anchor, item, game, paint) {
+function openBagMenu(anchor, item, game, paint, immediate = false) {
   const { use, drop } = bagHoldChoices(item);
   if (!use && !drop) return;
   closeBagAsk();
@@ -298,15 +343,17 @@ function openBagMenu(anchor, item, game, paint) {
   back.appendChild(card);
   document.body.appendChild(back);
   askEl = back;
-  card.style.pointerEvents = 'none';
+  card.style.pointerEvents = immediate ? '' : 'none';
   const arm = () => {
     if (askEl !== back) return;
     card.style.pointerEvents = '';
     window.removeEventListener('pointerup', arm, true);
     window.removeEventListener('pointercancel', arm, true);
   };
-  window.addEventListener('pointerup', arm, true);
-  window.addEventListener('pointercancel', arm, true);
+  if (!immediate) {
+    window.addEventListener('pointerup', arm, true);
+    window.addEventListener('pointercancel', arm, true);
+  }
 
   const r = anchor.getBoundingClientRect();
   const c = card.getBoundingClientRect();
