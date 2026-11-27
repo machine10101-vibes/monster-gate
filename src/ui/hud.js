@@ -303,13 +303,15 @@ export class HUD {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.stopPropagation();
         held = false;
+        suppressClick = false;
         if (this.itemHotbarLocked || !onHold) return;
         b.classList.add('hold-arming');
         holdTimer = setTimeout(() => {
           holdTimer = 0;
+          b.classList.remove('hold-arming');
+          if (this.itemHotbarLocked || this.panelOpen || this.skillPicker || !b.isConnected) return;
           held = true;
           suppressClick = true;
-          b.classList.remove('hold-arming');
           onHold(i);
         }, HOTBAR_HOLD_MS);
       });
@@ -325,7 +327,7 @@ export class HUD {
         if (held || holdTimer) e.preventDefault();
       });
       b.addEventListener('click', (e) => {
-        if (suppressClick) {
+        if (suppressClick && e.detail !== 0) {
           suppressClick = false;
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -1173,8 +1175,8 @@ export class HUD {
       add(`<section class="set-hotbar-controls" aria-label="Hotbar controls">
         <h3>Hotbar controls</h3>
         <p>Lock a bar to prevent accidental long-press assignment or changes.</p>
-        <div class="panel-row"><span>Lock skill hot buttons</span><button id="set-skill-lock" type="button" aria-pressed="${readHotbarLocked() ? 'true' : 'false'}">${readHotbarLocked() ? 'Locked' : 'Unlocked'}</button></div>
-        <div class="panel-row"><span>Lock item hotbar</span><button id="set-item-hotbar-lock" type="button" aria-pressed="${readItemHotbarLocked() ? 'true' : 'false'}">${readItemHotbarLocked() ? 'Locked' : 'Unlocked'}</button></div>
+        <div class="panel-row"><span>Lock skill hot buttons</span><button id="set-skill-lock" type="button" aria-pressed="${this.hotbarLocked ? 'true' : 'false'}">${this.hotbarLocked ? 'Locked' : 'Unlocked'}</button></div>
+        <div class="panel-row"><span>Lock item hotbar</span><button id="set-item-hotbar-lock" type="button" aria-pressed="${this.itemHotbarLocked ? 'true' : 'false'}">${this.itemHotbarLocked ? 'Locked' : 'Unlocked'}</button></div>
       </section>`);
       const q = game.quality;
       const liveSearch = typeof location !== 'undefined' ? location.search : '';
@@ -1329,8 +1331,7 @@ export class HUD {
   }
 
   openSkillPicker(game, slot) {
-    if (this.hotbarLocked || !game?.progress) return false;
-    this.closeSkillPicker();
+    if (this.hotbarLocked || this.panelOpen || this.dialogOpen || this.skillPicker || !game?.progress) return false;
     const skills = availableHotbarSkills(game.progress);
     const overlay = document.createElement('div');
     overlay.className = 'skill-hotbar-picker';
@@ -1438,9 +1439,11 @@ export class HUD {
         };
         el.addEventListener('pointerdown', (event) => {
           if (event.button !== undefined && event.button !== 0) return;
+          if (pointerId != null) return;
+          held = false;
+          delete el.dataset.skillPickerConsumed;
           const context = el._skillPickerContext;
           if (!context || context.hud.hotbarLocked) return;
-          held = false;
           pointerId = event.pointerId;
           startX = event.clientX;
           startY = event.clientY;
@@ -1449,11 +1452,11 @@ export class HUD {
           el.style.setProperty('--hold-ms', `${HOTBAR_HOLD_MS}ms`);
           holdTimer = setTimeout(() => {
             holdTimer = 0;
-            held = true;
             el.classList.remove('hold-arming');
-            el.dataset.skillPickerConsumed = '1';
             const current = el._skillPickerContext;
-            if (current && !current.hud.hotbarLocked) current.hud.openSkillPicker(current.game, i);
+            if (current?.game !== context.game || current?.hud !== context.hud || !el.isConnected) return;
+            held = current.hud.openSkillPicker(current.game, i);
+            if (held) el.dataset.skillPickerConsumed = '1';
           }, HOTBAR_HOLD_MS);
         });
         el.addEventListener('pointermove', (event) => {
@@ -1467,7 +1470,7 @@ export class HUD {
           if (held || holdTimer) event.preventDefault();
         });
         el.addEventListener('click', (event) => {
-          if (el.dataset.skillPickerConsumed === '1') {
+          if (el.dataset.skillPickerConsumed === '1' && event.detail !== 0) {
             delete el.dataset.skillPickerConsumed;
             event.preventDefault();
             event.stopImmediatePropagation();
@@ -1487,7 +1490,10 @@ export class HUD {
         });
       };
       casts.forEach((b, i) => {
-        b.addEventListener('click', () => b._skillPickerContext?.game?.castSlot(i));
+        b.addEventListener('click', () => {
+          const context = b._skillPickerContext;
+          if (context && !context.hud.skillPicker) context.game.castSlot(i);
+        });
         armLongPress(b, i);
         accept(b, i);
       });
