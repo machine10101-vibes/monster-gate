@@ -24,6 +24,20 @@ function angDiff(a, b) {
   return d;
 }
 
+export function hitReactionPose(dx, dz, yaw, weight = 1) {
+  const length = Math.hypot(dx, dz) || 1;
+  const nx = dx / length;
+  const nz = dz / length;
+  const forward = nx * Math.sin(yaw) + nz * Math.cos(yaw);
+  const side = nx * Math.cos(yaw) - nz * Math.sin(yaw);
+  const mass = clamp(weight, 0.25, 1.5);
+  return {
+    pitch: -forward * 0.22 * mass,
+    roll: -side * 0.28 * mass,
+    twist: side * 0.14 * mass,
+  };
+}
+
 function ease(t) {
   return t * t * (3 - 2 * t);
 }
@@ -257,6 +271,8 @@ export class Monster {
     this.pend = null;
     this.hitT = 0.34;
     this.flashDir = { x: dx, z: dz };
+    // Light creatures visibly give way; armored and massive enemies absorb more of the blow.
+    this.hitWeight = clamp((0.45 + dmg / 55 + knock / 22) * (heavy ? 0.62 : 1.08), 0.35, 1.25);
     if (dragon && this.state === 'windup' && dmg >= (volc ? 28 : 14) && this.atk !== 'breath') {
       this.state = 'recover';
       this.t = 0;
@@ -1234,8 +1250,10 @@ export class Monster {
     o.rotation.set(0, this.vyaw, this.type === 'slime' || this.type === 'voidslime' ? 0 : this.bank);
 
     const heavy = this.type === 'budgedragon' || this.type === 'darksycledragon' || yeti || knight || !!fam?.FX[this.type].heavy;
+    const hitPose = hk > 0 ? hitReactionPose(this.flashDir.x, this.flashDir.z, this.yaw, this.hitWeight || 1) : null;
     let rootX = -hk * (heavy ? 0.1 : 0.3) + (this.type === 'slime' || this.type === 'voidslime' ? 0 : clamp(-(this.accAlong || 0) * (heavy ? 0.004 : 0.007), -0.12, 0.12));
-    const rootZ = Math.sin(this.t * 70) * 0.05 * hk * (heavy ? 0.5 : 1);
+    if (hitPose) rootX += hitPose.pitch * hk;
+    let rootZ = Math.sin(this.t * 70) * 0.05 * hk * (heavy ? 0.5 : 1) + (hitPose ? hitPose.roll * hk : 0);
     let rootY = 0;
     let rootSZ = 1;
     let rootSXY = 1;
@@ -1631,6 +1649,7 @@ export class Monster {
       }
     }
     m.root.rotation.x = rootX;
+    m.root.rotation.y = hitPose ? hitPose.twist * hk : 0;
     m.root.rotation.z = rootZ;
     m.root.position.y = rootY;
     m.root.scale.set(rootSXY, rootSXY, rootSZ);

@@ -32,6 +32,9 @@ export function mountFriends(body, game) {
   const social = game?.social;
   const root = el('div', 'mg-social');
   body.appendChild(root);
+  let tab = game?.socialTeamTab ? 'team' : 'friends';
+  let friendQuery = '';
+  if (game) game.socialTeamTab = false;
 
   const paint = () => {
     const snap = social?.snapshot?.() || { mode: 'offline', friends: [], pendingIn: [], pendingOut: [], party: null };
@@ -52,6 +55,20 @@ export function mountFriends(body, game) {
     }
     if (snap.mode === 'mmo' && !snap.caps.friends && !snap.caps.party) {
       root.appendChild(el('p', 'mg-social-note', 'The world server has not opened friends or parties yet. The journal is ready; MG Servers still needs the protocol in <code>PROTOCOL.md</code>.'));
+    }
+
+    const tabs = el('div', 'mg-social-tabs');
+    for (const [id, label] of [['friends', 'Friends'], ['team', 'PvP team']]) {
+      const button = el('button', `mg-btn${tab === id ? ' active' : ' quiet'}`, label);
+      button.type = 'button';
+      button.setAttribute('aria-pressed', String(tab === id));
+      button.onclick = () => { tab = id; paint(); };
+      tabs.appendChild(button);
+    }
+    root.appendChild(tabs);
+    if (tab === 'team') {
+      paintTeam(root, game, social, snap, paint);
+      return;
     }
 
     const add = el('form', 'mg-social-add');
@@ -91,10 +108,27 @@ export function mountFriends(body, game) {
     }
 
     root.appendChild(el('div', 'mg-social-h', `Friends · ${snap.friends.length}/100`));
+    if (snap.friends.length > 5) {
+      const search = el('input', 'wg-input mg-input mg-social-search');
+      search.type = 'search';
+      search.placeholder = 'Find a friend';
+      search.setAttribute('aria-label', 'Find a friend');
+      search.value = friendQuery;
+      search.oninput = () => {
+        friendQuery = search.value.trim().toLowerCase();
+        for (const row of root.querySelectorAll('[data-friend-name]')) row.hidden = !row.dataset.friendName.includes(friendQuery);
+      };
+      root.appendChild(search);
+    }
     if (!snap.friends.length) {
       root.appendChild(el('p', 'mg-social-empty', 'No friends yet. Add a hunter by name, or tap a nameplate.'));
     }
-    for (const p of snap.friends) root.appendChild(friendRow(game, social, p, snap, paint));
+    for (const p of snap.friends) {
+      const row = friendRow(game, social, p, snap, paint);
+      row.dataset.friendName = String(p.name || '').toLowerCase();
+      row.hidden = !row.dataset.friendName.includes(friendQuery);
+      root.appendChild(row);
+    }
 
     if (snap.ignored?.length) {
       root.appendChild(el('div', 'mg-social-h', 'Ignored'));
@@ -166,11 +200,11 @@ function requestRow(game, social, p, paint) {
 
 function friendRow(game, social, p, snap, paint) {
   const row = personRow(p);
-    const invite = el('button', 'mg-btn', 'Invite');
+    const invite = el('button', 'mg-btn', 'Team invite');
     invite.type = 'button';
     const leader = !snap.party || snap.party.leader === snap.self?.id;
-    invite.disabled = p.presence !== PRESENCE.online || !leader;
-    invite.title = !leader ? 'Only the leader can invite' : p.presence === PRESENCE.online ? 'Invite to party' : 'They are offline';
+    invite.disabled = p.presence !== PRESENCE.online || !leader || (snap.party?.members?.length || 1) >= 3;
+    invite.title = !leader ? 'Only the team leader can invite' : p.presence === PRESENCE.online ? 'Invite to your PvP team / party' : 'They are offline';
   invite.onclick = async () => {
     const res = await report(game, await social.inviteToParty(p.id || p.name));
     paint();
@@ -187,6 +221,56 @@ function friendRow(game, social, p, snap, paint) {
   };
   row.append(invite, whisper, more);
   return row;
+}
+
+function paintTeam(root, game, social, snap, paint) {
+  const party = snap.party;
+  const members = party?.members || [];
+  const leader = !party || party.leader === snap.self?.id;
+  root.appendChild(el('p', 'mg-social-note', 'Your party is your arena team. Invite one friend for 2v2 or two for 3v3. Everyone must be online and accept the match.'));
+  root.appendChild(el('div', 'mg-social-h', `Team · ${members.length || 1}/3`));
+  if (!party) root.appendChild(el('p', 'mg-social-empty', 'You are the team leader. Invite a hunter to create a team.'));
+  for (const member of members) {
+    const row = personRow(member, member.id === party.leader ? 'Leader' : member.online === false ? 'Offline' : 'Ready to invite');
+    if (leader && member.id !== snap.self?.id) {
+      const kick = el('button', 'mg-btn quiet', 'Remove');
+      kick.type = 'button';
+      kick.onclick = async () => { await report(game, await social.kick(member.id)); paint(); };
+      row.appendChild(kick);
+    }
+    root.appendChild(row);
+  }
+  if (party) {
+    const leave = el('button', 'mg-btn quiet', leader ? 'Disband / leave team' : 'Leave team');
+    leave.type = 'button';
+    leave.onclick = async () => { await report(game, await social.leaveParty()); paint(); };
+    root.appendChild(leave);
+  }
+  if (leader && members.length < 3) {
+    const form = el('form', 'mg-social-add');
+    form.innerHTML = '<label class="wg-label" for="mg-team-name">Invite a hunter by name</label><div class="wg-row"><input id="mg-team-name" class="wg-input mg-input" maxlength="16" autocomplete="off" placeholder="Hunter name"><button type="submit" class="mg-btn">Invite</button></div>';
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const input = form.querySelector('input');
+      const name = cleanHunterName(input.value);
+      if (!name) return;
+      const res = await report(game, await social.inviteToParty(name));
+      if (res?.ok) { input.value = ''; toast(game, `Team invite sent to ${name}`); }
+    };
+    root.appendChild(form);
+    const friends = (snap.friends || []).filter(p => p.presence === PRESENCE.online && !members.some(m => m.id === p.id));
+    if (friends.length) root.appendChild(el('div', 'mg-social-h', 'Online friends'));
+    for (const friend of friends) {
+      const row = personRow(friend);
+      const invite = el('button', 'mg-btn', 'Invite');
+      invite.type = 'button';
+      invite.onclick = async () => { await report(game, await social.inviteToParty(friend.id || friend.name)); paint(); };
+      row.appendChild(invite);
+      root.appendChild(row);
+    }
+  }
+  const hint = !party ? '1v1 is ready. Build a team for 2v2 or 3v3.' : leader ? `${members.length}v${members.length} is ready when all teammates are online.` : 'Your leader signs the team up at the coliseum board.';
+  root.appendChild(el('p', 'mg-social-note', hint));
 }
 
 /** Party frame, invite modal, and hunter context menu. */
@@ -301,7 +385,7 @@ export function mountSocialHud(game) {
     lastInvite = inv.invite_id;
     modal.innerHTML = `
       <small>Party invite</small>
-      <p><b>${escapeHtml(inv.from.name)}</b> asked you to hunt together.</p>
+      <p><b>${escapeHtml(inv.from.name)}</b> invited you to their team for hunts and PvP.</p>
       <p class="mg-social-count">Expires in ${left}s</p>
       <div class="mg-social-btns">
         <button type="button" class="mg-btn" data-act="yes">Accept</button>

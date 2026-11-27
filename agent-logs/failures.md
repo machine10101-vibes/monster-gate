@@ -97,3 +97,33 @@
 - Root cause: grid track `1fr` uses the filter column's min-content width; duplicate alias missed before writing.
 - Retry reason: layout bug visible in the render.
 - Outcome: `minmax(0, 1fr)` tracks, min-width 0, 2x2 tabs, a Filters drawer on phones; dropped the duplicate alias (`market` still goes to Dalla). Re-render clean.
+### 2026-11-27 — PvP team and colosseum audit, iteration 1
+- Task: friends-managed PvP teams, arena detail, and match integrity.
+- Attempt: new PvP movement regression sent a move to the arena center, then expected an out-of-bounds move error.
+- Exact error: `waitUntil timeout` in `server/tests/pvp.test.js`; diagnostic run showed `bounds failed: {"x":1732.7,"errors":[]}`.
+- Root cause: the existing movement speed clamp correctly shortened the test packet before it reached the arena boundary. The first packet also initially exceeded the allowed travel distance.
+- Retry: move a short distance first; position the test fighter just inside the boundary, age the test move timestamp, then request a short crossing step. Test now passes.
+- Outcome: 5/5 PvP integration tests pass.
+
+### 2026-11-27 — PvP persistence test dependency, iteration 2
+- Task: verify ratings survive character storage.
+- Attempt: `npm run test:persistence` after root `npm ci`.
+- Exact error: `ERR_MODULE_NOT_FOUND: Cannot find package '@supabase/supabase-js'` in `server/persistence/adapters/supabase.js`.
+- Root cause: persistence has its own package and installation directory.
+- Retry: `npm ci --prefix server/persistence`, rerun suite.
+- Outcome: 41/41 persistence tests pass.
+
+### 2026-11-27 — Local visual check blocked, iteration 3
+- Task: visually inspect the detailed arena in a browser.
+- Attempt: run local Vite and then headless Chromium through puppeteer-core.
+- Exact errors: Vite dev server `uv_interface_addresses returned Unknown system error 1`; Chromium launcher `/usr/bin/chromium` reported `/usr/lib/chromium/chromium: not found`.
+- Root cause: environment network interface enumeration fails in Vite and the Chromium binary is absent. A static Python server starts, but the browser cannot launch.
+- Retry: inspected arena geometry and render path in source and ran production build and automated checks; preserve manual visual inspection as an outstanding release limitation.
+- Outcome: no local visual browser evidence claimed.
+### 2026-11-27 — Pending-upgrade reconciliation, iteration 1
+- Task: integrate the two outstanding modern PR upgrades onto current main.
+- Attempt: `git cherry-pick --no-commit b81fa00` for the hotbar change.
+- Exact error: content conflicts in `agent-logs/failures.md` and `agent-logs/progress.md`; application code and regression test merged cleanly.
+- Root cause: the old PR branch contained log snapshots that diverged substantially from current main.
+- Retry: retain current main logs, apply the four code/test files, record this reconciliation separately, and run full tests.
+- Outcome: 551/551 project tests, 41/41 persistence tests, smoke and build pass with both reconciled upgrades.

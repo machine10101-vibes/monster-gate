@@ -102,6 +102,22 @@
 - Checks: build pass; npm test 547 pass / 0 fail; test:persistence 41 pass / 0 fail; smoke pass; test:shaders skipped (no Chrome binary at the expected path). Browser (guest, swiftshader): district renders (overview, hall, street, arch), road and hall walk 0 blocked steps, 15 Exchange NPCs present; move, attack (combo 1), evade (roll) and talking to Odila Vane (opens the Exchange, offline notice for a guest) work; 0 page errors. Exchange UI rendered desktop and phone with a stubbed market connection (browse, search, sell, my listings, collect).
 - Not verified here: a real World 1 trade between two signed-in browsers (needs Supabase auth and the migration applied; covered by server socket tests against the memory store and by the SQL run).
 - Go-live dependencies: the migration must be applied in Supabase; the World 1 server (Render) must run the new server code. Until both, the Exchange answers "market unavailable" for trades.
+## 2026-11-27 — PvP team workflow and Gilantre colosseum
+
+- Director: audited friends/party UI, PvP board, World 1 match runtime, save path and arena instance. Found team setup duplicated in the board, a solo queue UI mismatch, client-supplied HP accepted during matches, ratings not loaded or saved by the server, and a sparse arena.
+- Designer acceptance: manage a team from Friends with online friend/name invites and leave/remove actions; board handles bracket and match confirmation; 1v1 works with an idle party; server keeps HP/zone/arena bounds authoritative; rated results persist and reload; arena gains seating, banners, inlays and flames without new collision inside the play ring.
+- Implementer: Friends and PvP team tabs, friend search and mobile wrapping; board links to team management. Server validates arena movement, ignores match HP/zone input and defers match saves until return pose, with persisted PvP stats. Arena uses instanced seating for modest draw cost plus banners and paving.
+- Tester: `npm test` 547/547; `npm run test:persistence` 41/41; `npm run test:smoke` passed; `npm run build` passed. PvP integration covers match entry, team sizes, forged HP/zone, bounds, return, saved rating. Local browser visual inspection blocked by absent Chromium binary; see failures log.
+- Critic: the PvP board and Friends previously had two separate invitation interfaces and team state presentations. Proposed process improvement for human review: add one browser UI regression fixture for the Friends-to-board handoff and mobile panel layout to CI, using a documented browser installation.
+- Release: branch `feature/pvp-team-colosseum-20261127`; commit and deployment status to follow. Manual browser gameplay check remains unverified.
+## 2026-11-27 — Pending PR reconciliation
+
+- Director: audited current main, production build and World 1; 82 open PRs remain. Recent PR #314 (hotbar hold and lock) and PR #251 (directional monster hit reactions) contain functionality absent from main. Older branches diverged by hundreds of commits and require individual supersession review; merging them all would risk regressions.
+- Designer: port only the missing code and tests onto current main, preserve the current engine and UI, verify the resulting exact branch, and publish client changes after CI.
+- Implementer: brought PR #314 hotbar event/input changes and PR #251 hit-reaction geometry/tests onto `release/pending-upgrades-20261127`.
+- Tester: `npm test` 551/551, `npm run test:persistence` 41/41, `npm run test:smoke` passed, `npm run build` passed. No live player account was used. Browser manual gameplay remains unverified in this workspace.
+- Critic: proposed a periodic stale-PR triage with a superseded-by link and current-main behavior check, so long-lived branches do not appear as ready-to-merge upgrades.
+- Release: review PR, CI and production publishing pending.
 
 ### 2026-11-27 — Release: Gilantre Exchange live
 - PR #333 merged (squash) as 81f20e9 after `verify` and `test-and-build` passed on f41c582 (main merged in first; 547 tests pass locally, persistence 41 pass, smoke pass).

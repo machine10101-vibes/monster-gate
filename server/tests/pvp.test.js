@@ -47,6 +47,15 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     assert.ok(startFrame?.pose);
     assert.equal(startFrame.pose.x, pa.x);
     assert.notEqual(pa.pvpTeam, pb.pvpTeam);
+    const arenaHp = pa.hp;
+    a.send(JSON.stringify({ v: 1, type: 'move', x: pa.x + 0.2, y: 2.2, z: pa.z, yaw: 0, hp: 999, zone: 'Oakhollow' }));
+    await waitUntil(() => pa.movedAt > 0).catch(() => { throw new Error(`move failed: ${JSON.stringify({ x: pa.x, y: pa.y, z: pa.z, movedAt: pa.movedAt, errors: aFrames.filter(m => m.type === 'error') })}`); });
+    assert.equal(pa.hp, arenaHp, 'client movement cannot heal a fighter');
+    assert.match(pa.zone, /^colosseum:/, 'client movement cannot leave the match zone');
+    pa.x = 1735; pa.z = 819.5; pa.movedAt = Date.now() - 2000;
+    a.send(JSON.stringify({ v: 1, type: 'move', x: 1735.6, y: 2.2, z: 819.5, yaw: 0 }));
+    await waitUntil(() => aFrames.some(m => m.type === 'error' && m.code === 'pvp_bounds')).catch(() => { throw new Error(`bounds failed: ${JSON.stringify({ x: pa.x, errors: aFrames.filter(m => m.type === 'error') })}`); });
+    assert.equal(pa.x, 1735, 'fighter cannot move into the stands');
     pa.x = pb.x - 2; pa.z = pb.z;
     const before = pb.hp;
     const hit = srv.world.pvp.attack(pa, pb.id);
@@ -77,6 +86,10 @@ test('Colosseum pairs solo hunters, applies server damage, and restores their re
     assert.equal(pa.z, returnPose.z);
     await waitUntil(() => aFrames.some(m => m.type === 'pvp_match_end'));
     assert.ok(aFrames.some(m => m.type === 'pvp_match_end'));
+    await srv.world.persist.flushAll();
+    const saved = await srv.world.persist.loadCharacter(pb.userId);
+    assert.equal(saved.state.pvp.wins, 1);
+    assert.equal(saved.state.pvp.rating, pb.pvpRating);
   });
 });
 
