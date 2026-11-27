@@ -870,6 +870,7 @@ export class World {
       alchemist: { x: 73.4, z: 83.6 },
       farmer: { x: 90, z: 82 },
       child: { x: 72, z: 80.5 },
+      dalla: { x: 77, z: 83.8 },
     };
   }
 
