@@ -11,6 +11,15 @@ export const TOWN_RETURN = {
 
 export const PORTALS = [
   {
+    id: 'oasis',
+    name: 'Oasis Portal',
+    place: 'Greenbowl, beside the living waters',
+    x: 47,
+    z: 458,
+    yaw: Math.PI / 2,
+    banner: ['The Living Water', 'Oasis'],
+  },
+  {
     id: 'oakhollow',
     name: 'Oakhollow Portal',
     place: 'Just outside the village',
