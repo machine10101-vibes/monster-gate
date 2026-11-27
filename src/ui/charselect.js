@@ -403,7 +403,7 @@ export class CharacterSelect {
   }
 
   enter() {
-    this.playSolo();
+    this.chooseWorld();
   }
 
   playSolo() {
@@ -437,9 +437,10 @@ export class CharacterSelect {
   paintWorldMenu() {
     const btn = $('cs-world-1');
     const status = $('cs-world-1-status');
-    const ready = this.game.worldOneReady?.() !== false;
+    const guest = this.game.wallet?.kind === 'guest';
+    const ready = !guest && this.game.worldOneReady?.() !== false;
     if (btn) btn.disabled = !ready;
-    if (status) status.textContent = ready ? (this.game.worldHealth?.label || 'Checking…') : 'Coming soon';
+    if (status) status.textContent = ready ? (this.game.worldHealth?.label || 'Checking…') : guest ? 'Sign in to play online' : 'Coming soon';
   }
 
   pickWorld1() {
