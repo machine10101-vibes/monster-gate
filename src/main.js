@@ -237,6 +237,10 @@ class Game {
     this.baseItems = ITEMS.map((i) => ({ ...i }));
     this.items = this.baseItems.slice();
     this.progress = new Progress();
+    // Mirror what this hunter uses, sells or drops onto World 1, so the Exchange never sells what is gone.
+    this.progress.onSpend = (kind, id, n) => {
+      if (!this.marketApplying) this.mmo?.reportSpend?.(kind, id, n);
+    };
     this.journal = new Journal(this.progress);
     this.bounties = new Bounties(this.progress);
     this.journalT = 0;
@@ -3637,6 +3641,10 @@ class Game {
       this.openMarket(near.def.name);
       return;
     }
+    if (near.def.service === 'exchange' && !script) {
+      this.openExchange();
+      return;
+    }
     if (near.def.service === 'alchemy' && !script) {
       this.openAlchemy();
       return;
@@ -3833,6 +3841,58 @@ class Game {
     if (!this.player.tryEat(g)) return false;
     this.progress.takeGood(id, 1);
     return true;
+  }
+
+  /* ------------------------------ Gilantre Exchange ------------------------------ */
+
+  openExchange() {
+    this.hud.openPanel('exchange', this);
+    this.hud.panelId = 'exchange';
+    this.audio.select();
+  }
+
+  /** Applies an Exchange result to this hunter's own save without echoing it back as spending. */
+  applyMarket(fn) {
+    this.marketApplying = true;
+    try {
+      fn();
+    } finally {
+      this.marketApplying = false;
+    }
+    this.applyGear?.();
+    this.itemsChanged?.();
+    this.hud.setGold(this.gold);
+  }
+
+  /** Items the server took into escrow for a new listing leave the local bag too. */
+  marketTake(kind, id, qty) {
+    this.applyMarket(() => {
+      if (kind === 'good') this.progress.takeGood(id, Math.min(qty, this.progress.good(id)));
+      else if (kind === 'material') this.progress.takePart(id, Math.min(qty, this.progress.count(id)));
+      else if (kind === 'gear') this.progress.releaseCrafted(id);
+    });
+  }
+
+  /** Items bought, cancelled back or returned after expiry arrive in the local bag. */
+  marketGive(kind, id, qty) {
+    this.applyMarket(() => {
+      if (kind === 'good') this.progress.addGood(id, qty);
+      else if (kind === 'material') this.progress.addPart(id, qty);
+      else if (kind === 'gear') this.progress.grantFound(id);
+    });
+  }
+
+  marketGold(delta) {
+    if (!delta) return;
+    this.applyMarket(() => this.addGold(delta));
+  }
+
+  /** A listing this hunter opened just sold on World 1. */
+  marketNotice(msg) {
+    if (msg?.kind !== 'sold') return;
+    this.hud.toast(`${msg.name}${msg.qty > 1 ? ' x' + msg.qty : ''} sold for ${msg.price} gold. Collect ${msg.payout} at the Gilantre Exchange.`, 4200);
+    this.audio.select?.();
+    this.exchangeRefresh?.();
   }
 
   openMarket(name = 'Dalla') {

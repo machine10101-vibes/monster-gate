@@ -129,6 +129,10 @@ export class MmoClient {
     this.retryBound = false;
     this.socialRequestSeq = 0;
     this.pendingSocial = new Map();
+    this.pendingMarket = new Map();
+    this.marketSeq = 0;
+    this.spendBatch = null;
+    this.spendTimer = null;
     this.lootOverlay = null;
     this.lootQueue = [];
     this.rewardSnapshot = null;
@@ -620,6 +624,19 @@ export class MmoClient {
         : 'Party loot was awarded.');
       return;
     }
+    if (msg.type === 'market_result') {
+      const pending = this.pendingMarket.get(String(msg.request_id || ''));
+      if (pending) {
+        clearTimeout(pending.timer);
+        this.pendingMarket.delete(String(msg.request_id));
+        pending.resolve(msg);
+      }
+      return;
+    }
+    if (msg.type === 'market_notice') {
+      this.game?.marketNotice?.(msg);
+      return;
+    }
     if (msg.type === 'reward_update') {
       this.game?.applyServerReward?.(msg);
       return;
@@ -898,6 +915,58 @@ export class MmoClient {
       try{this.ws.send(encode(type,{...extra,request_id}));}
       catch{clearTimeout(timer);this.pendingSocial.delete(request_id);resolve({ok:false,code:'offline',message:'World connection was interrupted.'});}
     });
+  }
+
+  /** True while this hunter is signed in on World 1 and can use the Exchange. */
+  get marketReady() {
+    return !!this.ws && this.ws.readyState === 1 && this.you?.guest === false;
+  }
+
+  /** One Exchange request; resolves with the server's market_result (ok, code and data). */
+  marketRequest(type, body = {}) {
+    if (!this.marketReady) return Promise.resolve({ ok: false, code: 'market_offline' });
+    const request_id = `market_${++this.marketSeq}`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingMarket.delete(request_id);
+        resolve({ ok: false, code: 'market_busy' });
+      }, 12000);
+      this.pendingMarket.set(request_id, { resolve, timer });
+      try {
+        this.ws.send(encode(type, { ...body, request_id }));
+      } catch {
+        clearTimeout(timer);
+        this.pendingMarket.delete(request_id);
+        resolve({ ok: false, code: 'market_offline' });
+      }
+    });
+  }
+
+  /**
+   * Mirrors something the hunter used, sold or dropped in their own game onto World 1, so the
+   * Exchange never sells what is already gone. Batched; only ever lowers server counts.
+   */
+  reportSpend(kind, id, n) {
+    if (!this.marketReady || !(n > 0)) return;
+    const b = (this.spendBatch ||= { gold: 0, goods: {}, materials: {}, gear: [] });
+    if (kind === 'gold') b.gold += n;
+    else if (kind === 'good') b.goods[id] = (b.goods[id] || 0) + n;
+    else if (kind === 'material') b.materials[id] = (b.materials[id] || 0) + n;
+    else if (kind === 'gear' && !b.gear.includes(id)) b.gear.push(id);
+    if (!this.spendTimer) this.spendTimer = setTimeout(() => this.flushSpend(), 1200);
+  }
+
+  flushSpend() {
+    clearTimeout(this.spendTimer);
+    this.spendTimer = null;
+    const b = this.spendBatch;
+    this.spendBatch = null;
+    if (!b || !this.marketReady) return;
+    try {
+      this.ws.send(encode('inv_spend', b));
+    } catch {
+      /* the next reward snapshot keeps the server copy honest */
+    }
   }
 
   friendRequest(name) {
