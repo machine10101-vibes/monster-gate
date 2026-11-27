@@ -3,9 +3,6 @@ name: Build and publish GitHub Pages
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, closed]
   workflow_dispatch:
 
 permissions:
@@ -13,11 +10,11 @@ permissions:
 
 concurrency:
   group: monster-gate-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-publish:
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.merged == true || github.event.pull_request.head.ref == 'codex/pages-release' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the merged game source
