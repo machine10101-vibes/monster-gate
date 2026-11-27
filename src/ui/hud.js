@@ -1,3 +1,4 @@
+import { MATERIALS } from '../data/catalog.js';
 import { iconCanvas, iconURL, uiIconURL, heartCanvas } from './icons.js';
 import { gearById } from '../data/catalog.js';
 import { GOODS } from '../data/gathering.js';
@@ -1058,7 +1059,7 @@ export class HUD {
       this.cleanup = mountStats(body, game, game.statsFocus);
       game.statsFocus = null;
     } else if (name === 'market') {
-      title.textContent = "Dalla's Market";
+      title.textContent = (game.marketName || "Dalla") + " — Item Merchant";
       this.cleanup = mountMarket(body, game);
     } else if (name === 'catalog') {
       title.textContent = 'Hunter Catalog';
@@ -1580,74 +1581,56 @@ export function bindPanelClose(btn, onClose) {
 
 function mountMarket(body, game) {
   const pr = game.progress;
+  let query = '';
   const paint = () => {
     body.innerHTML = '';
-    const intro = document.createElement('p');
-    intro.className = 'alc-intro mk-intro';
-    intro.innerHTML = "<b>Dalla's Market</b>Fresh ore, fish and timber are always welcome. I will buy what the pit, the lake and the woods give you.";
-    body.appendChild(intro);
     const gold = document.createElement('p');
     gold.className = 'alc-gold';
-    gold.textContent = `Your gold: ${game.gold}`;
+    gold.textContent = 'Your gold: ' + game.gold;
     body.appendChild(gold);
-    let total = 0;
-    let any = false;
-    for (const g of Object.values(GOODS)) {
-      if (isUnsellableGood(g)) continue;
-      const n = pr.good(g.id);
-      total += n * g.price;
-      if (!n) continue;
-      any = true;
-      const row = document.createElement('div');
-      row.className = 'alc-row';
-      const holder = document.createElement('div');
-      holder.className = 'mk-thumb';
-      const cv = renderThumb({ kind: 'good', id: g.id }, 96);
-      holder.appendChild(cv);
-      row.appendChild(holder);
-      const info = document.createElement('div');
-      info.className = 'alc-info';
-      info.innerHTML = `<b>${g.name}</b><span>${g.desc}</span><small>Carried ${n} · ${g.price}g each</small>`;
-      row.appendChild(info);
-      const col = document.createElement('div');
-      col.className = 'mk-btns';
-      const one = document.createElement('button');
-      one.type = 'button';
-      one.className = 'alc-buy';
-      one.textContent = `Sell 1  ${g.price}g`;
-      one.onclick = () => {
-        if (game.sellGood(g.id, 1)) paint();
-      };
-      col.appendChild(one);
-      if (n > 1) {
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.placeholder = 'Find items to sell';
+    search.value = query;
+    search.setAttribute('aria-label', 'Search merchant inventory');
+    body.appendChild(search);
+    const list = document.createElement('div');
+    body.appendChild(list);
+    const draw = () => {
+      list.innerHTML = '';
+      const offers = [
+        ...Object.values(GOODS).filter(g => !isUnsellableGood(g) && g.price > 0).map(g => ({...g, n:pr.good(g.id), kind:'good', sell:n=>game.sellGood(g.id,n)})),
+        ...Object.entries(MATERIALS).map(([id,g]) => ({...g,id,n:pr.count(id),price:5,kind:'material',sell:n=>game.sellPart(id,n)})),
+      ].filter(g=>g.n>0 && g.name.toLowerCase().includes(query.toLowerCase()));
+      for (const g of offers) {
+        const row = document.createElement('div');
+        row.className = 'alc-row';
+        row.appendChild(renderThumb({kind:g.kind,id:g.id},64));
+        const info = document.createElement('div');
+        info.className = 'alc-info';
+        info.textContent = g.name + ' · ' + g.n + ' carried · ' + g.price + 'g each';
+        const qty = document.createElement('input');
+        qty.type='number'; qty.min='1'; qty.max=String(g.n); qty.value='1'; qty.step='1';
+        qty.setAttribute('aria-label','Quantity of '+g.name);
+        qty.style.width='5em';
         const all = document.createElement('button');
-        all.type = 'button';
-        all.className = 'alc-buy';
-        all.textContent = `Sell ${n}  ${n * g.price}g`;
-        all.onclick = () => {
-          if (game.sellGood(g.id, n)) paint();
-        };
-        col.appendChild(all);
+        all.type='button'; all.textContent='Max';
+        const sell = document.createElement('button');
+        sell.type='button'; sell.className='alc-buy';
+        const amount=()=>Math.max(1,Math.min(g.n,Math.floor(Number(qty.value)||1)));
+        const label=()=>{sell.textContent='Sell for '+amount()*g.price+'g';};
+        qty.oninput=label;
+        all.onclick=()=>{qty.value=String(g.n);label();};
+        sell.onclick=()=>{if(g.sell(amount())) paint();};
+        label();
+        row.append(info,qty,all,sell);
+        list.appendChild(row);
       }
-      row.appendChild(col);
-      body.appendChild(row);
-    }
-    if (!any) {
-      const p = document.createElement('p');
-      p.className = 'bag-empty';
-      p.textContent = 'You have nothing to sell. Mine the Greyrock Pit, fish Mirrormere, or chop birch, oak and maple west of town.';
-      body.appendChild(p);
-    } else {
-      const all = document.createElement('button');
-      all.type = 'button';
-      all.className = 'alc-buy mk-all';
-      all.textContent = `Sell everything  ${total}g`;
-      all.onclick = () => {
-        if (game.sellAllGoods()) paint();
-      };
-      body.appendChild(all);
-    }
-    flushThumbs(240);
+      if(!offers.length) list.textContent='No matching sellable items.';
+      flushThumbs(240);
+    };
+    search.oninput=()=>{query=search.value;draw();};
+    draw();
   };
   paint();
   return () => {};
