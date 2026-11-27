@@ -1535,20 +1535,19 @@ body.touch #top-right {
 .playmap-label {
   position: absolute;
   transform: translate(-50%, -50%);
-  max-width: 14%;
+  transform-origin: center;
+  scale: var(--map-marker-scale, 1);
+  max-width: 12%;
   margin: 0;
   color: #fff8e8;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 13px;
-  line-height: 1.05;
+  font-size: 10px;
+  line-height: 1.1;
   letter-spacing: 0;
   text-align: center;
   text-wrap: balance;
-  text-shadow:
-    0 0 3px #000, 0 0 6px #000,
-    0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000,
-    1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
   pointer-events: none;
   z-index: 4;
 }
@@ -1560,11 +1559,11 @@ body.touch #top-right {
 .playmap-label.side-nw { transform: translate(calc(-100% - 8px), calc(-100% - 4px)); text-align: right; }
 .playmap-label.side-se { transform: translate(8px, 8px); text-align: left; }
 .playmap-label.side-sw { transform: translate(calc(-100% - 8px), 8px); text-align: right; }
-.playmap-label.city { color: #ffe7a0; font-size: 14px; }
-.playmap-label.landmark { font-size: 13px; }
-.playmap-label.minor { font-size: 12px; font-weight: 500; }
+.playmap-label.city { color: #ffe7a0; font-size: 11px; }
+.playmap-label.landmark { font-size: 10px; }
+.playmap-label.minor { font-size: 9px; font-weight: 500; }
 .playmap-label.uncharted {
-  font-size: 12px;
+  font-size: 8px;
   font-style: italic;
   font-weight: 700;
   color: #7a4a18;
