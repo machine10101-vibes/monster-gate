@@ -787,3 +787,8 @@ export const armorPieces = (setId) => GEAR.filter((g) => g.type === 'armor' && (
 export const corePieces = (setId) => armorPieces(setId).filter((g) => CORE_SLOTS.includes(g.slot));
 export const weapons = (monster) =>
   GEAR.filter((g) => g.type === 'weapon' && (!monster || g.monster === monster)).sort((a, b) => WEAPON_ORDER.indexOf(a.wtype) - WEAPON_ORDER.indexOf(b.wtype));
+
+/** Provisional resale value, scaled by recipe size and strength requirement. */
+export function gearSalePrice(g) {
+  return Math.max(10, 10 + 3 * Object.values(g.recipe || {}).reduce((a,n)=>a+(Number(n)||0),0) + 2 * (g.reqLevel || 0));
+}
