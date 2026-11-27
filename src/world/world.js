@@ -6,7 +6,7 @@ import {
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
 import { STARTER, TILES, originOf } from './tiles.js';
-import { rasterPlaymap } from './playmap.js';
+import { paintMapDecks, rasterPlaymap } from './playmap.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
@@ -738,6 +738,7 @@ export class World {
     const guildParts = M.buildHouse({ w: 6, d: 6, wh: 28, seed: 1, sign: 'GUILD', bigDoor: true, roof: roofTeal, wall: 0x93603a, pitch: 1.15 });
     this.putAt(guildParts, GUILD.x, GUILD.z, 0, 1);
     this.box(GUILD.x, GUILD.z - 0.1, 3.1, 3.1);
+    this.mapRoofs = [{ x0: GUILD.x - 3, x1: GUILD.x + 3, z0: GUILD.z - 3, z1: GUILD.z + 3, color: '#3f7d79' }];
     this.guildDoor = { x: GUILD.x, z: GUILD.z + 3.3 };
 
     const houses = [
@@ -751,6 +752,7 @@ export class World {
       this.putAt(parts, h.x, h.z, h.rot, 1);
       const sw = h.rot === 0 ? [h.w * 0.5, h.d * 0.5] : [h.d * 0.5, h.w * 0.5];
       this.box(h.x, h.z, sw[0] + 0.1, sw[1] + 0.1);
+      this.mapRoofs.push({ x0: h.x - sw[0], x1: h.x + sw[0], z0: h.z - sw[1], z1: h.z + sw[1], color: '#' + h.roof[0].toString(16).padStart(6, '0') });
     }
 
     const stallA = M.buildStall(1, [0xc8402f, 0xf2ead3], 'apple');
@@ -1521,6 +1523,13 @@ export class World {
       ctx.fillStyle = 'rgba(20,70,30,0.9)';
       ctx.fillRect(Math.floor(t.x - land.x0), Math.floor(t.z - land.z0), 1, 1);
     }
+    paintMapDecks(this.tileCanvas, this.lands, this.mapRoofs || []);
+    const bridge = this.forestBridge;
+    paintMapDecks(this.tileCanvas, this.lands, [
+      bridge && { x0: bridge.x - bridge.halfX, x1: bridge.x + bridge.halfX, z0: bridge.z - bridge.halfZ, z1: bridge.z + bridge.halfZ },
+      this.dock && { x0: this.dock.x0, x1: this.dock.x1, z0: this.dock.z - this.dock.hw, z1: this.dock.z + this.dock.hw },
+      ...(this.docks || []),
+    ]);
     const oak = this.tileCanvas[STARTER.id];
     const octx = oak.getContext('2d');
     const woodInk = { birch: '#7db24a', oak: '#3f9f47', maple: '#c45a28' };
