@@ -29,7 +29,8 @@ test('toast notifications are capped at 1.5 seconds', () => {
 
 test('equipped gear is drawn immediately in the selected hotbar slot', () => {
   const skin = readFileSync(new URL('../src/ui/skin.css', import.meta.url), 'utf8');
-  assert.match(hud, /if \(gear\) b\.appendChild\(renderThumbNow\(/);
+  assert.match(hud, /b\.appendChild\(renderThumbNow\(/);
+  assert.match(hud, /if \(!renderedGear\) \{/);
   assert.match(skin, /:root \.slot\.sel \{[^}]*border-image-source: var\(--rs-socket\)/);
   assert.match(skin, /outline: 2px solid #edc874/);
 });
