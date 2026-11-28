@@ -185,3 +185,10 @@
 - Fix (`src/world/terrain.js`): where the cell along the wall's edge is lower (the wall turns an outer corner there), the wall runs `CORNER_LAP` (0.05) past its end. Straight runs are unchanged; tile-border walls are unchanged.
 - Tests: new `tests/terrain-corners.test.js` on the real Oakhollow tile; it fails without the fix ("east wall laps the corner") and passes with it.
 - Checks: build pass; npm test 568 pass / 0 fail; smoke pass. Renders: the Oakhollow corner before (slit) and after (closed); a wider Seawind terrace view shows no new artifacts; 0 page errors.
+- Release: PR #342 merged (squash) as b154cba after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = b154cba (includes iteration 3, 84c1472). Live.
+
+### 2026-11-28 — Improvement loop, iteration 5: map and area names for the Gilantre Exchange
+- Audit: the world map paints each tile from its terrain, so the Exchange plaza and road already appear there. On the ground, the HUD area name still showed the surrounding Gilantre quarter ("The Arena") on the Exchange square, and the minimap had no landmark for it.
+- Change: `exchangeAreaName()` in `src/world/exchange.js` (plaza, hall and bank); `src/main.js` shows "Gilantre Exchange" with a "Market Square" banner on arrival, the same way the Oasis names itself (overworld only); `src/ui/hud.js` draws a gold coin marker for the Exchange on the minimap.
+- Tests: new case in `tests/exchange.test.js`.
+- Checks: build pass; npm test 569 pass / 0 fail; smoke pass. Browser (guest): Gilantre east gate → "Gilantre"; Exchange plaza → "Gilantre Exchange" with the Market Square banner; back outside → "Gilantre" (The Arena); Oasis unchanged ("Oasis", The Living Water); minimap label reads "Gilantre Exchange"; 0 page errors.

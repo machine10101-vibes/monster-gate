@@ -26,6 +26,11 @@ export const EXCHANGE = {
 const TAU = Math.PI * 2;
 const NORTH = -Math.PI / 2;
 
+/** HUD area name while standing on the Exchange grounds (the plaza, the hall and the bank around them). */
+export function exchangeAreaName(x, z) {
+  return exchangeEdge(Number(x), Number(z)) <= EXCHANGE.blend ? 'Gilantre Exchange' : null;
+}
+
 /* --------------------------------- terrain --------------------------------- */
 
 function segDist(x, z, r) {

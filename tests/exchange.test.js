@@ -5,7 +5,7 @@ import { W, generateTile } from '../src/world/terrain.js';
 import { generateSouthford, openSouthPass } from '../src/world/southford.js';
 import { openSouthfordDesert } from '../src/world/desert.js';
 import { generateRing, openRingPasses, openValeSides } from '../src/world/ring.js';
-import { EXCHANGE, exchangeEdge, exchangeShape } from '../src/world/exchange.js';
+import { EXCHANGE, exchangeEdge, exchangeShape, exchangeAreaName } from '../src/world/exchange.js';
 import { MARKET, TRADEABLE, tradeable, matchItems, listingProblem, feeFor, payoutFor } from '../src/data/market.js';
 import { atExchange, sellable } from '../src/ui/exchange.js';
 import { Progress } from '../src/systems/progress.js';
@@ -130,4 +130,17 @@ test('catalog search, listing rules and the 5% fee', () => {
   assert.equal(listingProblem({ kind: 'good', id: 'copper_ore', qty: 3, price: 10 }), null);
   assert.deepEqual([feeFor(100), payoutFor(100)], [5, 95]);
   assert.equal(feeFor(1) + payoutFor(1), 1);
+});
+
+test('the Exchange names itself in the HUD and marks the minimap', () => {
+  assert.equal(exchangeAreaName(EXCHANGE.x, EXCHANGE.z), 'Gilantre Exchange');
+  assert.equal(exchangeAreaName(EXCHANGE.hall.x, EXCHANGE.hall.z), 'Gilantre Exchange');
+  assert.equal(exchangeAreaName(EXCHANGE.x + EXCHANGE.flat + EXCHANGE.blend - 1, EXCHANGE.z), 'Gilantre Exchange');
+  assert.equal(exchangeAreaName(EXCHANGE.x + 60, EXCHANGE.z), null);
+  assert.equal(exchangeAreaName(432, 144), null, 'Gilantre itself keeps its quarter names');
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(main, /oasisAreaName\(P\.x, P\.z\) \|\| exName/);
+  assert.match(main, /exName \? 'Market Square' : 'The Living Water'/);
+  const hud = readFileSync(new URL('../src/ui/hud.js', import.meta.url), 'utf8');
+  assert.match(hud, /if \(world\.exchange && inView\(world\.exchange\.x, world\.exchange\.z\)\)/);
 });

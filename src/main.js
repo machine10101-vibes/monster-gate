@@ -23,6 +23,7 @@ import { Session } from './net/session.js';
 import { acquireAutoAttackTarget, attachDebug, grantDebugTankLoot, parseCloudShadowFlag, parseMapLabelsFlag, parsePhotoFlag, setDebugAutoAttack, tickDebugAutoAttack, tickDebugTank } from './debug/flags.js';
 import { DEBUG_LOOT_ID, isUnsellableGood, markDebugGranted } from './debug/transient.js';
 import { oasisAreaName } from './world/desert.js';
+import { exchangeAreaName } from './world/exchange.js';
 import { attachSocial } from './social/index.js';
 import { createAmbient } from './entities/ambient.js';
 import { HUD, ITEMS, POTION_SHOP } from './ui/hud.js';
@@ -4411,13 +4412,15 @@ class Game {
     }
 
     const land = this.world.landAt(P.x, P.z);
-    const oasisName = oasisAreaName(P.x, P.z);
+    // Named places inside a land: the Oasis pool, and the Gilantre Exchange market square.
+    const exName = !this.world.realm || this.world.realm === 'over' ? exchangeAreaName(P.x, P.z) : null;
+    const oasisName = oasisAreaName(P.x, P.z) || exName;
     if (oasisName) {
       if (this.zone !== oasisName) {
         const first = this.zone === -1;
         this.zone = oasisName;
         this.hud.setArea(oasisName);
-        if (!first && this.started) this.hud.banner('The Living Water', oasisName, 2600);
+        if (!first && this.started) this.hud.banner(exName ? 'Market Square' : 'The Living Water', oasisName, 2600);
       }
       const shade = land?.shade || 0;
       this.forestAmt += (shade - this.forestAmt) * Math.min(1, dt * 1.5);
