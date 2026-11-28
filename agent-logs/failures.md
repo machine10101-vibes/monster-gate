@@ -142,3 +142,11 @@
 - Root cause: browser process restricted by execution environment. Visual gameplay remains blocked.
 - Regression fixture initially sampled the outer raster frame (brown map border), which deliberately overlays terrain. Moved the probe to an interior terrain pixel; changed-height propagation assertion now passes.
 - Outcome: terrain-to-map regression passes; manual traversal release gate remains blocked.
+
+### 2026-11-28 — Quest reload check under debug mode (iteration 2)
+- Task: verify quest completion survives a reload.
+- Attempt: Playwright with `?debug=1&tp=oakhollow`, complete "board", reload, re-enter as the same guest.
+- Exact error: after reload `{"board":"locked","gold":0}` (expected done, 70 gold).
+- Root cause: debug flags call `freezeSaves(true)` and set `progress.sessionOnly`, so nothing is written in debug sessions (by design). Not a game defect.
+- Retry reason: the check measured the harness, not the game.
+- Outcome: rerun on `/` without debug: board done and gold unchanged after reload. Rule for future checks: persistence and reload checks must run without `?debug=1`.
