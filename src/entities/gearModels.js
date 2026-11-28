@@ -5,6 +5,7 @@ import { BUDGE } from '../data/budge.js';
 import { DARK } from '../data/darksycle.js';
 import { YETI } from '../data/yeti.js';
 import { JUNGLE_MATERIALS } from './materialsJungle.js';
+import { FIRE_SAND_MATERIALS } from './materialsFireSand.js';
 
 const J = (c, x, y, z, s = 0, a = 0.05) => jitter(c, a, hash3(x, y, z, s));
 const SZ = 0.06;
@@ -316,6 +317,7 @@ const BUDGE_MEMBRANE = { membrane: BUDGE.membrane, membraneHi: BUDGE.membraneHi,
 
 const BUILDERS = {
   ...JUNGLE_MATERIALS,
+  ...FIRE_SAND_MATERIALS,
   budgemembrane: (mat) => membraneModel(mat, BUDGE_MEMBRANE),
   yetihide: (mat) => hideModel(mat, YETI_HIDE),
   rimefur: furModel, glacierclaw: yetiClawModel, yetifang: yetiFangModel, frostshard: frostShardModel, frostheart: frostHeartModel,

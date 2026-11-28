@@ -9,7 +9,7 @@ const RAPTOR = { olv: 0x7d8438, olvLo: 0x555c26, tan: 0xbba76a, tanLo: 0x9c8a52,
 const GOLD = { gold: 0xd2a22c, goldHi: 0xffd95a, goldLo: 0x9a7518 };
 const BONE = { bone: 0xe8e0c8, boneLo: 0xbfb496, boneDark: 0x8a8068 };
 
-function pelt(mat, color) {
+export function pelt(mat, color) {
   const M = new VoxelModel(24, 22, 6);
   for (let y = 0; y < 18; y++)
     for (let x = 0; x < 22; x++) {
@@ -46,7 +46,7 @@ function raptorSkin(mat) {
   });
 }
 
-function curvedClaw(mat, P, scale, curl, seed) {
+export function curvedClaw(mat, P, scale, curl, seed) {
   const M = new VoxelModel(28, 26, 8);
   const n = Math.round(26 * scale);
   for (let i = 0; i < n; i++) {
