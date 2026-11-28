@@ -4,6 +4,8 @@ import { TILE, tileUV } from '../engine/materials.js';
 import { STARTER } from './tiles.js';
 
 export const W = 144;
+/** How far a terrace wall runs past an outer corner so neighbouring walls meet (walls sit 0.04 out). */
+export const CORNER_LAP = 0.05;
 export const CENTER = { x: 72, z: 72 };
 export const TOWN = { x: 72, z: 76 };
 export const GUILD = { x: 72, z: 67 };
@@ -518,6 +520,11 @@ export function buildTerrainMeshes(data, material, opt = {}) {
           if (wetTop) continue;
 
           const sideTiles = sideTilesFor(tl, top, width, depth, x, z);
+          const cornerEnd = (cx, cz, hh) => {
+            if (!inTile(cx, cz)) return false;
+            const ch = hAt(cx, cz);
+            return ch != null && ch < hh - 0.001;
+          };
           const dirs = [
             [1, 0],
             [-1, 0],
@@ -555,10 +562,17 @@ export function buildTerrainMeshes(data, material, opt = {}) {
             const rz = -dx;
             const mx = x + 0.5 + dx * (offTile ? (voidEdge ? 1.15 : 0.72) : 0.54);
             const mz = z + 0.5 + dz * (offTile ? (voidEdge ? 1.15 : 0.72) : 0.54);
-            const ax = mx - rx * 0.5;
-            const az = mz - rz * 0.5;
-            const bx = mx + rx * 0.5;
-            const bz = mz + rz * 0.5;
+            // Each wall sits 0.04 outside the cell, so at an outer corner the two walls stopped short of
+            // each other and left a sky-coloured slit down the corner. Where the cell along the edge is
+            // lower (the wall turns a corner there), run this wall a little past its end to close it.
+            const cornerA = !offTile && cornerEnd(x - rx, z - rz, h);
+            const cornerB = !offTile && cornerEnd(x + rx, z + rz, h);
+            const ea = 0.5 + (cornerA ? CORNER_LAP : 0);
+            const eb = 0.5 + (cornerB ? CORNER_LAP : 0);
+            const ax = mx - rx * ea;
+            const az = mz - rz * ea;
+            const bx = mx + rx * eb;
+            const bz = mz + rz * eb;
             let yt = h + (nextWater ? 0.04 : 0.02);
             let seg = 0;
             const shadeSide = dx !== 0 ? 0.86 : 0.93;
