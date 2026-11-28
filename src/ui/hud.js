@@ -675,6 +675,17 @@ export class HUD {
       ctx.fillRect(toX(p.x) - 0.5, toZ(p.z) - 0.5, 1, 1);
       ctx.fillStyle = '#5aa8d4';
     }
+    // The Gilantre Exchange: a gold coin on the market square.
+    if (world.exchange && inView(world.exchange.x, world.exchange.z)) {
+      const ex = toX(world.exchange.x);
+      const ez = toZ(world.exchange.z);
+      ctx.fillStyle = '#6a4a10';
+      ctx.fillRect(ex - 4, ez - 4, 8, 8);
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillRect(ex - 3, ez - 3, 6, 6);
+      ctx.fillStyle = '#fff2b0';
+      ctx.fillRect(ex - 1, ez - 2, 2, 2);
+    }
     if (world.smithy && inView(world.smithy.x, world.smithy.z)) {
       ctx.fillStyle = '#e07030';
       ctx.fillRect(toX(world.smithy.x) - 3, toZ(world.smithy.z) - 2, 6, 5);
