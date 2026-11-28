@@ -236,3 +236,4 @@
 - First render: the lava vein's glow sat inside its stone shell and showed as a black lump; the hearth core's crust hid most of its glow. Both fixed and re-rendered.
 - Tests: new `tests/material-models.test.js` (every material has a model).
 - Checks: build pass; npm test 576 pass / 0 fail; smoke pass; thumbnail sheet rendered with the game's own renderer, 0 page errors.
+- Release: PR #348 merged (squash) as c9f7983 after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = c9f7983 (includes iterations 8, 9 and 10). Live. Improvement loop complete: 10 of 10 iterations.
