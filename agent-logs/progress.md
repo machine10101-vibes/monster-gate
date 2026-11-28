@@ -219,3 +219,12 @@
 - Latest failures reviewed (failures.md, last 10 entries). Recurring theme: checks measured the harness, not the game. The reload check under ?debug=1 (saves frozen by design), a 30 ms sampler missing a swing at 2 fps, and a talk helper reading the wrong quest. Each was caught by questioning a surprising result before acting on it.
 - Proposal for human approval (not applied): add to AGENTS.md "Verification commands": "Run persistence and reload checks without ?debug=1 (debug freezes saves). Treat a surprising browser result as a harness bug until the game state confirms it."
 - Open candidates for a dedicated task: (1) the 949 MB JS heap (CPU copies of mesh attributes; needs collision and raycasting to stop reading mesh positions before they can be released), (2) party-guest kill credit when a host monster vanishes from the snapshot (gameplay decision), (3) a real two-player World 1 trade on the Gilantre Exchange (blocked on the Supabase migration and the Render deploy).
+- Release: PR #346 merged (squash) as 987a24a.
+
+### 2026-11-28 — Improvement loop, iteration 9: a monster frozen on a mountain top
+- Audit: simulated all 73 non-chicken monsters for 60 s at 30 Hz with the hunter far away and recorded how far each moved. No AI errors. Still: the two lair dragons (by design) and one slime at (118, 60).
+- Root cause: that slime's fixed spawn spot is on a peak at height 10; monsters may not step onto ground above 9 (`groundOk`), so it could not leave its spot. The land there was reshaped after the spot list was written.
+- Fix: `Spawner.standable()` / `nearestStandable()`; `populate()` moves any fixed spot a monster cannot walk to the nearest ground it can (playable, dry, out of town and the mine, at most `STAND_MAX_H` 8.5). A world that cannot answer keeps the spot as given (test stubs).
+- First attempt failed `tests/mg-volcanum-spawn.test.js` (its stub world has no `playable`); fixed in code with the guard above, test unchanged (logged in failures.md).
+- Tests: new `tests/spawn-standable.test.js` (2).
+- Checks: build pass; npm test 575 pass / 0 fail; smoke pass. Browser: rerun of the 60 s audit, every roaming monster moves (only the two lair dragons stay put); move, evade and shield work; 0 page errors.
