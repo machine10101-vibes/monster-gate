@@ -5,7 +5,7 @@ import './style.css';
 import './ui/theme.css';
 import './ui/skin.css';
 import * as THREE from 'three';
-import { World } from './world/world.js';
+import { World, DETAIL_RADIUS } from './world/world.js';
 import { Sky } from './world/sky.js';
 import { Snowfall } from './world/snowfall.js';
 import { Ashfall } from './world/ashfall.js';
@@ -4510,6 +4510,7 @@ class Game {
           const budget = this.quality?.id === 'low' ? 10 : this.safeBoot ? 20 : 18;
           this.world.revealAround(px, pz, budget);
         }
+        this.world.updateDetail?.(px, pz, DETAIL_RADIUS[this.quality?.id] || DETAIL_RADIUS.high);
       }
       this.renderer.render(this.scene, this.camera);
       // A successfully rendered title or character screen proves the boot worked.
