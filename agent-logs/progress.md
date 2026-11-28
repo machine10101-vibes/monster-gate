@@ -250,3 +250,11 @@
 - Performance (high quality, swiftshader): first try without chunking raised triangles 3.6× (Oakhollow 13.6 M). With near-only detail: Oakhollow 491 calls / 3.6 M triangles (baseline 492 / 3.8 M), Brookside 370 / 3.2 M, Exchange 563 / 2.7 M; heap 949 → 1,000 MB.
 - Tests: new `tests/tile-detail.test.js` (3).
 - Checks: build pass; npm test 579 pass / 0 fail; smoke pass; all 44 tiles captured through the World Creator path; ground renders in eight biomes; move, evade and shield in a Harefield grove; 60 s monster audit: every roaming monster moves; 0 page errors.
+- Release: PR #349 merged (squash) as 778c3be after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = 778c3be. Live.
+- Not done in this pass: terrain features (ponds, streams, hills) like Oakhollow's. This pass adds vegetation, rocks and set pieces only; terrain changes would mean regenerating tile heights and re-testing every border seam.
+
+### 2026-11-28 — Tile terrain features like Oakhollow's (pass 2: the six temperate meadow tiles)
+- Gap after pass 1: Oakhollow has shaped water and rock (a winding stream, ponds, rocky hills); the meadow tiles had vegetation but at most one pale pond.
+- Changes (`src/world/ring.js`): specs can now author several `ponds`, winding `brooks` (polylines between ponds) and stone `crags`; pond and brook beds go down to -1.6 / -1.2 so water reads deep blue like Oakhollow's (the old single pond and brook use the same profile now); reed banks follow the new water.
+- Authored per tile, kept 13+ cells from every edge and clear of the roads: Harefield (two ponds, a brook, a crag), Northleas (a second pond with a brook from the first, a crag), Goldmead (two ponds joined by a brook, a crag), Brookside (a crag), Eastleas (two ponds and a brook, a crag), Hayfield (two ponds and a brook, a crag).
+- Checks: build pass; npm test 579 pass / 0 fail; World Creator captures of all six tiles reviewed (first pass: water too pale and crags too small; deepened, widened and enlarged, re-captured); road audit: no road cell in water or on a crag, blocked road cells unchanged (76, camp buildings); 60 s monster audit: every roaming monster moves; ground view of a new pond; 0 page errors.
