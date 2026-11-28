@@ -192,3 +192,11 @@
 - Change: `exchangeAreaName()` in `src/world/exchange.js` (plaza, hall and bank); `src/main.js` shows "Gilantre Exchange" with a "Market Square" banner on arrival, the same way the Oasis names itself (overworld only); `src/ui/hud.js` draws a gold coin marker for the Exchange on the minimap.
 - Tests: new case in `tests/exchange.test.js`.
 - Checks: build pass; npm test 569 pass / 0 fail; smoke pass. Browser (guest): Gilantre east gate → "Gilantre"; Exchange plaza → "Gilantre Exchange" with the Market Square banner; back outside → "Gilantre" (The Arena); Oasis unchanged ("Oasis", The Living Water); minimap label reads "Gilantre Exchange"; 0 page errors.
+- Release: PR #343 merged (squash) as 0756ca9 after `verify` and `test-and-build` passed.
+
+### 2026-11-28 — Improvement loop, iteration 6: performance audit and quest integrity guard
+- Performance audit (guest, high quality, swiftshader): draw calls Oakhollow 492, Gilantre 475, Exchange 500, Oasis 184; the new districts are not outliers. Leak check: three laps of Oakhollow → Gilantre → Exchange → Oasis; GPU geometries level off near 930 after the first lap (+9 then +4), the JS heap stays flat at 949 MB. No leak.
+- Finding, not changed: the 949 MB heap is mostly CPU-side copies of mesh attributes (about 4 M triangles in view at Oakhollow on high). Releasing them after upload would need collision and raycasting to stop reading mesh positions; logged as a candidate for a dedicated task, too risky for this loop.
+- Quest audit of all 15 quests (48 steps: 29 talk, 8 visit, 5 kill, 6 hold): every talk NPC exists, every visit place is in the journal's pulse map, every kill and exclude type is a real monster, every held or delivered item exists, every delivery has a "lack" line, and every quest is reachable from the opening quest. No broken quests found.
+- Tests: new `tests/quest-integrity.test.js` (2) so a renamed NPC, place, monster or item cannot silently break a quest.
+- Checks: build pass; npm test 571 pass / 0 fail; smoke pass.
