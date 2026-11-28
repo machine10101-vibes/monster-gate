@@ -302,6 +302,19 @@ function noiseAt(x, z, seed, amp) {
   return (broad - 0.42) * amp + (mid - 0.5) * amp * 0.55 + (fine - 0.5) * 0.7;
 }
 
+function polylineDist(x, z, pts) {
+  let best = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, az] = pts[i];
+    const [bx, bz] = pts[i + 1];
+    const vx = bx - ax;
+    const vz = bz - az;
+    const t = clamp(((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+    best = Math.min(best, Math.hypot(x - (ax + vx * t), z - (az + vz * t)));
+  }
+  return best;
+}
+
 function knollAt(x, z, knolls) {
   let h = 0;
   for (const [cx, cz, r, amp] of knolls) {
@@ -363,6 +376,9 @@ const SPECS = {
     banner: ['Hare Leas', 'Harefield'], shade: 0.05, forest: 0.28, amp: 3.4, base: 3.6, seed: 44,
     rim: { n: true, w: true },
     knolls: [[40, 48, 10, 6], [78, 70, 8, 4.5], [24, 90, 7, -1.4], [110, 40, 6, 3]],
+    ponds: [[30, 66, 10.8, 8.1], [112, 104, 8.1, 6.8]],
+    brooks: [[[22, 24], [18, 38], [28, 50], [30, 66]]],
+    crags: [[118, 26, 13.0, 6.0]],
     roads: [[[100, 143], [90, 100], [70, 70], [72, 0]]],
   },
   northleas: {
@@ -370,6 +386,9 @@ const SPECS = {
     rim: { n: true },
     knolls: [[36, 50, 9, 5], [108, 60, 8, 4], [70, 36, 7, -1.6], [96, 90, 6, 3]],
     pond: [78, 46, 7.5, 5.5],
+    ponds: [[116, 30, 9.5, 6.8]],
+    brooks: [[[78, 46], [92, 40], [104, 34], [116, 30]]],
+    crags: [[26, 112, 14.5, 6.0]],
     roads: [[[72, 143], [72, 90], [64, 55]]],
   },
   goldmead: {
@@ -377,6 +396,9 @@ const SPECS = {
     rim: { n: true },
     knolls: [[40, 36, 9, 5], [70, 90, 8, 4], [28, 100, 7, 3.2]],
     clearing: [96, 58, 16],
+    ponds: [[40, 112, 10.8, 8.1], [102, 112, 9.5, 6.8]],
+    brooks: [[[40, 112], [56, 120], [74, 118], [88, 114], [102, 112]]],
+    crags: [[28, 30, 13.0, 6.0]],
     roads: [[[0, 80], [46, 72], [84, 58], [143, 64]]],
   },
   brookside: {
@@ -386,12 +408,16 @@ const SPECS = {
     camp: [38, 24, 18],
     brook: true,
     pond: [34, 86, 6.5, 5],
+    crags: [[112, 112, 13.0, 6.0]],
     roads: [[[143, 64], [90, 64], [55, 78], [20, 78], [0, 78]]],
   },
   eastleas: {
     banner: ['East Fields', 'Eastleas'], shade: 0, forest: 0.18, amp: 2.6, base: 3.2, seed: 56,
     rim: { e: true },
     knolls: [[80, 40, 8, 4], [110, 80, 7, 3.5], [50, 110, 6, -1.3], [90, 60, 5, 2]],
+    ponds: [[104, 34, 12.2, 9.5], [112, 120, 8.1, 5.4]],
+    brooks: [[[104, 34], [114, 58], [106, 86], [112, 120]]],
+    crags: [[30, 36, 14.5, 6.0]],
     roads: [[[0, 94], [40, 90], [70, 70]]],
   },
   longacre: {
@@ -406,6 +432,9 @@ const SPECS = {
     rim: { e: true, s: true },
     hay: true,
     knolls: [[80, 50, 8, 3], [40, 90, 6, 2], [100, 80, 5, -1]],
+    ponds: [[112, 112, 10.8, 8.1], [114, 36, 8.1, 6.8]],
+    brooks: [[[112, 112], [122, 84], [116, 56], [114, 36]]],
+    crags: [[30, 30, 13.0, 5.4]],
     roads: [[[0, 92], [36, 86], [70, 60]]],
   },
   silverrunWest: {
@@ -652,15 +681,36 @@ function applyFeature(h, x, z, spec) {
     const [cx, cz, rx, rz] = spec.pond;
     const d = Math.hypot((x - cx) / rx, (z - cz) / rz);
     if (d < 1.4 && h < 10) {
-      if (d < 0.72) return { h: 0, kind: WATER };
+      if (d < 0.72) return { h: lerp(-1.6, -0.2, (d / 0.72) ** 2), kind: WATER };
       return { h: lerp(0.3, Math.min(h, 3.4), (d - 0.72) / 0.68), kind: AUTO };
     }
+  }
+  // Authored landscape (as on Oakhollow): extra ponds, winding brooks between them, rocky crags.
+  for (const [cx, cz, rx, rz] of spec.ponds || []) {
+    const d = Math.hypot((x - cx) / rx, (z - cz) / rz);
+    // Deep beds read deep blue under the water plane, as Oakhollow's do.
+    if (d < 1.4 && h < 10) {
+      if (d < 0.72) return { h: lerp(-1.6, -0.2, (d / 0.72) ** 2), kind: WATER };
+      return { h: lerp(0.3, Math.min(h, 3.4), (d - 0.72) / 0.68), kind: AUTO };
+    }
+  }
+  for (const pts of spec.brooks || []) {
+    const d = polylineDist(x, z, pts);
+    if (d < 5.8 && h < 9) {
+      if (d < 2.3) return { h: lerp(-1.2, -0.15, (d / 2.3) ** 2), kind: WATER };
+      return { h: lerp(0.4, Math.min(h, 3.3), (d - 2.3) / 3.5), kind: AUTO };
+    }
+  }
+  for (const [cx, cz, r, amp] of spec.crags || []) {
+    const wob = 1 + Math.sin(Math.atan2(z - cz, x - cx) * 5 + cx) * 0.14 + Math.sin(Math.atan2(z - cz, x - cx) * 3 + cz) * 0.1;
+    const d = Math.hypot(x - cx, z - cz) / (r * wob);
+    if (d < 1) return { h: h + amp * (1 - d * d), kind: d < 0.86 ? STONE : AUTO };
   }
   if (spec.brook && x > 22 && x < 118 && h < 8) {
     const cz = 84 + Math.sin(x * 0.045) * 7;
     const d = Math.abs(z - cz);
     if (d < 5) {
-      if (d < 1.5) return { h: 0, kind: WATER };
+      if (d < 1.5) return { h: lerp(-1.1, -0.15, (d / 1.5) ** 2), kind: WATER };
       return { h: lerp(0.4, Math.min(h, 3.2), (d - 1.5) / 3.5), kind: AUTO };
     }
   }
@@ -1452,7 +1502,7 @@ function dressLand(world, land) {
     world.putAt(parts, x, z, roll * 6, roll > 0.78 ? 0.85 : 1, { cover: roll <= 0.78 });
     if (roll > 0.78) world.occupy(x, z, 0.6);
   }
-  if (spec.pond || spec.brook) {
+  if (spec.pond || spec.brook || spec.ponds?.length || spec.brooks?.length) {
     for (let z = 2; z < W - 2; z += 3) {
       for (let x = 2; x < W - 2; x += 3) {
         if (data.zone[z * W + x] === ZONE.WATER) continue;
