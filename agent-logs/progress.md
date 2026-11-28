@@ -250,3 +250,5 @@
 - Performance (high quality, swiftshader): first try without chunking raised triangles 3.6× (Oakhollow 13.6 M). With near-only detail: Oakhollow 491 calls / 3.6 M triangles (baseline 492 / 3.8 M), Brookside 370 / 3.2 M, Exchange 563 / 2.7 M; heap 949 → 1,000 MB.
 - Tests: new `tests/tile-detail.test.js` (3).
 - Checks: build pass; npm test 579 pass / 0 fail; smoke pass; all 44 tiles captured through the World Creator path; ground renders in eight biomes; move, evade and shield in a Harefield grove; 60 s monster audit: every roaming monster moves; 0 page errors.
+- Release: PR #349 merged (squash) as 778c3be after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = 778c3be. Live.
+- Not done in this pass: terrain features (ponds, streams, hills) like Oakhollow's. This pass adds vegetation, rocks and set pieces only; terrain changes would mean regenerating tile heights and re-testing every border seam.
