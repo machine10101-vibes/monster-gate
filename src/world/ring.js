@@ -1260,6 +1260,7 @@ function dressSilverrun(world, land, spec) {
     else if (roll > 0.91) parts = m.blossoms[n % m.blossoms.length];
     else if (roll > 0.82) parts = m.autumn[n % m.autumn.length];
     const scale = 0.9 + hash2(n, 9, seed + 41) * 0.38;
+    if (world.overLedge(X(lx), Z(lz), 0.45 * scale)) continue;
     world.putAt(parts, X(lx), Z(lz), roll * 6, scale);
     world.circle(X(lx), Z(lz), 0.38);
     world.occupy(X(lx), Z(lz), 1.25);
@@ -1283,7 +1284,9 @@ function dressSilverrun(world, land, spec) {
     else if (roll > 0.34) parts = m.mushRed[n % m.mushRed.length];
     else if (roll > 0.30) parts = m.mushGlow[n % m.mushGlow.length];
     if (!world.free(X(lx), Z(lz), 0.38)) continue;
-    world.putAt(parts, X(lx), Z(lz), roll * 6, 0.82 + hash2(n, 9, seed) * 0.42, { cover: true });
+    const coverScale = 0.82 + hash2(n, 9, seed) * 0.42;
+    if (world.overLedge(X(lx), Z(lz), 0.45 * coverScale)) continue;
+    world.putAt(parts, X(lx), Z(lz), roll * 6, coverScale, { cover: true });
     coverCount++;
   }
 
@@ -1315,7 +1318,9 @@ function dressSilverrun(world, land, spec) {
           if (data.zone[(z + dz) * W + (x + dx)] === ZONE.WATER) wet = true;
         }
         if (!wet || data.pathMask[i] || !world.free(X(x), Z(z), 0.35)) continue;
-        world.putAt(m.reeds[(x + z) % m.reeds.length], X(x), Z(z), 0, 0.95 + hash2(x, z, seed) * 0.35);
+        const reedScale = 0.95 + hash2(x, z, seed) * 0.35;
+        if (world.overLedge(X(x), Z(z), 0.45 * reedScale)) continue;
+        world.putAt(m.reeds[(x + z) % m.reeds.length], X(x), Z(z), 0, reedScale);
         reeds++;
       }
     }
@@ -1327,7 +1332,9 @@ function dressSilverrun(world, land, spec) {
     const i = lz * W + lx;
     if (reserved(lx, lz) || data.H[i] < 1.2 || data.H[i] > 10 || !world.free(X(lx), Z(lz), 0.8)) continue;
     const parts = data.H[i] > 6 ? m.boulders[n % m.boulders.length] : m.rocks[n % m.rocks.length];
-    world.putAt(parts, X(lx), Z(lz), n * 0.7, 0.8 + hash2(n, 4, seed) * 0.45);
+    const rockScale = 0.8 + hash2(n, 4, seed) * 0.45;
+    if (world.overLedge(X(lx), Z(lz), 0.45 * rockScale)) continue;
+    world.putAt(parts, X(lx), Z(lz), n * 0.7, rockScale);
     world.occupy(X(lx), Z(lz), 0.9);
   }
 

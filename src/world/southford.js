@@ -297,6 +297,7 @@ export function dressSouthford(world) {
     if (h < 1.6 || h > 5.8) continue;
     if (onSouthPath(world, x, z)) continue;
     if (!world.free(x, z, 0.6)) continue;
+    if (world.overLedge(x, z, 0.45)) continue;
     const roll = hash2(n, 7, 31);
     const parts = roll > 0.72 ? m.bushes[n % m.bushes.length] : roll > 0.4 ? m.flowers[n % m.flowers.length] : m.tufts[n % m.tufts.length];
     world.putAt(parts, x, z, roll * 6, roll > 0.72 ? 0.85 : 1, { cover: roll <= 0.72 });

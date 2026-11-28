@@ -200,3 +200,11 @@
 - Quest audit of all 15 quests (48 steps: 29 talk, 8 visit, 5 kill, 6 hold): every talk NPC exists, every visit place is in the journal's pulse map, every kill and exclude type is a real monster, every held or delivered item exists, every delivery has a "lack" line, and every quest is reachable from the opening quest. No broken quests found.
 - Tests: new `tests/quest-integrity.test.js` (2) so a renamed NPC, place, monster or item cannot silently break a quest.
 - Checks: build pass; npm test 571 pass / 0 fail; smoke pass.
+- Release: PR #344 merged (squash) after `verify` and `test-and-build` passed.
+
+### 2026-11-28 — Improvement loop, iteration 7: props hanging over terrace edges
+- Audit: logged every putAt placement at world build (dev server only, by intercepting world.js in the harness) and compared it with the final ground. Floating or sunken props (centre height off by more than 0.3): 0 of 15,711. Props whose footprint (0.45 × scale) hung over a step of 0.6 or more, with part of the base in the air: 155 (trees 48, ground cover 40, Silverrun dressing 28, arctic 11, rocks 8, jungle, desert, volcanic and Southford the rest).
+- Fix: `World.overLedge(x, z, r)` and `World.putOnGround()`; trees, rocks, ground cover, biome detail, logs and stumps, and the jungle, arctic, volcanic, desert, Silverrun and Southford placers leave a ledge spot empty. The check runs at the moment of placing, so random sequences (and the rest of the layout) are unchanged; a skipped bush, giant mushroom, stump or tree adds no collider.
+- Result: 155 → 5 hanging props. The 5 left are reeds standing in shallow water at a lake or river edge, by design.
+- Tests: new `tests/prop-ledges.test.js` (2).
+- Checks: build pass; npm test 573 pass / 0 fail; smoke pass; 0 page errors in the audit runs.
