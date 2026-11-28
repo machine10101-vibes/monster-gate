@@ -208,3 +208,14 @@
 - Result: 155 → 5 hanging props. The 5 left are reeds standing in shallow water at a lake or river edge, by design.
 - Tests: new `tests/prop-ledges.test.js` (2).
 - Checks: build pass; npm test 573 pass / 0 fail; smoke pass; 0 page errors in the audit runs.
+- Release: PR #345 merged (squash) as 79fd0e9 after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = 79fd0e9 (includes iterations 5 and 6). Live.
+
+### 2026-11-28 — Improvement loop, iteration 8: invisible barriers and NPC placement audit (no defects)
+- Roads: tested all 26,917 dirt-road cells across every land against the collision world (a 0.4 radius walker). 76 cells (0.3%) push the walker; the clusters are camps and docks built on dirt clearings (Brookside camp huts, Pirate Shore), where the collider belongs to a visible building. No invisible barrier on a road. (Paved town squares, 33,877 cells with cobbles included, were excluded because buildings, stalls and fountains stand on them by design.)
+- NPCs: all 42 people checked: none inside a wall (every NPC is pushed exactly 0.75, which is its own body collider), none in water, none off walkable ground.
+- No code change this iteration.
+
+### 2026-11-28 — Critic review (iterations 1-8)
+- Latest failures reviewed (failures.md, last 10 entries). Recurring theme: checks measured the harness, not the game. The reload check under ?debug=1 (saves frozen by design), a 30 ms sampler missing a swing at 2 fps, and a talk helper reading the wrong quest. Each was caught by questioning a surprising result before acting on it.
+- Proposal for human approval (not applied): add to AGENTS.md "Verification commands": "Run persistence and reload checks without ?debug=1 (debug freezes saves). Treat a surprising browser result as a harness bug until the game state confirms it."
+- Open candidates for a dedicated task: (1) the 949 MB JS heap (CPU copies of mesh attributes; needs collision and raycasting to stop reading mesh positions before they can be released), (2) party-guest kill credit when a host monster vanishes from the snapshot (gameplay decision), (3) a real two-player World 1 trade on the Gilantre Exchange (blocked on the Supabase migration and the Render deploy).
