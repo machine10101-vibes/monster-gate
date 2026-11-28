@@ -156,3 +156,11 @@
 - Root cause: no usable local browser in this workspace; the cloud browser cannot reach the local build.
 - Retry strategy: preserve a review branch and require a working browser gameplay check before the release gate. Do not infer live functionality from unit tests alone.
 - Outcome: manual gameplay verification blocked.
+
+### 2026-11-28 — Cloud browser local build attempt
+- Task: find an alternate gameplay verification route for PR #338.
+- Attempt: serve `dist` on port 4178, then open `http://127.0.0.1:4178/?debug=1` in the cloud browser.
+- Exact error: `net::ERR_CONNECTION_REFUSED` when opening the local URL.
+- Root cause: the cloud browser is remote from the repository's local loopback address; it cannot reach the workspace server.
+- Retry strategy: retain the verified draft branch and checklist; require an accessible browser test environment for the built branch. Do not publish unverified quest progression.
+- Outcome: gameplay gate remains blocked; no merge or production deployment.

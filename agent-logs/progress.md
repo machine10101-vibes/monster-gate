@@ -156,3 +156,4 @@
 - Implementer: narrowed the kill step's eligible types and added the regression test. Verification and release pending.
 - Tester: focused regression 1/1, project tests 560/560, persistence tests 41/41, build and server smoke pass. Gameplay browser did not launch, so movement, combat, evasion and village dialogue were not manually verified on this build. No live account or production data touched.
 - Critic: the quest target set is now explicit and stable. Recommend a browser fixture for the starter quest path and its eligible enemy types, with a documented browser runtime, for human review. The PR remains unmerged while the manual gate is blocked.
+- Continuation checklist: `tasks/continuous-improvement-20261128.md`. Cloud browser also returned `net::ERR_CONNECTION_REFUSED` for the local built site; it runs outside this workspace. PR #338 automated CI `verify` and `test-and-build` both passed on `74198d9`; the browser gate remains open.
