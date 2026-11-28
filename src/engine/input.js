@@ -89,7 +89,7 @@ export class Input {
     this.rotateDelta = this.zoomDelta = 0;
     this.slotSelect = -1;
     this.btnTouch = {};
-    document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
+    if (typeof document !== 'undefined') document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
     this.resetStick();
   }
 
