@@ -177,3 +177,11 @@
 - Gap found: the queue had no behavioural test. Added `tests/mg-save-queue.test.js` (5): outbox written before any network, retry after a 503, acknowledgement clears the outbox only after the guild stores it, one save in flight with only the newest follow-up sent, a 409 stale save is not retried in a loop and hands back the newer hunt, an offline network error keeps the save and sends it when flushed again, 30 s checkpoint and online flush wiring. Isolated test data, scripted endpoint, no live records.
 - Not covered here (needs real Supabase and two devices): concurrent sessions on the live service. The merge rules for two devices are covered by supabase/functions/hunter/huntMerge.test.js.
 - Checks: build pass; npm test 567 pass / 0 fail; test:persistence 41 pass; smoke pass.
+- Release: PR #341 merged (squash) as 84c1472 after `verify` and `test-and-build` passed.
+
+### 2026-11-28 — Improvement loop, iteration 4: sky slits down terrace corners
+- Audit: the "white gaps" on terrace steps noted during the east coast work. Rendered an Oakhollow stone step corner (92, 64): a bright vertical slit ran down the corner where the east- and south-facing walls should meet.
+- Root cause: each terrace wall sits 0.04 outside its cell and is exactly one cell wide, so at an outer corner the two perpendicular walls stopped 0.04 short of each other.
+- Fix (`src/world/terrain.js`): where the cell along the wall's edge is lower (the wall turns an outer corner there), the wall runs `CORNER_LAP` (0.05) past its end. Straight runs are unchanged; tile-border walls are unchanged.
+- Tests: new `tests/terrain-corners.test.js` on the real Oakhollow tile; it fails without the fix ("east wall laps the corner") and passes with it.
+- Checks: build pass; npm test 568 pass / 0 fail; smoke pass. Renders: the Oakhollow corner before (slit) and after (closed); a wider Seawind terrace view shows no new artifacts; 0 page errors.
