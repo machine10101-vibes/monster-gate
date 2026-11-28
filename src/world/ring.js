@@ -9,6 +9,7 @@ import { DESERT_SPECS, desertFeature, paintDesertCell, dressDesert, carveDesert,
 import { buildHouse } from './models.js';
 import { NORTH_JUNGLE_SPECS, northFeature, paintNorthCell, dressNorthJungle, northEmber, northChill } from './northJungle.js';
 import { EAST_COAST_SPECS, coastFeature, paintCoastCell, coastChill, dressFrozenCoast, dressSeawind, OCEAN_FLOOR } from './eastCoast.js';
+import { NORTH_FOREST_SPECS, NORTH_FOREST_KINDS, forestFeature, paintForestCell, forestChill, forestDetailBiome, dressNorthForest } from './northForest.js';
 import { GILANTRE_SPECS, openGilantreWest, carveGilantre, dressGilantre } from './gilantre.js';
 
 /**
@@ -182,7 +183,7 @@ function openHarefieldNorth(data) {
 }
 
 /** A pass through a north rim at column xc, with a path running down to the tile's own road at row toZ. */
-function openNorthPass(data, xc, toZ) {
+function openNorthPass(data, xc, toZ, maxBank = 40) {
   const H = data.H;
   const before = Float32Array.from(H);
   const mark = new Uint8Array(W * W);
@@ -191,7 +192,7 @@ function openNorthPass(data, xc, toZ) {
     const fade = 1 - smoothstep(26, 36, z);
     if (fade <= 0) return null;
     const bank = Math.abs(x - xc);
-    if (bank > 40) return null;
+    if (bank > maxBank) return null;
     const floor = lerp(4.4, 3.6, clamp(z / 24, 0, 1));
     const want = bank <= 5 ? floor : floor + (bank - 5) * 0.8;
     return { h: lerp(h, Math.min(h, want), fade), tag: bank <= 2 && z <= 28 ? PATH : 0 };
@@ -479,6 +480,7 @@ const SPECS = {
   ...DESERT_SPECS,
   ...NORTH_JUNGLE_SPECS,
   ...EAST_COAST_SPECS,
+  ...NORTH_FOREST_SPECS,
 };
 
 const HAY = 6;
@@ -662,6 +664,12 @@ function applyFeature(h, x, z, spec) {
   if (spec.north) return northFeature(h, x, z, spec);
   if (spec.jungle) return jungleFeature(h, x, z, spec);
   if (spec.desert) return desertFeature(h, x, z, spec);
+  if (spec.northForest) return forestFeature(h, x, z, spec, authoredFeature);
+  return authoredFeature(h, x, z, spec);
+}
+
+/** Camps, clearings, ponds, brooks and crags authored on a temperate tile. */
+function authoredFeature(h, x, z, spec) {
   if (spec.camp) {
     const [cx, cz, r] = spec.camp;
     const dx = (x - cx) / (r * 0.78);
@@ -810,6 +818,10 @@ function makeTile(spec, edges) {
       const n = fbm(x * 0.05, z * 0.05, spec.seed + 2, 2);
       const k = kind[i];
       if (k === PATH) mask[i] = 1;
+      if (spec.northForest) {
+        paintForestCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
+        continue;
+      }
       if (spec.eastCoast) {
         paintCoastCell({ zone, top, tint, forest }, H, x, z, k, k === PATH || mask[i] > 0, n, spec);
         continue;
@@ -934,6 +946,13 @@ function specEdges(kind, oak, south, made) {
   if (kind === 'glacierbay') return { w: colOf(made.glimmerfrost, W - 1), e: oceanEdge() };
   if (kind === 'frostshore') return { w: colOf(made.icewind, W - 1), n: rowOf(made.glacierbay, W - 1), e: oceanEdge() };
   if (kind === 'seawind') return { w: colOf(made.gilantreNe, W - 1), n: rowOf(made.frostshore, W - 1), e: oceanEdge() };
+  // The Northern Forest: snowfields to the south, Sunfeather to the west, open sea to the north and east.
+  if (kind === 'darkbough') return { s: rowOf(made.rimefang, 0), w: colOf(made.sunfeather, W - 1) };
+  if (kind === 'mossmere') return { s: rowOf(made.glimmerfrost, 0), w: colOf(made.darkbough, W - 1) };
+  if (kind === 'rimewood') return { s: rowOf(made.glacierbay, 0), w: colOf(made.mossmere, W - 1), e: oceanEdge() };
+  if (kind === 'pinestrand') return { s: rowOf(made.darkbough, 0), n: oceanEdge() };
+  if (kind === 'elmshade') return { s: rowOf(made.mossmere, 0), w: colOf(made.pinestrand, W - 1), n: oceanEdge() };
+  if (kind === 'coldridge') return { s: rowOf(made.rimewood, 0), w: colOf(made.elmshade, W - 1), n: oceanEdge(), e: oceanEdge() };
   if (kind === 'silverrunPeak') return { n: rowOf(made.silverrunEast, W - 1), w: colOf(made.silverrunRiver, W - 1), s: silverrunOceanEdge() };
   return {};
 }
@@ -1063,8 +1082,27 @@ function silverrunEdgeDensity(land, lx, lz) {
   return density;
 }
 
+/**
+ * Cuts a pass into an Arctic tile, then repaints what it changed in the Arctic's own snow and
+ * pale path, rather than the temperate grass that paintChanged gives the banks.
+ */
+function arcticPass(data, kind, cut) {
+  const before = Float32Array.from(data.H);
+  const pathBefore = Uint8Array.from(data.pathMask);
+  cut();
+  const tile = TILES.find((t) => t.kind === kind);
+  const spec = { ...SPECS[kind], kind, ox: (tile.tx - 4) * W, oz: (tile.tz - 5) * W };
+  for (let z = 1; z < W - 1; z++)
+    for (let x = 1; x < W - 1; x++) {
+      const i = z * W + x;
+      const newPath = data.pathMask[i] && !pathBefore[i];
+      if (!newPath && (data.pathMask[i] || Math.abs(data.H[i] - before[i]) < 0.01)) continue;
+      paintArcticCell(data, data.H, x, z, 0, !!newPath, fbm(x * 0.05, z * 0.05, spec.seed + 2, 2), spec);
+    }
+}
+
 export function generateRing(oak, south) {
-  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak', 'fernreach', 'mistvale', 'vinecrest', 'sunfeather', 'glacierbay', 'frostshore', 'seawind'];
+  const order = ['northleas', 'brookside', 'eastleas', 'harefield', 'goldmead', 'longacre', 'hayfield', 'lagoon', 'sunken', 'canopy', 'tigerwood', 'pirateshore', 'shellbeach', 'snowfall', 'icewind', 'rimefang', 'glimmerfrost', 'ashroad', 'warfield', 'dawnspire', 'hellspire', 'cinderfall', 'sunspill', 'glassroad', 'deepwell', 'greenbowl', 'gilantreNw', 'gilantreNe', 'gilantreSw', 'gilantreSe', 'silverrunNorth', 'silverrunWest', 'silverrunEast', 'silverrunRiver', 'silverrunPeak', 'fernreach', 'mistvale', 'vinecrest', 'sunfeather', 'glacierbay', 'frostshore', 'seawind', ...NORTH_FOREST_KINDS];
   const made = {};
   const lands = [];
   for (const kind of order) {
@@ -1081,11 +1119,16 @@ export function generateRing(oak, south) {
     }
     if (kind === 'glacierbay') {
       // Ways out to the east coast: from Glimmerfrost's south road and Icewind Reach's east bend.
-      openEastPass(made.glimmerfrost, 112, 70);
-      openEastPass(made.icewind, 50, 100);
+      arcticPass(made.glimmerfrost, 'glimmerfrost', () => openEastPass(made.glimmerfrost, 112, 70));
+      arcticPass(made.icewind, 'icewind', () => openEastPass(made.icewind, 50, 100));
+    }
+    if (kind === 'mossmere') {
+      // A way north out of Glimmerfrost into the forest, kept clear of its west seam and its camp.
+      arcticPass(made.glimmerfrost, 'glimmerfrost', () => openNorthPass(made.glimmerfrost, 18, 70, 16));
     }
     const spec = { ...(SPECS[kind] || GILANTRE_SPECS[kind]), kind };
     const tile = TILES.find((t) => t.kind === kind);
+    spec.n = tile.n;
     const edges = specEdges(kind, oak, south, made);
     for (const key of Object.keys(edges)) if (!edges[key]) edges[key] = null;
     const origin = { x: (tile.tx - 4) * W, z: (tile.tz - 5) * W };
@@ -1115,7 +1158,10 @@ export function generateRing(oak, south) {
       desert: !!spec.desert,
       silverrun: !!spec.silverrun,
       emberAt: spec.volcanic ? emberAmount(spec) : spec.north ? northEmber(spec) : () => 0,
-      chillAt: spec.eastCoast
+      detailBiome: spec.northForest ? forestDetailBiome(spec, data) : null,
+      chillAt: spec.northForest
+        ? forestChill(spec)
+        : spec.eastCoast
         ? coastChill(spec)
         : spec.north
         ? northChill(spec)
@@ -1406,6 +1452,11 @@ function dressLand(world, land) {
   const m = world.models;
   const spec = SPECS[land.kind];
   const seed = spec.seed;
+  if (spec.northForest) {
+    const tile = TILES.find((t) => t.kind === land.kind);
+    dressNorthForest(world, land, { ...spec, kind: land.kind, ox: land.x0, oz: land.z0, n: tile.n });
+    return;
+  }
   if (spec.silverrun) {
     dressSilverrun(world, land, spec);
     return;

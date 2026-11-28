@@ -158,3 +158,29 @@
 - Root cause: the test's stub world has no terrain methods; the new code assumed them.
 - Retry reason: the code, not the test, was wrong to assume a terrain on every world.
 - Outcome: `standable()` keeps the given spot when the world cannot answer; 575 / 575 pass. Test not modified.
+
+### 2026-11-28 — Northern Forest: stray frost deep in the forest (iteration 1)
+- Task: build tiles 17, 18, 19, 27, 28, 29 as forest; snow blend from the Arctic on the south of 27–29.
+- Attempt: frost band = edge ramp × 0.95 + (fbm − 0.5) × 0.9, painted frost grass above 0.36.
+- Exact error: `tests/north-forest.test.js` "snow creeps up…": `expected: 0, actual: 1` (one frost cell in the middle of a tile).
+- Root cause: the noise term was unbounded away from the band, so a high noise value alone crossed the frost threshold.
+- Retry reason: the paint was wrong, not the test.
+- Outcome: the noise is scaled by the band ramp (min(1, 0.2 + ramp × 2)); 8 / 8 pass.
+
+### 2026-11-28 — Northern Forest: brook column counted as missing beach (iteration 1)
+- Attempt: test that every column of 17–19 runs sea → beach → forest.
+- Exact error: `pinestrand column 30 shore at 80`.
+- Root cause: column 30 is the brook that runs out over the sand to the sea by design; the test skipped it only after the shore assertion.
+- Retry reason: test ordering bug in a test written in this task (not an existing test).
+- Outcome: the brook column is skipped before the shore check; pass.
+
+### 2026-11-28 — Open sea: dashed white line at every coast tile edge (iteration 2)
+- Attempt 1: added open-sea water on unbuilt sea tiles; a dashed white line remained where it met the coast water. Assumed T-junction cracks; rebuilt the open sea as fans with matching rim vertices. Line remained.
+- Root cause: the coast water's shore-foam distance treated every cell past its own tile edge as dry land (`hAt` returned 8 out of range), so foam was drawn along every tile border. Invisible before because beyond the coast there was nothing to see.
+- Retry reason: first hypothesis disproved by a re-render.
+- Outcome: out-of-range cells are read from the neighbouring land, and unbuilt sea counts as deep water; line gone in re-render.
+
+### 2026-11-28 — Harness errors during browser checks (not game defects)
+- Roll check sampled `player.state` 6 × 60 ms and missed one roll at low swiftshader frame rate (stamina 70, enough to roll); rerun: all four spots rolled.
+- `hud.openPanel('map')` called without the game argument threw `reading 'world'`; the signature is `openPanel(name, game)`. Opened the map with the M key instead; 0 page errors.
+- The background Vite server hit its 30 minute limit mid-run; restarted with a longer limit.

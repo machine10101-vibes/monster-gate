@@ -70,8 +70,10 @@ export const NORTH_JUNGLE_SPECS = {
     roads: [
       [[60, 143], [62, 118], [68, 100], [72, 87]],
       [[0, 70], [30, 70], [55, 68]],
+      // East gate: the road out to Darkbough and the Northern Forest.
+      [[97, 66], [120, 66], [143, 66]],
     ],
-    edgeBlend: {},
+    edgeBlend: { e: 'wood' },
     dress: { ...LIGHT, giants: 5, heliconia: 20, orchids: 24 },
   },
 };
@@ -81,6 +83,7 @@ const BLEND = {
   meadow: { tint: [0.66, 0.9, 0.42], keep: 0.35, span: 34 },
   ash: { tint: [0.6, 0.56, 0.38], keep: 0.3, span: 30 },
   frost: { tint: [0.72, 0.88, 0.74], keep: 0.45, span: 30 },
+  wood: { tint: [0.6, 0.9, 0.62], keep: 0.5, span: 32 },
 };
 
 function edgeDist(side, x, z) {
@@ -426,6 +429,7 @@ function dressEdges(world, land, spec) {
       let parts = null;
       if (b === BLEND.meadow) parts = pickM(m.oaks, n);
       else if (b === BLEND.frost) parts = pickM(m.pines, n);
+      else if (b === BLEND.wood) parts = hash2(n, 66, spec.seed) > 0.45 ? pickM(m.pines, n) : pickM(m.oaks, n);
       else if (b === BLEND.ash && V) parts = hash2(n, 64, spec.seed) > 0.5 ? pickM(V.ashTrees, n) : pickM(V.thornBushes, n);
       if (!parts) continue;
       world.putAt(parts, x, z, n * 1.3, 0.85 + hash2(n, 65, spec.seed) * 0.3);

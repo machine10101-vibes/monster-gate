@@ -29,9 +29,9 @@ const BIOMES = {
 };
 
 const CODES = [
-  'PPPPPPPPPP',
-  'PFVVFFFPPP',
-  'PFVVJJFFWP',
+  'PPPPPPSSSS',
+  'PFVVFFFFFS',
+  'PFVVJJFFFS',
   'PRFVJJIIIS',
   'RRMMMFIIIS',
   'MRLMOMAHMS',
@@ -64,6 +64,12 @@ const RING = {
   '8,3': ['glacierbay', 'East of Glimmerfrost. Glacier Bay is a frozen shore of snowfields, ice spires and grey shingle, where floes and small bergs drift on the open sea.'],
   '8,4': ['frostshore', 'East of Icewind Reach. Frostshore runs down to the sea through snowy pine woods; to the south the snow thins and the grass of Seawind Leas comes through.'],
   '8,5': ['seawind', 'East of Gilantre. Seawind Leas is open grass and groves of oak and blossom running down to a long sand beach on the eastern sea.'],
+  '6,1': ['pinestrand', 'North of Darkbough. Pinestrand is pine and oak forest running down through the dunes to a long sand beach on the northern sea, where a brook comes out over the sand.'],
+  '7,1': ['elmshade', 'North of Mossmere. Elmshade is deep shaded woodland with ponds and a dune lagoon behind the beach, and sea stacks standing off the shore.'],
+  '8,1': ['coldridge', 'North of Rimewood. Coldridge is the forested headland where the northern beach turns south down the east coast, with grey crags above the sea.'],
+  '6,2': ['darkbough', 'North of Rimefang Mesa, east of Sunfeather. Darkbough is old dark forest of pine and oak; the jungle comes through from the west and snow creeps up from the south.'],
+  '7,2': ['mossmere', 'North of Glimmerfrost. Mossmere is forest round two still meres and mossy crags; a pass climbs south into the glacier, and the meres freeze over toward the snow.'],
+  '8,2': ['rimewood', 'North of Glacier Bay. Rimewood is snowy pine forest thawing to green, running east to the beach where floes drift up from the bay.'],
   '2,5': ['lagoon', 'West of Brookside. A pass through the western peaks opens onto Mirrormere Oasis, a turquoise lagoon ringed by palms, ferns and flowering jungle.'],
   '1,5': ['canopy', 'West of the oasis. Silverrun Canopy is thick jungle under giant trees, with an overgrown stone temple, carved idols and roaming Bengal Tigers.'],
   '2,6': ['sunken', 'South of the oasis, west of Longacre. Southmead is dense jungle with bamboo groves, pools and tall grass, where Battle Raptors hunt in packs.'],
@@ -88,9 +94,9 @@ const RING = {
 };
 
 const NAMES = [
-  ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Glasscrag', 'Pale Spire', 'Frostspire', 'Last Snow'],
-  ['Greymarch', 'Pinehollow', 'Cinderfall', 'Hellspire', 'Northwood', 'Hartwood', 'Ashgrove', 'Elmshade', 'Coldridge', 'Windcrag'],
-  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Vinecrest', 'Sunfeather', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
+  ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Gull Deep', 'Grey Narrows', 'Boreal Sea', 'Far North'],
+  ['Greymarch', 'Pinehollow', 'Cinderfall', 'Hellspire', 'Northwood', 'Hartwood', 'Pinestrand', 'Elmshade', 'Coldridge', 'Windward Sea'],
+  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Vinecrest', 'Sunfeather', 'Darkbough', 'Mossmere', 'Rimewood', 'Floe Water'],
   ['Riverwatch', 'Silverbend', 'Fernwood', 'Ashen Road', 'Fernreach', 'Mistvale', 'Rimefang Mesa', 'Glimmerfrost', 'Glacier Bay', 'Northern Sea'],
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Frostshore', 'Grey Swell'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Gilantre', 'Gilantre', 'Seawind Leas', 'Eastern Sea'],

@@ -259,3 +259,27 @@
 - Authored per tile, kept 13+ cells from every edge and clear of the roads: Harefield (two ponds, a brook, a crag), Northleas (a second pond with a brook from the first, a crag), Goldmead (two ponds joined by a brook, a crag), Brookside (a crag), Eastleas (two ponds and a brook, a crag), Hayfield (two ponds and a brook, a crag).
 - Checks: build pass; npm test 579 pass / 0 fail; World Creator captures of all six tiles reviewed (first pass: water too pale and crags too small; deepened, widened and enlarged, re-captured); road audit: no road cell in water or on a crag, blocked road cells unchanged (76, camp buildings); 60 s monster audit: every roaming monster moves; ground view of a new pond; 0 page errors.
 - Release: PR #350 merged (squash) as 1f9c8d9 after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = 1f9c8d9. Live.
+
+### 2026-11-28 — The Northern Forest: tiles 17, 18, 19, 27, 28, 29; open ocean on 7, 8, 9
+- Request: build 17, 18, 19, 27, 28 and 29 as forest in tile 55's style; 27–29 blend with the Arctic to the south, 27 blends with Sunfeather to the west; the north of 17–19 is beach running into the open ocean; 7, 8 and 9 are open ocean.
+- New tiles (`src/world/northForest.js`): Darkbough (27), Mossmere (28), Rimewood (29), Pinestrand (17), Elmshade (18), Coldridge (19). Oakhollow-style forest: one grove field shared by the six tiles and the detail pass, so groves run across borders and stand on dark forest grass with light glades between; ponds, two large meres, brooks, mossy crags, frozen ponds in the snow band.
+- Blends: snow and frost grass rise over the last 46–62 cells toward Rimefang Mesa, Glimmerfrost and Glacier Bay, with frost pines and snow-kit detail on snowy ground. Darkbough warms to jungle green with broadleaf, banana and palm toward Sunfeather, and Sunfeather's east edge now fades to temperate green with pines and oaks.
+- Coast: a world-coordinate north shoreline across 17–19 (dunes, sand, wet sand, shingle; dune lagoons; a brook that runs out over the sand; sea stacks), joined at Coldridge by Glacier Bay's east shore, which now runs on up Rimewood and Coldridge (frozen shingle toward the bay). North and east tile edges are the open sea floor.
+- Map: 7, 8, 9, 10, 20 and 30 are sea. 20 and 30 sit off the east shore that Glacier Bay's coast continues into; 10 would otherwise be a lone peak tile in the ocean corner. Server zone names for rows 1–3 synced.
+- Roads: Sunfeather village has an east gate road into Darkbough; a new pass climbs north out of Glimmerfrost into Mossmere; roads join all six tiles and reach the beaches.
+- Fixes found on the way:
+  - Passes cut into Arctic tiles were repainted with temperate grass, leaving a green strip across Glimmerfrost's snow (and Icewind's). Arctic passes are now repainted in snow and the pale Arctic path.
+  - Unbuilt sea tiles drew nothing, so every coast's water ended in a hard edge. They now draw open water.
+  - Coast water drew shore foam along every tile border. Edge cells now read the neighbouring tile.
+- Detail pass (`src/world/enrich.js`): a land can hand cells to another kit (snow → Arctic kit, sand → new "strand" kit of driftwood, shells and beach rocks, Darkbough's west → jungle kit).
+- Tests: new `tests/north-forest.test.js` (8): registry and ocean tiles; exact seams with Sunfeather, Rimefang, Glimmerfrost, Glacier Bay and between all six (plus the Arctic seams beside the new pass); open sea floor on the north and east edges; every beach column runs sea → sand → forest; the east shore continues; snow band south, none in the middle or on 17–19; jungle fade west; all nine road routes paved with steps ≤ 1 and below the climb cap; no mesh cracks.
+- Checks:
+  - Build pass. npm test 587 pass / 0 fail. Server smoke pass.
+  - World Creator captures of 17–19, 26–29 and 37–39 reviewed; 0 page errors.
+  - Props: 839 (Coldridge, a third sea) to 1,918 (Mossmere).
+  - Ground renders of beaches, lagoons, brook mouth, meres, Glimmerfrost pass and the open sea.
+  - Road collider audit: no blocked road cell on the new tiles or at Sunfeather's new gate. The other 76 are identical to main.
+  - Performance (high, swiftshader): new tiles 363–417 draw calls and 2.6–3.4 M triangles; Oakhollow 490 / 3.6 M. Load 91 s, against 92 s on main.
+  - Core loop: walk, attack (slime killed) and roll at Oakhollow, Darkbough, the Pinestrand beach and the Mossmere pass.
+  - Quest and village: talk → visit → talk completes; five kills advance "board"; the report pays once and nothing on repeat; state and gold survive a reload (no debug).
+  - World map shows the new block with ocean north and east.
