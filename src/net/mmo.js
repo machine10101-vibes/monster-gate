@@ -420,9 +420,9 @@ export class MmoClient {
       return;
     }
     this.ws = ws;
+    this.you = null;
     const onOpen = () => {
       if (this.ws !== ws) return;
-      this.startPing();
       const token = this.currentToken();
       this.lastHelloToken = token;
       const payload = {
@@ -437,6 +437,7 @@ export class MmoClient {
     const onClose = (event) => {
       if (this.ws !== ws) return;
       this.stopPing();
+      this.you = null;
       console.info('World socket closed', event?.code, event?.reason || '');
       this.ws = null;
       if (!this.closed && !this.fatal && !this.authHold) this.schedule();
@@ -994,7 +995,7 @@ export class MmoClient {
   }
 
   sendMove(pose) {
-    if (!this.ws || this.ws.readyState !== 1 || !pose) return;
+    if (!this.ws || this.ws.readyState !== 1 || !this.you || !pose) return;
     this.ws.send(encode(TYPES.move, {
       x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw,
       anim: pose.anim, move: pose.move,
