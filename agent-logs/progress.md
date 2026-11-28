@@ -237,3 +237,16 @@
 - Tests: new `tests/material-models.test.js` (every material has a model).
 - Checks: build pass; npm test 576 pass / 0 fail; smoke pass; thumbnail sheet rendered with the game's own renderer, 0 page errors.
 - Release: PR #348 merged (squash) as c9f7983 after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = c9f7983 (includes iterations 8, 9 and 10). Live. Improvement loop complete: 10 of 10 iterations.
+
+### 2026-11-28 — Every tile to Oakhollow's fullness (pass 1: all 43 tiles) and the World Creator view
+- Objective (user request, with a World Map screenshot of tile 55): bring every other built tile's environment up to tile 55's creativity and fullness, keeping each tile's environment type, and make sure each shows properly in the World Creator.
+- Audit: props per tile before: Oakhollow 2,261; the other 43 tiles 82–646 (most 100–400). The World Creator showed nearly every tile as empty sky-blue: its top-down capture did not stream in the tile it photographed, so only the tile the player stood on appeared.
+- Changes:
+  - `src/world/tileview.js`: the World Creator streams in the photographed tile (and its detail) before the capture and restores the hunter's surroundings after.
+  - `src/world/enrich.js` (new): a detail pass run after every land is dressed. Per-biome recipes and kits (meadow, forest, river, lake, town country, arctic, volcanic, desert, jungle, coast): noise-shaped groves with undergrowth, grove edges, flower meadows, lone landmark trees, rock outcrops, fallen timber, and desert nomad camps. Keeps roads plus a verge, water, towns, mines, farms, ploughed fields plus a margin, and every landmark clearing (villages, keeps, the Endless Field, camps, the Oasis, the Exchange, Gilantre, portals, rune gates, fishing spots, NPC posts) clear; respects occupancy and terrace edges; deterministic per tile; scales with graphics quality. The Endless Field (24) stays an open battlefield.
+  - `src/world/world.js` + `src/main.js`: detail props are instanced in 48-unit chunks and drawn only within `DETAIL_RADIUS` of the hunter (high 100, medium 78, low 54).
+- Tuning from renders: blossom and autumn were too common (Oakhollow is mostly deep-green oaks with accents); giant canopies at 1.35–1.85× swallowed the camera; desert cactus at 1.7× looked like bamboo; trees grew on Gilantre's ploughed strips. All fixed and re-rendered.
+- Result: props per tile now 565 (Deepwell, desert) to 2,387 (Silverrun West); temperate tiles 1,500–2,300 like Oakhollow's 2,261.
+- Performance (high quality, swiftshader): first try without chunking raised triangles 3.6× (Oakhollow 13.6 M). With near-only detail: Oakhollow 491 calls / 3.6 M triangles (baseline 492 / 3.8 M), Brookside 370 / 3.2 M, Exchange 563 / 2.7 M; heap 949 → 1,000 MB.
+- Tests: new `tests/tile-detail.test.js` (3).
+- Checks: build pass; npm test 579 pass / 0 fail; smoke pass; all 44 tiles captured through the World Creator path; ground renders in eight biomes; move, evade and shield in a Harefield grove; 60 s monster audit: every roaming monster moves; 0 page errors.

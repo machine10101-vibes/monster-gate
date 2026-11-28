@@ -44,6 +44,14 @@ export function captureTileView(game, tile, outCanvas) {
   const clouds = game.sky?.clouds;
   const cloudVis = clouds?.visible;
   if (clouds) clouds.visible = false;
+  // The World Creator photographs any tile, not just the one the hunter stands on. Bring that
+  // tile's streamed-out land and props in first, then put the hunter's surroundings back.
+  const W = game.world;
+  const streamR = W?.streamRadius;
+  const P = game.player?.pos;
+  const detailAt = W?.detailAt ? { ...W.detailAt } : null;
+  if (tile.built && W?.streamAround) W.streamAround(cx, cz, TILE_SIZE * 0.75, 100000);
+  if (tile.built) W?.updateDetail?.(cx, cz, TILE_SIZE * 0.75, true);
   const over = game.world?.group;
   const overVis = over?.visible;
   const caveG = game.world?.cave?.group;
@@ -113,6 +121,8 @@ export function captureTileView(game, tile, outCanvas) {
       mesh.material.dispose();
     }
     if (clouds) clouds.visible = cloudVis;
+    if (tile.built && W?.streamAround && P && streamR) W.streamAround(P.x, P.z, streamR, 100000);
+    if (tile.built && P && detailAt) W.updateDetail(P.x, P.z, detailAt.r, true);
     if (over) over.visible = overVis;
     if (caveG) caveG.visible = caveVis;
     game.renderer.render(game.scene, cam);

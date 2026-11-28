@@ -11,6 +11,7 @@ import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH }
 import { openSouthfordDesert } from './desert.js';
 import { buildDesertModels } from './desertProps.js';
 import { openRingPasses, openValeSides, generateRing, sampleLands, dressRing } from './ring.js';
+import { enrichWorld } from './enrich.js';
 import { buildCave } from './cave.js';
 import { buildRift } from './rift.js';
 import { buildColosseum, buildColosseumSignUpBoard } from './colosseum.js';
@@ -25,6 +26,10 @@ import { placeWaygate as buildWaygateSite } from './waygate.js';
 import { placeTeleportPortals } from './teleport.js';
 import { placeRuneGate } from './runeGate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
+
+/** Landscape detail chunk size, and how far from the hunter it draws per graphics quality. */
+export const DETAIL_CHUNK = 48;
+export const DETAIL_RADIUS = { low: 54, medium: 78, high: 100 };
 
 /** A prop's base may not overhang a drop this tall (one terrace step is 1). */
 export const LEDGE_DROP = 0.6;
@@ -294,14 +299,17 @@ export class World {
 
   /** Keep one copy of a prop and stamp it with a matrix. A baked copy of every palm is what runs the tablet out of memory at the loading screen. */
   instancePlace(parts, matrix, x, z, opts) {
-    const tile = Math.floor(x / 144) + ',' + Math.floor(z / 144);
+    // Landscape detail is grouped in small chunks so only the ground near the hunter draws it.
+    const cx = Math.floor(x / DETAIL_CHUNK);
+    const cz = Math.floor(z / DETAIL_CHUNK);
+    const tile = opts.detail ? 'd' + cx + ',' + cz : Math.floor(x / 144) + ',' + Math.floor(z / 144);
     for (const p of parts) {
       if (!p?.geo) continue;
       const kind = p.kind === 'solid' && opts.cover ? 'cover' : p.kind;
       const key = tile + '|' + kind + '|' + p.geo.uuid;
       let bucket = this.instances.get(key);
       if (!bucket) {
-        bucket = { geo: p.geo, kind, matrices: [] };
+        bucket = { geo: p.geo, kind, matrices: [], detail: opts.detail ? { x: (cx + 0.5) * DETAIL_CHUNK, z: (cz + 0.5) * DETAIL_CHUNK } : null };
         this.instances.set(key, bucket);
       }
       bucket.matrices.push(matrix.clone());
@@ -450,6 +458,8 @@ export class World {
     dressSouthford(this);
     dressRing(this);
     this.placeRuneGates();
+    // Every tile to Oakhollow's fullness, each in its own biome. Runs last so it only fills free ground.
+    enrichWorld(this);
     this.cave = buildCave(this);
     this.rift = buildRift(this);
     this.colosseum = buildColosseum(this);
@@ -1331,8 +1341,31 @@ export class World {
       mesh.computeBoundingSphere();
       this.group.add(mesh);
       this.chunkMeshes.push(mesh);
+      if (b.detail) {
+        mesh.userData.detail = b.detail;
+        mesh.visible = false;
+        (this.detailMeshes ||= []).push(mesh);
+      }
     }
     this.instances.clear();
+    this.detailAt = null;
+  }
+
+  /**
+   * Show landscape detail only near (x, z). Far ground keeps its terrain and landmark props; the
+   * dense groves, meadows and outcrops of the detail pass appear as the hunter approaches.
+   */
+  updateDetail(x, z, radius = this.detailRadius || DETAIL_RADIUS.high, force = false) {
+    const list = this.detailMeshes;
+    if (!list?.length) return;
+    const at = this.detailAt;
+    if (!force && at && (x - at.x) ** 2 + (z - at.z) ** 2 < 36 && at.r === radius) return;
+    this.detailAt = { x, z, r: radius };
+    const reach = radius + DETAIL_CHUNK * 0.71;
+    for (const m of list) {
+      const d = m.userData.detail;
+      m.visible = (d.x - x) ** 2 + (d.z - z) ** 2 < reach * reach;
+    }
   }
 
   /** Park land that is now out of range, then reveal what is around the hunter. */
