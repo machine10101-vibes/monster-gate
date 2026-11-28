@@ -142,3 +142,25 @@
 - Root cause: browser process restricted by execution environment. Visual gameplay remains blocked.
 - Regression fixture initially sampled the outer raster frame (brown map border), which deliberately overlays terrain. Moved the probe to an interior terrain pixel; changed-height propagation assertion now passes.
 - Outcome: terrain-to-map regression passes; manual traversal release gate remains blocked.
+### 2026-11-28 — Guild board objective, iteration 1
+- Attempt: run the new behavioral test on a fresh hunter.
+- Exact error: `TypeError: Cannot set properties of null (setting 'step')` at `tests/mg-board-quest.test.js:17`.
+- Root cause: a fresh hunter must finish `restless` before `board` unlocks; `journal.row('board')` was null. The fixture skipped the dependency.
+- Retry: seed only the prerequisite as completed in isolated test data, let `Journal.rebind()` start the board, then rerun the test.
+- Outcome: focused test passes after correcting the prerequisite fixture.
+
+### 2026-11-28 — Guild board browser gameplay verification
+- Task: verify the quest objective and core village gameplay in the built game.
+- Attempt: launch the available desktop Chromium application after the full automated suite.
+- Exact result: `sky.launch_app({app:'chromium.desktop'})` returned with `sky.list_windows()` as `[]`; no browser window opened. Previous local Chrome binary attempts failed at process singleton with `socket() failed: Operation not permitted (1)`.
+- Root cause: no usable local browser in this workspace; the cloud browser cannot reach the local build.
+- Retry strategy: preserve a review branch and require a working browser gameplay check before the release gate. Do not infer live functionality from unit tests alone.
+- Outcome: manual gameplay verification blocked.
+
+### 2026-11-28 — Cloud browser local build attempt
+- Task: find an alternate gameplay verification route for PR #338.
+- Attempt: serve `dist` on port 4178, then open `http://127.0.0.1:4178/?debug=1` in the cloud browser.
+- Exact error: `net::ERR_CONNECTION_REFUSED` when opening the local URL.
+- Root cause: the cloud browser is remote from the repository's local loopback address; it cannot reach the workspace server.
+- Retry strategy: retain the verified draft branch and checklist; require an accessible browser test environment for the built branch. Do not publish unverified quest progression.
+- Outcome: gameplay gate remains blocked; no merge or production deployment.
