@@ -136,3 +136,23 @@ test('Tab camera preference persists and shares R action only during gameplay', 
   assert.match(src('src/main.js'), /canTabCamera = \(\) => this\.started/);
   assert.match(src('src/ui/hud.js'), /writeTabCamera\(!game\.input\.tabCamera\)/);
 });
+
+
+test('a mouse button released outside the window does not leave attack or camera drag held', () => {
+  const input = Object.assign(Object.create(Input.prototype), { attackHeld: true, drag: true });
+  // Still holding both buttons: nothing changes.
+  input.syncMouseButtons(1 | 4);
+  assert.equal(input.attackHeld, true);
+  assert.equal(input.drag, true);
+  // Back in the window with the left button up: the attack lets go, the drag stays.
+  input.syncMouseButtons(4);
+  assert.equal(input.attackHeld, false);
+  assert.equal(input.drag, true);
+  // Middle button up too.
+  input.syncMouseButtons(0);
+  assert.equal(input.drag, false);
+  const src2 = src('src/engine/input.js');
+  assert.match(src2, /if \(!this\.touch\) this\.syncMouseButtons\(e\.buttons\)/);
+  assert.match(src2, /addEventListener\('pointercancel', \(e\) => \{\n\s*if \(e\.pointerType === 'mouse'\) this\.syncMouseButtons\(0\)/);
+  assert.match(src2, /window\.addEventListener\('blur', \(\) => this\.releaseControls\(\)\)/);
+});

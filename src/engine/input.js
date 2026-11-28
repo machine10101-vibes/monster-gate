@@ -93,6 +93,17 @@ export class Input {
     this.resetStick();
   }
 
+  /**
+   * Reconciles held mouse actions with the buttons the browser says are down. A button released
+   * outside the window (or over another app) never sends this page a pointerup, so without this
+   * the attack or camera drag would stay held until the next click.
+   */
+  syncMouseButtons(buttons) {
+    const b = Number(buttons) | 0;
+    if (this.attackHeld && !(b & 1)) this.attackHeld = false;
+    if (this.drag && !(b & 4)) this.drag = false;
+  }
+
   bind() {
     const k = this.keys;
     window.addEventListener('keydown', (e) => {
@@ -184,7 +195,9 @@ export class Input {
     });
     window.addEventListener('keyup', (e) => k.delete(e.code), true);
     window.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'mouse' && !e.shiftKey) { k.delete('ShiftLeft'); k.delete('ShiftRight'); }
+      if (e.pointerType !== 'mouse') return;
+      if (!e.shiftKey) { k.delete('ShiftLeft'); k.delete('ShiftRight'); }
+      if (!this.touch) this.syncMouseButtons(e.buttons);
     }, true);
     window.addEventListener('blur', () => this.releaseControls());
     document.addEventListener('visibilitychange', () => {
@@ -223,6 +236,9 @@ export class Input {
       if (e.pointerType !== 'mouse') return;
       if (e.button === 0) this.attackHeld = false;
       if (e.button === 1) this.drag = false;
+    });
+    window.addEventListener('pointercancel', (e) => {
+      if (e.pointerType === 'mouse') this.syncMouseButtons(0);
     });
     const onWheel = (e) => {
       if (!this.enabled) return;
