@@ -398,6 +398,7 @@ export function dressDesert(world, land, spec) {
     if (!parts || blocked(lx, lz, rad)) return false;
     const x = X(lx);
     const z = Z(lz);
+    if (world.overLedge(x, z, 0.45 * scale)) return false;
     world.putAt(parts, x, z, rot, scale);
     if (rad > 0.4) {
       world.circle(x, z, rad * 0.55);
@@ -478,6 +479,7 @@ function dressMine(world, land, D, m) {
       const px = x + dx;
       const pz = z + dz;
       if (!world.free(px, pz, rad * 0.55)) continue;
+      if (world.overLedge(px, pz, 0.45 * scale)) continue;
       world.putAt(parts, px, pz, rot, scale);
       world.circle(px, pz, rad * 0.5);
       world.occupy(px, pz, rad);

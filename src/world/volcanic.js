@@ -278,6 +278,7 @@ export function dressVolcanic(world, land, spec) {
     const x = land.x0 + lx + 0.5;
     const z = land.z0 + lz + 0.5;
     if (!world.free(x, z, o.r ?? 1)) return false;
+    if (world.overLedge(x, z, 0.45 * scale)) return false;
     world.putAt(parts, x, z, rot, scale, o.opts);
     if (o.collide) world.circle(x, z, o.collide);
     if (o.occ) world.occupy(x, z, o.occ);

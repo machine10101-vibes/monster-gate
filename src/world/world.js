@@ -26,6 +26,10 @@ import { placeTeleportPortals } from './teleport.js';
 import { placeRuneGate } from './runeGate.js';
 import { FISH_SPOTS, WOOD_GROVES, buildGatherSites } from './gatherSite.js';
 
+/** A prop's base may not overhang a drop this tall (one terrace step is 1). */
+export const LEDGE_DROP = 0.6;
+const LEDGE_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7071, 0.7071], [-0.7071, 0.7071], [0.7071, -0.7071], [-0.7071, -0.7071]];
+
 const CH = 16;
 export const MAP_PX = 1;
 const GRASS_MAP = [105, 175, 75];
@@ -319,6 +323,20 @@ export class World {
     const k = Math.floor(x / 2) + ',' + Math.floor(z / 2);
     if (!this.occupied.has(k)) this.occupied.set(k, []);
     this.occupied.get(k).push({ x, z, r });
+  }
+
+  /** True when a footprint of radius r around (x, z) hangs over a terrace step (part of its base in the air). */
+  overLedge(x, z, r) {
+    const h = this.heightAt(x, z);
+    for (const [dx, dz] of LEDGE_DIRS) if (h - this.heightAt(x + dx * r, z + dz * r) >= LEDGE_DROP) return true;
+    return false;
+  }
+
+  /** putAt for scattered detail: leaves the spot empty rather than hang the prop over a step. */
+  putOnGround(parts, x, z, rotY = 0, scale = 1, opts = {}) {
+    if (this.overLedge(x, z, 0.45 * scale)) return false;
+    this.putAt(parts, x, z, rotY, scale, opts);
+    return true;
   }
 
   putAt(parts, x, z, rotY = 0, scale = 1, opts = {}) {
@@ -1075,6 +1093,7 @@ export class World {
     };
     const addTree = (parts, x, z, scale, r) => {
       const rot = Math.floor(rng.next() * 4) * (Math.PI / 2);
+      if (this.overLedge(x, z, 0.45 * scale)) return;
       this.putAt(parts, x, z, rot, scale);
       this.occupy(x, z, r * scale);
       this.circle(x, z, r * scale * 0.7);
@@ -1167,11 +1186,11 @@ export class World {
         }
         if (zn === ZONE.TOWN || zn === ZONE.GATE) {
           if (!this.free(x, z, 0.5)) continue;
-          if (rng.next() < 0.06 * dens) this.putAt(pickOf(m.tufts), x, z, rot, 1, cover);
+          if (rng.next() < 0.06 * dens) this.putOnGround(pickOf(m.tufts), x, z, rot, 1, cover);
           continue;
         }
         if (zn === ZONE.MOUNTAIN || h > 8) {
-          if (h < 12 && rng.next() < 0.06 * dens && this.free(x, z, 0.3)) this.putAt(pickOf(m.tuftsForest), x, z, rot, 1, cover);
+          if (h < 12 && rng.next() < 0.06 * dens && this.free(x, z, 0.3)) this.putOnGround(pickOf(m.tuftsForest), x, z, rot, 1, cover);
           if (rng.next() < 0.02) this.rock(x, z, rng, true);
           continue;
         }
@@ -1181,35 +1200,39 @@ export class World {
         }
         const patch = fbm(x * 0.13 + 5, z * 0.13, 55, 3);
         if (fo > 0.45) {
-          if (roll < 0.17 * dens) this.putAt(pickOf(m.tuftsForest), x, z, rot, 1, cover);
-          else if (roll < 0.17 * dens + 0.1 * dens) this.putAt(pickOf(m.ferns), x, z, rot, 1.1, cover);
+          if (roll < 0.17 * dens) this.putOnGround(pickOf(m.tuftsForest), x, z, rot, 1, cover);
+          else if (roll < 0.17 * dens + 0.1 * dens) this.putOnGround(pickOf(m.ferns), x, z, rot, 1.1, cover);
           else if (roll < 0.3 * dens + 0.026) {
             const r2 = rng.next();
             const list = r2 < 0.38 ? m.mushGlow : r2 < 0.65 ? m.mushRed : r2 < 0.82 ? m.mushBrown : m.mushPurple;
-            this.putAt(pickOf(list), x, z, rot, 1.25, cover);
+            this.putOnGround(pickOf(list), x, z, rot, 1.25, cover);
           } else if (roll < 0.3 * dens + 0.03 && z < 58) {
             const s = rng.range(0.8, 1.3);
             if (this.free(x, z, 1.2 * s)) {
-              this.putAt(pickOf(m.bigMush), x, z, rot, s);
-              this.occupy(x, z, 0.8 * s);
-              this.circle(x, z, 0.45 * s);
+              const pick = pickOf(m.bigMush);
+              if (this.putOnGround(pick, x, z, rot, s)) {
+                this.occupy(x, z, 0.8 * s);
+                this.circle(x, z, 0.45 * s);
+              }
             }
           } else if (roll < 0.3 * dens + 0.035) this.rock(x, z, rng, false);
           else if (roll < 0.3 * dens + 0.045 && this.free(x, z, 0.9)) {
-            this.putAt(pickOf(m.bushes), x, z, rot, 1.1);
-            this.occupy(x, z, 0.7);
-            this.circle(x, z, 0.5);
+            if (this.putOnGround(pickOf(m.bushes), x, z, rot, 1.1)) {
+              this.occupy(x, z, 0.7);
+              this.circle(x, z, 0.5);
+            }
           }
         } else {
           const flowerPatch = patch > 0.56;
-          if (flowerPatch && roll < 0.42 * dens) this.putAt(pickOf(m.flowers), x, z, rot, 1, cover);
-          else if (roll < 0.27 * dens) this.putAt(rng.next() < 0.18 ? pickOf(m.tuftsGold) : pickOf(m.tufts), x, z, rot, 1, cover);
+          if (flowerPatch && roll < 0.42 * dens) this.putOnGround(pickOf(m.flowers), x, z, rot, 1, cover);
+          else if (roll < 0.27 * dens) this.putOnGround(rng.next() < 0.18 ? pickOf(m.tuftsGold) : pickOf(m.tufts), x, z, rot, 1, cover);
           else if (roll < 0.27 * dens + 0.012) this.rock(x, z, rng, false);
           else if (roll < 0.27 * dens + 0.02 && this.free(x, z, 0.9)) {
-            this.putAt(pickOf(m.bushes), x, z, rot, 1.05);
-            this.occupy(x, z, 0.7);
-            this.circle(x, z, 0.5);
-          } else if (roll < 0.27 * dens + 0.024) this.putAt(pickOf(m.mushRed), x, z, rot, 1.1, cover);
+            if (this.putOnGround(pickOf(m.bushes), x, z, rot, 1.05)) {
+              this.occupy(x, z, 0.7);
+              this.circle(x, z, 0.5);
+            }
+          } else if (roll < 0.27 * dens + 0.024) this.putOnGround(pickOf(m.mushRed), x, z, rot, 1.1, cover);
         }
       }
     }
@@ -1219,8 +1242,8 @@ export class World {
       const y = this.heightAt(x, z);
       if (!this.playable(x, z) || y < 1 || this.nearPath(x, z, 2) || !this.free(x, z, 1.2)) continue;
       const stump = rng.next() < 0.5;
-      if (stump) this.putAt(this.models.stumps[i % 2], x, z, rng.next() * 6, 1.3);
-      else this.putAt(this.models.logs[i % 2], x, z, rng.next() * 6, 1.3);
+      const rotS = rng.next() * 6;
+      if (!this.putOnGround(stump ? this.models.stumps[i % 2] : this.models.logs[i % 2], x, z, rotS, 1.3)) continue;
       this.occupy(x, z, 1.1);
       this.circle(x, z, 0.6);
     }
@@ -1255,26 +1278,26 @@ export class World {
           const rot = rng.next() * Math.PI * 2;
           if (t === TILE.GRASS || t === TILE.FLOWER_GRASS) {
             const roll = rng.next();
-            if (roll < 0.55) this.putAt(pickOf(m.tufts), x, z, rot, 1, cover);
-            else if (roll < 0.82) this.putAt(pickOf(m.flowers), x, z, rot, 1, cover);
-            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.55, 0.9), cover);
+            if (roll < 0.55) this.putOnGround(pickOf(m.tufts), x, z, rot, 1, cover);
+            else if (roll < 0.82) this.putOnGround(pickOf(m.flowers), x, z, rot, 1, cover);
+            else this.putOnGround(pickOf(m.rocks), x, z, rot, rng.range(0.55, 0.9), cover);
             put++;
           } else if (t === TILE.SAND) {
             const Ds = m.desert;
-            if (rng.next() < 0.35 && Ds?.cactus) this.putAt(pickOf(Ds.cactus), x, z, rot, rng.range(0.7, 1.05));
-            else if (Ds?.scrub && rng.next() < 0.7) this.putAt(pickOf(Ds.scrub), x, z, rot, rng.range(0.7, 1), cover);
-            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.5, 0.85), cover);
+            if (rng.next() < 0.35 && Ds?.cactus) this.putOnGround(pickOf(Ds.cactus), x, z, rot, rng.range(0.7, 1.05));
+            else if (Ds?.scrub && rng.next() < 0.7) this.putOnGround(pickOf(Ds.scrub), x, z, rot, rng.range(0.7, 1), cover);
+            else this.putOnGround(pickOf(m.rocks), x, z, rot, rng.range(0.5, 0.85), cover);
             put++;
           } else if (t === TILE.SNOW || t === TILE.FROST_GRASS || t === TILE.ICE) {
             const A = m.arctic;
-            if (A?.snowMounds && rng.next() < 0.45) this.putAt(pickOf(A.snowMounds), x, z, rot, rng.range(0.55, 0.9), cover);
-            else if (A?.snowRocks) this.putAt(pickOf(A.snowRocks), x, z, rot, rng.range(0.5, 0.85), cover);
-            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.45, 0.75), cover);
+            if (A?.snowMounds && rng.next() < 0.45) this.putOnGround(pickOf(A.snowMounds), x, z, rot, rng.range(0.55, 0.9), cover);
+            else if (A?.snowRocks) this.putOnGround(pickOf(A.snowRocks), x, z, rot, rng.range(0.5, 0.85), cover);
+            else this.putOnGround(pickOf(m.rocks), x, z, rot, rng.range(0.45, 0.75), cover);
             put++;
           } else if (t === TILE.ASH || t === TILE.BASALT || t === TILE.CINDER) {
             const V = m.volcanic;
-            if (V?.rocks && rng.next() < 0.6) this.putAt(pickOf(V.rocks), x, z, rot, rng.range(0.55, 0.9), cover);
-            else this.putAt(pickOf(m.rocks), x, z, rot, rng.range(0.5, 0.8), cover);
+            if (V?.rocks && rng.next() < 0.6) this.putOnGround(pickOf(V.rocks), x, z, rot, rng.range(0.55, 0.9), cover);
+            else this.putOnGround(pickOf(m.rocks), x, z, rot, rng.range(0.5, 0.8), cover);
             put++;
           }
         }
@@ -1287,7 +1310,10 @@ export class World {
     const list = big ? m.boulders : m.rocks;
     const s = big ? rng.range(1.4, 2.4) : rng.range(0.8, 1.4);
     if (!this.free(x, z, 0.9 * s)) return;
-    this.putAt(list[Math.floor(rng.next() * list.length)], x, z, rng.next() * 6.28, s);
+    const pick = list[Math.floor(rng.next() * list.length)];
+    const rot = rng.next() * 6.28;
+    if (this.overLedge(x, z, 0.45 * s)) return;
+    this.putAt(pick, x, z, rot, s);
     this.occupy(x, z, 0.8 * s);
     this.circle(x, z, 0.5 * s);
   }
