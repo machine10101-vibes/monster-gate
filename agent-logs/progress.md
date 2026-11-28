@@ -162,3 +162,11 @@
 - Tests: new regression test in `tests/mg-input.test.js`.
 - Checks: build pass; npm test 560 pass / 0 fail; smoke pass. Browser (guest, Oakhollow): attack held → pointer re-enters with no buttons → released; W held + window blur → keys cleared and the hunter stops (0.00 moved after); D held + page hidden → keys cleared; then move (1.78), attack, evade and shield all work; 0 page errors. Attack compared with and without the change: identical.
 - Investigated and dropped: an apparent "first click ignored". The second swing reports combo index 1, so the first swing registered; the 30 ms sampler missed it at about 2 fps under software rendering.
+- Release: PR #339 merged (squash) as c72ea35 after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = c72ea35. Live.
+
+### 2026-11-28 — Improvement loop, iteration 2: quest reward exactly once and reload
+- Audit (tasks/quest-progression.md), quest "Five for the Board": kills tracked (chickens excluded), the fifth kill advances to the report, reporting to Mira pays 30 gold once; talking again or further kills pay nothing; the completed state survives a reload. Every die() call site was already guarded; die() is now idempotent as well so one kill can never count twice.
+- Noted, not changed (gameplay decision): a party guest gets kill credit when a host-driven monster disappears from the host's snapshot. Usually that means the host killed it, which looks like intended shared credit; if it ever vanishes for another reason the guest would still get credit.
+- Tests: new `tests/mg-quest-reward-once.test.js` (2). No economy changes.
+- Checks: build pass; npm test 562 pass / 0 fail; smoke pass. Browser (guest, normal play without debug so saves are written): restless completed through talk / gate / talk; five real kills counted 1-4 then advanced; report paid the quest gold once (+30 in the debug run; +40 without debug, which includes coins picked up from the kills); talking again +0; after a full page reload the guest returned with "board" done and the same 80 gold; 0 page errors.
+- Failure note: the first reload check ran with ?debug=1, which freezes saves by design (src/debug/flags.js), so it showed a fresh hunter. Rerun without debug passed. Logged in failures.md.

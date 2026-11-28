@@ -365,6 +365,7 @@ export class Monster {
   }
 
   die() {
+    if (this.dead) return;
     const g = this.game;
     this.dead = true;
     this.deadT = 0;
