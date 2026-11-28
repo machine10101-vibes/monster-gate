@@ -4,6 +4,7 @@ import { TILE } from '../engine/materials.js';
 import { TILES, originOf } from './tiles.js';
 import { OASIS } from './desert.js';
 import { EXCHANGE } from './exchange.js';
+import { NORTH_GROVE_SEED } from './northForest.js';
 
 /**
  * Landscape detail pass. Oakhollow (tile 55) is the bar: dense mixed groves, lone big trees in
@@ -29,11 +30,15 @@ export const BIOME_DETAIL = {
   oasis: { grove: 0.42, trees: 0.22, under: 0.34, meadow: 0.18, tufts: 0.14, lone: 0.003, rocks: 0.034, timber: 0.004, camp: 0.0016, size: 1.12, rockSize: 1.6 },
   jungle: { grove: 0.4, trees: 0.2, under: 0.24, meadow: 0.22, tufts: 0.08, lone: 0.006, rocks: 0.006, timber: 0.003 },
   coast: { grove: 0.26, trees: 0.24, under: 0.24, meadow: 0.24, tufts: 0.08, lone: 0.008, rocks: 0.01, timber: 0.004 },
+  // Open beach and shingle inside another biome's tile: no trees, just what the tide leaves.
+  strand: { grove: 0, trees: 0, under: 0.04, meadow: 0.05, tufts: 0.1, lone: 0, rocks: 0.012, timber: 0.01 },
 };
 
 /** Tiles whose purpose needs a different mix: the Endless Field is a battlefield and stays open. */
 export const TILE_DETAIL = {
   24: { grove: 0.05, trees: 0.12, rocks: 0.022 },
+  // The Northern Forest shares one grove field across its six tiles, matched by its ground paint.
+  ...Object.fromEntries([17, 18, 19, 27, 28, 29].map((n) => [n, { groveSeed: NORTH_GROVE_SEED }])),
 };
 
 /** Which models each biome draws from. Missing kits fall back to the temperate set. */
@@ -94,6 +99,16 @@ function kitFor(biome, m) {
         tufts: J.ferns || m.tufts,
         rocks: [...(J.mossRocks || m.rocks), ...(J.mossBoulders || [])],
         timber: m.logs,
+      };
+    case 'strand':
+      return {
+        trees: [],
+        big: [],
+        under: J.beachRocks?.length ? J.beachRocks : m.rocks,
+        meadow: J.shells?.length ? J.shells : m.tufts,
+        tufts: m.tufts,
+        rocks: [...(J.beachRocks || []), ...m.rocks],
+        timber: J.driftwood?.length ? J.driftwood : m.logs,
       };
     case 'coast':
       return {
@@ -172,8 +187,15 @@ function groundAt(world, x, z, clear) {
 
 /** Detail one built tile. Returns how many props it placed. */
 export function enrichTile(world, tile, dens = 1) {
-  const recipe = { ...(BIOME_DETAIL[tile.biome] || BIOME_DETAIL.meadow), ...(TILE_DETAIL[tile.n] || {}) };
-  const kit = kitFor(tile.biome, world.models);
+  const baseRecipe = { ...(BIOME_DETAIL[tile.biome] || BIOME_DETAIL.meadow), ...(TILE_DETAIL[tile.n] || {}) };
+  const baseKit = kitFor(tile.biome, world.models);
+  // A land can hand some cells to another kit (snow in a forest tile takes frost pines, sand takes driftwood).
+  const kits = {};
+  const mixFor = (land, x, z) => {
+    const b = land.detailBiome?.(Math.floor(x) - land.x0, Math.floor(z) - land.z0);
+    if (!b || b === tile.biome) return null;
+    return kits[b] || (kits[b] = { recipe: { ...(BIOME_DETAIL[b] || baseRecipe) }, kit: kitFor(b, world.models) });
+  };
   const pick = (list, k) => (list?.length ? list[Math.floor(k * list.length) % list.length] : null);
   const clear = world.__enrichClear || (world.__enrichClear = clearings(world));
   const o = originOf(tile);
@@ -192,10 +214,10 @@ export function enrichTile(world, tile, dens = 1) {
   };
   // Giant canopies are landmark-sized already: they stand alone, at their own size, never in a grove.
   const tree = (list, x, z, k, big = false) => {
-    const s = ((big ? 0.9 : 0.85) + hash2(x * 7, z * 3, seed + 5) * (big ? 0.25 : 0.45)) * (recipe.size || 1);
+    const s = ((big ? 0.9 : 0.85) + hash2(x * 7, z * 3, seed + 5) * (big ? 0.25 : 0.45)) * (baseRecipe.size || 1);
     if (put(pick(list, k), x, z, Math.floor(hash2(x, z, seed + 6) * 4) * (Math.PI / 2), s, 0.95 * s, 0.32 * s)) world.treeDots?.push({ x, z });
   };
-  const small = (list, x, z, k, scale, cover = true) => put(pick(list, k), x, z, hash2(x, z, seed + 8) * 6.28, scale * (recipe.size ? Math.sqrt(recipe.size) : 1), 0.35, 0, cover ? { cover: true } : undefined);
+  const small = (list, x, z, k, scale, cover = true) => put(pick(list, k), x, z, hash2(x, z, seed + 8) * 6.28, scale * (baseRecipe.size ? Math.sqrt(baseRecipe.size) : 1), 0.35, 0, cover ? { cover: true } : undefined);
 
   for (let gz = 1.5; gz < W - 1.5; gz += step) {
     for (let gx = 1.5; gx < W - 1.5; gx += step) {
@@ -203,11 +225,14 @@ export function enrichTile(world, tile, dens = 1) {
       const z = o.z + gz + (hash2(gx, gz * 2.7, seed + 1) - 0.5) * step;
       const g = groundAt(world, x, z, clear);
       if (!g) continue;
+      const mix = mixFor(g.land, x, z);
+      const recipe = mix ? mix.recipe : baseRecipe;
+      const kit = mix ? mix.kit : baseKit;
       const roll = hash2(x * 1.3, z * 1.7, seed + 2);
       const k = hash2(x * 0.7, z * 0.9, seed + 3);
       if (roll > dens) continue; // lower quality keeps a share of every kind
       const r = roll / Math.max(0.05, dens);
-      const grove = fbm(x * 0.032, z * 0.032, seed + 11, 3);
+      const grove = fbm(x * 0.032, z * 0.032, baseRecipe.groveSeed ?? seed + 11, 3);
       const patch = fbm(x * 0.09 + 7, z * 0.09, seed + 13, 2);
       const forestLine = 0.62 - recipe.grove * 0.3;
       if (grove > forestLine) {

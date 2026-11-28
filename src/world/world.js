@@ -5,7 +5,7 @@ import {
   W, CENTER, TOWN, GUILD, GATE, WATER_Y, WATER_SURFACE, PLAY_RADIUS, FARM, ZONE, SMOOTH_PATHS,
   generateTile, buildTerrainMeshes,
 } from './terrain.js';
-import { STARTER, TILES, originOf } from './tiles.js';
+import { STARTER, TILES, originOf, tileAt } from './tiles.js';
 import { paintMapDecks, rasterPlaymap } from './playmap.js';
 import { openSouthPass, generateSouthford, dressSouthford, SOUTH_Z, CAVE_MOUTH } from './southford.js';
 import { openSouthfordDesert } from './desert.js';
@@ -632,9 +632,21 @@ export class World {
     mat.uniforms.uCloudDark = cloudShadowUniforms.uCloudDark;
     mat.uniforms.uCloudForce = cloudShadowUniforms.uCloudForce;
     const seen = new Set();
+    // Cells past a land's own edge are read from the land next door, so the shore foam does not
+    // draw a line along every tile border. Open sea beyond the built world counts as deep water.
+    const byCell = new Map();
+    for (const l of this.lands || []) if (l.data) byCell.set(Math.floor(l.x0 / W) * 1000 + Math.floor(l.z0 / W), l);
     const hAt = (land, x, z) => {
-      if (x < 0 || z < 0 || x >= W || z >= W) return 8;
-      return land.data.H[z * W + x];
+      if (x >= 0 && z >= 0 && x < W && z < W) return land.data.H[z * W + x];
+      if (!this.lands) return 8;
+      const gx = land.x0 + x;
+      const gz = land.z0 + z;
+      const cx = Math.floor(gx / W);
+      const cz = Math.floor(gz / W);
+      const other = byCell.get(cx * 1000 + cz);
+      if (other) return other.data.H[(gz - other.z0) * W + (gx - other.x0)];
+      const t = tileAt(cx + STARTER.tx, cz + STARTER.tz);
+      return t && !t.built && t.biome === 'sea' ? -2.4 : 8;
     };
     const depthAt = (land, x, z) => Math.max(0, WATER_SURFACE - hAt(land, x, z));
     const cellLand = (land, xx, zz) => hAt(land, xx, zz) >= WATER_SURFACE;
@@ -697,6 +709,47 @@ export class World {
       mesh.renderOrder = 2;
       mesh.frustumCulled = true;
       this.group.add(mesh);
+    }
+    // Open sea on the unbuilt ocean tiles, so the water runs on past the coasts instead of ending at the last tile.
+    if (this.lands) {
+      const pos = [];
+      const depth = [];
+      const shore = [];
+      const idx = [];
+      // Each tile is a fan from its centre to a rim with a vertex at every water step, the same spacing
+      // as the coast water beside it, so the two meet without hairline cracks.
+      const step = this.quality?.id === 'low' ? 2 : 1;
+      const rim = [];
+      for (let k = 0; k < W; k += step) rim.push([k, 0]);
+      for (let k = 0; k < W; k += step) rim.push([W, k]);
+      for (let k = W; k > 0; k -= step) rim.push([k, W]);
+      for (let k = W; k > 0; k -= step) rim.push([0, k]);
+      for (const t of TILES) {
+        if (t.built || t.biome !== 'sea') continue;
+        const o = originOf(t);
+        const centre = pos.length / 3;
+        pos.push(o.x + W / 2, WATER_SURFACE, o.z + W / 2);
+        for (const [rx, rz] of rim) pos.push(o.x + rx, WATER_SURFACE, o.z + rz);
+        for (let k = 0; k <= rim.length; k++) {
+          depth.push(3);
+          shore.push(8);
+        }
+        for (let k = 0; k < rim.length; k++) idx.push(centre, centre + 1 + ((k + 1) % rim.length), centre + 1 + k);
+      }
+      if (pos.length) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('aDepth', new THREE.Float32BufferAttribute(depth, 1));
+        geo.setAttribute('aShore', new THREE.Float32BufferAttribute(shore, 1));
+        geo.setIndex(pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+        geo.computeBoundingSphere();
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.name = 'mg-water';
+        mesh.userData.openSea = true;
+        mesh.renderOrder = 2;
+        this.group.add(mesh);
+        this.openSea = mesh;
+      }
     }
   }
 

@@ -16,9 +16,9 @@ export const STARTER_TZ = 5;
 
 /** Copied from src/world/tiles.js NAMES so zone strings match the map. */
 export const TILE_NAMES = [
-  ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Glasscrag', 'Pale Spire', 'Frostspire', 'Last Snow'],
-  ['Greymarch', 'Pinehollow', 'Cinderfall', 'Hellspire', 'Northwood', 'Hartwood', 'Ashgrove', 'Elmshade', 'Coldridge', 'Windcrag'],
-  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Gatewood', 'Wyrmwood', 'Darkbough', 'Emberwood', 'Cinderhill', 'Ashfall'],
+  ['Frostwall', 'High Ice', 'Snowgate', 'White Pass', 'North Peak', 'Stormhorn', 'Gull Deep', 'Grey Narrows', 'Boreal Sea', 'Far North'],
+  ['Greymarch', 'Pinehollow', 'Cinderfall', 'Hellspire', 'Northwood', 'Hartwood', 'Pinestrand', 'Elmshade', 'Coldridge', 'Windward Sea'],
+  ['Fellwatch', 'Bramblewood', 'Dawnspire', 'The Endless Field', 'Vinecrest', 'Sunfeather', 'Darkbough', 'Mossmere', 'Rimewood', 'Floe Water'],
   ['Riverwatch', 'Silverbend', 'Fernwood', 'Ashen Road', 'Goldglade', 'Meadowrise', 'Rimefang Mesa', 'Glimmerfrost', 'Dusthill', 'Redcrag'],
   ['Westwater', 'Millrace', 'Buttermead', 'Harefield', 'Northleas', 'Goldmead', 'Snowfall', 'Icewind Reach', 'Saltpan', 'Far Leas'],
   ['Westmead', 'Silverrun', 'Mirrormere', 'Brookside', 'Oakhollow', 'Eastleas', 'Old Acre', 'Harrowfen', 'Reedbank', 'Frogmarsh'],

@@ -63,7 +63,7 @@ export function shoreX(spec, z) {
 }
 
 /** Ground profile by distance past the shoreline: lowland, beach, shallows, then the sea floor. */
-function shoreProfile(dd) {
+export function shoreProfile(dd) {
   if (dd < -12) return 2.6;
   if (dd < 0) return lerp(0.6, 2.6, -dd / 12);
   if (dd < 8) return lerp(0.6, -0.7, dd / 8);
