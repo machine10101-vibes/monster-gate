@@ -150,3 +150,15 @@
 - Tests: new `tests/oasis-croc.test.js` (5).
 - Checks: build pass; npm test 556 pass / 0 fail; test:persistence 41 pass; smoke pass. Browser (guest at the Oasis): 10 crocodiles; 90 s simulated unprovoked: 58% waterline, 35% shallows, 7% bank, max 12.6 past the water; provoked: stalk, bite, lunge and tail sweep all fired; after the hunter left it returned to the water. Real damage killed one in 15 hits of 60; drops 4 hide + 1 back plate; hide sold for 40 gold; refill spawner restored the count; move, attack and evade work; 0 page errors. Renders reviewed (side, front bite, top-down tail wave frames, swimming low in the pool).
 - Approval (user, 2026-11-27): publish, but keep crocodile parts at the flat 5 gold. The per-part price change was removed before release; parts sell for 5 like every other part. Rechecked after the revert: build pass, npm test 556 pass / 0 fail, test:persistence 0 fail, smoke pass.
+
+### 2026-11-27 — Release: Oasis Crocodile live
+- PR #336 merged (squash) as fd95104 after `verify` and `test-and-build` passed on 514c6d5 (main merged in first after a progress-log conflict; locally 559 tests pass, persistence 0 fail, smoke pass).
+- Pages run 46028832046: success. gh-pages `version.json` build = fd95104. Live at monstergate.online.
+- Crocodile parts sell for the flat 5 gold, as the user chose.
+
+### 2026-11-28 — Improvement loop, iteration 1: held mouse actions after release outside the window
+- Audit (tasks/combat-reliability.md): blur and hidden-page release already existed and were tested. Gap found: a mouse button released outside the browser window (drag onto another screen, or over another app without a focus change) sends no pointerup, so `attackHeld` (auto-swing) or the middle-button camera drag stayed on until the next click.
+- Fix: `Input.syncMouseButtons(buttons)` reconciles held attack and drag with the browser's live button mask on every mouse move (fires as the pointer comes back in), and a mouse pointercancel releases both. No combat balance changes.
+- Tests: new regression test in `tests/mg-input.test.js`.
+- Checks: build pass; npm test 560 pass / 0 fail; smoke pass. Browser (guest, Oakhollow): attack held → pointer re-enters with no buttons → released; W held + window blur → keys cleared and the hunter stops (0.00 moved after); D held + page hidden → keys cleared; then move (1.78), attack, evade and shield all work; 0 page errors. Attack compared with and without the change: identical.
+- Investigated and dropped: an apparent "first click ignored". The second swing reports combo index 1, so the first swing registered; the 30 ms sampler missed it at about 2 fps under software rendering.
