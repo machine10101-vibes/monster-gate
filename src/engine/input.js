@@ -88,6 +88,8 @@ export class Input {
     this.moveX = this.moveY = 0;
     this.rotateDelta = this.zoomDelta = 0;
     this.slotSelect = -1;
+    this.btnTouch = {};
+    if (typeof document !== 'undefined') document.querySelectorAll('.tbtn.active').forEach(b => b.classList.remove('active'));
     this.resetStick();
   }
 
@@ -180,7 +182,10 @@ export class Input {
           else if (e.code === 'Digit0') this.slotSelect = 9;
       }
     });
-    window.addEventListener('keyup', (e) => k.delete(e.code));
+    window.addEventListener('keyup', (e) => k.delete(e.code), true);
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'mouse' && !e.shiftKey) { k.delete('ShiftLeft'); k.delete('ShiftRight'); }
+    }, true);
     window.addEventListener('blur', () => this.releaseControls());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.releaseControls();
@@ -290,12 +295,25 @@ export class Input {
     };
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
+    const releaseButton = (e) => {
+      for (const [act, id] of Object.entries(this.btnTouch)) {
+        if (id !== e.pointerId) continue;
+        delete this.btnTouch[act];
+        if (act === 'shield') this.shieldBtn = false;
+        if (act === 'attack') this.attackHeld = false;
+        document.querySelectorAll('.tbtn').forEach(b => { if (b.dataset.act === act) b.classList.remove('active'); });
+      }
+    };
+    window.addEventListener('pointerup', releaseButton, true);
+    window.addEventListener('pointercancel', releaseButton, true);
 
     document.querySelectorAll('.tbtn').forEach((b) => {
       const act = b.dataset.act;
       const down = (e) => {
+        if (!this.enabled) return;
         e.preventDefault();
         e.stopPropagation();
+        this.btnTouch[act] = e.pointerId;
         try { b.setPointerCapture?.(e.pointerId); } catch { /* synthetic / DevTools pointers */ }
         b.classList.add('active');
         if (act === 'shield') this.shieldBtn = true;

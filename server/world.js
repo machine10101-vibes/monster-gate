@@ -174,7 +174,7 @@ export class World {
     ws.on('close', () => this.drop(session));
     ws.on('error', () => this.drop(session));
     const helloTimer = setTimeout(() => {
-      if (!session.authed) {
+      if (!session.authed && !session.authenticating) {
         send(ws, errorFrame('protocol', 'Say hello.'));
         ws.close();
       }
@@ -209,7 +209,9 @@ export class World {
     try {
       if (!session.authed) {
         if (msg.type !== TYPES.hello) throw new ProtocolError('protocol', 'Say hello first.');
-        await this.hello(session, msg);
+        if (session.authenticating) return;
+        session.authenticating = true;
+        try { await this.hello(session, msg); } finally { session.authenticating = false; }
         return;
       }
       if (msg.type === TYPES.move) this.move(session, msg);
