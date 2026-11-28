@@ -283,3 +283,4 @@
   - Core loop: walk, attack (slime killed) and roll at Oakhollow, Darkbough, the Pinestrand beach and the Mossmere pass.
   - Quest and village: talk → visit → talk completes; five kills advance "board"; the report pays once and nothing on repeat; state and gold survive a reload (no debug).
   - World map shows the new block with ocean north and east.
+- Release: PR #351 merged (squash) as af8c290 after `verify` and `test-and-build` passed. Pages: gh-pages `version.json` build = af8c290. Live.
