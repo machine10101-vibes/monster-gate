@@ -228,3 +228,11 @@
 - First attempt failed `tests/mg-volcanum-spawn.test.js` (its stub world has no `playable`); fixed in code with the guard above, test unchanged (logged in failures.md).
 - Tests: new `tests/spawn-standable.test.js` (2).
 - Checks: build pass; npm test 575 pass / 0 fail; smoke pass. Browser: rerun of the 60 s audit, every roaming monster moves (only the two lair dragons stay put); move, evade and shield work; 0 page errors.
+- Release: PR #347 merged (squash) after `verify` and `test-and-build` passed.
+
+### 2026-11-28 — Improvement loop, iteration 10: blank thumbnails for eleven monster parts
+- Audit: built the 3D model of every material. 11 of 44 had none, so their catalog, bag, storage and Exchange thumbnails rendered blank: all seven Volcanum parts (cinder scale, lava vein, ash membrane, obsidian talon, spire horn, hearth core, cinder hide) and four desert parts (sand spine, worm plate, scorpion chitin, scorpion sting).
+- Fix: new `src/entities/materialsFireSand.js` with a model for each, in its monster's own colours (keeled scale plates, a lava vein with molten cracks, a membrane pelt, a pale talon, a banded spire horn, a glowing hearth core, a cinder pelt, a bone spine, a ridged worm plate, gold chitin, a hooked sting); `pelt` and `curvedClaw` in `materialsJungle.js` are now exported for reuse.
+- First render: the lava vein's glow sat inside its stone shell and showed as a black lump; the hearth core's crust hid most of its glow. Both fixed and re-rendered.
+- Tests: new `tests/material-models.test.js` (every material has a model).
+- Checks: build pass; npm test 576 pass / 0 fail; smoke pass; thumbnail sheet rendered with the game's own renderer, 0 page errors.
