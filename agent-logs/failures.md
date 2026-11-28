@@ -150,3 +150,11 @@
 - Root cause: debug flags call `freezeSaves(true)` and set `progress.sessionOnly`, so nothing is written in debug sessions (by design). Not a game defect.
 - Retry reason: the check measured the harness, not the game.
 - Outcome: rerun on `/` without debug: board done and gold unchanged after reload. Rule for future checks: persistence and reload checks must run without `?debug=1`.
+
+### 2026-11-28 — Spawn relocation broke a spawner unit test (iteration 9)
+- Task: move unwalkable fixed spawns to walkable ground.
+- Attempt: `Spawner.standable()` calling `world.playable/heightAt/zoneAt` from `populate()`.
+- Exact error: `tests/mg-volcanum-spawn.test.js` "lightweight startup spawns Volcanum…": `w.playable is not a function`.
+- Root cause: the test's stub world has no terrain methods; the new code assumed them.
+- Retry reason: the code, not the test, was wrong to assume a terrain on every world.
+- Outcome: `standable()` keeps the given spot when the world cannot answer; 575 / 575 pass. Test not modified.

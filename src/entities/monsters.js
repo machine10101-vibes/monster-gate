@@ -1921,6 +1921,8 @@ export class Monster {
 }
 
 const JUNGLE_QUOTA = { tiger: 5, raptor: 7, cursedpirate: 6, pirate: 7 };
+/** Monsters cannot step onto ground higher than 9 (see groundOk); spawn a little below that. */
+export const STAND_MAX_H = 8.5;
 const DESERT_QUOTA = { sandworm: 3, scorpion: 6 };
 /** Oasis Crocodiles alive at once, all around the Oasis pool. */
 export const OASIS_CROCS = 10;
@@ -1942,7 +1944,12 @@ export class Spawner {
       ['boar', 52, 44], ['boar', 94, 48], ['slime', 118, 60], ['slime', 44, 70], ['slime', 76, 102],
       ['budgedragon', 120, 74],
     ];
-    for (const [t, x, z] of spots) this.spawn(t, x, z, false);
+    for (const [t, x, z] of spots) {
+      // A fixed spot can end up somewhere a monster cannot walk (the land around it was reshaped);
+      // move it to the nearest ground it can stand and roam on rather than freeze it there.
+      const at = this.standable(x, z) ? { x, z } : this.nearestStandable(x, z) || { x, z };
+      this.spawn(t, at.x, at.z, false);
+    }
     this.fillChickens(99);
     // The iPad dies if the dragon, knights and jungle packs are built in the same breath as the first picture.
     // Keep the heavy spawn deferred, but let fillVolcanum create the lair boss on its next update.
@@ -2008,6 +2015,32 @@ export class Spawner {
       g.fx.ring(x, m.y + 0.1, z, 0xc27bff, 16, 4, 0.1, 0.5);
     }
     return m;
+  }
+
+  /** Ground a roaming monster can stand and move on: playable, dry, out of town and the mine, below the climb cap. */
+  standable(x, z) {
+    const w = this.game.world;
+    // A world that cannot answer (no terrain yet) keeps the spot as given.
+    if (typeof w?.playable !== 'function' || typeof w.heightAt !== 'function') return true;
+    if (!w.playable(x, z)) return false;
+    const h = w.heightAt(x, z);
+    if (h < WATER_Y + 0.15 || h > STAND_MAX_H) return false;
+    const zn = typeof w.zoneAt === 'function' ? w.zoneAt(x, z) : ZONE.FIELD;
+    return zn !== ZONE.TOWN && zn !== ZONE.WATER && zn !== ZONE.LAKE && zn !== ZONE.MINE;
+  }
+
+  /** The closest standable spot within 24 units, searching outward in rings; null if there is none. */
+  nearestStandable(x, z) {
+    for (let r = 1; r <= 24; r += 1) {
+      const n = Math.max(8, Math.round(r * 6));
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * TAU;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (this.standable(px, pz)) return { x: px, z: pz };
+      }
+    }
+    return null;
   }
 
   pickSpot() {
