@@ -80,7 +80,7 @@ export const QUESTS = [
       {
         id: 'slay-five',
         kind: 'kill',
-        exclude: ['chicken'],
+        types: ['slime', 'voidslime', 'boar', 'wraith'],
         count: 5,
         objective: 'Slay 5 gate creatures',
         lines: [
